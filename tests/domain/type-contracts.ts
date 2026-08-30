@@ -24,6 +24,12 @@ import {
 } from "../../src/workspace/index.js";
 import * as workspacePublic from "../../src/workspace/index.js";
 import * as canonicalPathModule from "../../src/workspace/canonical-path.js";
+import {
+  discoverGitRepository,
+  type GitDiscoveryFailure,
+  type GitRepository,
+} from "../../src/git/index.js";
+import * as gitPublic from "../../src/git/index.js";
 
 // 1. raw string is NOT assignable to CanonicalPath
 // @ts-expect-error raw string is not assignable to CanonicalPath
@@ -193,6 +199,44 @@ workspacePublic.brandCanonicalPath;
 // @ts-expect-error brandCanonicalPath must not be exported from canonical-path module
 canonicalPathModule.brandCanonicalPath;
 
+// ---------------------------------------------------------------------------
+// Phase 1D discovery contract evidence
+// ---------------------------------------------------------------------------
+
+type DiscoverReturn = Awaited<ReturnType<typeof discoverGitRepository>>;
+type _DiscoverConsumesBoundary = ExpectTrue<
+  Parameters<typeof discoverGitRepository>[0] extends WorkspaceBoundary
+    ? true
+    : false
+>;
+type _DiscoverSuccessRootIsCanonical = ExpectTrue<
+  Extract<DiscoverReturn, { readonly ok: true }>["value"]["root"] extends CanonicalPath
+    ? true
+    : false
+>;
+type DiscoverFailure = Extract<DiscoverReturn, { readonly ok: false }>;
+type _DiscoverFailureHasNoRepo = ExpectTrue<
+  "value" extends keyof DiscoverFailure ? false : true
+>;
+
+// Raw Git text cannot be assigned directly to GitRepository.root
+// @ts-expect-error raw string is not CanonicalPath / GitRepository.root
+const _rawGitRoot: GitRepository = { root: "/tmp/repo" };
+
+type _GitFailureIsStructured = ExpectTrue<
+  GitDiscoveryFailure["code"] extends
+    | "GIT_NOT_AVAILABLE"
+    | "NOT_A_GIT_REPOSITORY"
+    | "NOT_A_WORKTREE"
+    | "GIT_ROOT_OUTSIDE_WORKSPACE"
+    | "GIT_DISCOVERY_FAILED"
+    ? true
+    : false
+>;
+
+// @ts-expect-error private Git runner must not be on the public git barrel
+gitPublic.runGit;
+
 // Silence unused binding warnings under noUnusedLocals while keeping type probes live.
 void _rawPath;
 void _completionMissingNotValidated;
@@ -206,6 +250,7 @@ void _boundaryKeysOk;
 void _badBareCanonicalize;
 void _validFailureDetails;
 void _invalidFailureDetails;
+void _rawGitRoot;
 type _Keep = [
   _CanonicalizeIsAsyncResult,
   _CanonicalizeNotBare,
@@ -213,6 +258,10 @@ type _Keep = [
   _ResolveSymlinkAbsent,
   _FactoryReturnsResult,
   _FailureHasNoValue,
+  _DiscoverConsumesBoundary,
+  _DiscoverSuccessRootIsCanonical,
+  _DiscoverFailureHasNoRepo,
+  _GitFailureIsStructured,
 ];
 type _ForceKeep = _Keep;
 void 0 as unknown as _ForceKeep;

@@ -4,6 +4,7 @@
  * Phase 1A: runtime compatibility contract.
  * Phase 1B: core domain contracts.
  * Phase 1C: workspace + canonical path foundation.
+ * Phase 1D: Git + workspace discovery.
  * No process side effects occur on import.
  */
 
@@ -70,3 +71,10 @@ export {
 } from "./domain/index.js";
 
 export { createWorkspaceBoundary } from "./workspace/index.js";
+
+export {
+  discoverGitRepository,
+  type GitDiscoveryFailure,
+  type GitDiscoveryFailureCode,
+  type GitRepository,
+} from "./git/index.js";

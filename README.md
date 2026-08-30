@@ -32,8 +32,12 @@ Production implementation must remain consistent with that document.
 
 **Phase 1C — Workspace + Canonical Path Foundation: FROZEN**
 
+**Phase 1C CanonicalPath Encapsulation Hardening: FROZEN**
+
+**Phase 1D — Git + Workspace Discovery: FROZEN**
+
 Next:
 
-**Phase 1D — Git + Workspace Discovery**
+**Phase 1E — PATHCODE.md + Configuration**
 
 Design forward. Implement only the current frozen phase.

@@ -6,6 +6,7 @@ dist/
 
 # Test / coverage
 coverage/
+.path-code-tmp/
 
 # Logs
 *.log
