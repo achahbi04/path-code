@@ -24,11 +24,12 @@ Production implementation must remain consistent with that document.
 
 **Phase 0 — FROZEN**
 
-**Phase 1 — Foundation Kernel**  
 **Phase 1A — Project + TypeScript Foundation: FROZEN**
+
+**Phase 1B — Core Domain Contracts: PASS — awaiting freeze acceptance**
 
 Next:
 
-**Phase 1B — Core Domain Contracts**
+**Phase 1C — Workspace + Canonical Path Foundation**
 
 Design forward. Implement only the current frozen phase.
