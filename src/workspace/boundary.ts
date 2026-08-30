@@ -13,12 +13,17 @@ import type {
   WorkspaceBoundary,
   WorkspacePathFailure,
 } from "../domain/workspace.js";
-import {
-  brandCanonicalPath,
-  physicalRealpath,
-} from "./canonical-path.js";
+import { physicalRealpath } from "./canonical-path.js";
 import { workspacePathFailure } from "./failure.js";
 import { isInsideRoot } from "./path-semantics.js";
+
+/**
+ * Apply CanonicalPath brand only after validated physical canonicalization.
+ * Module-local — must not be exported from any production module.
+ */
+function brandCanonicalPath(physicalPath: string): CanonicalPath {
+  return physicalPath as CanonicalPath;
+}
 
 /**
  * Validate raw path input at the Path Code trust boundary.

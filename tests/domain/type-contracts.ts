@@ -23,6 +23,7 @@ import {
   createWorkspaceBoundary,
 } from "../../src/workspace/index.js";
 import * as workspacePublic from "../../src/workspace/index.js";
+import * as canonicalPathModule from "../../src/workspace/canonical-path.js";
 
 // 1. raw string is NOT assignable to CanonicalPath
 // @ts-expect-error raw string is not assignable to CanonicalPath
@@ -188,6 +189,9 @@ type _FailureHasNoValue = ExpectTrue<
 
 // @ts-expect-error brandCanonicalPath must not be part of the public workspace API
 workspacePublic.brandCanonicalPath;
+
+// @ts-expect-error brandCanonicalPath must not be exported from canonical-path module
+canonicalPathModule.brandCanonicalPath;
 
 // Silence unused binding warnings under noUnusedLocals while keeping type probes live.
 void _rawPath;

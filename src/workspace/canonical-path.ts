@@ -1,23 +1,14 @@
 /**
- * Private CanonicalPath branding and physical resolution helpers.
- * Brand application is NOT part of the public Path Code API.
+ * Physical path resolution helpers for workspace admission.
+ * Does not brand CanonicalPath — branding is private to boundary.ts.
  */
 
 import { realpath } from "node:fs/promises";
 
-import type { CanonicalPath } from "../domain/workspace.js";
 import type { Result } from "../domain/result.js";
 import { failure, success } from "../domain/result.js";
 import type { WorkspacePathFailure } from "../domain/workspace.js";
 import { workspacePathFailure } from "./failure.js";
-
-/**
- * Apply the CanonicalPath brand to a verified physical path.
- * Must remain module-private — never re-export from the public package surface.
- */
-export function brandCanonicalPath(physicalPath: string): CanonicalPath {
-  return physicalPath as CanonicalPath;
-}
 
 type NodeErrnoException = Error & {
   readonly code?: string;
@@ -35,7 +26,7 @@ function isNodeErrnoException(error: unknown): error is NodeErrnoException {
 /**
  * Map host filesystem errors to WorkspacePathFailure without exposing raw Errors.
  */
-export function mapFilesystemError(error: unknown): WorkspacePathFailure {
+function mapFilesystemError(error: unknown): WorkspacePathFailure {
   if (isNodeErrnoException(error)) {
     const code = error.code;
     if (code === "ENOENT" || code === "ENOTDIR") {
