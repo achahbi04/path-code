@@ -3,6 +3,7 @@
  *
  * Phase 1A: runtime compatibility contract.
  * Phase 1B: core domain contracts.
+ * Phase 1C: workspace + canonical path foundation.
  * No process side effects occur on import.
  */
 
@@ -67,3 +68,5 @@ export {
   type WorkspacePathFailure,
   type WorkspacePathFailureCode,
 } from "./domain/index.js";
+
+export { createWorkspaceBoundary } from "./workspace/index.js";

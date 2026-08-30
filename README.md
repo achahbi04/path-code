@@ -26,10 +26,14 @@ Production implementation must remain consistent with that document.
 
 **Phase 1A — Project + TypeScript Foundation: FROZEN**
 
-**Phase 1B — Core Domain Contracts: PASS — awaiting freeze acceptance**
+**Phase 1B — Core Domain Contracts: FROZEN**
+
+**Phase 1B WorkspaceBoundary Amendment: FROZEN**
+
+**Phase 1C — Workspace + Canonical Path Foundation: FROZEN**
 
 Next:
 
-**Phase 1C — Workspace + Canonical Path Foundation**
+**Phase 1D — Git + Workspace Discovery**
 
 Design forward. Implement only the current frozen phase.

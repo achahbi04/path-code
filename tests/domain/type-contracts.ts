@@ -19,6 +19,10 @@ import type {
   WorkspaceBoundary,
   WorkspacePathFailure,
 } from "../../src/domain/workspace.js";
+import {
+  createWorkspaceBoundary,
+} from "../../src/workspace/index.js";
+import * as workspacePublic from "../../src/workspace/index.js";
 
 // 1. raw string is NOT assignable to CanonicalPath
 // @ts-expect-error raw string is not assignable to CanonicalPath
@@ -166,6 +170,25 @@ const _invalidFailureDetails: WorkspacePathFailure = {
   details: { when: new Date() },
 };
 
+// ---------------------------------------------------------------------------
+// Phase 1C factory / brand surface evidence
+// ---------------------------------------------------------------------------
+
+type FactoryReturn = Awaited<ReturnType<typeof createWorkspaceBoundary>>;
+type _FactoryReturnsResult = ExpectTrue<
+  FactoryReturn extends Result<WorkspaceBoundary, WorkspacePathFailure>
+    ? true
+    : false
+>;
+
+type FailureBranch = Extract<FactoryReturn, { readonly ok: false }>;
+type _FailureHasNoValue = ExpectTrue<
+  "value" extends keyof FailureBranch ? false : true
+>;
+
+// @ts-expect-error brandCanonicalPath must not be part of the public workspace API
+workspacePublic.brandCanonicalPath;
+
 // Silence unused binding warnings under noUnusedLocals while keeping type probes live.
 void _rawPath;
 void _completionMissingNotValidated;
@@ -184,6 +207,8 @@ type _Keep = [
   _CanonicalizeNotBare,
   _IsInsideAbsent,
   _ResolveSymlinkAbsent,
+  _FactoryReturnsResult,
+  _FailureHasNoValue,
 ];
 type _ForceKeep = _Keep;
 void 0 as unknown as _ForceKeep;

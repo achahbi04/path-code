@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-describe("domain import side-effect contract", () => {
-  it("imports public domain modules without intentional observable side effects", async () => {
+describe("import side-effect contract", () => {
+  it("imports domain, workspace, and package entry without intentional observable side effects", async () => {
     const envSnapshot = { ...process.env };
     const cwdSnapshot = process.cwd();
     const consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -11,12 +11,20 @@ describe("domain import side-effect contract", () => {
 
     try {
       const domain = await import("../../src/domain/index.js");
+      const workspace = await import("../../src/workspace/index.js");
       const root = await import("../../src/index.js");
 
       expect(typeof domain.success).toBe("function");
       expect(typeof domain.requiresReRead).toBe("function");
+      expect(typeof workspace.createWorkspaceBoundary).toBe("function");
       expect(typeof root.isNodeVersionSupported).toBe("function");
-      expect(typeof root.isJsonValue).toBe("function");
+      expect(typeof root.createWorkspaceBoundary).toBe("function");
+      expect(
+        Object.prototype.hasOwnProperty.call(workspace, "brandCanonicalPath"),
+      ).toBe(false);
+      expect(
+        Object.prototype.hasOwnProperty.call(root, "brandCanonicalPath"),
+      ).toBe(false);
 
       expect(consoleLog).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();
