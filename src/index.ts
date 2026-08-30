@@ -64,4 +64,6 @@ export {
   type ToolResult,
   type ValidationOutcome,
   type WorkspaceBoundary,
+  type WorkspacePathFailure,
+  type WorkspacePathFailureCode,
 } from "./domain/index.js";

@@ -55,7 +55,12 @@ export type {
   ToolResult,
 } from "./tool.js";
 
-export type { CanonicalPath, WorkspaceBoundary } from "./workspace.js";
+export type {
+  CanonicalPath,
+  WorkspaceBoundary,
+  WorkspacePathFailure,
+  WorkspacePathFailureCode,
+} from "./workspace.js";
 
 export type {
   Diagnosis,
