@@ -24,8 +24,11 @@ Production implementation must remain consistent with that document.
 
 **Phase 0 — FROZEN**
 
+**Phase 1 — Foundation Kernel**  
+**Phase 1A — Project + TypeScript Foundation: FROZEN**
+
 Next:
 
-**Phase 1 — Foundation Kernel**
+**Phase 1B — Core Domain Contracts**
 
 Design forward. Implement only the current frozen phase.
