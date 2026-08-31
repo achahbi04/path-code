@@ -53,6 +53,7 @@ describe("config architecture", () => {
     expect(Object.prototype.hasOwnProperty.call(configPublic, "configEntryExists")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(configPublic, "PATHCODE_FILENAME")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(configPublic, "MAX_CONFIG_BYTES")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(configPublic, "configFailure")).toBe(false);
   });
 
   it("does not expose loadProjectConfig with a caller-supplied filename/path parameter", () => {

@@ -4,7 +4,6 @@
 
 export { loadProjectConfig } from "./loader.js";
 export {
-  configFailure,
   type ConfigFailure,
   type ConfigFailureCode,
 } from "./failure.js";

@@ -283,6 +283,9 @@ configPublic.readBoundedConfigFile;
 // @ts-expect-error parser must not be exported from config public API
 configPublic.parseProjectConfigContent;
 
+// @ts-expect-error configFailure factory must not be exported from config public API
+configPublic.configFailure;
+
 // Silence unused binding warnings under noUnusedLocals while keeping type probes live.
 void _rawPath;
 void _completionMissingNotValidated;
