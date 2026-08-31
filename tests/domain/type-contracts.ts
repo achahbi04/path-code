@@ -460,8 +460,8 @@ type _GitBaselineSuccessIsBranded = ExpectTrue<
 // @ts-expect-error GitStateBaseline branding helper must not be public
 gitPublic.brandGitStateBaseline;
 
-// @ts-expect-error private Git state stdin runner must not be on the public git barrel
-gitPublic.runGitStateWithStdin;
+// @ts-expect-error private Git check-ignore runner must not be on the public git barrel
+gitPublic.runGitCheckIgnore;
 
 // ---------------------------------------------------------------------------
 // Phase 2B reader provenance evidence

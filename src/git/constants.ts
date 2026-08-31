@@ -13,3 +13,23 @@ export const GIT_STATE_COMMAND_TIMEOUT_MS = 15_000;
  * exclusion without risking glob reinterpretation.
  */
 export const GIT_PATHSPEC_UNSAFE_CHARS = /[[\]*?]/;
+
+/**
+ * Maximum pathname arguments per check-ignore --stdin -z invocation.
+ *
+ * Conservative batch size for inventories near the Phase 2A observation
+ * ceiling. Callers cannot widen this.
+ */
+export const MAX_CHECK_IGNORE_PATHS_PER_BATCH = 64;
+
+/**
+ * Conservative UTF-8 stdin-byte ceiling for one check-ignore --stdin -z
+ * invocation (NUL-framed pathname payload).
+ *
+ * Path Code safety bound — not an exact OS pipe/argv proof. Callers cannot
+ * widen this.
+ *
+ * Naming note: Git rejects `check-ignore -z` without `--stdin`, so the H1
+ * transport bound applies to the stdin pathname payload rather than argv.
+ */
+export const MAX_CHECK_IGNORE_ARGUMENT_BYTES = 16_384;

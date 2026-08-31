@@ -21,7 +21,7 @@ import {
   gitBaselineFailure,
   type GitBaselineFailure,
 } from "./baseline-failure.js";
-import { parseCheckIgnoreOutput } from "./check-ignore.js";
+import { observeIgnoredPaths } from "./check-ignore.js";
 import { discoverGitRepository } from "./discovery.js";
 import { isGitlinkMode, parseLsFilesStage } from "./ls-files.js";
 import {
@@ -33,7 +33,7 @@ import {
   statusRecordToEntryState,
   type ParsedStatusRecord,
 } from "./porcelain.js";
-import { runGitState, runGitStateWithStdin, stripGitStdoutTerminator } from "./runner.js";
+import { runGitState, stripGitStdoutTerminator } from "./runner.js";
 import type {
   GitBranchState,
   GitEntryAnnotation,
@@ -46,10 +46,8 @@ import type {
 import {
   appendPathspecArgs,
   buildGitVisibilityScope,
-  type GitVisibilityScope,
 } from "./visibility.js";
 
-const CHECK_IGNORE_BATCH_SIZE = 256;
 
 function brandBaseline(data: GitStateBaselineData): GitStateBaseline {
   return data as GitStateBaseline;
@@ -149,38 +147,6 @@ function makeObservation(
   });
 }
 
-async function runCheckIgnoreBatches(
-  gitRoot: string,
-  candidates: readonly string[],
-  scope: GitVisibilityScope,
-): Promise<Result<ReadonlySet<string>, GitBaselineFailure>> {
-  const ignored = new Set<string>();
-  const requested = new Set(candidates);
-
-  for (let offset = 0; offset < candidates.length; offset += CHECK_IGNORE_BATCH_SIZE) {
-    const batch = candidates.slice(offset, offset + CHECK_IGNORE_BATCH_SIZE);
-    const result = await runGitStateWithStdin(
-      {
-        cwd: gitRoot,
-        args: ["check-ignore", "--stdin", "-z"],
-        acceptExitCodes: [0, 1],
-      },
-      batch.map((pathName) => `${pathName}\0`).join(""),
-    );
-    if (!result.ok) {
-      return result;
-    }
-    const parsed = parseCheckIgnoreOutput(result.value.stdout, scope, requested);
-    if (!parsed.ok) {
-      return parsed;
-    }
-    for (const pathName of parsed.value) {
-      ignored.add(pathName);
-    }
-  }
-
-  return success(ignored);
-}
 
 /**
  * Collect Git state baseline for an authorized workspace and inventory.
@@ -429,7 +395,7 @@ export async function collectGitStateBaseline(
 
   let ignoredPaths = new Set<string>();
   if (ignoreCandidates.length > 0) {
-    const ignoreResult = await runCheckIgnoreBatches(
+    const ignoreResult = await observeIgnoredPaths(
       gitRoot,
       ignoreCandidates,
       scope,

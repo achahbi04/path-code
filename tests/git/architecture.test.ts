@@ -41,11 +41,38 @@ describe("git architecture", () => {
     expect(violations).toEqual([]);
   });
 
-  it("uses execFile rather than shell exec", () => {
+  it("uses execFile as the sole child-process primitive", () => {
     const runner = readFileSync(join(gitDir, "runner.ts"), "utf8");
     expect(runner).toContain("execFile");
     expect(runner).toContain("shell: false");
     expect(runner).not.toMatch(/\bexec\(/);
+    expect(runner).not.toMatch(/\bspawn\s*\(/);
+    expect(runner).not.toMatch(/\bfork\s*\(/);
+    expect(runner).not.toContain("runGitStateWithStdin");
+  });
+
+  it("keeps production git source free of spawn, exec, and fork", () => {
+    const violations: string[] = [];
+    for (const filePath of listTsFiles(gitDir)) {
+      const source = readFileSync(filePath, "utf8");
+      if (/\bspawn\s*\(|\{\s*spawn\s*[,}]|\bspawn\s*,/.test(source)) {
+        violations.push(`${filePath}: spawn`);
+      }
+      if (/\bfork\s*\(|\{\s*fork\s*[,}]|\bfork\s*,/.test(source)) {
+        violations.push(`${filePath}: fork`);
+      }
+      if (
+        /import\s*\{[^}]*\bexec\b[^}]*\}\s*from\s*["']node:child_process["']/.test(
+          source,
+        )
+      ) {
+        violations.push(`${filePath}: exec import`);
+      }
+      if (/import\s*\(\s*["']node:child_process["']\s*\)/.test(source)) {
+        violations.push(`${filePath}: dynamic child_process import`);
+      }
+    }
+    expect(violations).toEqual([]);
   });
 
   it("imports src/git without spawning Git or mutating process state", async () => {

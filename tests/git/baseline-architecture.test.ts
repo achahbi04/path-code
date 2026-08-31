@@ -7,6 +7,8 @@ import { describe, expect, it, vi } from "vitest";
 import * as gitPublic from "../../src/git/index.js";
 import {
   GIT_STATE_COMMAND_TIMEOUT_MS,
+  MAX_CHECK_IGNORE_ARGUMENT_BYTES,
+  MAX_CHECK_IGNORE_PATHS_PER_BATCH,
   MAX_GIT_STATE_COMMAND_OUTPUT_BYTES,
 } from "../../src/git/index.js";
 
@@ -103,6 +105,91 @@ describe("git baseline architecture", () => {
   it("exposes the Phase 2C Git state command bounds as fixed constants", () => {
     expect(MAX_GIT_STATE_COMMAND_OUTPUT_BYTES).toBe(16_777_216);
     expect(GIT_STATE_COMMAND_TIMEOUT_MS).toBe(15_000);
+    expect(MAX_CHECK_IGNORE_PATHS_PER_BATCH).toBe(64);
+    expect(MAX_CHECK_IGNORE_ARGUMENT_BYTES).toBe(16_384);
+  });
+
+  it("keeps production git source free of spawn, exec, fork, and stdin runner", () => {
+    const violations: string[] = [];
+    for (const filePath of listTsFiles(gitDir)) {
+      const source = readFileSync(filePath, "utf8");
+      if (/\bspawn\s*\(|\{\s*spawn\s*[,}]|\bspawn\s*,/.test(source)) {
+        violations.push(`${filePath}: spawn`);
+      }
+      if (/\bfork\s*\(|\{\s*fork\s*[,}]|\bfork\s*,/.test(source)) {
+        violations.push(`${filePath}: fork`);
+      }
+      if (
+        /import\s*\{[^}]*\bexec\b[^}]*\}\s*from\s*["']node:child_process["']/.test(
+          source,
+        )
+      ) {
+        violations.push(`${filePath}: exec import`);
+      }
+      if (/runGitStateWithStdin/.test(source)) {
+        violations.push(`${filePath}: runGitStateWithStdin`);
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("compiled dist production modules use execFile only for child_process", () => {
+    const distRoot = join(repoRoot, "dist");
+    const hits: string[] = [];
+
+    function walk(dir: string): void {
+      for (const name of readdirSync(dir)) {
+        if (name.endsWith(".map")) {
+          continue;
+        }
+        const full = join(dir, name);
+        const st = statSync(full);
+        if (st.isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (
+          !name.endsWith(".js") &&
+          !name.endsWith(".cjs") &&
+          !name.endsWith(".mjs")
+        ) {
+          continue;
+        }
+        const source = readFileSync(full, "utf8");
+        if (
+          !source.includes("child_process") &&
+          !source.includes("node:child_process")
+        ) {
+          continue;
+        }
+        const primitives: string[] = [];
+        if (/\bexecFile\b/.test(source)) {
+          primitives.push("execFile");
+        }
+        if (/\bspawn\s*\(/.test(source)) {
+          primitives.push("spawn");
+        }
+        if (/\bfork\s*\(/.test(source)) {
+          primitives.push("fork");
+        }
+        if (
+          /import\s*\{[^}]*\bexec\b[^}]*\}\s*from\s*["'](?:node:)?child_process["']/.test(
+            source,
+          ) ||
+          /(?:^|[^\w.])exec\s*\(/.test(source.replace(/execFile/g, "EXEC_FILE"))
+        ) {
+          primitives.push("exec");
+        }
+        hits.push(`${full}: ${primitives.join(",") || "other"}`);
+        expect(primitives.includes("spawn"), full).toBe(false);
+        expect(primitives.includes("exec"), full).toBe(false);
+        expect(primitives.includes("fork"), full).toBe(false);
+        expect(primitives.includes("execFile"), full).toBe(true);
+      }
+    }
+
+    walk(distRoot);
+    expect(hits.length).toBeGreaterThan(0);
   });
 
   it("does not export runGit from the compiled dist git barrel", async () => {

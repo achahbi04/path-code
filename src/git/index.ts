@@ -20,6 +20,8 @@ export type {
 } from "./baseline-failure.js";
 export {
   GIT_STATE_COMMAND_TIMEOUT_MS,
+  MAX_CHECK_IGNORE_ARGUMENT_BYTES,
+  MAX_CHECK_IGNORE_PATHS_PER_BATCH,
   MAX_GIT_STATE_COMMAND_OUTPUT_BYTES,
 } from "./constants.js";
 export type {
