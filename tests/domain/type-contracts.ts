@@ -30,6 +30,13 @@ import {
   type GitRepository,
 } from "../../src/git/index.js";
 import * as gitPublic from "../../src/git/index.js";
+import {
+  loadProjectConfig,
+  type ProjectConfig,
+  type ProjectRestrictions,
+  type RepositoryGuidance,
+} from "../../src/config/index.js";
+import * as configPublic from "../../src/config/index.js";
 
 // 1. raw string is NOT assignable to CanonicalPath
 // @ts-expect-error raw string is not assignable to CanonicalPath
@@ -237,6 +244,45 @@ type _GitFailureIsStructured = ExpectTrue<
 // @ts-expect-error private Git runner must not be on the public git barrel
 gitPublic.runGit;
 
+// ---------------------------------------------------------------------------
+// Phase 1E configuration contract evidence
+// ---------------------------------------------------------------------------
+
+type LoadReturn = Awaited<ReturnType<typeof loadProjectConfig>>;
+type _LoadConsumesBoundary = ExpectTrue<
+  Parameters<typeof loadProjectConfig>[0] extends WorkspaceBoundary ? true : false
+>;
+type LoadFailure = Extract<LoadReturn, { readonly ok: false }>;
+type _LoadFailureHasNoConfig = ExpectTrue<
+  "value" extends keyof LoadFailure ? false : true
+>;
+
+type RestrictionsKeys = keyof ProjectRestrictions;
+type _NoAllowPathField = ExpectTrue<
+  "allowPaths" extends RestrictionsKeys ? false : true
+>;
+type _NoGrantActionField = ExpectTrue<
+  "grantActions" extends RestrictionsKeys ? false : true
+>;
+type _NoWorkspaceRootField = ExpectTrue<
+  "workspaceRoot" extends RestrictionsKeys ? false : true
+>;
+
+type GuidanceTrust = RepositoryGuidance["trust"];
+type _GuidanceTrustIsExplicit = ExpectTrue<
+  GuidanceTrust extends "UNTRUSTED_REPOSITORY" ? true : false
+>;
+
+type AbsentConfig = Extract<ProjectConfig, { source: { kind: "ABSENT" } }>;
+type _AbsentHasNoGuidance = ExpectTrue<
+  "guidance" extends keyof AbsentConfig ? false : true
+>;
+// @ts-expect-error bounded reader must not be exported from config public API
+configPublic.readBoundedConfigFile;
+
+// @ts-expect-error parser must not be exported from config public API
+configPublic.parseProjectConfigContent;
+
 // Silence unused binding warnings under noUnusedLocals while keeping type probes live.
 void _rawPath;
 void _completionMissingNotValidated;
@@ -262,6 +308,13 @@ type _Keep = [
   _DiscoverSuccessRootIsCanonical,
   _DiscoverFailureHasNoRepo,
   _GitFailureIsStructured,
+  _LoadConsumesBoundary,
+  _LoadFailureHasNoConfig,
+  _NoAllowPathField,
+  _NoGrantActionField,
+  _NoWorkspaceRootField,
+  _GuidanceTrustIsExplicit,
+  _AbsentHasNoGuidance,
 ];
 type _ForceKeep = _Keep;
 void 0 as unknown as _ForceKeep;

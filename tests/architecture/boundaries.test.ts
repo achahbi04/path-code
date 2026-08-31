@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 const workspaceDir = fileURLToPath(new URL("../../src/workspace", import.meta.url));
 const domainDir = fileURLToPath(new URL("../../src/domain", import.meta.url));
 const gitDir = fileURLToPath(new URL("../../src/git", import.meta.url));
+const configDir = fileURLToPath(new URL("../../src/config", import.meta.url));
 
 const DOMAIN_FORBIDDEN = [
   /from\s+["'](?:\.\.\/)+core\//,
@@ -37,6 +38,17 @@ const GIT_FORBIDDEN = [
   /from\s+["']node:net["']/,
   /from\s+["']node:http["']/,
   /from\s+["']node:https["']/,
+];
+
+const CONFIG_FORBIDDEN = [
+  /from\s+["'].*workspace\/canonical-path/,
+  /brandCanonicalPath/,
+  /from\s+["'](?:\.\.\/)+git\//,
+  /from\s+["']node:child_process["']/,
+  /from\s+["']node:net["']/,
+  /from\s+["']node:http["']/,
+  /from\s+["']node:https["']/,
+  /shell:\s*true/,
 ];
 
 function listTsFiles(dir: string): string[] {
@@ -86,6 +98,23 @@ describe("architecture boundaries", () => {
     for (const filePath of files) {
       const source = readFileSync(filePath, "utf8");
       for (const pattern of GIT_FORBIDDEN) {
+        if (pattern.test(source)) {
+          violations.push(`${filePath} matched ${pattern}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps src/config free of brand bypass and forbidden capability imports", () => {
+    expect(statSync(configDir).isDirectory()).toBe(true);
+    const files = listTsFiles(configDir);
+    expect(files.length).toBeGreaterThan(0);
+
+    const violations: string[] = [];
+    for (const filePath of files) {
+      const source = readFileSync(filePath, "utf8");
+      for (const pattern of CONFIG_FORBIDDEN) {
         if (pattern.test(source)) {
           violations.push(`${filePath} matched ${pattern}`);
         }

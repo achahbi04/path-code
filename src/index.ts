@@ -5,6 +5,7 @@
  * Phase 1B: core domain contracts.
  * Phase 1C: workspace + canonical path foundation.
  * Phase 1D: Git + workspace discovery.
+ * Phase 1E: PATHCODE.md + configuration (load/represent only).
  * No process side effects occur on import.
  */
 
@@ -78,3 +79,15 @@ export {
   type GitDiscoveryFailureCode,
   type GitRepository,
 } from "./git/index.js";
+
+export {
+  loadProjectConfig,
+  type ConfigFailure,
+  type ConfigFailureCode,
+  type ProjectConfig,
+  type ProjectConfigSource,
+  type ProjectRestrictions,
+  type RepositoryGuidance,
+  type RepositoryGuidanceTrust,
+  type UnknownDirective,
+} from "./config/index.js";

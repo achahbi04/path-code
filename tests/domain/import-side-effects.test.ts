@@ -13,15 +13,18 @@ describe("import side-effect contract", () => {
       const domain = await import("../../src/domain/index.js");
       const workspace = await import("../../src/workspace/index.js");
       const git = await import("../../src/git/index.js");
+      const config = await import("../../src/config/index.js");
       const root = await import("../../src/index.js");
 
       expect(typeof domain.success).toBe("function");
       expect(typeof domain.requiresReRead).toBe("function");
       expect(typeof workspace.createWorkspaceBoundary).toBe("function");
       expect(typeof git.discoverGitRepository).toBe("function");
+      expect(typeof config.loadProjectConfig).toBe("function");
       expect(typeof root.isNodeVersionSupported).toBe("function");
       expect(typeof root.createWorkspaceBoundary).toBe("function");
       expect(typeof root.discoverGitRepository).toBe("function");
+      expect(typeof root.loadProjectConfig).toBe("function");
       expect(
         Object.prototype.hasOwnProperty.call(workspace, "brandCanonicalPath"),
       ).toBe(false);
@@ -29,6 +32,9 @@ describe("import side-effect contract", () => {
         Object.prototype.hasOwnProperty.call(root, "brandCanonicalPath"),
       ).toBe(false);
       expect(Object.prototype.hasOwnProperty.call(git, "runGit")).toBe(false);
+      expect(
+        Object.prototype.hasOwnProperty.call(config, "readBoundedConfigFile"),
+      ).toBe(false);
 
       expect(consoleLog).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();

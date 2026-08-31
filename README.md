@@ -36,8 +36,10 @@ Production implementation must remain consistent with that document.
 
 **Phase 1D — Git + Workspace Discovery: FROZEN**
 
+**Phase 1E — PATHCODE.md + Configuration: FROZEN**
+
 Next:
 
-**Phase 1E — PATHCODE.md + Configuration**
+**Phase 1 Foundation Integration Audit**
 
 Design forward. Implement only the current frozen phase.
