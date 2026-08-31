@@ -68,10 +68,14 @@ Master contract:
 
 **Phase 2C — Git State Baseline + Ignore / Provenance Annotation: FROZEN**
 
-**Phase 2D: NOT STARTED**
+**Phase 2C-H1 — execFile-only Git Runner Hardening: FROZEN**
+
+**Phase 2D — Project Metadata + Evidence-Backed Repository Map: FROZEN**
+
+**Phase 2E: NOT STARTED**
 
 Next:
 
-**Phase 2D — Project Metadata + Evidence-Backed Repository Map**
+**Phase 2E — Search + Candidate Retrieval**
 
 Design forward. Implement only the current permitted phase.

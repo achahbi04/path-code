@@ -63,6 +63,14 @@ import type {
   ContentObservationData,
   RepositoryReadOutcome,
 } from "../../src/reader/index.js";
+import * as metadataPublic from "../../src/metadata/index.js";
+import type {
+  ManifestEvidence,
+  ManifestEvidenceData,
+  ProjectIdentityClaim,
+  RepositoryMap,
+  RepositoryMapData,
+} from "../../src/metadata/index.js";
 
 // 1. raw string is NOT assignable to CanonicalPath
 // @ts-expect-error raw string is not assignable to CanonicalPath
@@ -540,6 +548,82 @@ readerPublic.brandContentObservation;
 // @ts-expect-error reader must not be on package root
 rootPublic.readRepositoryContent;
 
+// ---------------------------------------------------------------------------
+// Phase 2D metadata provenance evidence (RI-010)
+// ---------------------------------------------------------------------------
+
+declare function acceptObservedClaim(
+  value: Extract<ProjectIdentityClaim, { readonly confidence: "OBSERVED" }>,
+): void;
+declare function acceptManifestEvidence(value: ManifestEvidence): void;
+declare function acceptRepositoryMap(value: RepositoryMap): void;
+
+const observedWithoutEvidence = {
+  confidence: "OBSERVED" as const,
+  scopeRelativePath: "",
+  fact: {
+    kind: "DECLARED_PACKAGE_DEPENDENCY",
+    packageName: "next",
+    section: "dependencies",
+  },
+};
+
+// @ts-expect-error OBSERVED claim requires ManifestEvidence
+acceptObservedClaim(observedWithoutEvidence);
+
+const forgedManifestEvidence: ManifestEvidenceData = {
+  observation: forgedObservation as ContentObservation,
+  entry: forgedEntry as RepositoryEntry,
+  manifestKind: "package.json",
+  fact: {
+    kind: "DECLARED_PACKAGE_DEPENDENCY",
+    packageName: "next",
+    section: "dependencies",
+  },
+};
+
+// @ts-expect-error ManifestEvidence requires earned metadata provenance
+acceptManifestEvidence(forgedManifestEvidence);
+
+const freeFormObservedFact = {
+  confidence: "OBSERVED" as const,
+  scopeRelativePath: "",
+  fact: {
+    kind: "THIS_IS_NOT_A_CLOSED_OBSERVED_FACT",
+    subject: "Next.js",
+  },
+  evidence: forgedManifestEvidence as ManifestEvidence,
+};
+
+// @ts-expect-error observed fact must be a closed union member
+acceptObservedClaim(freeFormObservedFact);
+
+const forgedMap: RepositoryMapData = {
+  inventoryTraversalCompletion: { kind: "COMPLETE" },
+  metadataCompletion: { kind: "COMPLETE" },
+  boundaries: [],
+  directories: [],
+  entries: [],
+  scopes: [],
+  manifestObservations: [],
+  sidecarUnmappedGit: [],
+};
+
+// @ts-expect-error RepositoryMap requires earned builder provenance
+acceptRepositoryMap(forgedMap);
+
+type _InferredHasNoEvidence = ExpectTrue<
+  "evidence" extends keyof Extract<
+    ProjectIdentityClaim,
+    { readonly confidence: "INFERRED" }
+  >
+    ? false
+    : true
+>;
+
+// @ts-expect-error RepositoryMap branding helper must not be public
+metadataPublic.brandRepositoryMap;
+
 type _TooLargeHasNoObservation = ExpectTrue<
   "observation" extends keyof Extract<
     RepositoryReadOutcome,
@@ -616,6 +700,7 @@ type _Keep = [
   _InventorySuccessIsBranded,
   _UnmappedHasNoEntry,
   _GitBaselineSuccessIsBranded,
+  _InferredHasNoEvidence,
   _TooLargeHasNoObservation,
   _PlatformIdClosed,
   _NoExtraPlatformId,

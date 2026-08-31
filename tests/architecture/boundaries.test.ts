@@ -238,4 +238,30 @@ describe("architecture boundaries", () => {
     }
     expect(violations).toEqual([]);
   });
+
+  it("keeps src/metadata free of direct fs content reads and forbidden imports", () => {
+    const metadataDir = fileURLToPath(new URL("../../src/metadata", import.meta.url));
+    expect(statSync(metadataDir).isDirectory()).toBe(true);
+    const METADATA_FORBIDDEN = [
+      /from\s+["'].*config\/loader/,
+      /loadProjectConfig/,
+      /from\s+["'].*workspace\/canonical-path/,
+      /brandCanonicalPath/,
+      /from\s+["']node:fs["']/,
+      /from\s+["']node:fs\/promises["']/,
+      /\breadFile\b/,
+      /\breaddir\b/,
+      /from\s+["']node:child_process["']/,
+    ];
+    const violations: string[] = [];
+    for (const filePath of listTsFiles(metadataDir)) {
+      const source = readFileSync(filePath, "utf8");
+      for (const pattern of METADATA_FORBIDDEN) {
+        if (pattern.test(source)) {
+          violations.push(`${filePath} matched ${pattern}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
 });
