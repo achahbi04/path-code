@@ -35,7 +35,9 @@ import {
   type ProjectConfig,
   type ProjectRestrictions,
   type RepositoryGuidance,
+  type ResolvedProjectConfig,
 } from "../../src/config/index.js";
+import { defaultProjectConfig } from "../../src/config/types.js";
 import * as configPublic from "../../src/config/index.js";
 import type { PlatformId, PlatformInfo } from "../../src/platform/types.js";
 import { detectPlatform } from "../../src/platform/detect.js";
@@ -289,6 +291,48 @@ configPublic.parseProjectConfigContent;
 // @ts-expect-error configFailure factory must not be exported from config public API
 configPublic.configFailure;
 
+// @ts-expect-error defaultProjectConfig must not be on the public config barrel
+configPublic.defaultProjectConfig;
+
+// ---------------------------------------------------------------------------
+// Phase 2 Pre-2A resolved configuration provenance evidence
+// ---------------------------------------------------------------------------
+
+declare function acceptResolved(value: ResolvedProjectConfig): void;
+
+declare const plainConfig: ProjectConfig;
+
+// @ts-expect-error plain ProjectConfig has no resolved provenance
+acceptResolved(plainConfig);
+
+const fallbackConfig = defaultProjectConfig();
+
+// @ts-expect-error default config is not successfully resolved config
+acceptResolved(fallbackConfig);
+
+const syntheticAbsent: ProjectConfig = {
+  source: { kind: "ABSENT" },
+  restrictions: {
+    deniedPaths: [],
+    disabledActions: [],
+  },
+  unknownDirectives: [],
+};
+
+// @ts-expect-error synthetic ABSENT object is not resolved provenance
+acceptResolved(syntheticAbsent);
+
+type LoadSuccess = Extract<LoadReturn, { readonly ok: true }>["value"];
+type _LoadSuccessIsResolved = ExpectTrue<
+  LoadSuccess extends ResolvedProjectConfig ? true : false
+>;
+type _ResolvedExtendsProjectConfig = ExpectTrue<
+  ResolvedProjectConfig extends ProjectConfig ? true : false
+>;
+type _PlainDoesNotExtendResolved = ExpectFalse<
+  ProjectConfig extends ResolvedProjectConfig ? true : false
+>;
+
 // ---------------------------------------------------------------------------
 // Phase 1F platform / CLI contract evidence
 // ---------------------------------------------------------------------------
@@ -350,6 +394,9 @@ type _Keep = [
   _NoWorkspaceRootField,
   _GuidanceTrustIsExplicit,
   _AbsentHasNoGuidance,
+  _LoadSuccessIsResolved,
+  _ResolvedExtendsProjectConfig,
+  _PlainDoesNotExtendResolved,
   _PlatformIdClosed,
   _NoExtraPlatformId,
   _UnsupportedHasNoPlatformInfo,

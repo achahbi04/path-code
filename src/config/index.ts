@@ -8,11 +8,11 @@ export {
   type ConfigFailureCode,
 } from "./failure.js";
 export {
-  defaultProjectConfig,
   type ProjectConfig,
   type ProjectConfigSource,
   type ProjectRestrictions,
   type RepositoryGuidance,
   type RepositoryGuidanceTrust,
+  type ResolvedProjectConfig,
   type UnknownDirective,
 } from "./types.js";

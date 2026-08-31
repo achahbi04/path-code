@@ -60,10 +60,12 @@ Master contract:
 
 **MASTER CONTRACT FROZEN**
 
-**IMPLEMENTATION NOT STARTED**
+**Phase 2 Pre-2A — Resolved Configuration Provenance Hardening: FROZEN**
 
-Next permitted phase:
+**Phase 2A: NOT STARTED**
 
-**Phase 2 Pre-2A — Resolved Configuration Provenance Hardening**
+Next:
+
+**Phase 2A — Inventory + Traversal Safety**
 
 Design forward. Implement only the current permitted phase.

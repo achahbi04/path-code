@@ -47,6 +47,14 @@ export type ProjectConfig =
       readonly guidance: RepositoryGuidance;
     });
 
+/**
+ * Successfully resolved project configuration — produced only by loadProjectConfig.
+ * The uninhabitable brand prevents normal typed structural construction.
+ */
+export type ResolvedProjectConfig = ProjectConfig & {
+  readonly __resolvedProjectConfigBrand: never;
+};
+
 export function defaultProjectConfig(): ProjectConfig {
   return {
     source: { kind: "ABSENT" },

@@ -89,5 +89,6 @@ export {
   type ProjectRestrictions,
   type RepositoryGuidance,
   type RepositoryGuidanceTrust,
+  type ResolvedProjectConfig,
   type UnknownDirective,
 } from "./config/index.js";

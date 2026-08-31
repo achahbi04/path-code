@@ -13,7 +13,15 @@ import { configEntryExists } from "./existence.js";
 import { configFailure, type ConfigFailure } from "./failure.js";
 import { parseProjectConfigContent } from "./parser.js";
 import { readBoundedConfigFile } from "./reader.js";
-import { defaultProjectConfig, type ProjectConfig } from "./types.js";
+import {
+  defaultProjectConfig,
+  type ProjectConfig,
+  type ResolvedProjectConfig,
+} from "./types.js";
+
+function resolvedAfterSuccessfulLoad(config: ProjectConfig): ResolvedProjectConfig {
+  return config as ResolvedProjectConfig;
+}
 
 /**
  * Load project configuration from the fixed PATHCODE.md filename inside
@@ -21,7 +29,7 @@ import { defaultProjectConfig, type ProjectConfig } from "./types.js";
  */
 export async function loadProjectConfig(
   workspace: WorkspaceBoundary,
-): Promise<Result<ProjectConfig, ConfigFailure>> {
+): Promise<Result<ResolvedProjectConfig, ConfigFailure>> {
   const rootResult = await workspace.canonicalize(".");
   if (!rootResult.ok) {
     return failure(
@@ -36,7 +44,7 @@ export async function loadProjectConfig(
   const workspaceRoot = rootResult.value;
   const entryExists = await configEntryExists(workspaceRoot);
   if (!entryExists) {
-    return success(defaultProjectConfig());
+    return success(resolvedAfterSuccessfulLoad(defaultProjectConfig()));
   }
 
   const canonicalResult = await workspace.canonicalize(PATHCODE_FILENAME);
@@ -64,5 +72,10 @@ export async function loadProjectConfig(
     return readResult;
   }
 
-  return parseProjectConfigContent(readResult.value);
+  const parsed = parseProjectConfigContent(readResult.value);
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  return success(resolvedAfterSuccessfulLoad(parsed.value));
 }

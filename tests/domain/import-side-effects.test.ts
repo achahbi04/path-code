@@ -41,6 +41,9 @@ describe("import side-effect contract", () => {
       expect(
         Object.prototype.hasOwnProperty.call(config, "readBoundedConfigFile"),
       ).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(config, "defaultProjectConfig")).toBe(
+        false,
+      );
       expect(Object.prototype.hasOwnProperty.call(root, "runCli")).toBe(false);
       expect(Object.prototype.hasOwnProperty.call(root, "detectPlatform")).toBe(false);
 
