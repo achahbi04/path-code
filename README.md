@@ -54,4 +54,16 @@ Next:
 
 **Phase 2 — Repository Intelligence**
 
+Master contract:
+
+[`docs/PHASE_2_REPOSITORY_INTELLIGENCE_MASTER.md`](docs/PHASE_2_REPOSITORY_INTELLIGENCE_MASTER.md)
+
+**MASTER CONTRACT FROZEN**
+
+**IMPLEMENTATION NOT STARTED**
+
+Next permitted phase:
+
+**Phase 2 Pre-2A — Resolved Configuration Provenance Hardening**
+
 Design forward. Implement only the current permitted phase.
