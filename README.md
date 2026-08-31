@@ -66,10 +66,12 @@ Master contract:
 
 **Phase 2B — Bounded Reader + Content Fingerprints: FROZEN**
 
-**Phase 2C: NOT STARTED**
+**Phase 2C — Git State Baseline + Ignore / Provenance Annotation: FROZEN**
+
+**Phase 2D: NOT STARTED**
 
 Next:
 
-**Phase 2C — Git State Baseline + Ignore / Provenance Annotation**
+**Phase 2D — Project Metadata + Evidence-Backed Repository Map**
 
 Design forward. Implement only the current permitted phase.

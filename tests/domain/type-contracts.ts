@@ -25,9 +25,14 @@ import {
 import * as workspacePublic from "../../src/workspace/index.js";
 import * as canonicalPathModule from "../../src/workspace/canonical-path.js";
 import {
+  collectGitStateBaseline,
   discoverGitRepository,
   type GitDiscoveryFailure,
+  type GitPathObservation,
   type GitRepository,
+  type GitStateBaseline,
+  type GitStateBaselineData,
+  type UnmappedVisibleGitObservation,
 } from "../../src/git/index.js";
 import * as gitPublic from "../../src/git/index.js";
 import {
@@ -411,6 +416,54 @@ inventoryPublic.asRepositoryInventory;
 void emptyPartial;
 
 // ---------------------------------------------------------------------------
+// Phase 2C Git baseline provenance evidence (RI-017)
+// ---------------------------------------------------------------------------
+
+declare function acceptRepositoryEntryFromGit(value: RepositoryEntry): void;
+declare function acceptGitBaseline(value: GitStateBaseline): void;
+
+declare const rawGitPath: string;
+// @ts-expect-error raw Git path string is not RepositoryEntry
+acceptRepositoryEntryFromGit(rawGitPath);
+
+declare const gitPathObservation: GitPathObservation;
+// @ts-expect-error GitPathObservation is not RepositoryEntry
+acceptRepositoryEntryFromGit(gitPathObservation);
+
+const forgedGitBaseline: GitStateBaselineData = {
+  availability: { kind: "NOT_GIT_REPOSITORY" },
+  annotations: [],
+  unmappedVisibleObservations: [],
+  inventoryTraversalCompletion: { kind: "COMPLETE" },
+  provenance: "PRE_EXISTING",
+  commandExclusionStatuses: [],
+};
+
+// @ts-expect-error GitStateBaseline requires earned collection provenance
+acceptGitBaseline(forgedGitBaseline);
+
+declare const unmapped: UnmappedVisibleGitObservation;
+// @ts-expect-error unmapped observation has no RepositoryEntry field
+unmapped.entry;
+
+type _UnmappedHasNoEntry = ExpectTrue<
+  "entry" extends keyof UnmappedVisibleGitObservation ? false : true
+>;
+
+type GitBaselineReturn = Awaited<ReturnType<typeof collectGitStateBaseline>>;
+type _GitBaselineSuccessIsBranded = ExpectTrue<
+  Extract<GitBaselineReturn, { readonly ok: true }>["value"] extends GitStateBaseline
+    ? true
+    : false
+>;
+
+// @ts-expect-error GitStateBaseline branding helper must not be public
+gitPublic.brandGitStateBaseline;
+
+// @ts-expect-error private Git state stdin runner must not be on the public git barrel
+gitPublic.runGitStateWithStdin;
+
+// ---------------------------------------------------------------------------
 // Phase 2B reader provenance evidence
 // ---------------------------------------------------------------------------
 
@@ -561,6 +614,8 @@ type _Keep = [
   _ResolvedExtendsProjectConfig,
   _PlainDoesNotExtendResolved,
   _InventorySuccessIsBranded,
+  _UnmappedHasNoEntry,
+  _GitBaselineSuccessIsBranded,
   _TooLargeHasNoObservation,
   _PlatformIdClosed,
   _NoExtraPlatformId,
