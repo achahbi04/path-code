@@ -62,10 +62,12 @@ Master contract:
 
 **Phase 2 Pre-2A — Resolved Configuration Provenance Hardening: FROZEN**
 
-**Phase 2A: NOT STARTED**
+**Phase 2A — Inventory + Traversal Safety: FROZEN**
+
+**Phase 2B: NOT STARTED**
 
 Next:
 
-**Phase 2A — Inventory + Traversal Safety**
+**Phase 2B — Bounded Reader + Content Fingerprints**
 
 Design forward. Implement only the current permitted phase.

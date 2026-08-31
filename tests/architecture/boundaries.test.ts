@@ -10,6 +10,19 @@ const gitDir = fileURLToPath(new URL("../../src/git", import.meta.url));
 const configDir = fileURLToPath(new URL("../../src/config", import.meta.url));
 const platformDir = fileURLToPath(new URL("../../src/platform", import.meta.url));
 const cliDir = fileURLToPath(new URL("../../src/cli", import.meta.url));
+const inventoryDir = fileURLToPath(new URL("../../src/inventory", import.meta.url));
+
+const INVENTORY_FORBIDDEN = [
+  /from\s+["'](?:\.\.\/)+config\/loader/,
+  /loadProjectConfig/,
+  /from\s+["'].*workspace\/canonical-path/,
+  /brandCanonicalPath/,
+  /from\s+["'](?:\.\.\/)+git\//,
+  /from\s+["']node:child_process["']/,
+  /readFile\s*\(/,
+  /createReadStream/,
+  /createHash/,
+];
 
 const DOMAIN_FORBIDDEN = [
   /from\s+["'](?:\.\.\/)+core\//,
@@ -171,6 +184,23 @@ describe("architecture boundaries", () => {
     for (const filePath of files) {
       const source = readFileSync(filePath, "utf8");
       for (const pattern of CLI_FORBIDDEN) {
+        if (pattern.test(source)) {
+          violations.push(`${filePath} matched ${pattern}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps src/inventory free of forbidden capability imports and content reads", () => {
+    expect(statSync(inventoryDir).isDirectory()).toBe(true);
+    const files = listTsFiles(inventoryDir);
+    expect(files.length).toBeGreaterThan(0);
+
+    const violations: string[] = [];
+    for (const filePath of files) {
+      const source = readFileSync(filePath, "utf8");
+      for (const pattern of INVENTORY_FORBIDDEN) {
         if (pattern.test(source)) {
           violations.push(`${filePath} matched ${pattern}`);
         }

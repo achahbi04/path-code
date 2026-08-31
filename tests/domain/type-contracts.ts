@@ -42,6 +42,15 @@ import * as configPublic from "../../src/config/index.js";
 import type { PlatformId, PlatformInfo } from "../../src/platform/types.js";
 import { detectPlatform } from "../../src/platform/detect.js";
 import * as rootPublic from "../../src/index.js";
+import { inventory } from "../../src/inventory/index.js";
+import * as inventoryPublic from "../../src/inventory/index.js";
+import type {
+  RepositoryEntry,
+  RepositoryEntryData,
+  RepositoryInventory,
+  RepositoryInventoryData,
+} from "../../src/inventory/index.js";
+import type { TraversalCompletion } from "../../src/inventory/disposition.js";
 
 // 1. raw string is NOT assignable to CanonicalPath
 // @ts-expect-error raw string is not assignable to CanonicalPath
@@ -334,6 +343,67 @@ type _PlainDoesNotExtendResolved = ExpectFalse<
 >;
 
 // ---------------------------------------------------------------------------
+// Phase 2A inventory provenance evidence
+// ---------------------------------------------------------------------------
+
+declare function acceptRepositoryEntry(value: RepositoryEntry): void;
+declare function acceptRepositoryInventory(value: RepositoryInventory): void;
+
+declare const earnedCanonicalPath: CanonicalPath;
+
+const forgedEntry: RepositoryEntryData = {
+  canonicalPath: earnedCanonicalPath,
+  relativePath: "src/main.ts",
+  lexicalKind: "FILE",
+  physicalKind: "FILE",
+  size: 1,
+  mtimeMs: 0,
+};
+
+// @ts-expect-error RepositoryEntry requires earned inventory provenance
+acceptRepositoryEntry(forgedEntry);
+
+const forgedInventory: RepositoryInventoryData = {
+  observations: [],
+  traversalCompletion: { kind: "COMPLETE" },
+  denyPathRules: [],
+};
+
+// @ts-expect-error RepositoryInventory requires earned inventory provenance
+acceptRepositoryInventory(forgedInventory);
+
+declare function runInventory(
+  workspace: WorkspaceBoundary,
+  config: ResolvedProjectConfig,
+): ReturnType<typeof inventory>;
+
+// @ts-expect-error inventory requires ResolvedProjectConfig, not plain ProjectConfig
+runInventory(_boundary, plainConfig);
+
+// @ts-expect-error inventory requires ResolvedProjectConfig, not default fallback
+runInventory(_boundary, fallbackConfig);
+
+const emptyPartial: TraversalCompletion = {
+  kind: "PARTIAL",
+  // @ts-expect-error PARTIAL requires a non-empty reasons list
+  reasons: [],
+};
+
+type InventoryReturn = Awaited<ReturnType<typeof inventory>>;
+type InventorySuccess = Extract<InventoryReturn, { readonly ok: true }>["value"];
+type _InventorySuccessIsBranded = ExpectTrue<
+  InventorySuccess extends RepositoryInventory ? true : false
+>;
+
+// @ts-expect-error RepositoryEntry branding helper must not be on inventory public API
+inventoryPublic.brandRepositoryEntry;
+
+// @ts-expect-error RepositoryInventory branding helper must not be on inventory public API
+inventoryPublic.asRepositoryInventory;
+
+void emptyPartial;
+
+// ---------------------------------------------------------------------------
 // Phase 1F platform / CLI contract evidence
 // ---------------------------------------------------------------------------
 
@@ -397,6 +467,7 @@ type _Keep = [
   _LoadSuccessIsResolved,
   _ResolvedExtendsProjectConfig,
   _PlainDoesNotExtendResolved,
+  _InventorySuccessIsBranded,
   _PlatformIdClosed,
   _NoExtraPlatformId,
   _UnsupportedHasNoPlatformInfo,
