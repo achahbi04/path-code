@@ -24,6 +24,14 @@ Production implementation must remain consistent with that document.
 
 **Phase 0 — FROZEN**
 
+**Phase 1 — Foundation Kernel: COMPLETE / FROZEN**
+
+Closure evidence:
+
+[`docs/PHASE_1_FOUNDATION_CLOSURE.md`](docs/PHASE_1_FOUNDATION_CLOSURE.md)
+
+Preserved Phase 1 sub-pass history:
+
 **Phase 1A — Project + TypeScript Foundation: FROZEN**
 
 **Phase 1B — Core Domain Contracts: FROZEN**
@@ -44,6 +52,6 @@ Production implementation must remain consistent with that document.
 
 Next:
 
-**Phase 1 Foundation Integration Re-Audit**
+**Phase 2 — Repository Intelligence**
 
-Design forward. Implement only the current frozen phase.
+Design forward. Implement only the current permitted phase.
