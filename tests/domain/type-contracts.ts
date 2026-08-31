@@ -51,6 +51,13 @@ import type {
   RepositoryInventoryData,
 } from "../../src/inventory/index.js";
 import type { TraversalCompletion } from "../../src/inventory/disposition.js";
+import { readRepositoryContent } from "../../src/reader/index.js";
+import * as readerPublic from "../../src/reader/index.js";
+import type {
+  ContentObservation,
+  ContentObservationData,
+  RepositoryReadOutcome,
+} from "../../src/reader/index.js";
 
 // 1. raw string is NOT assignable to CanonicalPath
 // @ts-expect-error raw string is not assignable to CanonicalPath
@@ -404,6 +411,92 @@ inventoryPublic.asRepositoryInventory;
 void emptyPartial;
 
 // ---------------------------------------------------------------------------
+// Phase 2B reader provenance evidence
+// ---------------------------------------------------------------------------
+
+declare function runReader(
+  entry: RepositoryEntry,
+  workspace: WorkspaceBoundary,
+  config: ResolvedProjectConfig,
+): ReturnType<typeof readRepositoryContent>;
+
+declare const resolvedForReader: ResolvedProjectConfig;
+
+// @ts-expect-error raw string is not RepositoryEntry
+runReader("/tmp/file.txt", _boundary, resolvedForReader);
+
+// @ts-expect-error CanonicalPath alone is not RepositoryEntry
+runReader(earnedCanonicalPath, _boundary, resolvedForReader);
+
+// @ts-expect-error reader requires ResolvedProjectConfig, not plain ProjectConfig
+runReader(forgedEntry as RepositoryEntry, _boundary, plainConfig);
+
+declare const tooLargeOutcome: Extract<
+  RepositoryReadOutcome,
+  { readonly status: "TOO_LARGE" }
+>;
+
+// @ts-expect-error TOO_LARGE has no ContentObservation
+tooLargeOutcome.observation;
+
+declare const deniedOutcome: Extract<
+  RepositoryReadOutcome,
+  { readonly status: "DENIED" }
+>;
+
+// @ts-expect-error DENIED has no ContentObservation
+deniedOutcome.observation;
+
+declare const unreadableOutcome: Extract<
+  RepositoryReadOutcome,
+  { readonly status: "UNREADABLE" }
+>;
+
+// @ts-expect-error UNREADABLE has no ContentObservation
+unreadableOutcome.observation;
+
+declare const staleOutcome: Extract<
+  RepositoryReadOutcome,
+  { readonly status: "STALE_ENTRY" }
+>;
+
+// @ts-expect-error STALE_ENTRY has no ContentObservation
+staleOutcome.observation;
+
+declare function acceptContentObservation(value: ContentObservation): void;
+
+const forgedObservation: ContentObservationData = {
+  kind: "TEXT",
+  entry: forgedEntry as RepositoryEntry,
+  byteLength: 0,
+  encoding: "UTF-8",
+  text: "",
+  fingerprint: {
+    algorithm: "sha256",
+    hex: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    byteLength: 0,
+  },
+};
+
+// @ts-expect-error ContentObservation requires earned reader provenance
+acceptContentObservation(forgedObservation);
+
+// @ts-expect-error ContentObservation branding helper must not be on reader public API
+readerPublic.brandContentObservation;
+
+// @ts-expect-error reader must not be on package root
+rootPublic.readRepositoryContent;
+
+type _TooLargeHasNoObservation = ExpectTrue<
+  "observation" extends keyof Extract<
+    RepositoryReadOutcome,
+    { readonly status: "TOO_LARGE" }
+  >
+    ? false
+    : true
+>;
+
+// ---------------------------------------------------------------------------
 // Phase 1F platform / CLI contract evidence
 // ---------------------------------------------------------------------------
 
@@ -468,6 +561,7 @@ type _Keep = [
   _ResolvedExtendsProjectConfig,
   _PlainDoesNotExtendResolved,
   _InventorySuccessIsBranded,
+  _TooLargeHasNoObservation,
   _PlatformIdClosed,
   _NoExtraPlatformId,
   _UnsupportedHasNoPlatformInfo,

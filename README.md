@@ -64,10 +64,12 @@ Master contract:
 
 **Phase 2A — Inventory + Traversal Safety: FROZEN**
 
-**Phase 2B: NOT STARTED**
+**Phase 2B — Bounded Reader + Content Fingerprints: FROZEN**
+
+**Phase 2C: NOT STARTED**
 
 Next:
 
-**Phase 2B — Bounded Reader + Content Fingerprints**
+**Phase 2C — Git State Baseline + Ignore / Provenance Annotation**
 
 Design forward. Implement only the current permitted phase.

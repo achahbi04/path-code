@@ -11,6 +11,19 @@ const configDir = fileURLToPath(new URL("../../src/config", import.meta.url));
 const platformDir = fileURLToPath(new URL("../../src/platform", import.meta.url));
 const cliDir = fileURLToPath(new URL("../../src/cli", import.meta.url));
 const inventoryDir = fileURLToPath(new URL("../../src/inventory", import.meta.url));
+const readerDir = fileURLToPath(new URL("../../src/reader", import.meta.url));
+
+const READER_FORBIDDEN = [
+  /import\s+.*loadProjectConfig|from\s+["'].*config\/loader/,
+  /from\s+["'].*workspace\/canonical-path/,
+  /brandCanonicalPath/,
+  /from\s+["'](?:\.\.\/)+git\//,
+  /from\s+["'](?:\.\.\/)+cli\//,
+  /\bwriteFile\b/,
+  /\bappendFile\b/,
+  /\bcreateWriteStream\b/,
+  /ModelProvider/,
+];
 
 const INVENTORY_FORBIDDEN = [
   /from\s+["'](?:\.\.\/)+config\/loader/,
@@ -201,6 +214,23 @@ describe("architecture boundaries", () => {
     for (const filePath of files) {
       const source = readFileSync(filePath, "utf8");
       for (const pattern of INVENTORY_FORBIDDEN) {
+        if (pattern.test(source)) {
+          violations.push(`${filePath} matched ${pattern}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps src/reader free of forbidden capability imports and write APIs", () => {
+    expect(statSync(readerDir).isDirectory()).toBe(true);
+    const files = listTsFiles(readerDir);
+    expect(files.length).toBeGreaterThan(0);
+
+    const violations: string[] = [];
+    for (const filePath of files) {
+      const source = readFileSync(filePath, "utf8");
+      for (const pattern of READER_FORBIDDEN) {
         if (pattern.test(source)) {
           violations.push(`${filePath} matched ${pattern}`);
         }

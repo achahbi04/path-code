@@ -21,7 +21,13 @@ export type {
   InventoryFailure,
   InventoryFailureCode,
 } from "./failure.js";
+export {
+  isLexicallyDenied,
+  isPhysicallyDenied,
+  prepareDenyPathPlan,
+} from "./denial.js";
 export type {
+  DenyPathPlan,
   DenyPathRuleRecord,
   PhysicalDenyRootStatus,
 } from "./denial.js";
