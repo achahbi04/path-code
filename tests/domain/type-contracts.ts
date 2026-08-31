@@ -37,6 +37,9 @@ import {
   type RepositoryGuidance,
 } from "../../src/config/index.js";
 import * as configPublic from "../../src/config/index.js";
+import type { PlatformId, PlatformInfo } from "../../src/platform/types.js";
+import { detectPlatform } from "../../src/platform/detect.js";
+import * as rootPublic from "../../src/index.js";
 
 // 1. raw string is NOT assignable to CanonicalPath
 // @ts-expect-error raw string is not assignable to CanonicalPath
@@ -286,6 +289,35 @@ configPublic.parseProjectConfigContent;
 // @ts-expect-error configFailure factory must not be exported from config public API
 configPublic.configFailure;
 
+// ---------------------------------------------------------------------------
+// Phase 1F platform / CLI contract evidence
+// ---------------------------------------------------------------------------
+
+type _PlatformIdClosed = ExpectTrue<
+  PlatformId extends "macos" | "linux" | "windows" ? true : false
+>;
+type _NoExtraPlatformId = ExpectTrue<
+  "freebsd" extends PlatformId ? false : true
+>;
+
+type DetectReturn = ReturnType<typeof detectPlatform>;
+type DetectFailure = Extract<DetectReturn, { readonly ok: false }>;
+type _UnsupportedHasNoPlatformInfo = ExpectTrue<
+  "value" extends keyof DetectFailure ? false : true
+>;
+
+// Successful PlatformInfo cannot be constructed from unsupported mapping result type alone.
+type DetectSuccess = Extract<DetectReturn, { readonly ok: true }>["value"];
+type _SuccessIsPlatformInfo = ExpectTrue<
+  DetectSuccess extends PlatformInfo ? true : false
+>;
+
+// @ts-expect-error CLI runCli must not be on package root
+rootPublic.runCli;
+
+// @ts-expect-error platform detectPlatform must not be on package root
+rootPublic.detectPlatform;
+
 // Silence unused binding warnings under noUnusedLocals while keeping type probes live.
 void _rawPath;
 void _completionMissingNotValidated;
@@ -318,6 +350,10 @@ type _Keep = [
   _NoWorkspaceRootField,
   _GuidanceTrustIsExplicit,
   _AbsentHasNoGuidance,
+  _PlatformIdClosed,
+  _NoExtraPlatformId,
+  _UnsupportedHasNoPlatformInfo,
+  _SuccessIsPlatformInfo,
 ];
 type _ForceKeep = _Keep;
 void 0 as unknown as _ForceKeep;

@@ -8,6 +8,8 @@ const workspaceDir = fileURLToPath(new URL("../../src/workspace", import.meta.ur
 const domainDir = fileURLToPath(new URL("../../src/domain", import.meta.url));
 const gitDir = fileURLToPath(new URL("../../src/git", import.meta.url));
 const configDir = fileURLToPath(new URL("../../src/config", import.meta.url));
+const platformDir = fileURLToPath(new URL("../../src/platform", import.meta.url));
+const cliDir = fileURLToPath(new URL("../../src/cli", import.meta.url));
 
 const DOMAIN_FORBIDDEN = [
   /from\s+["'](?:\.\.\/)+core\//,
@@ -49,6 +51,26 @@ const CONFIG_FORBIDDEN = [
   /from\s+["']node:http["']/,
   /from\s+["']node:https["']/,
   /shell:\s*true/,
+];
+
+const PLATFORM_FORBIDDEN = [
+  /from\s+["'](?:\.\.\/)+workspace\//,
+  /from\s+["'](?:\.\.\/)+git\//,
+  /from\s+["'](?:\.\.\/)+config\//,
+  /from\s+["'](?:\.\.\/)+cli\//,
+  /from\s+["']node:child_process["']/,
+  /from\s+["']node:fs["']/,
+  /from\s+["']node:net["']/,
+];
+
+const CLI_FORBIDDEN = [
+  /from\s+["'](?:\.\.\/)+workspace\//,
+  /from\s+["'](?:\.\.\/)+git\//,
+  /from\s+["'](?:\.\.\/)+config\//,
+  /createWorkspaceBoundary|discoverGitRepository|loadProjectConfig/,
+  /from\s+["']node:child_process["']/,
+  /from\s+["']node:net["']/,
+  /CommandRunner|ProcessService|ShellExecutor|ExecutionEngine/,
 ];
 
 function listTsFiles(dir: string): string[] {
@@ -115,6 +137,40 @@ describe("architecture boundaries", () => {
     for (const filePath of files) {
       const source = readFileSync(filePath, "utf8");
       for (const pattern of CONFIG_FORBIDDEN) {
+        if (pattern.test(source)) {
+          violations.push(`${filePath} matched ${pattern}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps src/platform free of capability and CLI imports", () => {
+    expect(statSync(platformDir).isDirectory()).toBe(true);
+    const files = listTsFiles(platformDir);
+    expect(files.length).toBeGreaterThan(0);
+
+    const violations: string[] = [];
+    for (const filePath of files) {
+      const source = readFileSync(filePath, "utf8");
+      for (const pattern of PLATFORM_FORBIDDEN) {
+        if (pattern.test(source)) {
+          violations.push(`${filePath} matched ${pattern}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps src/cli free of workspace/Git/config and generic process imports", () => {
+    expect(statSync(cliDir).isDirectory()).toBe(true);
+    const files = listTsFiles(cliDir);
+    expect(files.length).toBeGreaterThan(0);
+
+    const violations: string[] = [];
+    for (const filePath of files) {
+      const source = readFileSync(filePath, "utf8");
+      for (const pattern of CLI_FORBIDDEN) {
         if (pattern.test(source)) {
           violations.push(`${filePath} matched ${pattern}`);
         }

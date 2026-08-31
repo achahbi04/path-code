@@ -14,6 +14,9 @@ describe("import side-effect contract", () => {
       const workspace = await import("../../src/workspace/index.js");
       const git = await import("../../src/git/index.js");
       const config = await import("../../src/config/index.js");
+      const platform = await import("../../src/platform/index.js");
+      const cliStartup = await import("../../src/cli/startup.js");
+      const cliMain = await import("../../src/cli/main.js");
       const root = await import("../../src/index.js");
 
       expect(typeof domain.success).toBe("function");
@@ -21,6 +24,9 @@ describe("import side-effect contract", () => {
       expect(typeof workspace.createWorkspaceBoundary).toBe("function");
       expect(typeof git.discoverGitRepository).toBe("function");
       expect(typeof config.loadProjectConfig).toBe("function");
+      expect(typeof platform.detectPlatform).toBe("function");
+      expect(typeof cliStartup.evaluateStartup).toBe("function");
+      expect(typeof cliMain.runCli).toBe("function");
       expect(typeof root.isNodeVersionSupported).toBe("function");
       expect(typeof root.createWorkspaceBoundary).toBe("function");
       expect(typeof root.discoverGitRepository).toBe("function");
@@ -35,6 +41,8 @@ describe("import side-effect contract", () => {
       expect(
         Object.prototype.hasOwnProperty.call(config, "readBoundedConfigFile"),
       ).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(root, "runCli")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(root, "detectPlatform")).toBe(false);
 
       expect(consoleLog).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();

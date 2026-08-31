@@ -38,8 +38,12 @@ Production implementation must remain consistent with that document.
 
 **Phase 1E — PATHCODE.md + Configuration: FROZEN**
 
+**Phase 1E ConfigFailure Surface Correction: FROZEN**
+
+**Phase 1F — CLI + Platform Foundation Closure: FROZEN**
+
 Next:
 
-**Phase 1 Foundation Integration Audit**
+**Phase 1 Foundation Integration Re-Audit**
 
 Design forward. Implement only the current frozen phase.
