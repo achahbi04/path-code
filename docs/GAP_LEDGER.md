@@ -1,16 +1,12 @@
-# PATH CODE — GAP LEDGER V0
+# PATH CODE — GAP LEDGER V1
 
 ## Status
 
 **ACTIVE**
 
-**DOCUMENT-ONLY**
+**MACHINE-READABLE SOURCE OF TRUTH**
 
-**NO RUNTIME AUTHORITY**
-
-## Purpose
-
-Record known engineering limitations and deferred obligations before they can be forgotten or reconstructed after the fact.
+Rendered deterministically from canonical Gap Ledger v1 data.
 
 The Gap Ledger does **not** decide correctness.
 
@@ -40,14 +36,11 @@ Every entry should contain:
 ## INITIAL GAP LEDGER
 
 ---
-
 ### GAP-001 — Git executable resolution
 
 **Discovered in / source:** Phase 1D / Phase 2C
 
 **Description:** Git executable still resolves through inherited PATH.
-
-**Implementer proposed class:** (none recorded at v0)
 
 **Review classification:** NON_BLOCKING_LIMITATION
 
@@ -57,10 +50,6 @@ Every entry should contain:
 
 **Required condition to close:** Deliberate executable-resolution/pinning policy plus adversarial evidence.
 
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
-
 ---
 
 ### GAP-002 — Live Windows filesystem validation
@@ -68,8 +57,6 @@ Every entry should contain:
 **Discovered in / source:** Phase 2A / 2B / 2D / 2E
 
 **Description:** No live supported Windows environment integration suite has been executed.
-
-**Implementer proposed class:** (none recorded at v0)
 
 **Review classification:** NON_BLOCKING_LIMITATION
 
@@ -79,9 +66,7 @@ Every entry should contain:
 
 **Required condition to close:** Live supported Windows environment and platform-specific integration suite.
 
-**Assigned closure phase/environment:** External Windows host
-
-**Notes:** —
+**Assigned closure phase/environment:** Live supported Windows environment and platform-specific integration suite.
 
 ---
 
@@ -91,8 +76,6 @@ Every entry should contain:
 
 **Description:** Case-insensitive filesystem and Git/core.ignorecase interaction not validated on representative hosts.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN_REQUIRES_EXTERNAL_CONDITION
@@ -101,9 +84,7 @@ Every entry should contain:
 
 **Required condition to close:** Case-insensitive filesystem validation matrix including Git/core.ignorecase.
 
-**Assigned closure phase/environment:** External case-insensitive filesystem host
-
-**Notes:** —
+**Assigned closure phase/environment:** Case-insensitive filesystem validation matrix including Git/core.ignorecase.
 
 ---
 
@@ -113,8 +94,6 @@ Every entry should contain:
 
 **Description:** Raw pathname byte sequences with invalid encoding are not modeled with a deliberate policy.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -122,10 +101,6 @@ Every entry should contain:
 **Why non-blocking:** Current bounded claims do not assert universal pathname-byte coverage.
 
 **Required condition to close:** Deliberate raw-path-byte model or explicit permanent unsupported-path policy.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -135,17 +110,13 @@ Every entry should contain:
 
 **Description:** `as unknown as TrustedType` can bypass compile-time brands intentionally.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** ACCEPTED_PERMANENT
 
 **Why non-blocking:** TypeScript is not a security sandbox. Normal architectural bypasses remain forbidden.
 
-**Required condition to close:** N/A — intentional permanent limitation.
-
-**Assigned closure phase:** N/A
+**Required condition to close:** TypeScript is not a security sandbox; hostile casts remain outside the trust model.
 
 **Notes:** Compile-time brands remain the primary production guard; hostile casts are out of scope for TypeScript alone to prevent.
 
@@ -157,8 +128,6 @@ Every entry should contain:
 
 **Description:** Directory enumeration loads a single readdir result into memory per directory.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -166,10 +135,6 @@ Every entry should contain:
 **Why non-blocking:** Inventory hard ceilings bound worst-case observation count; correctness claims remain valid within declared bounds.
 
 **Required condition to close:** Bounded/streamed deterministic directory enumeration design if required.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -179,19 +144,11 @@ Every entry should contain:
 
 **Description:** Large dependency trees (e.g. `node_modules`) may consume inventory observation budget before project-owned entries are fully observed.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** OPTIMIZATION
 
 **Lifecycle:** OPEN
 
-**Why non-blocking:** PARTIAL inventory completion is explicit; no false COMPLETE claim is made.
-
 **Required condition to close:** Evidence-backed pruning/priority policy after sufficient repository metadata exists.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -201,8 +158,6 @@ Every entry should contain:
 
 **Description:** Content may change between stat/open and read completion.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -210,10 +165,6 @@ Every entry should contain:
 **Why non-blocking:** Current hash describes bytes actually observed, not an atomic repository snapshot.
 
 **Required condition to close:** Platform-specific stronger atomic observation mechanism if ever required.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -223,8 +174,6 @@ Every entry should contain:
 
 **Description:** Entry identity assumptions tied to dev/ino semantics are not validated across Windows/network/virtual filesystems.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN_REQUIRES_EXTERNAL_CONDITION
@@ -233,9 +182,7 @@ Every entry should contain:
 
 **Required condition to close:** Windows/network/virtual filesystem validation and identity-policy review.
 
-**Assigned closure phase/environment:** External representative filesystem hosts
-
-**Notes:** —
+**Assigned closure phase/environment:** Windows/network/virtual filesystem validation and identity-policy review.
 
 ---
 
@@ -245,19 +192,11 @@ Every entry should contain:
 
 **Description:** No orchestration-level concurrent reader memory budget exists across parallel operations.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** OPTIMIZATION
 
 **Lifecycle:** OPEN
 
-**Why non-blocking:** Per-read bounds remain enforced; no unbounded parallel read API is exposed in Phase 2.
-
 **Required condition to close:** Future orchestration/concurrency budget if measurements require it.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -267,19 +206,13 @@ Every entry should contain:
 
 **Description:** Binary vs text classification uses a fixed deterministic rule, not universal format detection.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** ACCEPTED_PERMANENT
 
 **Why non-blocking:** Current definition is explicit: valid UTF-8 without NUL → TEXT; otherwise supported binary classifications.
 
-**Required condition to close:** N/A — not a universal file-format detector by design.
-
-**Assigned closure phase:** N/A
-
-**Notes:** —
+**Required condition to close:** Not a universal file-format detector by design.
 
 ---
 
@@ -289,8 +222,6 @@ Every entry should contain:
 
 **Description:** Reader hard ceiling rejects full observation of content above 1 MiB.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -298,10 +229,6 @@ Every entry should contain:
 **Why non-blocking:** TOO_LARGE outcomes are explicit; no silent truncation claim is made.
 
 **Required condition to close:** Deliberate large-content architecture decision if product requirements need it.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -311,8 +238,6 @@ Every entry should contain:
 
 **Description:** Deterministic production-safe test seam for read close-failure paths is not established.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -320,10 +245,6 @@ Every entry should contain:
 **Why non-blocking:** Failure vocabulary exists; runtime falsification of close failure remains incomplete.
 
 **Required condition to close:** Deterministic test seam that does not widen production architecture.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -333,8 +254,6 @@ Every entry should contain:
 
 **Description:** When command-level pathspec exclusion is not expressible, Git may emit denied bytes before authoritative parser rejection.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -342,10 +261,6 @@ Every entry should contain:
 **Why non-blocking:** Denied path cannot cross parser visibility boundary into Path Code knowledge.
 
 **Required condition to close:** Stronger Git-side literal exclusion mechanism if one becomes available.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -355,8 +270,6 @@ Every entry should contain:
 
 **Description:** Repositories exceeding 16 MiB path-bearing Git output fail baseline collection.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -364,10 +277,6 @@ Every entry should contain:
 **Why non-blocking:** Failure is explicit; no partial silent Git state is presented as complete.
 
 **Required condition to close:** Deliberate scalable Git-state transport if real repositories require it.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -377,8 +286,6 @@ Every entry should contain:
 
 **Description:** Fixed-Git timeout behavior is not deterministically falsified at runtime.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -386,10 +293,6 @@ Every entry should contain:
 **Why non-blocking:** Timeout bounds exist in architecture; falsification seam remains incomplete.
 
 **Required condition to close:** Safe fixed-Git timeout test mechanism without generic process execution.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -399,17 +302,13 @@ Every entry should contain:
 
 **Description:** Global and system Git ignore configuration is excluded from deterministic Phase 1D semantics.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** ACCEPTED_PERMANENT
 
 **Why non-blocking:** Current Phase 1D deterministic semantics sanitize global/system Git config.
 
-**Required condition to close:** N/A unless policy changes — then reopen as architectural decision.
-
-**Assigned closure phase:** N/A
+**Required condition to close:** Intentional permanent limitation unless policy changes.
 
 **Notes:** If policy changes later, this gap must be reopened as an architectural decision.
 
@@ -421,8 +320,6 @@ Every entry should contain:
 
 **Description:** Nested/recursive submodule Git state is not observed.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -430,10 +327,6 @@ Every entry should contain:
 **Why non-blocking:** Phase 2C claims are bounded to supported Git baseline scope.
 
 **Required condition to close:** Explicit submodule engineering capability if required.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -443,8 +336,6 @@ Every entry should contain:
 
 **Description:** Workspaces with multiple independent nested Git roots are not modeled.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -452,10 +343,6 @@ Every entry should contain:
 **Why non-blocking:** Single discovered repository root remains the supported model.
 
 **Required condition to close:** Explicit multi-repository workspace model.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -465,19 +352,11 @@ Every entry should contain:
 
 **Description:** check-ignore batching at scale near inventory ceiling is not performance-characterized.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** OPTIMIZATION
 
 **Lifecycle:** OPEN
 
-**Why non-blocking:** Correctness and bounds remain intact; performance at extreme scale is unknown.
-
 **Required condition to close:** Measurement on large repositories followed by optimization only if necessary.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -487,8 +366,6 @@ Every entry should contain:
 
 **Description:** UNPARSED_TEXT manifests are read but not semantically parsed for OBSERVED identity.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -496,10 +373,6 @@ Every entry should contain:
 **Why non-blocking:** Limitation is explicit; INFERRED-only ecosystem claims remain labeled.
 
 **Required condition to close:** Deliberately approved parser capability for each ecosystem if required.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -509,8 +382,6 @@ Every entry should contain:
 
 **Description:** tsconfig.json with JSONC syntax fails JSON.parse and yields explicit parse failure.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -518,10 +389,6 @@ Every entry should contain:
 **Why non-blocking:** Failure mode is explicit, not silent UNKNOWN.
 
 **Required condition to close:** Deliberate JSONC parser decision or TypeScript-native configuration parser architecture.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -531,8 +398,6 @@ Every entry should contain:
 
 **Description:** Declared dependencies are observed only as declarations; no lockfile/tree/version reasoning exists.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -540,10 +405,6 @@ Every entry should contain:
 **Why non-blocking:** Phase 2D claims remain declaration-only by design.
 
 **Required condition to close:** Future dependency-intelligence capability if explicitly required.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -553,8 +414,6 @@ Every entry should contain:
 
 **Description:** Fixed extension and manifest-name inference registries do not cover all ecosystems or markers.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -562,10 +421,6 @@ Every entry should contain:
 **Why non-blocking:** Absence of inference is not evidence of absence; UNKNOWN remains explicit.
 
 **Required condition to close:** Evidence-backed registry expansion only when justified.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -575,8 +430,6 @@ Every entry should contain:
 
 **Description:** Manifest observations above 256 KiB are rejected by metadata operation.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -584,10 +437,6 @@ Every entry should contain:
 **Why non-blocking:** TOO_LARGE and PARTIAL metadata are explicit.
 
 **Required condition to close:** Deliberate bound change with evidence if real manifests require it.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -597,8 +446,6 @@ Every entry should contain:
 
 **Description:** More than 128 manifest candidates may yield PARTIAL metadata.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -606,10 +453,6 @@ Every entry should contain:
 **Why non-blocking:** MANIFEST_LIMIT_REACHED is explicit.
 
 **Required condition to close:** Evidence-backed bound/selection change if real monorepos require it.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -619,8 +462,6 @@ Every entry should contain:
 
 **Description:** RepositoryMap exists in memory only; no persistence or serialization contract exists.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
@@ -628,10 +469,6 @@ Every entry should contain:
 **Why non-blocking:** Phase 2 Master Contract defers persistence.
 
 **Required condition to close:** Future persistence/versioning architecture.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -641,8 +478,6 @@ Every entry should contain:
 
 **Description:** No semantic intent, typo tolerance, synonyms, stemming, fuzzy search, AST/symbol/import search, or general content search.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** SCHEDULED_DEFERRED
 
 **Lifecycle:** OPEN
@@ -650,8 +485,6 @@ Every entry should contain:
 **Why non-blocking:** Phase 2E bounded claims are lexical/topological only.
 
 **Required condition to close:** Advanced context/session intelligence or another explicitly approved retrieval phase.
-
-**Assigned closure phase:** Post–Phase 2 retrieval intelligence (not Phase 2E)
 
 **Notes:** Do not solve inside Phase 2E.
 
@@ -663,19 +496,11 @@ Every entry should contain:
 
 **Description:** Lexical search performance near Phase 2A's 50,000-observation ceiling is not benchmarked.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** OPTIMIZATION
 
 **Lifecycle:** OPEN
 
-**Why non-blocking:** Algorithmic bounds are declared; product performance at max scale is unknown.
-
 **Required condition to close:** Benchmark near Phase 2A's 50,000-observation ceiling if performance becomes a product requirement.
-
-**Assigned closure phase:** (not assigned)
-
-**Notes:** —
 
 ---
 
@@ -685,8 +510,6 @@ Every entry should contain:
 
 **Description:** No freshness or snapshot-integrity engine exists; RI-008 remains deferred.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** SCHEDULED_DEFERRED
 
 **Lifecycle:** CLOSED
@@ -695,11 +518,9 @@ Every entry should contain:
 
 **Required condition to close:** RI-008 and freshness/snapshot evidence.
 
-**Assigned closure phase:** Phase 2F
+**Closed by checkpoint:** `ba588a084982736bfd924aa5fc821df45694279f`
 
-**Closed in:** `ba588a084982736bfd924aa5fc821df45694279f` (Phase 2F implementation freeze)
-
-**Repository evidence:** `docs/reports/PHASE_2F_REPORT.md` (document-only evidence commit)
+**Evidence:** docs/reports/PHASE_2F_REPORT.md
 
 **Notes:** RI-008 behavioral evidence includes same-size same-mtime in-place content change detection via bounded 2B re-read; metadata equality never produces `VERIFIED_CURRENT`.
 
@@ -711,8 +532,6 @@ Every entry should contain:
 
 **Description:** Repository snapshots remain in memory only; no durable snapshot store exists.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** SCHEDULED_DEFERRED
 
 **Lifecycle:** OPEN
@@ -720,8 +539,6 @@ Every entry should contain:
 **Why non-blocking:** Current Phase 2 rule explicitly forbids persistence in 2A–2F scope.
 
 **Required condition to close:** Advanced session/context persistence architecture.
-
-**Assigned closure phase:** Post–Phase 2 (not Phase 2F)
 
 **Notes:** This MUST NOT be "fixed" in Phase 2F.
 
@@ -733,8 +550,6 @@ Every entry should contain:
 
 **Description:** RI-012 independent integration audit covering model/provider boundaries is not complete.
 
-**Implementer proposed class:** (none recorded at v0)
-
 **Review classification:** SCHEDULED_DEFERRED
 
 **Lifecycle:** CLOSED
@@ -743,11 +558,9 @@ Every entry should contain:
 
 **Required condition to close:** RI-012 independent integration audit.
 
-**Assigned closure phase:** Phase 2G
-
 **Closed by checkpoint:** `f2e175886f888ce3ce42d5b1982f153971b75320`
 
-**Evidence:** `docs/reports/PHASE_2G_AUDIT_REPORT.md` §RI-012 independent audit; `tests/integration/phase2-architecture-audit.test.ts`
+**Evidence:** docs/reports/PHASE_2G_AUDIT_REPORT.md §RI-012 independent audit; tests/integration/phase2-architecture-audit.test.ts
 
 **Notes:** Closed at Phase 2 Closure; not closed in the Phase 2G audit commit itself.
 
@@ -755,11 +568,9 @@ Every entry should contain:
 
 ### GAP-033 — Canonical cross-component RepositoryEntry membership was undeclared, causing Git/snapshot incompatibility
 
-**Discovered in / source:** Phase 2G NOT COMPLETE audit against baseline `fb1484afe9c6527dd906dfdb6aa5a907ac6d01ab`
+**Discovered in / source:** Phase 2G NOT COMPLETE audit against baseline fb1484afe9c6527dd906dfdb6aa5a907ac6d01ab
 
 **Description:** Phase 2C legitimately annotates `RepositoryEntry` values carried by entry-bearing inventory observations such as DESCENDED directories. Phase 2F validated Git annotation membership against an ADMITTED-only subset. The root defect is broader than one comparison: the canonical `RepositoryEntry` set used for cross-component reference identity was not explicitly defined as a shared inventory-layer contract. This caused a valid `GitStateBaseline` produced from a `RepositoryInventory` to be rejected by a `RepositorySnapshot` built from the same inventory.
-
-**Evidence / observation:** Original symptom `SNAPSHOT_ARTIFACTS_INCOMPATIBLE` for nested repositories; Phase 2G integration test evidence archived at `/tmp/path-code-phase2g-not-complete/`.
 
 **Implementer proposed class:** BLOCKING_INVARIANT
 
@@ -767,15 +578,13 @@ Every entry should contain:
 
 **Lifecycle:** CLOSED
 
-**Why blocking:** Downstream false assumption / composition failure — Phase 3 would inherit incorrect PRE_EXISTING binding semantics.
+**Why non-blocking:** Downstream false assumption / composition failure — Phase 3 would inherit incorrect PRE_EXISTING binding semantics.
 
 **Required condition to close:** Canonical cross-component `RepositoryEntry` membership defined; every relevant 2C/2D/2E/2F consumer audited against it; legitimate nested Git baseline binds into snapshot; foreign-inventory references still fail closed; original defect reproduced by falsification; immutable implementation checkpoint exists.
 
-**Assigned closure phase:** Phase 2G-H1
-
 **Closed by checkpoint:** `c0309407ea891cfa036f93d455f500694779c301`
 
-**Evidence:** `docs/reports/PHASE_2G_H1_REPORT.md`
+**Evidence:** docs/reports/PHASE_2G_H1_REPORT.md
 
 **Notes:** Phase 2G remains NOT COMPLETE until the independent integration audit is rerun after H1.
 
@@ -783,32 +592,27 @@ Every entry should contain:
 
 ### GAP-034 — Phase 2G compile-time spot-checks for RI-017 and RI-012 listed but unexecuted
 
-**Discovered in / source:** Phase 2G re-audit, `f2e175886f888ce3ce42d5b1982f153971b75320`
+**Discovered in / source:** Phase 2G re-audit, f2e175886f888ce3ce42d5b1982f153971b75320
 
 **Description:** The committed Phase 2G audit report listed RI-017 and RI-012 among compile-time intended-error spot-checks, but a malformed shell loop meant those two probes did not execute during the audit.
 
-**Evidence / observation:** Only RI-001 and related probes produced captured compiler output during the original audit sweep.
+**Implementer proposed class:** BLOCKING_INVARIANT
 
-**Implementer proposed class:** BLOCKING_INVARIANT — AUDIT EVIDENCE
-
-**Review classification:** BLOCKING_INVARIANT — AUDIT EVIDENCE
+**Review classification:** BLOCKING_INVARIANT
 
 **Lifecycle:** CLOSED
 
-**Why blocking:** The frozen invariant "claims require evidence" was violated in the audit's own record. It blocked the closure evidence chain, not the production implementation.
+**Why non-blocking:** The frozen invariant "claims require evidence" was violated in the audit's own record. It blocked the closure evidence chain, not the production implementation.
 
 **Required condition to close:** Execute or formally disposition RI-017 and RI-012 compile-time evidence; restore source; document reconciliation.
 
-**Assigned closure phase:** Phase 2G-E1
-
 **Closed by checkpoint:** `2a4d81cefa6b3c32d6970fad8b9f985083fb24da`
 
-**Evidence:** `docs/reports/PHASE_2G_E1_EVIDENCE_SUPPLEMENT.md`
+**Evidence:** docs/reports/PHASE_2G_E1_EVIDENCE_SUPPLEMENT.md
 
-**Notes:** RI-017 executed with the intended error; RI-012 recorded NOT APPLICABLE with rationale rather than a manufactured probe.
+**Notes:** BLOCKING_INVARIANT — AUDIT EVIDENCE. RI-017 executed with the intended error; RI-012 recorded NOT APPLICABLE with rationale rather than a manufactured probe.
 
 ---
-
 ## GAP CLOSURE CONDUCT
 
 When a later pass closes a gap:

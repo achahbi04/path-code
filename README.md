@@ -78,7 +78,7 @@ Master contract:
 
 [`docs/ENGINEERING_SELF_OBSERVATION.md`](docs/ENGINEERING_SELF_OBSERVATION.md)
 
-**Gap Ledger: V0 ACTIVE**
+**Gap Ledger: V1 ACTIVE**
 
 [`docs/GAP_LEDGER.md`](docs/GAP_LEDGER.md)
 
@@ -98,25 +98,27 @@ Master contract:
 
 [`docs/PHASE_2_CLOSURE.md`](docs/PHASE_2_CLOSURE.md)
 
-**Engineering Self-Observation Architecture: FROZEN**
+**Engineering Self-Observation: RUNTIME FOUNDATION FROZEN**
 
-**Gap Ledger: V0 ACTIVE**
+[`docs/reports/SELF_OBSERVATION_V1_REPORT.md`](docs/reports/SELF_OBSERVATION_V1_REPORT.md)
 
-Next architecture:
+**Capability Ledger: V1 ACTIVE**
+
+**ledger:verify: ACTIVE IN npm run check**
 
 **Phase 3 Safe Editing Master Contract: FROZEN**
 
 [`docs/PHASE_3_SAFE_EDITING_MASTER.md`](docs/PHASE_3_SAFE_EDITING_MASTER.md)
 
-**Phase 3 implementation: NOT STARTED**
+**Phase 3 — Safe Editing Engine: DECLARED / NOT IMPLEMENTED**
 
-**Self-Observation foundation gate: PENDING**
+Path Code has NO editing capability yet.
 
-Next runtime foundation:
+Next permitted runtime phase:
 
-Capability / Construction Ledger v1 + Gap Ledger v1 + ledger + Engineering Self-Observation runtime foundation
+**Phase 3A — Edit Contracts / Preparation / Authorization**
 
-Phase 3 implementation (3A+) remains gated until both the Phase 3 Master Contract is frozen and the post-Phase-2 Self-Observation foundation gate is satisfied.
+Phase 3A preflight must verify this Self-Observation v1 freeze externally, because the Capability Ledger intentionally contains no self-record.
 
 Do not claim Phase 3 capability or editing capability exists.
 
