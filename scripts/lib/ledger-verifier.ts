@@ -211,7 +211,12 @@ export async function verifyLedgers(
         ...(exists ? {} : { reason: "commit does not exist" }),
       });
       if (!exists) {
-        failures.push(fail("GAP_CLOSURE", `${record.id}: closedByCommit missing`));
+        failures.push(
+          fail(
+            "GAP_CLOSURE_COMMIT_UNRESOLVED",
+            `${record.id}: closedByCommit ${record.closedByCommit} does not resolve to a Git commit`,
+          ),
+        );
       } else {
         const ancestor = await gitIsAncestor(
           repoRoot,
