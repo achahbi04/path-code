@@ -114,4 +114,36 @@ describe("selfobs derivation", () => {
       state: "IMPLEMENTED",
     });
   });
+
+  it("derives edit-contracts PASS_FROZEN and safe-editing DECLARED with verification", async () => {
+    const { verifyLedgers } = await import("../../scripts/lib/ledger-verifier.js");
+    const repoRoot = new URL("../..", import.meta.url).pathname;
+    const capabilityLedger = getCanonicalCapabilityLedger();
+    const gapLedger = getCanonicalGapLedger();
+    const result = await verifyLedgers(repoRoot, capabilityLedger, gapLedger);
+    expect(result.ok).toBe(true);
+    expect(result.verification).toBeDefined();
+    if (!result.verification) {
+      return;
+    }
+
+    const observations = deriveAllCapabilityObservations(
+      capabilityLedger,
+      gapLedger,
+      result.verification,
+    );
+    const editContracts = observations.find((o) => o.capabilityId === "edit-contracts");
+    const safeEditing = observations.find((o) => o.capabilityId === "safe-editing");
+
+    expect(editContracts).toMatchObject({
+      kind: "VERIFIED_CAPABILITY_STATE",
+      capabilityId: "edit-contracts",
+      state: "PASS_FROZEN",
+    });
+    expect(safeEditing).toMatchObject({
+      kind: "VERIFIED_CAPABILITY_STATE",
+      capabilityId: "safe-editing",
+      state: "DECLARED",
+    });
+  });
 });

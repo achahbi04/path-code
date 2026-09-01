@@ -425,6 +425,92 @@ const RECORDS: CapabilityRecord[] = [
     ],
   },
   {
+    capabilityId: "edit-contracts",
+    title: "Phase 3A Edit Contracts / Preparation / Authorization",
+    phaseId: "phase-3",
+    declarationEvidence: [
+      doc(
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "3A — EDIT CONTRACTS / PREPARATION / AUTHORIZATION",
+      ),
+    ],
+    implementationEvidence: [
+      mod(
+        "src/editing/index.ts",
+        SHA.phase3AImpl,
+        "Phase 3A public editing contract surface",
+      ),
+      mod(
+        "src/editing/preparation.ts",
+        SHA.phase3AImpl,
+        "Point-in-time preparation through Phase 2B reader",
+      ),
+      mod(
+        "src/editing/authorization.ts",
+        SHA.phase3AImpl,
+        "Explicit authorization and single-use semantics",
+      ),
+    ],
+    freezeEvidence: {
+      kind: "sameCommit",
+      implementationCommit: SHA.phase3AImpl,
+      reportPath: "docs/reports/PHASE_3A_REPORT.md",
+    },
+    dependencies: [
+      "safe-editing",
+      "repository-reader",
+      "repository-inventory",
+      "project-configuration",
+      "canonical-workspace-path",
+    ],
+    proofObligations: [
+      obligation(
+        "SE-002",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-002 — AUTHORIZATION BINDS EXACT BYTES",
+      ),
+      obligation(
+        "SE-003",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-003 — NO UNAUTHORIZED MUTATION",
+      ),
+      obligation(
+        "SE-004",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-004 — NO AUTONOMOUS AUTHORITY",
+      ),
+      obligation(
+        "SE-005",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-005 — AUTHORIZATION IS SINGLE-USE",
+      ),
+      obligation(
+        "SE-012",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-012 — EXACT AUTHORIZED BYTES ONLY",
+      ),
+      obligation(
+        "SE-013",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-013 — BOUNDS HOLD",
+      ),
+      obligation(
+        "SE-016",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-016 — WRITE BOUNDARY HOLDS",
+      ),
+    ],
+    knownLimitations: [],
+  },
+  {
     capabilityId: "safe-editing",
     title: "Phase 3 Safe Editing Engine",
     phaseId: "phase-3",
