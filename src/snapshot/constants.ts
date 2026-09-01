@@ -1,0 +1,8 @@
+/**
+ * Phase 2F verification hard production ceilings.
+ */
+
+export const MAX_ENTRY_VERIFICATIONS_PER_OPERATION = 50_000;
+export const MAX_CONTENT_VERIFICATIONS_PER_OPERATION = 128;
+export const MAX_ENTRY_VERIFICATION_CONCURRENCY = 32;
+export const MAX_CONTENT_VERIFICATION_CONCURRENCY = 4;

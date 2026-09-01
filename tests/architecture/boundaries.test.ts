@@ -12,6 +12,7 @@ const platformDir = fileURLToPath(new URL("../../src/platform", import.meta.url)
 const cliDir = fileURLToPath(new URL("../../src/cli", import.meta.url));
 const inventoryDir = fileURLToPath(new URL("../../src/inventory", import.meta.url));
 const readerDir = fileURLToPath(new URL("../../src/reader", import.meta.url));
+const snapshotDir = fileURLToPath(new URL("../../src/snapshot", import.meta.url));
 
 const READER_FORBIDDEN = [
   /import\s+.*loadProjectConfig|from\s+["'].*config\/loader/,
@@ -281,6 +282,33 @@ describe("architecture boundaries", () => {
     for (const filePath of listTsFiles(searchDir)) {
       const source = readFileSync(filePath, "utf8");
       for (const pattern of SEARCH_FORBIDDEN) {
+        if (pattern.test(source)) {
+          violations.push(`${filePath} matched ${pattern}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps src/snapshot free of persistence, traversal, git execution, and loader imports", () => {
+    expect(statSync(snapshotDir).isDirectory()).toBe(true);
+    const SNAPSHOT_FORBIDDEN = [
+      /from\s+["'].*config\/loader/,
+      /loadProjectConfig/,
+      /from\s+["']node:child_process["']/,
+      /from\s+["']node:fs["']/,
+      /\bwriteFile\b/,
+      /\bappendFile\b/,
+      /\bcreateWriteStream\b/,
+      /from\s+["'].*inventory\/traverse/,
+      /runGit/,
+      /collectGitStateBaseline/,
+      /createHash/,
+    ];
+    const violations: string[] = [];
+    for (const filePath of listTsFiles(snapshotDir)) {
+      const source = readFileSync(filePath, "utf8");
+      for (const pattern of SNAPSHOT_FORBIDDEN) {
         if (pattern.test(source)) {
           violations.push(`${filePath} matched ${pattern}`);
         }

@@ -725,8 +725,93 @@ type _TooLargeHasNoObservation = ExpectTrue<
 >;
 
 // ---------------------------------------------------------------------------
-// Phase 1F platform / CLI contract evidence
+// Phase 2F snapshot / freshness provenance evidence (RI-008, RI-011)
 // ---------------------------------------------------------------------------
+
+import type {
+  ContentVerificationState,
+  EntryVerificationState,
+  FreshnessAssessment,
+  FreshnessAssessmentData,
+  RepositorySnapshot,
+  RepositorySnapshotData,
+  SnapshotGeneration,
+} from "../../src/snapshot/index.js";
+import * as snapshotPublic from "../../src/snapshot/index.js";
+
+declare function acceptRepositorySnapshot(value: RepositorySnapshot): void;
+declare function acceptFreshnessAssessment(value: FreshnessAssessment): void;
+declare function requireVerifiedCurrentState(
+  state: Extract<ContentVerificationState, "VERIFIED_CURRENT">,
+): void;
+declare function requireContentState(state: ContentVerificationState): void;
+
+const forgedSnapshot: RepositorySnapshotData = {
+  generation: {} as SnapshotGeneration,
+  assembledAt: 0,
+  workspace: _boundary,
+  config: resolvedForReader,
+  inventory: forgedInventory as RepositoryInventory,
+  contentObservations: [],
+  contentObservationByEntry: new Map(),
+  entryStatIdentities: new Map(),
+  inventoryTraversalCompletion: { kind: "COMPLETE" },
+};
+
+// @ts-expect-error RepositorySnapshot requires earned builder provenance
+acceptRepositorySnapshot(forgedSnapshot);
+const forgedAssessment: FreshnessAssessmentData = {
+  snapshot: forgedSnapshot as RepositorySnapshot,
+  generation: forgedSnapshot.generation,
+  assessedAt: 0,
+  entryResults: [],
+  contentResults: [],
+  derivedResults: [],
+  assessmentCompletion: { kind: "COMPLETE" },
+  honesty: {
+    verifiedObservationsOnly: true,
+    newEntriesNotDetectable: true,
+    repositoryUnchangedClaim: false,
+  },
+};
+
+// @ts-expect-error FreshnessAssessment requires earned verification provenance
+acceptFreshnessAssessment(forgedAssessment);
+
+declare const revalidationState: Extract<
+  ContentVerificationState,
+  "REVALIDATION_REQUIRED"
+>;
+
+// @ts-expect-error REVALIDATION_REQUIRED cannot satisfy a VERIFIED_CURRENT requirement
+requireVerifiedCurrentState(revalidationState);
+declare const currentIdentityState: Extract<
+  EntryVerificationState,
+  "CURRENT_IDENTITY"
+>;
+
+// @ts-expect-error entry identity states must not assign to content verification states
+requireContentState(currentIdentityState);
+
+type CurrentContentOnly = Extract<ContentVerificationState, "VERIFIED_CURRENT">;
+type RevalidationOnly = Extract<ContentVerificationState, "REVALIDATION_REQUIRED">;
+type _RevalidationNotCurrent = ExpectFalse<
+  RevalidationOnly extends CurrentContentOnly ? true : false
+>;
+
+declare function verifyEntries(
+  request: import("../../src/snapshot/index.js").VerificationRequest,
+): void;
+
+// @ts-expect-error verification scope must use RepositoryEntry references, not raw paths
+verifyEntries({ entries: ["src/main.ts"], content: "NONE" });
+
+// @ts-expect-error snapshot module must not export branding bypass helpers
+snapshotPublic.brandRepositorySnapshot;
+
+const _phase2fStructuralChecks: [_RevalidationNotCurrent] = [false];
+
+void _phase2fStructuralChecks;
 
 type _PlatformIdClosed = ExpectTrue<
   PlatformId extends "macos" | "linux" | "windows" ? true : false
