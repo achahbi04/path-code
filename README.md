@@ -94,14 +94,24 @@ Master contract:
 
 [`docs/reports/PHASE_2G_AUDIT_REPORT.md`](docs/reports/PHASE_2G_AUDIT_REPORT.md)
 
-Phase 2:
+**Phase 2 — Repository Intelligence: COMPLETE / FROZEN**
 
-**AUDIT COMPLETE**
+[`docs/PHASE_2_CLOSURE.md`](docs/PHASE_2_CLOSURE.md)
 
-**FORMAL CLOSURE PENDING**
+**Engineering Self-Observation Architecture: FROZEN**
 
-Next:
+**Gap Ledger: V0 ACTIVE**
 
-**Phase 2 Closure** — separate document-only operation
+Next architecture:
+
+**Phase 3 Safe Editing Engine Master Contract**
+
+Next runtime foundation:
+
+Capability / Construction Ledger v1 + Gap Ledger v1 + ledger + Engineering Self-Observation runtime foundation
+
+Phase 3 implementation (3A+) remains gated until both the Phase 3 Master Contract is frozen and the post-Phase-2 Self-Observation foundation gate is satisfied.
+
+Do not claim Phase 3 capability or editing capability exists.
 
 Design forward. Implement only the current permitted phase.

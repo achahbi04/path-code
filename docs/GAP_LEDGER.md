@@ -737,7 +737,7 @@ Every entry should contain:
 
 **Review classification:** SCHEDULED_DEFERRED
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Why non-blocking:** Assigned to Phase 2G by frozen contract.
 
@@ -745,7 +745,11 @@ Every entry should contain:
 
 **Assigned closure phase:** Phase 2G
 
-**Notes:** —
+**Closed by checkpoint:** `f2e175886f888ce3ce42d5b1982f153971b75320`
+
+**Evidence:** `docs/reports/PHASE_2G_AUDIT_REPORT.md` §RI-012 independent audit; `tests/integration/phase2-architecture-audit.test.ts`
+
+**Notes:** Closed at Phase 2 Closure; not closed in the Phase 2G audit commit itself.
 
 ---
 
@@ -774,6 +778,34 @@ Every entry should contain:
 **Evidence:** `docs/reports/PHASE_2G_H1_REPORT.md`
 
 **Notes:** Phase 2G remains NOT COMPLETE until the independent integration audit is rerun after H1.
+
+---
+
+### GAP-034 — Phase 2G compile-time spot-checks for RI-017 and RI-012 listed but unexecuted
+
+**Discovered in / source:** Phase 2G re-audit, `f2e175886f888ce3ce42d5b1982f153971b75320`
+
+**Description:** The committed Phase 2G audit report listed RI-017 and RI-012 among compile-time intended-error spot-checks, but a malformed shell loop meant those two probes did not execute during the audit.
+
+**Evidence / observation:** Only RI-001 and related probes produced captured compiler output during the original audit sweep.
+
+**Implementer proposed class:** BLOCKING_INVARIANT — AUDIT EVIDENCE
+
+**Review classification:** BLOCKING_INVARIANT — AUDIT EVIDENCE
+
+**Lifecycle:** CLOSED
+
+**Why blocking:** The frozen invariant "claims require evidence" was violated in the audit's own record. It blocked the closure evidence chain, not the production implementation.
+
+**Required condition to close:** Execute or formally disposition RI-017 and RI-012 compile-time evidence; restore source; document reconciliation.
+
+**Assigned closure phase:** Phase 2G-E1
+
+**Closed by checkpoint:** `2a4d81cefa6b3c32d6970fad8b9f985083fb24da`
+
+**Evidence:** `docs/reports/PHASE_2G_E1_EVIDENCE_SUPPLEMENT.md`
+
+**Notes:** RI-017 executed with the intended error; RI-012 recorded NOT APPLICABLE with rationale rather than a manufactured probe.
 
 ---
 
