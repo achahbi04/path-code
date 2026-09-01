@@ -104,7 +104,13 @@ Master contract:
 
 Next architecture:
 
-**Phase 3 Safe Editing Engine Master Contract**
+**Phase 3 Safe Editing Master Contract: FROZEN**
+
+[`docs/PHASE_3_SAFE_EDITING_MASTER.md`](docs/PHASE_3_SAFE_EDITING_MASTER.md)
+
+**Phase 3 implementation: NOT STARTED**
+
+**Self-Observation foundation gate: PENDING**
 
 Next runtime foundation:
 
