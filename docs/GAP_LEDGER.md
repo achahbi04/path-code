@@ -749,6 +749,34 @@ Every entry should contain:
 
 ---
 
+### GAP-033 — Canonical cross-component RepositoryEntry membership was undeclared, causing Git/snapshot incompatibility
+
+**Discovered in / source:** Phase 2G NOT COMPLETE audit against baseline `fb1484afe9c6527dd906dfdb6aa5a907ac6d01ab`
+
+**Description:** Phase 2C legitimately annotates `RepositoryEntry` values carried by entry-bearing inventory observations such as DESCENDED directories. Phase 2F validated Git annotation membership against an ADMITTED-only subset. The root defect is broader than one comparison: the canonical `RepositoryEntry` set used for cross-component reference identity was not explicitly defined as a shared inventory-layer contract. This caused a valid `GitStateBaseline` produced from a `RepositoryInventory` to be rejected by a `RepositorySnapshot` built from the same inventory.
+
+**Evidence / observation:** Original symptom `SNAPSHOT_ARTIFACTS_INCOMPATIBLE` for nested repositories; Phase 2G integration test evidence archived at `/tmp/path-code-phase2g-not-complete/`.
+
+**Implementer proposed class:** BLOCKING_INVARIANT
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** CLOSED
+
+**Why blocking:** Downstream false assumption / composition failure — Phase 3 would inherit incorrect PRE_EXISTING binding semantics.
+
+**Required condition to close:** Canonical cross-component `RepositoryEntry` membership defined; every relevant 2C/2D/2E/2F consumer audited against it; legitimate nested Git baseline binds into snapshot; foreign-inventory references still fail closed; original defect reproduced by falsification; immutable implementation checkpoint exists.
+
+**Assigned closure phase:** Phase 2G-H1
+
+**Closed by checkpoint:** `c0309407ea891cfa036f93d455f500694779c301`
+
+**Evidence:** `docs/reports/PHASE_2G_H1_REPORT.md`
+
+**Notes:** Phase 2G remains NOT COMPLETE until the independent integration audit is rerun after H1.
+
+---
+
 ## GAP CLOSURE CONDUCT
 
 When a later pass closes a gap:
