@@ -155,8 +155,8 @@ describe("Phase 2G architecture audit — package surface", () => {
     expect(rootSource).not.toMatch(/verifyRepositorySnapshot/);
   });
 
-  it("Phase 3/editing modules are absent", () => {
-    expect(statSync(join(repoRoot, "src/editing"), { throwIfNoEntry: false })).toBeUndefined();
+  it("Phase 3 execution/model modules remain absent while editing contracts exist", () => {
+    expect(statSync(join(repoRoot, "src/editing"), { throwIfNoEntry: false })).toBeDefined();
     expect(statSync(join(repoRoot, "src/execution"), { throwIfNoEntry: false })).toBeUndefined();
     expect(statSync(join(repoRoot, "src/model"), { throwIfNoEntry: false })).toBeUndefined();
   });
