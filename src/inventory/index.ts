@@ -4,6 +4,12 @@
  * No content reading, hashing, Git, or configuration loading.
  */
 
+export {
+  canonicalInventoryEntrySet,
+  isEntryBearingInventoryObservation,
+  repositoryEntries,
+  type EntryBearingInventoryObservation,
+} from "./membership.js";
 export { inventory } from "./traverse.js";
 export {
   DEFAULT_SYSTEM_PRUNED_DIRECTORIES,

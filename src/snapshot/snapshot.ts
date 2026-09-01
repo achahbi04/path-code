@@ -6,6 +6,7 @@ import type { Result } from "../domain/result.js";
 import { failure, success } from "../domain/result.js";
 import type { GitStateBaseline } from "../git/types.js";
 import type { RepositoryEntry, RepositoryInventory } from "../inventory/types.js";
+import { canonicalInventoryEntrySet } from "../inventory/membership.js";
 import type { ManifestEvidence, RepositoryMap } from "../metadata/types.js";
 import type { ContentObservation } from "../reader/types.js";
 import { buildRepositorySearchCorpus } from "../search/corpus.js";
@@ -92,9 +93,9 @@ function validateGitCompatibility(
     );
   }
 
-  const admitted = new Set(collectAdmittedEntries(inventory));
+  const canonicalEntries = canonicalInventoryEntrySet(inventory);
   for (const annotation of baseline.annotations) {
-    if (!admitted.has(annotation.entry)) {
+    if (!canonicalEntries.has(annotation.entry)) {
       return failure(
         snapshotFailure(
           "SNAPSHOT_ARTIFACTS_INCOMPATIBLE",

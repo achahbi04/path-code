@@ -16,6 +16,7 @@ import {
   isPhysicallyDenied,
   prepareDenyPathPlan,
 } from "../inventory/denial.js";
+import { repositoryEntries } from "../inventory/membership.js";
 import type { RepositoryEntry, RepositoryInventory } from "../inventory/types.js";
 import {
   gitBaselineFailure,
@@ -105,22 +106,6 @@ async function readBranchState(
     return success({ kind: "ATTACHED", name });
   }
   return success({ kind: "DETACHED" });
-}
-
-function inventoryEntries(
-  inventory: RepositoryInventory,
-): readonly RepositoryEntry[] {
-  const entries: RepositoryEntry[] = [];
-  for (const observation of inventory.observations) {
-    if (
-      observation.disposition === "ADMITTED" ||
-      observation.disposition === "DESCENDED" ||
-      observation.disposition === "DEPTH_LIMIT_REACHED"
-    ) {
-      entries.push(observation.entry);
-    }
-  }
-  return entries;
 }
 
 function makeObservation(
@@ -286,7 +271,7 @@ export async function collectGitStateBaseline(
     trackedModes.set(record.gitRelativePath, record.mode);
   }
 
-  const entries = inventoryEntries(inventory);
+  const entries = repositoryEntries(inventory);
   const entryByWorkspacePath = new Map<string, RepositoryEntry>();
   for (const entry of entries) {
     entryByWorkspacePath.set(entry.relativePath, entry);
