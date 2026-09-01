@@ -86,8 +86,22 @@ Master contract:
 
 [`docs/reports/PHASE_2F_REPORT.md`](docs/reports/PHASE_2F_REPORT.md)
 
+**Phase 2G-H1 — Canonical Cross-Component RepositoryEntry Membership: FROZEN**
+
+[`docs/reports/PHASE_2G_H1_REPORT.md`](docs/reports/PHASE_2G_H1_REPORT.md)
+
+**Phase 2G — Repository Intelligence Integration Audit: COMPLETE**
+
+[`docs/reports/PHASE_2G_AUDIT_REPORT.md`](docs/reports/PHASE_2G_AUDIT_REPORT.md)
+
+Phase 2:
+
+**AUDIT COMPLETE**
+
+**FORMAL CLOSURE PENDING**
+
 Next:
 
-**Phase 2G — Repository Intelligence Integration Audit**
+**Phase 2 Closure** — separate document-only operation
 
 Design forward. Implement only the current permitted phase.
