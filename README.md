@@ -74,6 +74,14 @@ Master contract:
 
 **Phase 2E — Search + Candidate Retrieval: FROZEN**
 
+**Engineering Self-Observation Architecture: FROZEN**
+
+[`docs/ENGINEERING_SELF_OBSERVATION.md`](docs/ENGINEERING_SELF_OBSERVATION.md)
+
+**Gap Ledger: V0 ACTIVE**
+
+[`docs/GAP_LEDGER.md`](docs/GAP_LEDGER.md)
+
 **Phase 2F: NOT STARTED**
 
 Next:
