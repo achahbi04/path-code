@@ -82,10 +82,12 @@ Master contract:
 
 [`docs/GAP_LEDGER.md`](docs/GAP_LEDGER.md)
 
-**Phase 2F: NOT STARTED**
+**Phase 2F — Freshness + In-Memory Snapshot Integrity: FROZEN**
+
+[`docs/reports/PHASE_2F_REPORT.md`](docs/reports/PHASE_2F_REPORT.md)
 
 Next:
 
-**Phase 2F — Freshness + In-Memory Snapshot Integrity**
+**Phase 2G — Repository Intelligence Integration Audit**
 
 Design forward. Implement only the current permitted phase.

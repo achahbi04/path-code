@@ -689,7 +689,7 @@ Every entry should contain:
 
 **Review classification:** SCHEDULED_DEFERRED
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Why non-blocking:** Deferred by frozen Master Contract until Phase 2F.
 
@@ -697,7 +697,11 @@ Every entry should contain:
 
 **Assigned closure phase:** Phase 2F
 
-**Notes:** —
+**Closed in:** `ba588a084982736bfd924aa5fc821df45694279f` (Phase 2F implementation freeze)
+
+**Repository evidence:** `docs/reports/PHASE_2F_REPORT.md` (document-only evidence commit)
+
+**Notes:** RI-008 behavioral evidence includes same-size same-mtime in-place content change detection via bounded 2B re-read; metadata equality never produces `VERIFIED_CURRENT`.
 
 ---
 
