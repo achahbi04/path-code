@@ -71,6 +71,16 @@ import type {
   RepositoryMap,
   RepositoryMapData,
 } from "../../src/metadata/index.js";
+import * as searchPublic from "../../src/search/index.js";
+import type {
+  RepositoryCandidate,
+  RepositoryCandidateData,
+  RepositorySearchCorpus,
+  RepositorySearchCorpusData,
+  RepositorySearchResult,
+  RepositorySearchResultData,
+  SearchQuery,
+} from "../../src/search/index.js";
 
 // 1. raw string is NOT assignable to CanonicalPath
 // @ts-expect-error raw string is not assignable to CanonicalPath
@@ -624,6 +634,87 @@ type _InferredHasNoEvidence = ExpectTrue<
 // @ts-expect-error RepositoryMap branding helper must not be public
 metadataPublic.brandRepositoryMap;
 
+// ---------------------------------------------------------------------------
+// Phase 2E search provenance evidence (RI-009)
+// ---------------------------------------------------------------------------
+
+declare function acceptRepositorySearchCorpus(value: RepositorySearchCorpus): void;
+declare function acceptRepositoryCandidate(value: RepositoryCandidate): void;
+declare function acceptRepositorySearchResult(value: RepositorySearchResult): void;
+declare function acceptSearchQuery(value: SearchQuery): void;
+
+const plainEntryArray = [forgedEntry as RepositoryEntry];
+
+// @ts-expect-error plain RepositoryEntry[] cannot satisfy RepositorySearchCorpus
+acceptRepositorySearchCorpus(plainEntryArray);
+
+const forgedCorpusData: RepositorySearchCorpusData = {
+  inventoryTraversalCompletion: { kind: "COMPLETE" },
+  metadataCompletion: { kind: "COMPLETE" },
+  boundaries: [],
+  admittedEntries: [forgedEntry as RepositoryEntry],
+  mapEntriesByEntry: new Map(),
+};
+
+// @ts-expect-error RepositorySearchCorpus requires earned builder provenance
+acceptRepositorySearchCorpus(forgedCorpusData);
+
+const forgedCandidateData: RepositoryCandidateData = {
+  entry: forgedEntry as RepositoryEntry,
+  relevanceScore: 1,
+  matchReasons: [{ kind: "PATH_COMPONENT_MATCH", term: "auth", component: "auth" }],
+  relativePath: "src/auth.ts",
+  lexicalDepth: 1,
+  lexicalKind: "FILE",
+};
+
+// @ts-expect-error RepositoryCandidate requires earned search provenance
+acceptRepositoryCandidate(forgedCandidateData);
+
+const rawStringCandidateEntry = {
+  entry: "src/auth.ts",
+  relevanceScore: 1,
+  matchReasons: [],
+  relativePath: "src/auth.ts",
+  lexicalDepth: 1,
+  lexicalKind: "FILE" as const,
+};
+
+// @ts-expect-error candidate entry must be RepositoryEntry, not string
+acceptRepositoryCandidate(rawStringCandidateEntry);
+
+const forgedSearchResultData: RepositorySearchResultData = {
+  query: { terms: [], normalizedTerms: [] } as unknown as SearchQuery,
+  candidates: [],
+  observedMatchCount: 0,
+  sourceCompletion: {
+    inventoryTraversalCompletion: { kind: "COMPLETE" },
+    metadataCompletion: { kind: "COMPLETE" },
+  },
+  selectionCompletion: { kind: "COMPLETE" },
+  unavailableSignals: [],
+  limitations: [],
+};
+
+// @ts-expect-error RepositorySearchResult requires earned search provenance
+acceptRepositorySearchResult(forgedSearchResultData);
+
+// @ts-expect-error unvalidated caller input is not an earned SearchQuery
+acceptSearchQuery({ terms: ["auth"] });
+
+type _CandidateEntryIsRepositoryEntry = ExpectTrue<
+  Extract<RepositoryCandidate, unknown>["entry"] extends RepositoryEntry ? true : false
+>;
+
+type _UnavailableSignalIsNotCandidate = ExpectTrue<
+  Extract<RepositorySearchResult, unknown>["unavailableSignals"][number] extends RepositoryCandidate
+    ? false
+    : true
+>;
+
+// @ts-expect-error search module must not export unsafe corpus branding helper
+searchPublic.brandRepositorySearchCorpus;
+
 type _TooLargeHasNoObservation = ExpectTrue<
   "observation" extends keyof Extract<
     RepositoryReadOutcome,
@@ -701,6 +792,8 @@ type _Keep = [
   _UnmappedHasNoEntry,
   _GitBaselineSuccessIsBranded,
   _InferredHasNoEvidence,
+  _CandidateEntryIsRepositoryEntry,
+  _UnavailableSignalIsNotCandidate,
   _TooLargeHasNoObservation,
   _PlatformIdClosed,
   _NoExtraPlatformId,

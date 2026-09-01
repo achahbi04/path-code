@@ -72,10 +72,12 @@ Master contract:
 
 **Phase 2D — Project Metadata + Evidence-Backed Repository Map: FROZEN**
 
-**Phase 2E: NOT STARTED**
+**Phase 2E — Search + Candidate Retrieval: FROZEN**
+
+**Phase 2F: NOT STARTED**
 
 Next:
 
-**Phase 2E — Search + Candidate Retrieval**
+**Phase 2F — Freshness + In-Memory Snapshot Integrity**
 
 Design forward. Implement only the current permitted phase.

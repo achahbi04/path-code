@@ -264,4 +264,28 @@ describe("architecture boundaries", () => {
     }
     expect(violations).toEqual([]);
   });
+
+  it("keeps src/search free of reader execution, fs access, and forbidden imports", () => {
+    const searchDir = fileURLToPath(new URL("../../src/search", import.meta.url));
+    expect(statSync(searchDir).isDirectory()).toBe(true);
+    const SEARCH_FORBIDDEN = [
+      /readRepositoryContent/,
+      /from\s+["'].*reader\/read/,
+      /from\s+["']node:fs["']/,
+      /from\s+["']node:fs\/promises["']/,
+      /\breadFile\b/,
+      /from\s+["']node:child_process["']/,
+      /runGit/,
+    ];
+    const violations: string[] = [];
+    for (const filePath of listTsFiles(searchDir)) {
+      const source = readFileSync(filePath, "utf8");
+      for (const pattern of SEARCH_FORBIDDEN) {
+        if (pattern.test(source)) {
+          violations.push(`${filePath} matched ${pattern}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
 });
