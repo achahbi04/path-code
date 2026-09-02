@@ -153,3 +153,13 @@ const _creationRecord: EditRecord = {
   durabilityVerified: false,
 };
 void _creationRecord;
+
+// C-F9 / Amendment 1: path-shaped objects are not publication-earned verification targets
+import type { PublishedCreationVerificationTarget } from "../../src/editing/atomic-fs.js";
+const forgedPathShapedCreationTarget = {
+  absolutePath: "/tmp/preexisting.txt",
+};
+// @ts-expect-error path-shaped plain object is not a PublishedCreationVerificationTarget
+const _forgedCreationVerifyTarget: PublishedCreationVerificationTarget =
+  forgedPathShapedCreationTarget;
+void _forgedCreationVerifyTarget;

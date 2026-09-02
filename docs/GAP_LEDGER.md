@@ -828,11 +828,17 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Why non-blocking:** Blocking — deny-path is not an equivalent substitute for action-class restriction of CREATE_FILE.
 
 **Required condition to close:** Additive Phase 1 ActionClass amendment plus authorization-time and mutation-time CREATE_FILE disable enforcement with immutable corrective evidence.
+
+**Closed by checkpoint:** `1136c40ab1667e4a5b70185c8bef68ce67d675a2`
+
+**Evidence:** docs/reports/PHASE_3C_H1_REPORT.md
+
+**Notes:** Closed by Phase 3C-H1: Phase 1 Action Class Amendment 1 + Stage 2 CREATE_FILE mapping + C-F8 live falsification. Evidence: docs/PHASE_1_ACTION_CLASS_AMENDMENT_1.md, docs/PHASE_3_SAFE_EDITING_AMENDMENT_1.md, docs/reports/PHASE_3C_H1_REPORT.md §2/§5.
 
 ---
 
@@ -846,11 +852,17 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Why non-blocking:** Blocking — post-creation verification must not become generic repository-read authority.
 
 **Required condition to close:** Frozen operation-bound PublishedCreationVerificationTarget / CreationAfterStateEvidence contract and implementation that cannot target caller-supplied or other-operation paths.
+
+**Closed by checkpoint:** `1136c40ab1667e4a5b70185c8bef68ce67d675a2`
+
+**Evidence:** docs/reports/PHASE_3C_H1_REPORT.md
+
+**Notes:** Closed by Phase 3C-H1: Phase 3 Safe Editing Amendment 1 + Stage 2 opaque verification + C-F9 type/runtime falsification. Evidence: docs/PHASE_3_SAFE_EDITING_AMENDMENT_1.md, docs/reports/PHASE_3C_H1_REPORT.md §2/§5.
 
 ---
 ## GAP CLOSURE CONDUCT

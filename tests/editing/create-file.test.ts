@@ -252,6 +252,39 @@ describe("createFile — target exists / window race", () => {
 });
 
 describe("createFile — absence vs inconclusive", () => {
+  it("refuses when absence is inconclusive (not PATH_NOT_FOUND)", async () => {
+    const root = await createCanonicalTempRoot("pc-3c-absence-inconclusive-");
+    const { prepared, authorization } = await earnAuthorizedCreation(
+      root,
+      "src",
+      "ghost.txt",
+      "x\n",
+    );
+    const originalCanonicalize = prepared.workspace.canonicalize.bind(
+      prepared.workspace,
+    );
+    prepared.workspace.canonicalize = async (inputPath: string) => {
+      if (inputPath === prepared.targetRelativePath) {
+        return {
+          ok: false as const,
+          error: {
+            code: "CANONICALIZATION_FAILED" as const,
+            message: "injected inconclusive absence",
+          },
+        };
+      }
+      return originalCanonicalize(inputPath);
+    };
+    const result = await createFile(authorization, prepared);
+    expect(result.outcome).toBe("REFUSED_PRECOMMIT");
+    expect(result.commitPointReached).toBe(false);
+    if (result.outcome === "REFUSED_PRECOMMIT") {
+      expect(result.failureCode).toBe("ABSENCE_UNVERIFIABLE");
+    }
+    const names = await readdir(join(root, "src"));
+    expect(names.includes("ghost.txt")).toBe(false);
+  });
+
   it("refuses when parent is a file", async () => {
     const root = await createCanonicalTempRoot("pc-3c-parent-file-");
     const { entry, workspace, config } = await earnAdmittedFile(
