@@ -79,4 +79,5 @@ export const SHA = {
   phase3AImpl: "087a30ff6fcf75eec695825593e1a1f98ee383f4",
   phase3BImpl: "76d106724a129a4101981db88c7c1a4d086fb100",
   phase3BH1Impl: "ad85c9f1262635f9a81b5608b20c198a7b8b489d",
+  phase3CImpl: "5deb63e96d9a11d44410e02eafe950d562032cbf",
 } as const;

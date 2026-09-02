@@ -607,6 +607,93 @@ const RECORDS: CapabilityRecord[] = [
     ],
   },
   {
+    capabilityId: "safe-file-creation",
+    title: "Phase 3C Safe Single-File Creation",
+    phaseId: "phase-3",
+    declarationEvidence: [
+      doc(
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "3C — SAFE CREATION",
+      ),
+    ],
+    implementationEvidence: [
+      mod(
+        "src/editing/atomic-fs.ts",
+        SHA.phase3CImpl,
+        "Hard-link no-overwrite publication and creation temp candidate adapter",
+      ),
+      mod(
+        "src/editing/create-file.ts",
+        SHA.phase3CImpl,
+        "Safe single-file creation orchestration with verified candidate publication",
+      ),
+    ],
+    freezeEvidence: {
+      kind: "sameCommit",
+      implementationCommit: SHA.phase3CImpl,
+      reportPath: "docs/reports/PHASE_3C_REPORT.md",
+    },
+    dependencies: [
+      "edit-contracts",
+      "safe-editing",
+      "repository-reader",
+      "repository-inventory",
+      "project-configuration",
+      "canonical-workspace-path",
+    ],
+    proofObligations: [
+      obligation(
+        "SE-001",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-001 — NO UNVERIFIED MUTATION",
+      ),
+      obligation(
+        "SE-009",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-009 — PRE-COMMIT RECOVERY",
+      ),
+      obligation(
+        "SE-010",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-010 — AFTER-STATE IS VERIFIED",
+      ),
+      obligation(
+        "SE-011",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-011 — PROVENANCE IS EARNED",
+      ),
+      obligation(
+        "SE-015",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-015 — KNOWLEDGE INVALIDATED, NOT REPAIRED",
+      ),
+      obligation(
+        "SE-016",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-016 — WRITE BOUNDARY HOLDS",
+      ),
+      obligation(
+        "SE-019",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-019 — SAFE CREATION",
+      ),
+    ],
+    knownLimitations: [
+      { kind: "gap", id: "GAP-043", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-044", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-045", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-040", admissibility: "REPOSITORY_RECORDED" },
+    ],
+  },
+  {
     capabilityId: "safe-editing",
     title: "Phase 3 Safe Editing Engine",
     phaseId: "phase-3",

@@ -156,6 +156,15 @@ describe("selfobs derivation", () => {
         capabilityId: "existing-file-replacement",
         state: "PASS_FROZEN",
       });
+
+      const safeFileCreation = observations.find(
+        (o) => o.capabilityId === "safe-file-creation",
+      );
+      expect(safeFileCreation).toMatchObject({
+        kind: "VERIFIED_CAPABILITY_STATE",
+        capabilityId: "safe-file-creation",
+        state: "PASS_FROZEN",
+      });
     },
     60_000,
   );
