@@ -29,8 +29,12 @@ import { issueLedgerVerification } from "../../src/selfobs/internal/issue-verifi
 import type { LedgerVerification } from "../../src/selfobs/verification-types.js";
 
 import {
+  assertProductionScopes,
+  validateImplementationModulesUnderProductionScopes,
+  verifyProductionScopeContamination,
+} from "./freeze-production-scope.js";
+import {
   gitCommitExists,
-  gitDiffNameOnly,
   gitFileExistsAtCommit,
   gitIsAncestor,
   gitReadFileAtCommit,
@@ -501,11 +505,9 @@ async function resolveFreezeEvidence(
   const resolved = await verifyTwoCommitFreeze(
     repoRoot,
     verifiedAtHead,
-    freeze.implementationCommit,
-    freeze.evidenceCommit,
-    freeze.reportPath,
+    record,
+    freeze,
     failures,
-    record.capabilityId,
   );
   outcomes.push({ citationKey: key, resolved });
 }
@@ -555,24 +557,50 @@ async function verifySameCommitFreeze(
 async function verifyTwoCommitFreeze(
   repoRoot: string,
   verifiedAtHead: string,
-  implementationCommit: string,
-  evidenceCommit: string,
-  reportPath: string,
+  record: CapabilityRecord,
+  freeze: Extract<NonNullable<CapabilityRecord["freezeEvidence"]>, { kind: "twoCommit" }>,
   failures: VerifierFailure[],
-  capabilityId: string,
 ): Promise<boolean> {
-  assertExactFullSha(implementationCommit, "implementationCommit");
-  assertExactFullSha(evidenceCommit, "evidenceCommit");
-  assertSafeRepoRelativePath(reportPath, "reportPath");
+  const capabilityId = record.capabilityId;
+  assertExactFullSha(freeze.implementationCommit, "implementationCommit");
+  assertExactFullSha(freeze.evidenceCommit, "evidenceCommit");
+  assertSafeRepoRelativePath(freeze.reportPath, "reportPath");
 
-  const implExists = await gitCommitExists(repoRoot, implementationCommit);
-  const evidenceExists = await gitCommitExists(repoRoot, evidenceCommit);
+  let productionScopes: readonly string[];
+  try {
+    productionScopes = assertProductionScopes(freeze.productionScopes);
+  } catch (error) {
+    failures.push(
+      fail(
+        "FREEZE",
+        `${capabilityId}: ${error instanceof Error ? error.message : "invalid productionScopes"}`,
+      ),
+    );
+    return false;
+  }
+
+  const moduleCoverage = validateImplementationModulesUnderProductionScopes(
+    record,
+    freeze,
+    productionScopes,
+  );
+  if (moduleCoverage !== undefined) {
+    failures.push(fail("FREEZE", moduleCoverage));
+    return false;
+  }
+
+  const implExists = await gitCommitExists(repoRoot, freeze.implementationCommit);
+  const evidenceExists = await gitCommitExists(repoRoot, freeze.evidenceCommit);
   if (!implExists || !evidenceExists) {
     failures.push(fail("FREEZE", `${capabilityId}: two-commit pair commit missing`));
     return false;
   }
-  const aToB = await gitIsAncestor(repoRoot, implementationCommit, evidenceCommit);
-  const bToHead = await gitIsAncestor(repoRoot, evidenceCommit, verifiedAtHead);
+  const aToB = await gitIsAncestor(
+    repoRoot,
+    freeze.implementationCommit,
+    freeze.evidenceCommit,
+  );
+  const bToHead = await gitIsAncestor(repoRoot, freeze.evidenceCommit, verifiedAtHead);
   if (!aToB || !bToHead) {
     failures.push(
       fail("FREEZE", `${capabilityId}: two-commit ancestry chain invalid`),
@@ -581,8 +609,8 @@ async function verifyTwoCommitFreeze(
   }
   const reportExists = await gitFileExistsAtCommit(
     repoRoot,
-    reportPath,
-    evidenceCommit,
+    freeze.reportPath,
+    freeze.evidenceCommit,
   );
   if (!reportExists) {
     failures.push(
@@ -594,8 +622,8 @@ async function verifyTwoCommitFreeze(
   try {
     reportContent = await gitReadFileAtCommit(
       repoRoot,
-      reportPath,
-      evidenceCommit,
+      freeze.reportPath,
+      freeze.evidenceCommit,
     );
   } catch {
     failures.push(
@@ -603,7 +631,7 @@ async function verifyTwoCommitFreeze(
     );
     return false;
   }
-  if (!reportContent.includes(implementationCommit)) {
+  if (!reportContent.includes(freeze.implementationCommit)) {
     failures.push(
       fail(
         "FREEZE",
@@ -612,18 +640,16 @@ async function verifyTwoCommitFreeze(
     );
     return false;
   }
-  const productionChanges = await gitDiffNameOnly(
+
+  const contamination = await verifyProductionScopeContamination(
     repoRoot,
-    implementationCommit,
-    evidenceCommit,
+    freeze.implementationCommit,
+    freeze.evidenceCommit,
+    productionScopes,
+    capabilityId,
   );
-  if (productionChanges.length > 0) {
-    failures.push(
-      fail(
-        "FREEZE",
-        `${capabilityId}: evidence commit introduces production src changes: ${productionChanges.join(", ")}`,
-      ),
-    );
+  if (contamination !== undefined) {
+    failures.push(contamination);
     return false;
   }
   return true;

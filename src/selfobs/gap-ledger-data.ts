@@ -614,6 +614,24 @@ const GAP_LEDGER_V1: GapLedger = {
       notes:
         "Missing evidence: immutable repository record of bounded pass execution instructions. Closure requires deliberate process decision on storage/freeze location.",
     },
+    {
+      id: "GAP-042",
+      title:
+        "Two-commit freeze contamination was repository-wide instead of capability-scoped",
+      sourceCheckpoint:
+        "Phase 3B evidence completion linkage failure at 2b635316f7f08c0cf08ef42ec40ab2cd513d3969",
+      description:
+        "TWO_COMMIT_FREEZE rejected unrelated src/selfobs bookkeeping between the corrected Phase 3B implementation commit and evidence commit because the verifier treated all src/** changes as contamination instead of validating only the frozen capability's declared productionScopes.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: "BLOCKING_INVARIANT",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Blocking — unrelated self-observation bookkeeping must not invalidate an unrelated capability freeze when declared production scopes are unchanged.",
+      closureCondition:
+        "Verifier validates unchanged declared productionScopes for the frozen capability while allowing unrelated source changes outside those scopes; permanent tests and live falsifications at immutable H2 checkpoint.",
+      missingEvidence:
+        "Immutable H2 verifier correction commit with scoped contamination validation.",
+    },
   ],
 };
 

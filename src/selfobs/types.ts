@@ -63,6 +63,7 @@ export type TwoCommitFreezeEvidence = Readonly<{
   readonly implementationCommit: string;
   readonly evidenceCommit: string;
   readonly reportPath: string;
+  readonly productionScopes: readonly string[];
 }>;
 
 export type FreezeEvidence = SameCommitFreezeEvidence | TwoCommitFreezeEvidence;

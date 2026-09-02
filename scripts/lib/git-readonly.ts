@@ -145,3 +145,37 @@ export async function gitDiffNameOnly(
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 }
+
+export async function gitDiffNameOnlyUnderPrefix(
+  repoRoot: string,
+  fromCommit: string,
+  toCommit: string,
+  directoryPrefix: string,
+): Promise<string[]> {
+  assertExactFullSha(fromCommit, "fromCommit");
+  assertExactFullSha(toCommit, "toCommit");
+  const normalized = directoryPrefix.endsWith("/")
+    ? directoryPrefix
+    : `${directoryPrefix}/`;
+  if (!normalized.startsWith("src/")) {
+    throw new Error("directoryPrefix must be under src/");
+  }
+  if (normalized.includes("\0") || normalized.includes("..")) {
+    throw new Error("unsafe directoryPrefix");
+  }
+  const { stdout } = await execFileAsync(
+    "git",
+    ["diff", "--name-only", fromCommit, toCommit, "--", normalized],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: GIT_TIMEOUT_MS,
+      maxBuffer: MAX_GIT_OUTPUT_BYTES,
+      shell: false,
+    },
+  );
+  return stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}

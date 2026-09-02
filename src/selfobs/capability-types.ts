@@ -35,6 +35,7 @@ export const MAX_CAPABILITIES = 64;
 export const MAX_GAPS = 256;
 export const MAX_TOTAL_CITATIONS = 2048;
 export const MAX_EVIDENCE_DOCUMENT_BYTES = 2 * 1024 * 1024;
+export const MAX_PRODUCTION_SCOPES_PER_FREEZE = 16;
 
 export const BOOTSTRAP_FORBIDDEN_CAPABILITY_IDS = new Set([
   "capability-ledger-v1",

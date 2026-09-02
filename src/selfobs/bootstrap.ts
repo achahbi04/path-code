@@ -128,5 +128,12 @@ export function detectImpossibleProgression(
   if (record.freezeEvidence && !record.implementationEvidence.length) {
     return `${record.capabilityId}: freeze evidence without implementation evidence`;
   }
+  if (
+    record.freezeEvidence?.kind === "twoCommit" &&
+    (!record.freezeEvidence.productionScopes ||
+      record.freezeEvidence.productionScopes.length === 0)
+  ) {
+    return `${record.capabilityId}: two-commit freeze without productionScopes`;
+  }
   return undefined;
 }

@@ -741,6 +741,24 @@ Every entry should contain:
 **Notes:** Missing evidence: immutable repository record of bounded pass execution instructions. Closure requires deliberate process decision on storage/freeze location.
 
 ---
+
+### GAP-042 — Two-commit freeze contamination was repository-wide instead of capability-scoped
+
+**Discovered in / source:** Phase 3B evidence completion linkage failure at 2b635316f7f08c0cf08ef42ec40ab2cd513d3969
+
+**Description:** TWO_COMMIT_FREEZE rejected unrelated src/selfobs bookkeeping between the corrected Phase 3B implementation commit and evidence commit because the verifier treated all src/** changes as contamination instead of validating only the frozen capability's declared productionScopes.
+
+**Implementer proposed class:** BLOCKING_INVARIANT
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Blocking — unrelated self-observation bookkeeping must not invalidate an unrelated capability freeze when declared production scopes are unchanged.
+
+**Required condition to close:** Immutable H2 verifier correction commit with scoped contamination validation.
+
+---
 ## GAP CLOSURE CONDUCT
 
 When a later pass closes a gap:

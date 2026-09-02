@@ -360,6 +360,7 @@ const RECORDS: CapabilityRecord[] = [
       implementationCommit: SHA.phase2FImpl,
       evidenceCommit: SHA.phase2FEvidence,
       reportPath: "docs/reports/PHASE_2F_REPORT.md",
+      productionScopes: ["src/snapshot/"],
     },
     dependencies: ["repository-reader", "git-state-baseline", "project-metadata-map"],
     proofObligations: [
