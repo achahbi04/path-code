@@ -114,6 +114,8 @@ Master contract:
 
 **Phase 3B — Existing-File Atomic Replacement: PASS_FROZEN**
 
+**Phase 3B-H1 — Corrective pass: PASS_FROZEN**
+
 Existing-file replacement is available as a bounded internal capability through the Phase 3B mechanism.
 
 **Phase 3 — Safe Editing Engine: DECLARED / IN PROGRESS**

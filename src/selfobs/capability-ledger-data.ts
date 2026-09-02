@@ -534,8 +534,13 @@ const RECORDS: CapabilityRecord[] = [
         "Existing-file atomic replacement with fail-closed mutation-time config and temp-creation recovery",
       ),
     ],
-    // freezeEvidence intentionally absent: Phase 3B evidence at 035cb5f failed;
-    // H1 corrects blocking defects but does not itself re-freeze PASS_FROZEN.
+    freezeEvidence: {
+      kind: "twoCommit",
+      implementationCommit: SHA.phase3BH1Impl,
+      evidenceCommit: "2b635316f7f08c0cf08ef42ec40ab2cd513d3969",
+      reportPath: "docs/reports/PHASE_3B_EVIDENCE_COMPLETION_REPORT.md",
+      productionScopes: ["src/editing/"],
+    },
     dependencies: [
       "edit-contracts",
       "safe-editing",

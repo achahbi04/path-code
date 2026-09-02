@@ -624,13 +624,15 @@ const GAP_LEDGER_V1: GapLedger = {
         "TWO_COMMIT_FREEZE rejected unrelated src/selfobs bookkeeping between the corrected Phase 3B implementation commit and evidence commit because the verifier treated all src/** changes as contamination instead of validating only the frozen capability's declared productionScopes.",
       proposedClass: "BLOCKING_INVARIANT",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       whyNonBlocking:
         "Blocking — unrelated self-observation bookkeeping must not invalidate an unrelated capability freeze when declared production scopes are unchanged.",
       closureCondition:
         "Verifier validates unchanged declared productionScopes for the frozen capability while allowing unrelated source changes outside those scopes; permanent tests and live falsifications at immutable H2 checkpoint.",
       missingEvidence:
         "Immutable H2 verifier correction commit with scoped contamination validation.",
+      closedByCommit: "7e54424fd6a2bb1d298f28bd83f513046307a37e",
+      closureEvidence: "docs/reports/SELF_OBSERVATION_V1_H2_FREEZE_SCOPE_REPORT.md",
     },
   ],
 };

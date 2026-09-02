@@ -752,11 +752,15 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Why non-blocking:** Blocking — unrelated self-observation bookkeeping must not invalidate an unrelated capability freeze when declared production scopes are unchanged.
 
 **Required condition to close:** Immutable H2 verifier correction commit with scoped contamination validation.
+
+**Closed by checkpoint:** `7e54424fd6a2bb1d298f28bd83f513046307a37e`
+
+**Evidence:** docs/reports/SELF_OBSERVATION_V1_H2_FREEZE_SCOPE_REPORT.md
 
 ---
 ## GAP CLOSURE CONDUCT
