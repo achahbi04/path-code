@@ -117,8 +117,14 @@ const _recordShape: EditRecord = {
   target: sampleEntry,
   authorizationId: "auth",
   beforeFingerprint: { algorithm: "sha256", hex: "a", byteLength: 1 },
+  beforeByteLength: 1,
   expectedAfterFingerprint: { algorithm: "sha256", hex: "b", byteLength: 1 },
+  expectedAfterByteLength: 1,
   observedAfterFingerprint: null,
-  outcome: "REFUSED",
+  observedAfterByteLength: null,
+  outcome: "REFUSED_PRECOMMIT",
+  commitPointReached: false,
+  provenance: null,
+  durabilityVerified: false,
 };
 void _recordShape;

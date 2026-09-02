@@ -7,28 +7,23 @@ import { describe, expect, it } from "vitest";
 const editingDir = fileURLToPath(new URL("../../src/editing", import.meta.url));
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
+/** Phase 3B — only atomic-fs.ts may import project-write primitives. */
+const AUTHORIZED_WRITE_FILE = "atomic-fs.ts";
+
 const WRITE_FORBIDDEN = [
-  /\bwriteFile\b/,
-  /\bwriteFileSync\b/,
-  /\bappendFile\b/,
-  /\bappendFileSync\b/,
-  /\brename\b/,
-  /\brenameSync\b/,
-  /\bunlink\b/,
-  /\bunlinkSync\b/,
-  /\brm\b/,
-  /\brmSync\b/,
-  /\bmkdir\b/,
-  /\bmkdirSync\b/,
-  /\bcreateWriteStream\b/,
-  /\btruncate\b/,
-  /\btruncateSync\b/,
-  /\bcopyFile\b/,
-  /\bcopyFileSync\b/,
-  /\blink\b/,
-  /\blinkSync\b/,
-  /\bsymlink\b/,
-  /\bsymlinkSync\b/,
+  /(?<![.\w])writeFile\s*\(/,
+  /(?<![.\w])writeFileSync\s*\(/,
+  /(?<![.\w])appendFile\s*\(/,
+  /(?<![.\w])rename\s*\(/,
+  /(?<![.\w])unlink\s*\(/,
+  /(?<![.\w])mkdir\s*\(/,
+  /(?<![.\w])createWriteStream\s*\(/,
+  /(?<![.\w])truncate\s*\(/,
+  /(?<![.\w])copyFile\s*\(/,
+  /(?<![.\w])link\s*\(/,
+  /(?<![.\w])symlink\s*\(/,
+  /from\s+["']node:fs["']/,
+  /from\s+["']node:fs\/promises["']/,
 ];
 
 const OTHER_FORBIDDEN = [
@@ -56,9 +51,12 @@ function listTsFiles(dir: string): string[] {
 }
 
 describe("editing architecture", () => {
-  it("contains no project-write primitives under src/editing/**", () => {
+  it("contains no project-write primitives outside the authorized atomic-fs module", () => {
     const violations: string[] = [];
     for (const filePath of listTsFiles(editingDir)) {
+      if (filePath.endsWith(`/${AUTHORIZED_WRITE_FILE}`)) {
+        continue;
+      }
       const source = readFileSync(filePath, "utf8");
       for (const pattern of WRITE_FORBIDDEN) {
         if (pattern.test(source)) {

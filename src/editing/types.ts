@@ -127,19 +127,26 @@ export type EditCommitGrant = {
 
 export type EditOutcome =
   | "SUCCESS"
-  | "REFUSED"
-  | "PARTIAL_APPLICATION"
-  | "AFTER_STATE_UNVERIFIED";
+  | "REFUSED_PRECOMMIT"
+  | "FAILED_PRECOMMIT"
+  | "COMMITTED_FAILURE"
+  | "PARTIAL_APPLICATION";
 
-/** Future terminal record contract — not issuable in Phase 3A. */
+/** Terminal record for existing-file replacement — issued only by the editing engine. */
 export type EditRecordExistingFile = {
   readonly kind: "EXISTING_FILE";
   readonly target: RepositoryEntry;
   readonly authorizationId: string;
   readonly beforeFingerprint: ContentFingerprint;
+  readonly beforeByteLength: number;
   readonly expectedAfterFingerprint: ContentFingerprint;
+  readonly expectedAfterByteLength: number;
   readonly observedAfterFingerprint: ContentFingerprint | null;
+  readonly observedAfterByteLength: number | null;
   readonly outcome: EditOutcome;
+  readonly commitPointReached: boolean;
+  readonly provenance: "PATH_CODE_MODIFIED" | null;
+  readonly durabilityVerified: boolean;
   readonly gitContext?: GitStateBaseline;
 };
 
@@ -168,3 +175,51 @@ export type KnowledgeInvalidation = {
 export type AuthorizePreparedChangeOptions = {
   readonly gitContext?: GitStateBaseline;
 };
+
+export type ReplaceExistingFileFailureCode =
+  | AuthorizationFailureCode
+  | PreparationFailureCode
+  | "UNSUPPORTED_ATOMIC_REPLACE_PLATFORM"
+  | "STALE_BEFORE_STATE"
+  | "HARD_LINK_UNSUPPORTED"
+  | "NOT_REGULAR_FILE"
+  | "TARGET_TYPE_CHANGED"
+  | "IDENTITY_CHANGED"
+  | "WORKSPACE_INCOMPATIBLE"
+  | "TEMP_CREATE_FAILED"
+  | "TEMP_WRITE_FAILED"
+  | "TEMP_FSYNC_FAILED"
+  | "METADATA_PRESERVATION_FAILED"
+  | "CANDIDATE_VERIFICATION_FAILED"
+  | "RENAME_FAILED"
+  | "DIRECTORY_FSYNC_FAILED"
+  | "AFTER_STATE_READ_FAILED"
+  | "AFTER_STATE_MISMATCH";
+
+export type ReplaceExistingFileFailure = {
+  readonly code: ReplaceExistingFileFailureCode;
+  readonly message: string;
+};
+
+export type ReplaceExistingFileSuccess = {
+  readonly outcome: "SUCCESS";
+  readonly commitPointReached: true;
+  readonly durabilityVerified: true;
+  readonly editRecord: EditRecordExistingFile;
+  readonly knowledgeInvalidation: KnowledgeInvalidation;
+  readonly configFreshness: "MUTATION_TIME_RE_RESOLVED" | "SUPPLIED_ONLY";
+};
+
+export type ReplaceExistingFileTerminalFailure = {
+  readonly outcome: "REFUSED_PRECOMMIT" | "FAILED_PRECOMMIT" | "COMMITTED_FAILURE";
+  readonly commitPointReached: boolean;
+  readonly durabilityVerified: boolean;
+  readonly editRecord: EditRecordExistingFile;
+  readonly knowledgeInvalidation: KnowledgeInvalidation | null;
+  readonly cleanupFailure?: boolean;
+  readonly configFreshness: "MUTATION_TIME_RE_RESOLVED" | "SUPPLIED_ONLY";
+};
+
+export type ReplaceExistingFileResult =
+  | ReplaceExistingFileSuccess
+  | ReplaceExistingFileTerminalFailure;

@@ -497,6 +497,51 @@ const GAP_LEDGER_V1: GapLedger = {
       notes:
         "BLOCKING_INVARIANT — AUDIT EVIDENCE. RI-017 executed with the intended error; RI-012 recorded NOT APPLICABLE with rationale rather than a manufactured probe.",
     },
+    {
+      id: "GAP-035",
+      title:
+        "Residual hostile concurrent filesystem race after final pre-commit revalidation",
+      sourceCheckpoint: "Phase 3B existing-file atomic replacement",
+      description:
+        "A narrow window remains between final pre-commit currentness revalidation and the atomic rename commit point during which a hostile concurrent writer could still mutate the target.",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "The frozen Phase 3 Master explicitly limits the guarantee and does not claim hostile-filesystem linearizability.",
+      missingEvidence:
+        "Proven stronger platform compare-and-swap, locking, or equivalent mechanism.",
+      closureCondition:
+        "Proven stronger platform compare-and-swap, locking, or equivalent mechanism.",
+    },
+    {
+      id: "GAP-036",
+      title: "Crash-orphan temporary candidate possibility",
+      sourceCheckpoint: "Phase 3B existing-file atomic replacement",
+      description:
+        "An abrupt process or OS crash before handled temp cleanup can leave a same-directory Path Code temp candidate on disk.",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Handled failures and normal completion clean up; abrupt crash is explicitly outside the stronger claim.",
+      missingEvidence: "Proven unnamed-temp or crash-recovery architecture.",
+      closureCondition:
+        "Proven unnamed-temp or crash-recovery architecture.",
+    },
+    {
+      id: "GAP-037",
+      title: "Extended metadata not preserved or proven in existing-file replacement",
+      sourceCheckpoint: "Phase 3B existing-file atomic replacement",
+      description:
+        "ACLs, xattrs, resource forks, alternate data streams, and filesystem-specific metadata are not claimed preserved during existing-file atomic replacement unless actually proven.",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Basic mode and owner/group preservation are proven; extended metadata is honestly excluded.",
+      missingEvidence:
+        "Platform-specific preservation or explicit detection-and-refusal mechanism.",
+      closureCondition:
+        "Platform-specific preservation or explicit detection-and-refusal mechanism.",
+    },
   ],
 };
 

@@ -613,6 +613,54 @@ Every entry should contain:
 **Notes:** BLOCKING_INVARIANT — AUDIT EVIDENCE. RI-017 executed with the intended error; RI-012 recorded NOT APPLICABLE with rationale rather than a manufactured probe.
 
 ---
+
+### GAP-035 — Residual hostile concurrent filesystem race after final pre-commit revalidation
+
+**Discovered in / source:** Phase 3B existing-file atomic replacement
+
+**Description:** A narrow window remains between final pre-commit currentness revalidation and the atomic rename commit point during which a hostile concurrent writer could still mutate the target.
+
+**Review classification:** NON_BLOCKING_LIMITATION
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** The frozen Phase 3 Master explicitly limits the guarantee and does not claim hostile-filesystem linearizability.
+
+**Required condition to close:** Proven stronger platform compare-and-swap, locking, or equivalent mechanism.
+
+---
+
+### GAP-036 — Crash-orphan temporary candidate possibility
+
+**Discovered in / source:** Phase 3B existing-file atomic replacement
+
+**Description:** An abrupt process or OS crash before handled temp cleanup can leave a same-directory Path Code temp candidate on disk.
+
+**Review classification:** NON_BLOCKING_LIMITATION
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Handled failures and normal completion clean up; abrupt crash is explicitly outside the stronger claim.
+
+**Required condition to close:** Proven unnamed-temp or crash-recovery architecture.
+
+---
+
+### GAP-037 — Extended metadata not preserved or proven in existing-file replacement
+
+**Discovered in / source:** Phase 3B existing-file atomic replacement
+
+**Description:** ACLs, xattrs, resource forks, alternate data streams, and filesystem-specific metadata are not claimed preserved during existing-file atomic replacement unless actually proven.
+
+**Review classification:** NON_BLOCKING_LIMITATION
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Basic mode and owner/group preservation are proven; extended metadata is honestly excluded.
+
+**Required condition to close:** Platform-specific preservation or explicit detection-and-refusal mechanism.
+
+---
 ## GAP CLOSURE CONDUCT
 
 When a later pass closes a gap:
