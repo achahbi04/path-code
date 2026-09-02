@@ -511,6 +511,94 @@ const RECORDS: CapabilityRecord[] = [
     knownLimitations: [],
   },
   {
+    capabilityId: "existing-file-replacement",
+    title: "Phase 3B Existing-File Atomic Replacement",
+    phaseId: "phase-3",
+    declarationEvidence: [
+      doc(
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "3B — EXISTING-FILE ATOMIC REPLACEMENT",
+      ),
+    ],
+    implementationEvidence: [
+      mod(
+        "src/editing/atomic-fs.ts",
+        SHA.phase3BImpl,
+        "Authorized low-level filesystem mutation adapter",
+      ),
+      mod(
+        "src/editing/replace-existing-file.ts",
+        SHA.phase3BImpl,
+        "Existing-file atomic replacement orchestration",
+      ),
+    ],
+    freezeEvidence: {
+      kind: "sameCommit",
+      implementationCommit: SHA.phase3BImpl,
+      reportPath: "docs/reports/PHASE_3B_REPORT.md",
+    },
+    dependencies: [
+      "edit-contracts",
+      "safe-editing",
+      "repository-reader",
+      "repository-inventory",
+      "project-configuration",
+      "canonical-workspace-path",
+    ],
+    proofObligations: [
+      obligation(
+        "SE-001",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-001 — NO UNVERIFIED MUTATION",
+      ),
+      obligation(
+        "SE-008",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-008 — EXISTING-FILE COMMIT IS ATOMIC WHERE CLAIMED",
+      ),
+      obligation(
+        "SE-009",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-009 — PRE-COMMIT RECOVERY",
+      ),
+      obligation(
+        "SE-010",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-010 — AFTER-STATE IS VERIFIED",
+      ),
+      obligation(
+        "SE-011",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-011 — PROVENANCE IS EARNED",
+      ),
+      obligation(
+        "SE-015",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-015 — KNOWLEDGE INVALIDATED, NOT REPAIRED",
+      ),
+      obligation(
+        "SE-017",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-017 — CONCURRENT CHANGE FAILS CLOSED WHEN DETECTED",
+      ),
+      obligation(
+        "SE-018",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-018 — GIT SAFETY",
+      ),
+    ],
+    knownLimitations: [],
+  },
+  {
     capabilityId: "safe-editing",
     title: "Phase 3 Safe Editing Engine",
     phaseId: "phase-3",

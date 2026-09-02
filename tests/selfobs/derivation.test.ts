@@ -147,6 +147,15 @@ describe("selfobs derivation", () => {
         capabilityId: "safe-editing",
         state: "DECLARED",
       });
+
+      const existingFileReplacement = observations.find(
+        (o) => o.capabilityId === "existing-file-replacement",
+      );
+      expect(existingFileReplacement).toMatchObject({
+        kind: "VERIFIED_CAPABILITY_STATE",
+        capabilityId: "existing-file-replacement",
+        state: "PASS_FROZEN",
+      });
     },
     30_000,
   );

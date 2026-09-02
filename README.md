@@ -110,16 +110,25 @@ Master contract:
 
 [`docs/PHASE_3_SAFE_EDITING_MASTER.md`](docs/PHASE_3_SAFE_EDITING_MASTER.md)
 
-**Phase 3 — Safe Editing Engine: DECLARED / NOT IMPLEMENTED**
+**Phase 3A — Edit Contracts / Preparation / Authorization: PASS_FROZEN**
 
-Path Code has NO editing capability yet.
+**Phase 3B — Existing-File Atomic Replacement: PASS_FROZEN**
 
-Next permitted runtime phase:
+Existing-file replacement is available as a bounded internal capability through the Phase 3B mechanism.
 
-**Phase 3A — Edit Contracts / Preparation / Authorization**
+**Phase 3 — Safe Editing Engine: DECLARED / IN PROGRESS**
 
-Phase 3A preflight must verify this Self-Observation v1 freeze externally, because the Capability Ledger intentionally contains no self-record.
+Path Code may replace the content of an existing authorized file through the bounded 3B mechanism.
 
-Do not claim Phase 3 capability or editing capability exists.
+It still cannot:
 
-Design forward. Implement only the current permitted phase.
+- create files
+- delete files
+- create directories
+- coordinate multi-file changes
+
+Phase 3 is not complete.
+
+Next permitted implementation phase:
+
+**Phase 3C — Safe Creation**
