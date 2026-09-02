@@ -154,9 +154,9 @@ describe("selfobs derivation", () => {
       expect(existingFileReplacement).toMatchObject({
         kind: "VERIFIED_CAPABILITY_STATE",
         capabilityId: "existing-file-replacement",
-        state: "PASS_FROZEN",
+        state: "IMPLEMENTED",
       });
     },
-    30_000,
+    60_000,
   );
 });

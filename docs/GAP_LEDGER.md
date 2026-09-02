@@ -672,11 +672,17 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Why non-blocking:** Blocking — fail-closed mutation-time config reload is required; stale fallback permits mutation under failed trust revalidation.
 
 **Required condition to close:** Immutable H1 corrective implementation commit with permanent fail-closed tests and live falsifications.
+
+**Closed by checkpoint:** `ad85c9f1262635f9a81b5608b20c198a7b8b489d`
+
+**Evidence:** docs/reports/PHASE_3B_H1_REPORT.md
+
+**Notes:** Phase 3B remains NOT COMPLETE pending full evidence re-run after H1.
 
 ---
 
@@ -690,11 +696,33 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Why non-blocking:** Blocking — pre-commit recovery must surface controlled FAILED_PRECOMMIT rather than escaping throws.
 
 **Required condition to close:** Immutable H1 corrective implementation commit with permanent temp-creation recovery test and live falsification.
+
+**Closed by checkpoint:** `ad85c9f1262635f9a81b5608b20c198a7b8b489d`
+
+**Evidence:** docs/reports/PHASE_3B_H1_REPORT.md
+
+**Notes:** Phase 3B remains NOT COMPLETE pending full evidence re-run after H1.
+
+---
+
+### GAP-040 — Capability Ledger v1 cannot let later negative evidence supersede PASS_FROZEN
+
+**Discovered in / source:** Phase 3B-H1 corrective bookkeeping after failed evidence 035cb5f36b989496b30c289ee931b950bd61fa7d
+
+**Description:** Capability Ledger v1 derives PASS_FROZEN from freezeEvidence citations resolving at HEAD. Later negative evidence reports cannot mechanically revoke or supersede an earlier PASS_FROZEN without an explicit canonical-record edit removing/superseding freezeEvidence. Historical linkage commits remain immutable.
+
+**Review classification:** NON_BLOCKING_LIMITATION
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Operators must manually correct the current canonical capability record when later evidence fails; the limitation is honesty/process, not a silent production mutation hazard.
+
+**Required condition to close:** Schema/runtime support for negative-evidence supersession of freeze state, or an equivalent explicit ledger revision protocol.
 
 ---
 ## GAP CLOSURE CONDUCT

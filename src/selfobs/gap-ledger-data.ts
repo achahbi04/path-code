@@ -551,13 +551,17 @@ const GAP_LEDGER_V1: GapLedger = {
         "resolveMutationConfig treated loadProjectConfig ConfigFailure as success by substituting stale prepared.config (SUPPLIED_ONLY), allowing mutation to continue instead of REFUSED_PRECOMMIT before temp creation.",
       proposedClass: "BLOCKING_INVARIANT",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       whyNonBlocking:
         "Blocking — fail-closed mutation-time config reload is required; stale fallback permits mutation under failed trust revalidation.",
       closureCondition:
         "ConfigFailure refuses with CONFIG_RELOAD_FAILED before temp/write/rename; ABSENT remains successful reload; permanent C1–C4 and FAL-C1/C2/C3 evidence; immutable H1 implementation checkpoint.",
       missingEvidence:
         "Immutable H1 corrective implementation commit with permanent fail-closed tests and live falsifications.",
+      closedByCommit: "ad85c9f1262635f9a81b5608b20c198a7b8b489d",
+      closureEvidence: "docs/reports/PHASE_3B_H1_REPORT.md",
+      notes:
+        "Phase 3B remains NOT COMPLETE pending full evidence re-run after H1.",
     },
     {
       id: "GAP-039",
@@ -568,13 +572,34 @@ const GAP_LEDGER_V1: GapLedger = {
         "prepareTempCandidate invoked createTempExclusive outside the inner try/catch, so injected or real creation failures escaped as uncaught exceptions instead of terminal FAILED_PRECOMMIT with commitPointReached=false.",
       proposedClass: "BLOCKING_INVARIANT",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       whyNonBlocking:
         "Blocking — pre-commit recovery must surface controlled FAILED_PRECOMMIT rather than escaping throws.",
       closureCondition:
         "createTempExclusive failures map to FAILED_PRECOMMIT without escape; permanent adapter-fault test and FAL-T1; immutable H1 implementation checkpoint.",
       missingEvidence:
         "Immutable H1 corrective implementation commit with permanent temp-creation recovery test and live falsification.",
+      closedByCommit: "ad85c9f1262635f9a81b5608b20c198a7b8b489d",
+      closureEvidence: "docs/reports/PHASE_3B_H1_REPORT.md",
+      notes:
+        "Phase 3B remains NOT COMPLETE pending full evidence re-run after H1.",
+    },
+    {
+      id: "GAP-040",
+      title:
+        "Capability Ledger v1 cannot let later negative evidence supersede PASS_FROZEN",
+      sourceCheckpoint:
+        "Phase 3B-H1 corrective bookkeeping after failed evidence 035cb5f36b989496b30c289ee931b950bd61fa7d",
+      description:
+        "Capability Ledger v1 derives PASS_FROZEN from freezeEvidence citations resolving at HEAD. Later negative evidence reports cannot mechanically revoke or supersede an earlier PASS_FROZEN without an explicit canonical-record edit removing/superseding freezeEvidence. Historical linkage commits remain immutable.",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Operators must manually correct the current canonical capability record when later evidence fails; the limitation is honesty/process, not a silent production mutation hazard.",
+      missingEvidence:
+        "Schema/runtime support for negative-evidence supersession of freeze state, or an equivalent explicit ledger revision protocol.",
+      closureCondition:
+        "Schema/runtime support for negative-evidence supersession of freeze state, or an equivalent explicit ledger revision protocol.",
     },
   ],
 };

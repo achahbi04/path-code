@@ -524,20 +524,17 @@ const RECORDS: CapabilityRecord[] = [
     implementationEvidence: [
       mod(
         "src/editing/atomic-fs.ts",
-        SHA.phase3BImpl,
-        "Authorized low-level filesystem mutation adapter",
+        SHA.phase3BH1Impl,
+        "Authorized low-level filesystem mutation adapter (H1-corrected)",
       ),
       mod(
         "src/editing/replace-existing-file.ts",
-        SHA.phase3BImpl,
-        "Existing-file atomic replacement orchestration",
+        SHA.phase3BH1Impl,
+        "Existing-file atomic replacement with fail-closed mutation-time config and temp-creation recovery",
       ),
     ],
-    freezeEvidence: {
-      kind: "sameCommit",
-      implementationCommit: SHA.phase3BImpl,
-      reportPath: "docs/reports/PHASE_3B_REPORT.md",
-    },
+    // freezeEvidence intentionally absent: Phase 3B evidence at 035cb5f failed;
+    // H1 corrects blocking defects but does not itself re-freeze PASS_FROZEN.
     dependencies: [
       "edit-contracts",
       "safe-editing",
@@ -596,7 +593,12 @@ const RECORDS: CapabilityRecord[] = [
         "SE-018 — GIT SAFETY",
       ),
     ],
-    knownLimitations: [],
+    knownLimitations: [
+      { kind: "gap", id: "GAP-035", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-036", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-037", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-040", admissibility: "REPOSITORY_RECORDED" },
+    ],
   },
   {
     capabilityId: "safe-editing",

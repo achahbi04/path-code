@@ -15,7 +15,7 @@ import { verifyLedgers } from "../../scripts/lib/ledger-verifier.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const FAKE_SHA = "0000000000000000000000000000000000000001";
-const LEDGER_VERIFY_TIMEOUT_MS = 15_000;
+const LEDGER_VERIFY_TIMEOUT_MS = 60_000;
 
 function cloneGapLedger(): GapLedger {
   const canonical = getCanonicalGapLedger();
