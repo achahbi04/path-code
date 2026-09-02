@@ -725,6 +725,22 @@ Every entry should contain:
 **Required condition to close:** Schema/runtime support for negative-evidence supersession of freeze state, or an equivalent explicit ledger revision protocol.
 
 ---
+
+### GAP-041 — Pass contracts are not repository artifacts
+
+**Discovered in / source:** Phase 3B evidence completion re-run after Phase 3B-H1 recovery
+
+**Description:** Master contracts and phase reports are repository-recorded, but the exact per-pass execution instruction (e.g. merged audit contract prose) may not be present as an immutable repository artifact at audit time. Recovery and evidence passes then rely on recovery instructions, committed reports, and current tree inspection.
+
+**Implementer proposed class:** NON_BLOCKING_LIMITATION
+
+**Review classification:** (unreviewed)
+
+**Lifecycle:** OPEN
+
+**Notes:** Missing evidence: immutable repository record of bounded pass execution instructions. Closure requires deliberate process decision on storage/freeze location.
+
+---
 ## GAP CLOSURE CONDUCT
 
 When a later pass closes a gap:
