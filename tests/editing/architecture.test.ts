@@ -87,6 +87,36 @@ describe("editing architecture", () => {
     expect(barrel).not.toMatch(/resetAuthorizationRegistryForTests/);
   });
 
+  it("does not export post-creation verification authority from the public barrel", () => {
+    const barrel = readFileSync(join(editingDir, "index.ts"), "utf8");
+    expect(barrel).not.toMatch(/PublishedCreationVerificationTarget/);
+    expect(barrel).not.toMatch(/CreationAfterStateEvidence/);
+    expect(barrel).not.toMatch(/mintPublishedCreationVerificationTarget/);
+    expect(barrel).not.toMatch(/verifyPublishedCreation/);
+    expect(barrel).not.toMatch(/creation-verification/);
+  });
+
+  it("forbids unrestricted path-shaped published creation reads", () => {
+    const violations: string[] = [];
+    for (const filePath of listTsFiles(editingDir)) {
+      const source = readFileSync(filePath, "utf8");
+      if (source.includes("readPublishedBytes")) {
+        violations.push(filePath);
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps creation orchestration free of direct node fs write imports", () => {
+    const orchestrationPath = join(editingDir, "create-file.ts");
+    const source = readFileSync(orchestrationPath, "utf8");
+    expect(source).not.toMatch(/from\s+["']node:fs/);
+    expect(source).not.toMatch(/from\s+["']node:fs\/promises/);
+    expect(source).toMatch(/atomic-fs/);
+    expect(source).toMatch(/verifyPublishedCreation/);
+    expect(source).not.toMatch(/readPublishedBytes/);
+  });
+
   it("keeps lower Phase 1/2 modules free of editing imports", () => {
     const lowerDirs = [
       "src/domain",

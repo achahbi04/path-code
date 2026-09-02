@@ -12,7 +12,7 @@ import { MAX_EDIT_FILE_BYTES } from "./bounds.js";
 import { refuseIfTargetDenied } from "./denial.js";
 import { copyBytes, fingerprintBytes } from "./fingerprint.js";
 import { validateLeafName } from "./leaf-name.js";
-import { isModifyExistingFileDisabled } from "./policy.js";
+import { isCreateFileDisabled, isModifyExistingFileDisabled } from "./policy.js";
 import { childRelativePath } from "./relative-path.js";
 import { nextPreparedId } from "./internal/registry.js";
 import type {
@@ -240,6 +240,15 @@ export async function prepareCreateFile(
   workspace: WorkspaceBoundary,
   config: ResolvedProjectConfig,
 ): Promise<Result<PreparedCreation, PreparationFailure>> {
+  if (isCreateFileDisabled(config)) {
+    return failure(
+      preparationFailure(
+        "ACTION_DISABLED",
+        "CREATE_FILE is disabled by project configuration",
+      ),
+    );
+  }
+
   if (parent.physicalKind !== "DIRECTORY") {
     return failure(
       preparationFailure(

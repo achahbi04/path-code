@@ -227,9 +227,13 @@ describe("createFile — target exists / window race", () => {
 
     const fsOps: AtomicCreateFsOps = {
       ...productionAtomicCreateFs,
-      linkNoOverwrite: async (candidatePath, targetPath) => {
+      linkNoOverwrite: async (candidatePath, targetPath, operationIdentity) => {
         await writeFile(targetPath, externalBytes);
-        return productionAtomicCreateFs.linkNoOverwrite(candidatePath, targetPath);
+        return productionAtomicCreateFs.linkNoOverwrite(
+          candidatePath,
+          targetPath,
+          operationIdentity,
+        );
       },
     };
 
@@ -383,6 +387,25 @@ describe("createFile — config fail-closed", () => {
     const result = await createFile(authorization, prepared);
     expect(result.outcome).toBe("SUCCESS");
   });
+
+  it("C4b: disable-action=CREATE_FILE after authorize → ACTION_DISABLED", async () => {
+    const root = await createCanonicalTempRoot("pc-3c-c4b-");
+    const { prepared, authorization } = await earnAuthorizedCreation(
+      root,
+      "src",
+      "blocked.txt",
+      "a\n",
+    );
+    await writePathcodeConfig(root, "disable-action = CREATE_FILE");
+    const result = await createFile(authorization, prepared);
+    expect(result.outcome).toBe("REFUSED_PRECOMMIT");
+    expect(result.commitPointReached).toBe(false);
+    if (result.outcome === "REFUSED_PRECOMMIT") {
+      expect(result.refusalReason).toBe("ACTION_DISABLED");
+    }
+    const names = await readdir(join(root, "src"));
+    expect(names.includes("blocked.txt")).toBe(false);
+  });
 });
 
 describe("createFile — recovery", () => {
@@ -464,9 +487,16 @@ describe("createFile — recovery", () => {
       "m.txt",
       "auth\n",
     );
+    const tampered = Buffer.from("tampered\n");
     const fsOps: AtomicCreateFsOps = {
       ...productionAtomicCreateFs,
-      readPublishedBytes: async () => Buffer.from("tampered\n"),
+      verifyPublishedCreation: async () =>
+        Object.freeze({
+          kind: "CREATION_AFTER_STATE_EVIDENCE" as const,
+          publicationId: "injected-mismatch",
+          observedHex: sha256Hex(tampered),
+          observedByteLength: tampered.byteLength,
+        }),
     };
     const result = await createFile(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("COMMITTED_FAILURE");
@@ -507,9 +537,16 @@ describe("createFile — live falsification scaffolding", () => {
     );
     const fsOps: AtomicCreateFsOps = {
       ...productionAtomicCreateFs,
-      linkNoOverwrite: async (candidatePath, targetPath) => {
+      linkNoOverwrite: async (candidatePath, targetPath, operationIdentity) => {
         await writeFile(targetPath, external);
         await productionAtomicCreateFs.renameAtomic(candidatePath, targetPath);
+        const { mintPublishedCreationVerificationTarget } = await import(
+          "../../src/editing/internal/creation-verification.js"
+        );
+        return mintPublishedCreationVerificationTarget({
+          absolutePath: targetPath,
+          operationIdentity,
+        });
       },
       unlink: async (filePath) => {
         // rename already removed the candidate path; ignore missing-temp unlink.

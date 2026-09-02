@@ -24,7 +24,9 @@ export {
 } from "./batch-bounds.js";
 
 export {
+  DISABLE_ACTION_FOR_CREATE_FILE,
   DISABLE_ACTION_FOR_MODIFY_EXISTING_FILE,
+  isCreateFileDisabled,
   isModifyExistingFileDisabled,
   isMutationActionDisabledByConfig,
 } from "./policy.js";

@@ -8,7 +8,9 @@ import { loadProjectConfig } from "../../src/config/index.js";
 import {
   authorizePreparedChange,
   explicitEditApproval,
+  isCreateFileDisabled,
   isModifyExistingFileDisabled,
+  prepareCreateFile,
   prepareModifyExistingFile,
 } from "../../src/editing/index.js";
 import { consumeEditAuthorization } from "../../src/editing/internal/consume-authorization.js";
@@ -19,7 +21,7 @@ import {
   cleanupInventoryFixtures,
   createCanonicalTempRoot,
 } from "../inventory/fixture-helpers.js";
-import { earnAdmittedFile } from "./helpers.js";
+import { earnAdmittedDirectory, earnAdmittedFile } from "./helpers.js";
 
 afterEach(async () => {
   resetAuthorizationRegistryForTests();
@@ -30,6 +32,21 @@ async function disabledEditConfig(root: string) {
   await writeFile(
     join(root, "PATHCODE.md"),
     "# Config\n\n```pathcode-config\ndisable-action = EDIT\n```\n",
+    "utf8",
+  );
+  const workspace = await boundaryFor(root);
+  const loaded = await loadProjectConfig(workspace);
+  expect(loaded.ok).toBe(true);
+  if (!loaded.ok) {
+    throw new Error("config load failed");
+  }
+  return { workspace, config: loaded.value };
+}
+
+async function disabledCreateFileConfig(root: string) {
+  await writeFile(
+    join(root, "PATHCODE.md"),
+    "# Config\n\n```pathcode-config\ndisable-action = CREATE_FILE\n```\n",
     "utf8",
   );
   const workspace = await boundaryFor(root);
@@ -113,6 +130,26 @@ describe("authorizePreparedChange", () => {
 
     const prepared = await prepareModifyExistingFile(
       entry,
+      Buffer.from("y\n"),
+      workspace,
+      config,
+    );
+    expect(prepared.ok).toBe(false);
+    if (prepared.ok) {
+      return;
+    }
+    expect(prepared.error.code).toBe("ACTION_DISABLED");
+  });
+
+  it("refuses disabled CREATE_FILE via disable-action=CREATE_FILE", async () => {
+    const root = await createCanonicalTempRoot("pc-3c-h1-disabled-create-");
+    const { workspace, config } = await disabledCreateFileConfig(root);
+    const { entry } = await earnAdmittedDirectory(root, "src");
+    expect(isCreateFileDisabled(config)).toBe(true);
+
+    const prepared = await prepareCreateFile(
+      entry,
+      "new.ts",
       Buffer.from("y\n"),
       workspace,
       config,

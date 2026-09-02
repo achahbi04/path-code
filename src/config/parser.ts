@@ -42,6 +42,7 @@ const ACTION_CLASSES: ReadonlySet<ActionClass> = new Set([
   "SEARCH",
   "INSPECT",
   "EDIT",
+  "CREATE_FILE",
   "TARGETED_TEST",
   "TYPECHECK",
   "LINT",

@@ -9,6 +9,7 @@ export type ActionClass =
   | "SEARCH"
   | "INSPECT"
   | "EDIT"
+  | "CREATE_FILE"
   | "TARGETED_TEST"
   | "TYPECHECK"
   | "LINT"

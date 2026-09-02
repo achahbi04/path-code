@@ -528,6 +528,9 @@ export async function createFile(
   }
 
   const authorizationId = authorization.authorizationId;
+  const operationIdentity = Object.freeze({
+    kind: "CREATE_FILE_OPERATION" as const,
+  });
 
   if (prepared.afterByteLength > MAX_EDIT_FILE_BYTES) {
     return preReloadRefusal(prepared, authorizationId, gitContext, "BOUNDS_EXCEEDED");
@@ -647,8 +650,15 @@ export async function createFile(
     return withCleanup(finalAbsence.error, cleanupFailure);
   }
 
+  let publishedVerificationTarget: Awaited<
+    ReturnType<AtomicCreateFsOps["linkNoOverwrite"]>
+  >;
   try {
-    await fsOps.linkNoOverwrite(tempPath, targetPath);
+    publishedVerificationTarget = await fsOps.linkNoOverwrite(
+      tempPath,
+      targetPath,
+      operationIdentity,
+    );
   } catch (error) {
     const cleanupFailure = await cleanupTemp(fsOps, null, tempPath);
     if (isNodeErrno(error) && error.code === "EEXIST") {
@@ -695,23 +705,20 @@ export async function createFile(
   let observedAfterByteLength: number | null = null;
   let afterStateOk = false;
   try {
-    // Confirm published path exists and matches authorized bytes.
-    await fsOps.lstatTarget(targetPath);
-    if (prepared.afterByteLength === 0) {
-      const published = await fsOps.readPublishedBytes(targetPath, 0);
-      observedAfterFingerprint = fingerprintBytes(published);
-      observedAfterByteLength = published.byteLength;
-    } else {
-      const published = await fsOps.readPublishedBytes(
-        targetPath,
-        prepared.afterByteLength,
-      );
-      observedAfterFingerprint = fingerprintBytes(published);
-      observedAfterByteLength = published.byteLength;
-    }
-    afterStateOk =
-      observedAfterFingerprint !== null &&
-      fingerprintsEqual(observedAfterFingerprint, prepared.afterFingerprint);
+    const evidence = await fsOps.verifyPublishedCreation(
+      publishedVerificationTarget,
+      operationIdentity,
+    );
+    observedAfterFingerprint = {
+      algorithm: "sha256",
+      hex: evidence.observedHex,
+      byteLength: evidence.observedByteLength,
+    };
+    observedAfterByteLength = evidence.observedByteLength;
+    afterStateOk = fingerprintsEqual(
+      observedAfterFingerprint,
+      prepared.afterFingerprint,
+    );
   } catch {
     afterStateOk = false;
   }

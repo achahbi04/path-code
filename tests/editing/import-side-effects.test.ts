@@ -7,6 +7,7 @@ describe("editing import side effects", () => {
     expect(Object.keys(editing).sort()).toEqual(
       [
         "CREATED_FILE_BASE_MODE",
+        "DISABLE_ACTION_FOR_CREATE_FILE",
         "DISABLE_ACTION_FOR_MODIFY_EXISTING_FILE",
         "MAX_EDIT_FILE_BYTES",
         "MAX_FILES_PER_EDIT_OPERATION",
@@ -19,6 +20,7 @@ describe("editing import side effects", () => {
         "explicitEditApproval",
         "isAtomicCreatePlatformSupported",
         "isAtomicReplacePlatformSupported",
+        "isCreateFileDisabled",
         "isModifyExistingFileDisabled",
         "isMutationActionDisabledByConfig",
         "prepareCreateFile",

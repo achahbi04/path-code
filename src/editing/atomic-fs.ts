@@ -6,7 +6,7 @@
  * Phase 3C: same-directory hard-link no-overwrite publication.
  */
 
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { fsync as fsyncCallback } from "node:fs";
 import {
   constants,
@@ -18,6 +18,16 @@ import {
   type FileHandle,
 } from "node:fs/promises";
 import path from "node:path";
+
+import {
+  mintPublishedCreationVerificationTarget,
+  resolvePublishedCreationTarget,
+  type CreationAfterStateEvidence,
+  type PublishedCreationVerificationTarget,
+} from "./internal/creation-verification.js";
+import { MAX_EDIT_FILE_BYTES } from "./bounds.js";
+
+export type { CreationAfterStateEvidence, PublishedCreationVerificationTarget };
 
 /** Phase 3B temporary candidate prefix. */
 export const PATH_CODE_TEMP_PREFIX = ".path-code-replace-";
@@ -66,18 +76,26 @@ export type AtomicReplaceFsOps = {
   ) => Promise<Uint8Array>;
   readonly closeHandle: (handle: FileHandle) => Promise<void>;
   readonly renameAtomic: (tempPath: string, targetPath: string) => Promise<void>;
-  /** Hard-link publication: fails with EEXIST if target already exists. */
+  /**
+   * Hard-link publication: fails with EEXIST if target already exists.
+   * On success, earns an opaque PublishedCreationVerificationTarget bound to
+   * operationIdentity for post-creation verification only.
+   */
   readonly linkNoOverwrite: (
     candidatePath: string,
     targetPath: string,
-  ) => Promise<void>;
+    operationIdentity: object,
+  ) => Promise<PublishedCreationVerificationTarget>;
   readonly fsyncDirectory: (dirPath: string) => Promise<void>;
   readonly unlink: (filePath: string) => Promise<void>;
-  /** Bounded read of a published path for creation after-state verification. */
-  readonly readPublishedBytes: (
-    filePath: string,
-    expectedLength: number,
-  ) => Promise<Uint8Array>;
+  /**
+   * Operation-bound after-state verification — accepts only a publication-earned
+   * opaque target; no caller-selectable path.
+   */
+  readonly verifyPublishedCreation: (
+    target: PublishedCreationVerificationTarget,
+    operationIdentity: object,
+  ) => Promise<CreationAfterStateEvidence>;
 };
 
 /** Alias used by creation orchestration — same production seam. */
@@ -202,32 +220,6 @@ async function readCandidateBytesImpl(
   return buffer;
 }
 
-async function readPublishedBytesImpl(
-  filePath: string,
-  expectedLength: number,
-): Promise<Uint8Array> {
-  const handle = await open(filePath, "r");
-  try {
-    const buffer = new Uint8Array(expectedLength);
-    let offset = 0;
-    while (offset < expectedLength) {
-      const { bytesRead } = await handle.read(
-        buffer,
-        offset,
-        expectedLength - offset,
-        offset,
-      );
-      if (bytesRead === 0) {
-        throw new Error("Published-file read ended before expected length");
-      }
-      offset += bytesRead;
-    }
-    return buffer;
-  } finally {
-    await handle.close();
-  }
-}
-
 async function fsyncDirectoryImpl(dirPath: string): Promise<void> {
   const handle = await open(dirPath, constants.O_RDONLY | constants.O_DIRECTORY);
   try {
@@ -248,8 +240,53 @@ async function fsyncDirectoryImpl(dirPath: string): Promise<void> {
 async function linkNoOverwriteImpl(
   candidatePath: string,
   targetPath: string,
-): Promise<void> {
+  operationIdentity: object,
+): Promise<PublishedCreationVerificationTarget> {
   await link(candidatePath, targetPath);
+  return mintPublishedCreationVerificationTarget({
+    absolutePath: targetPath,
+    operationIdentity,
+  });
+}
+
+async function verifyPublishedCreationImpl(
+  target: PublishedCreationVerificationTarget,
+  operationIdentity: object,
+): Promise<CreationAfterStateEvidence> {
+  const resolved = resolvePublishedCreationTarget(target, operationIdentity);
+  const handle = await open(resolved.absolutePath, "r");
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile()) {
+      throw new Error("Published creation target is not a regular file");
+    }
+    if (stat.size > MAX_EDIT_FILE_BYTES) {
+      throw new Error("Published creation target exceeds verification ceiling");
+    }
+    const buffer = new Uint8Array(stat.size);
+    let offset = 0;
+    while (offset < buffer.byteLength) {
+      const { bytesRead } = await handle.read(
+        buffer,
+        offset,
+        buffer.byteLength - offset,
+        offset,
+      );
+      if (bytesRead === 0) {
+        throw new Error("Published creation read ended before expected length");
+      }
+      offset += bytesRead;
+    }
+    const hex = createHash("sha256").update(buffer).digest("hex");
+    return Object.freeze({
+      kind: "CREATION_AFTER_STATE_EVIDENCE",
+      publicationId: resolved.publicationId,
+      observedHex: hex,
+      observedByteLength: buffer.byteLength,
+    });
+  } finally {
+    await handle.close();
+  }
 }
 
 export const productionAtomicReplaceFs: AtomicReplaceFsOps = {
@@ -265,7 +302,7 @@ export const productionAtomicReplaceFs: AtomicReplaceFsOps = {
   linkNoOverwrite: linkNoOverwriteImpl,
   fsyncDirectory: fsyncDirectoryImpl,
   unlink: (filePath) => unlink(filePath),
-  readPublishedBytes: readPublishedBytesImpl,
+  verifyPublishedCreation: verifyPublishedCreationImpl,
 };
 
 export const productionAtomicCreateFs: AtomicCreateFsOps = productionAtomicReplaceFs;

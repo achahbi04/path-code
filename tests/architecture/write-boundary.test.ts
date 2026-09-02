@@ -79,4 +79,12 @@ describe("Phase 3B write boundary", () => {
     expect(source).not.toMatch(/from\s+["']node:fs\/promises/);
     expect(source).toMatch(/atomic-fs/);
   });
+
+  it("keeps create orchestration free of direct node fs write imports", () => {
+    const orchestrationPath = join(repoRoot, "src/editing/create-file.ts");
+    const source = readFileSync(orchestrationPath, "utf8");
+    expect(source).not.toMatch(/from\s+["']node:fs/);
+    expect(source).not.toMatch(/from\s+["']node:fs\/promises/);
+    expect(source).toMatch(/atomic-fs/);
+  });
 });
