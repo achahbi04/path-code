@@ -435,27 +435,56 @@ const RECORDS: CapabilityRecord[] = [
         SHA.phase3Master,
         "3A — EDIT CONTRACTS / PREPARATION / AUTHORIZATION",
       ),
+      doc(
+        "docs/PHASE_1_ACTION_CLASS_AMENDMENT_1.md",
+        SHA.phase3CH1Impl,
+        "Additive CREATE_FILE ActionClass amendment",
+      ),
+      doc(
+        "docs/PHASE_3_SAFE_EDITING_AMENDMENT_1.md",
+        SHA.phase3CH1Impl,
+        "CREATE_FILE ActionClass mapping amendment",
+      ),
     ],
     implementationEvidence: [
       mod(
-        "src/editing/index.ts",
-        SHA.phase3AImpl,
-        "Phase 3A public editing contract surface",
+        "src/domain/authority.ts",
+        SHA.phase3CH1Impl,
+        "ActionClass vocabulary including CREATE_FILE",
+      ),
+      mod(
+        "src/config/parser.ts",
+        SHA.phase3CH1Impl,
+        "disable-action parser membership for CREATE_FILE",
+      ),
+      mod(
+        "src/editing/policy.ts",
+        SHA.phase3CH1Impl,
+        "CREATE_FILE and EDIT disable-action mapping",
       ),
       mod(
         "src/editing/preparation.ts",
-        SHA.phase3AImpl,
-        "Point-in-time preparation through Phase 2B reader",
+        SHA.phase3CH1Impl,
+        "Preparation refuses CREATE_FILE when action disabled",
       ),
       mod(
         "src/editing/authorization.ts",
-        SHA.phase3AImpl,
+        SHA.phase3CH1Impl,
         "Explicit authorization and single-use semantics",
       ),
+      mod(
+        "src/editing/index.ts",
+        SHA.phase3CH1Impl,
+        "Phase 3 editing contract public surface",
+      ),
     ],
-    // freezeEvidence removed in Phase 3C-H1 Stage 0: 3A shipped without CREATE_FILE
-    // ActionClass mapping required by frozen Master (STOP AND REPORT). Historical
-    // sameCommit freeze at SHA.phase3AImpl remains in Git ancestry.
+    freezeEvidence: {
+      kind: "twoCommit",
+      implementationCommit: SHA.phase3CH1Impl,
+      evidenceCommit: SHA.phase3CH1Evidence,
+      reportPath: "docs/reports/PHASE_3C_H1_REPORT.md",
+      productionScopes: ["src/editing/", "src/domain/", "src/config/"],
+    },
     dependencies: [
       "safe-editing",
       "repository-reader",
@@ -614,22 +643,36 @@ const RECORDS: CapabilityRecord[] = [
         SHA.phase3Master,
         "3C — SAFE CREATION",
       ),
+      doc(
+        "docs/PHASE_3_SAFE_EDITING_AMENDMENT_1.md",
+        SHA.phase3CH1Impl,
+        "Post-creation verification authority amendment",
+      ),
     ],
     implementationEvidence: [
       mod(
         "src/editing/atomic-fs.ts",
-        SHA.phase3CImpl,
-        "Hard-link no-overwrite publication and creation temp candidate adapter",
+        SHA.phase3CH1Impl,
+        "Hard-link no-overwrite publication and operation-bound verification read",
       ),
       mod(
         "src/editing/create-file.ts",
-        SHA.phase3CImpl,
-        "Safe single-file creation orchestration with verified candidate publication",
+        SHA.phase3CH1Impl,
+        "Safe single-file creation orchestration with CREATE_FILE policy and opaque after-state verify",
+      ),
+      mod(
+        "src/editing/internal/creation-verification.ts",
+        SHA.phase3CH1Impl,
+        "Opaque PublishedCreationVerificationTarget minting and operation binding",
       ),
     ],
-    // freezeEvidence removed in Phase 3C-H1 Stage 0 pending contract correction
-    // (CREATE_FILE disable-action + post-creation verification authority).
-    // Historical sameCommit freeze at SHA.phase3CImpl remains in Git ancestry.
+    freezeEvidence: {
+      kind: "twoCommit",
+      implementationCommit: SHA.phase3CH1Impl,
+      evidenceCommit: SHA.phase3CH1Evidence,
+      reportPath: "docs/reports/PHASE_3C_H1_REPORT.md",
+      productionScopes: ["src/editing/"],
+    },
     dependencies: [
       "edit-contracts",
       "safe-editing",

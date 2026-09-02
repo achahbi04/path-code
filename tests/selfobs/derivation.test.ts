@@ -116,7 +116,7 @@ describe("selfobs derivation", () => {
   });
 
   it(
-    "derives edit-contracts and safe-file-creation IMPLEMENTED pending 3C-H1 correction",
+    "derives edit-contracts and safe-file-creation PASS_FROZEN after 3C-H1 correction",
     async () => {
       const { verifyLedgers } = await import("../../scripts/lib/ledger-verifier.js");
       const repoRoot = new URL("../..", import.meta.url).pathname;
@@ -140,7 +140,7 @@ describe("selfobs derivation", () => {
       expect(editContracts).toMatchObject({
         kind: "VERIFIED_CAPABILITY_STATE",
         capabilityId: "edit-contracts",
-        state: "IMPLEMENTED",
+        state: "PASS_FROZEN",
       });
       expect(safeEditing).toMatchObject({
         kind: "VERIFIED_CAPABILITY_STATE",
@@ -163,7 +163,7 @@ describe("selfobs derivation", () => {
       expect(safeFileCreation).toMatchObject({
         kind: "VERIFIED_CAPABILITY_STATE",
         capabilityId: "safe-file-creation",
-        state: "IMPLEMENTED",
+        state: "PASS_FROZEN",
       });
     },
     60_000,

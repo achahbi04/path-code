@@ -116,11 +116,15 @@ Master contract:
 
 **Phase 3B-H1 — Corrective pass: PASS_FROZEN**
 
-**Phase 3C — Safe Creation: PASS_FROZEN**
+**Phase 3C — Safe Creation: PASS_FROZEN** (contract-corrected via Phase 3C-H1)
+
+**Phase 3C-H1 — Contract Correction: COMPLETE**
+
+[`docs/reports/PHASE_3C_H1_REPORT.md`](docs/reports/PHASE_3C_H1_REPORT.md)
 
 Existing-file replacement is available as a bounded internal capability through the Phase 3B mechanism.
 
-Safe-file-creation is available as a bounded internal capability through the Phase 3C mechanism.
+Safe-file-creation is available as a bounded internal capability through the Phase 3C mechanism (CREATE_FILE ActionClass + operation-bound post-creation verification).
 
 **Phase 3 — Safe Editing Engine: DECLARED / IN PROGRESS**
 
@@ -135,7 +139,7 @@ It still cannot:
 - create directories
 - coordinate multi-file changes
 
-Phase 3 is not complete.
+Phase 3 is not complete. Next: Phase 3D.
 
 Next permitted implementation phase:
 
