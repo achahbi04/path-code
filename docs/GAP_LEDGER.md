@@ -763,6 +763,60 @@ Every entry should contain:
 **Evidence:** docs/reports/SELF_OBSERVATION_V1_H2_FREEZE_SCOPE_REPORT.md
 
 ---
+
+### GAP-043 — Created vs modified provenance is not distinguished
+
+**Discovered in / source:** Phase 3C safe single-file creation
+
+**Description:** Successful Phase 3C creation earns PATH_CODE_MODIFIED using the frozen provenance vocabulary. The vocabulary does not distinguish files created by Path Code from files modified by Path Code.
+
+**Implementer proposed class:** NON_BLOCKING_LIMITATION
+
+**Review classification:** NON_BLOCKING_LIMITATION
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Frozen provenance vocabulary remains truthful; creation vs modification distinction is not required for SE-019 safety claims.
+
+**Required condition to close:** Deliberate provenance-vocabulary revision if product semantics require the distinction.
+
+---
+
+### GAP-044 — Residual race between final creation revalidation and hard-link publication
+
+**Discovered in / source:** Phase 3C safe single-file creation
+
+**Description:** After final parent/absence/denial rechecks and before linkNoOverwrite, a concurrent actor may create the target. Hard-link EEXIST refuses overwrite, but the Master does not claim hostile concurrent-filesystem linearizability for the revalidation window.
+
+**Implementer proposed class:** NON_BLOCKING_LIMITATION
+
+**Review classification:** NON_BLOCKING_LIMITATION
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Publication remains no-overwrite; residual race is detection/refusal, not silent corruption. Distinct from GAP-035 (3B rename window).
+
+**Required condition to close:** Proven stronger dirfd/openat2/locking/CAS-style platform mechanism.
+
+---
+
+### GAP-045 — Post-publication creation temp may remain as a second hard-link name
+
+**Discovered in / source:** Phase 3C safe single-file creation
+
+**Description:** After successful linkNoOverwrite, candidate and target name the same inode. If candidate-name removal fails or the process crashes before removal, a Path Code temp name may remain as a second directory entry for the published file. GAP-036 covers crash-orphan unpublished temps for 3B; this records the post-publication second-name case for creation.
+
+**Implementer proposed class:** NON_BLOCKING_LIMITATION
+
+**Review classification:** NON_BLOCKING_LIMITATION
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Handled unlink failure is reported as COMMITTED_FAILURE with cleanupFailure; target is not deleted. Crash residue is an OS-visible honesty limit, not silent corruption.
+
+**Required condition to close:** Unnamed-temp or stronger platform primitive eliminating the second-name window.
+
+---
 ## GAP CLOSURE CONDUCT
 
 When a later pass closes a gap:

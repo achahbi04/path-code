@@ -128,3 +128,28 @@ const _recordShape: EditRecord = {
   durabilityVerified: false,
 };
 void _recordShape;
+
+// Creation EditRecord before-state is NON_EXISTENT precondition, not a fingerprint.
+const _creationRecord: EditRecord = {
+  kind: "CREATION",
+  parent: sampleEntry,
+  leafName: "new.ts",
+  targetRelativePath: "new.ts",
+  authorizationId: "auth",
+  beforePrecondition: {
+    kind: "NON_EXISTENT",
+    parent: sampleEntry,
+    leafName: "new.ts",
+    targetRelativePath: "new.ts",
+    observedAtMs: 0,
+  },
+  expectedAfterFingerprint: { algorithm: "sha256", hex: "b", byteLength: 1 },
+  expectedAfterByteLength: 1,
+  observedAfterFingerprint: null,
+  observedAfterByteLength: null,
+  outcome: "REFUSED_PRECOMMIT",
+  commitPointReached: false,
+  provenance: null,
+  durabilityVerified: false,
+};
+void _creationRecord;

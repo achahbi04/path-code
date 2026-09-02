@@ -1,12 +1,16 @@
 /**
- * Phase 3B authorized low-level filesystem adapter — the sole production
- * import site for project mutation primitives (write/rename/chown/chmod/fsync).
+ * Authorized low-level filesystem adapter — the sole production import site
+ * for project mutation primitives (write/rename/link/chown/chmod/fsync).
+ *
+ * Phase 3B: same-directory rename publication.
+ * Phase 3C: same-directory hard-link no-overwrite publication.
  */
 
 import { randomBytes } from "node:crypto";
 import { fsync as fsyncCallback } from "node:fs";
 import {
   constants,
+  link,
   lstat,
   open,
   rename,
@@ -15,9 +19,16 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 
+/** Phase 3B temporary candidate prefix. */
 export const PATH_CODE_TEMP_PREFIX = ".path-code-replace-";
 
+/** Phase 3C temporary candidate prefix — distinct from replacement temps. */
+export const PATH_CODE_CREATE_TEMP_PREFIX = ".path-code-create-";
+
 export const MAX_TEMP_COLLISION_ATTEMPTS = 10;
+
+/** POSIX base mode for newly created files before umask application. */
+export const CREATED_FILE_BASE_MODE = 0o666;
 
 export type TargetFileMetadata = {
   readonly dev: number;
@@ -27,6 +38,7 @@ export type TargetFileMetadata = {
   readonly gid: number;
   readonly nlink: number;
   readonly isFile: boolean;
+  readonly isDirectory: boolean;
   readonly isSymbolicLink: boolean;
 };
 
@@ -54,9 +66,22 @@ export type AtomicReplaceFsOps = {
   ) => Promise<Uint8Array>;
   readonly closeHandle: (handle: FileHandle) => Promise<void>;
   readonly renameAtomic: (tempPath: string, targetPath: string) => Promise<void>;
+  /** Hard-link publication: fails with EEXIST if target already exists. */
+  readonly linkNoOverwrite: (
+    candidatePath: string,
+    targetPath: string,
+  ) => Promise<void>;
   readonly fsyncDirectory: (dirPath: string) => Promise<void>;
   readonly unlink: (filePath: string) => Promise<void>;
+  /** Bounded read of a published path for creation after-state verification. */
+  readonly readPublishedBytes: (
+    filePath: string,
+    expectedLength: number,
+  ) => Promise<Uint8Array>;
 };
+
+/** Alias used by creation orchestration — same production seam. */
+export type AtomicCreateFsOps = AtomicReplaceFsOps;
 
 type NodeErrnoException = Error & { readonly code?: string };
 
@@ -74,6 +99,33 @@ export function isAtomicReplacePlatformSupported(): boolean {
   return process.platform === "darwin" || process.platform === "linux";
 }
 
+/**
+ * Creation requires proven hard-link no-overwrite + directory fsync.
+ * Evaluated independently from replace support.
+ */
+export function isAtomicCreatePlatformSupported(): boolean {
+  return process.platform === "darwin" || process.platform === "linux";
+}
+
+/**
+ * Final created-file mode: base 0o666 masked by the process umask.
+ * Does not mutate process.umask().
+ */
+export function computeCreatedFileMode(): number {
+  return CREATED_FILE_BASE_MODE & ~process.umask();
+}
+
+function exclusiveCreateFlags(): number {
+  let flags = constants.O_RDWR | constants.O_CREAT | constants.O_EXCL;
+  if (
+    "O_NOFOLLOW" in constants &&
+    typeof (constants as { O_NOFOLLOW?: number }).O_NOFOLLOW === "number"
+  ) {
+    flags |= (constants as { O_NOFOLLOW: number }).O_NOFOLLOW;
+  }
+  return flags;
+}
+
 async function lstatTargetImpl(targetPath: string): Promise<TargetFileMetadata> {
   const statResult = await lstat(targetPath);
   return {
@@ -84,6 +136,7 @@ async function lstatTargetImpl(targetPath: string): Promise<TargetFileMetadata> 
     gid: statResult.gid,
     nlink: statResult.nlink,
     isFile: statResult.isFile(),
+    isDirectory: statResult.isDirectory(),
     isSymbolicLink: statResult.isSymbolicLink(),
   };
 }
@@ -92,15 +145,12 @@ async function createTempExclusiveImpl(
   parentDir: string,
   prefix: string,
 ): Promise<TempCandidateHandle> {
+  const flags = exclusiveCreateFlags();
   for (let attempt = 0; attempt < MAX_TEMP_COLLISION_ATTEMPTS; attempt += 1) {
     const suffix = randomBytes(16).toString("hex");
     const tempPath = path.join(parentDir, `${prefix}${suffix}`);
     try {
-      const handle = await open(
-        tempPath,
-        constants.O_RDWR | constants.O_CREAT | constants.O_EXCL,
-        0o600,
-      );
+      const handle = await open(tempPath, flags, 0o600);
       return { handle, tempPath };
     } catch (error) {
       if (isNodeErrno(error) && error.code === "EEXIST") {
@@ -138,13 +188,44 @@ async function readCandidateBytesImpl(
   const buffer = new Uint8Array(expectedLength);
   let offset = 0;
   while (offset < expectedLength) {
-    const { bytesRead } = await handle.read(buffer, offset, expectedLength - offset, 0);
+    const { bytesRead } = await handle.read(
+      buffer,
+      offset,
+      expectedLength - offset,
+      0,
+    );
     if (bytesRead === 0) {
       throw new Error("Candidate read-back ended before expected length");
     }
     offset += bytesRead;
   }
   return buffer;
+}
+
+async function readPublishedBytesImpl(
+  filePath: string,
+  expectedLength: number,
+): Promise<Uint8Array> {
+  const handle = await open(filePath, "r");
+  try {
+    const buffer = new Uint8Array(expectedLength);
+    let offset = 0;
+    while (offset < expectedLength) {
+      const { bytesRead } = await handle.read(
+        buffer,
+        offset,
+        expectedLength - offset,
+        offset,
+      );
+      if (bytesRead === 0) {
+        throw new Error("Published-file read ended before expected length");
+      }
+      offset += bytesRead;
+    }
+    return buffer;
+  } finally {
+    await handle.close();
+  }
 }
 
 async function fsyncDirectoryImpl(dirPath: string): Promise<void> {
@@ -164,6 +245,13 @@ async function fsyncDirectoryImpl(dirPath: string): Promise<void> {
   }
 }
 
+async function linkNoOverwriteImpl(
+  candidatePath: string,
+  targetPath: string,
+): Promise<void> {
+  await link(candidatePath, targetPath);
+}
+
 export const productionAtomicReplaceFs: AtomicReplaceFsOps = {
   lstatTarget: lstatTargetImpl,
   createTempExclusive: createTempExclusiveImpl,
@@ -174,6 +262,10 @@ export const productionAtomicReplaceFs: AtomicReplaceFsOps = {
   readCandidateBytes: readCandidateBytesImpl,
   closeHandle: (handle) => handle.close(),
   renameAtomic: (tempPath, targetPath) => rename(tempPath, targetPath),
+  linkNoOverwrite: linkNoOverwriteImpl,
   fsyncDirectory: fsyncDirectoryImpl,
   unlink: (filePath) => unlink(filePath),
+  readPublishedBytes: readPublishedBytesImpl,
 };
+
+export const productionAtomicCreateFs: AtomicCreateFsOps = productionAtomicReplaceFs;

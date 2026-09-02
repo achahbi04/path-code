@@ -634,6 +634,56 @@ const GAP_LEDGER_V1: GapLedger = {
       closedByCommit: "7e54424fd6a2bb1d298f28bd83f513046307a37e",
       closureEvidence: "docs/reports/SELF_OBSERVATION_V1_H2_FREEZE_SCOPE_REPORT.md",
     },
+    {
+      id: "GAP-043",
+      title: "Created vs modified provenance is not distinguished",
+      sourceCheckpoint: "Phase 3C safe single-file creation",
+      description:
+        "Successful Phase 3C creation earns PATH_CODE_MODIFIED using the frozen provenance vocabulary. The vocabulary does not distinguish files created by Path Code from files modified by Path Code.",
+      proposedClass: "NON_BLOCKING_LIMITATION",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Frozen provenance vocabulary remains truthful; creation vs modification distinction is not required for SE-019 safety claims.",
+      missingEvidence:
+        "Deliberate provenance-vocabulary revision if product semantics require the distinction.",
+      closureCondition:
+        "Deliberate provenance-vocabulary revision if product semantics require the distinction.",
+    },
+    {
+      id: "GAP-044",
+      title:
+        "Residual race between final creation revalidation and hard-link publication",
+      sourceCheckpoint: "Phase 3C safe single-file creation",
+      description:
+        "After final parent/absence/denial rechecks and before linkNoOverwrite, a concurrent actor may create the target. Hard-link EEXIST refuses overwrite, but the Master does not claim hostile concurrent-filesystem linearizability for the revalidation window.",
+      proposedClass: "NON_BLOCKING_LIMITATION",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Publication remains no-overwrite; residual race is detection/refusal, not silent corruption. Distinct from GAP-035 (3B rename window).",
+      missingEvidence:
+        "Proven stronger dirfd/openat2/locking/CAS-style platform mechanism.",
+      closureCondition:
+        "Proven stronger dirfd/openat2/locking/CAS-style platform mechanism.",
+    },
+    {
+      id: "GAP-045",
+      title:
+        "Post-publication creation temp may remain as a second hard-link name",
+      sourceCheckpoint: "Phase 3C safe single-file creation",
+      description:
+        "After successful linkNoOverwrite, candidate and target name the same inode. If candidate-name removal fails or the process crashes before removal, a Path Code temp name may remain as a second directory entry for the published file. GAP-036 covers crash-orphan unpublished temps for 3B; this records the post-publication second-name case for creation.",
+      proposedClass: "NON_BLOCKING_LIMITATION",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Handled unlink failure is reported as COMMITTED_FAILURE with cleanupFailure; target is not deleted. Crash residue is an OS-visible honesty limit, not silent corruption.",
+      missingEvidence:
+        "Unnamed-temp or stronger platform primitive eliminating the second-name window.",
+      closureCondition:
+        "Unnamed-temp or stronger platform primitive eliminating the second-name window.",
+    },
   ],
 };
 

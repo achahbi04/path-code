@@ -154,11 +154,17 @@ export type EditRecordCreation = {
   readonly kind: "CREATION";
   readonly parent: RepositoryEntry;
   readonly leafName: string;
+  readonly targetRelativePath: string;
   readonly authorizationId: string;
   readonly beforePrecondition: CreationPrecondition;
   readonly expectedAfterFingerprint: ContentFingerprint;
+  readonly expectedAfterByteLength: number;
   readonly observedAfterFingerprint: ContentFingerprint | null;
+  readonly observedAfterByteLength: number | null;
   readonly outcome: EditOutcome;
+  readonly commitPointReached: boolean;
+  readonly provenance: "PATH_CODE_MODIFIED" | null;
+  readonly durabilityVerified: boolean;
   readonly gitContext?: GitStateBaseline;
 };
 
@@ -246,3 +252,51 @@ export type ReplaceExistingFileTerminalFailure = {
 export type ReplaceExistingFileResult =
   | ReplaceExistingFileSuccess
   | ReplaceExistingFileTerminalFailure;
+
+export type CreateFileFailureCode =
+  | AuthorizationFailureCode
+  | PreparationFailureCode
+  | "UNSUPPORTED_ATOMIC_CREATE_PLATFORM"
+  | "TARGET_ALREADY_EXISTS"
+  | "ABSENCE_UNVERIFIABLE"
+  | "PARENT_NOT_ADMITTED"
+  | "PARENT_IDENTITY_CHANGED"
+  | "WORKSPACE_INCOMPATIBLE"
+  | "TEMP_CREATE_FAILED"
+  | "TEMP_WRITE_FAILED"
+  | "TEMP_FSYNC_FAILED"
+  | "MODE_APPLY_FAILED"
+  | "CANDIDATE_VERIFICATION_FAILED"
+  | "LINK_FAILED"
+  | "DIRECTORY_FSYNC_FAILED"
+  | "AFTER_STATE_READ_FAILED"
+  | "AFTER_STATE_MISMATCH"
+  | "GIT_UNMERGED";
+
+export type CreateFileFailure = {
+  readonly code: CreateFileFailureCode;
+  readonly message: string;
+};
+
+export type CreateFileSuccess = {
+  readonly outcome: "SUCCESS";
+  readonly commitPointReached: true;
+  readonly durabilityVerified: true;
+  readonly editRecord: EditRecordCreation;
+  readonly knowledgeInvalidation: KnowledgeInvalidation;
+  readonly configFreshness: "MUTATION_TIME_RE_RESOLVED";
+};
+
+export type CreateFileTerminalFailure = {
+  readonly outcome: "REFUSED_PRECOMMIT" | "FAILED_PRECOMMIT" | "COMMITTED_FAILURE";
+  readonly commitPointReached: boolean;
+  readonly durabilityVerified: boolean;
+  readonly editRecord: EditRecordCreation;
+  readonly knowledgeInvalidation: KnowledgeInvalidation | null;
+  readonly cleanupFailure?: boolean;
+  readonly configFreshness: ConfigFreshness;
+  readonly refusalReason?: MutationTimeRefusalReason;
+  readonly failureCode?: CreateFileFailureCode;
+};
+
+export type CreateFileResult = CreateFileSuccess | CreateFileTerminalFailure;
