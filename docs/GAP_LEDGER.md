@@ -817,6 +817,42 @@ Every entry should contain:
 **Required condition to close:** Unnamed-temp or stronger platform primitive eliminating the second-name window.
 
 ---
+
+### GAP-046 — CREATE_FILE action restriction missing from Phase 1 ActionClass mapping
+
+**Discovered in / source:** Phase 3C-H1 review at c82ed1042d06bed56485cf622871ded970d6d440
+
+**Description:** Frozen Phase 3 Master required Phase 3A to map CREATE_FILE to an honest disable-action ActionClass or STOP AND REPORT. 3A shipped without that mapping; disable-action=EDIT blocks modification only while creation remains permitted. This violates the frozen mutation-class distinction and would leave Phase 3D without a distinct creation restriction axis.
+
+**Implementer proposed class:** BLOCKING_INVARIANT
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Blocking — deny-path is not an equivalent substitute for action-class restriction of CREATE_FILE.
+
+**Required condition to close:** Additive Phase 1 ActionClass amendment plus authorization-time and mutation-time CREATE_FILE disable enforcement with immutable corrective evidence.
+
+---
+
+### GAP-047 — Uncontracted post-creation verification path read
+
+**Discovered in / source:** Phase 3C-H1 review at c82ed1042d06bed56485cf622871ded970d6d440
+
+**Description:** Phase 3C requires after-state verification of a newly published path that has no RepositoryEntry and intentionally performs no reinventory. The shipped bounded path read in the editing filesystem layer lacked a frozen authority concept limiting it to the exact target this creation operation published.
+
+**Implementer proposed class:** BLOCKING_INVARIANT
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Blocking — post-creation verification must not become generic repository-read authority.
+
+**Required condition to close:** Frozen operation-bound PublishedCreationVerificationTarget / CreationAfterStateEvidence contract and implementation that cannot target caller-supplied or other-operation paths.
+
+---
 ## GAP CLOSURE CONDUCT
 
 When a later pass closes a gap:

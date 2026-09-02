@@ -684,6 +684,40 @@ const GAP_LEDGER_V1: GapLedger = {
       closureCondition:
         "Unnamed-temp or stronger platform primitive eliminating the second-name window.",
     },
+    {
+      id: "GAP-046",
+      title: "CREATE_FILE action restriction missing from Phase 1 ActionClass mapping",
+      sourceCheckpoint:
+        "Phase 3C-H1 review at c82ed1042d06bed56485cf622871ded970d6d440",
+      description:
+        "Frozen Phase 3 Master required Phase 3A to map CREATE_FILE to an honest disable-action ActionClass or STOP AND REPORT. 3A shipped without that mapping; disable-action=EDIT blocks modification only while creation remains permitted. This violates the frozen mutation-class distinction and would leave Phase 3D without a distinct creation restriction axis.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: "BLOCKING_INVARIANT",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Blocking — deny-path is not an equivalent substitute for action-class restriction of CREATE_FILE.",
+      missingEvidence:
+        "Additive Phase 1 ActionClass amendment plus authorization-time and mutation-time CREATE_FILE disable enforcement with immutable corrective evidence.",
+      closureCondition:
+        "CREATE_FILE maps to a distinct amended Phase 1 ActionClass; authorization and mutation-time refusal work; Stage 2/3 evidence closes the defect.",
+    },
+    {
+      id: "GAP-047",
+      title: "Uncontracted post-creation verification path read",
+      sourceCheckpoint:
+        "Phase 3C-H1 review at c82ed1042d06bed56485cf622871ded970d6d440",
+      description:
+        "Phase 3C requires after-state verification of a newly published path that has no RepositoryEntry and intentionally performs no reinventory. The shipped bounded path read in the editing filesystem layer lacked a frozen authority concept limiting it to the exact target this creation operation published.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: "BLOCKING_INVARIANT",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Blocking — post-creation verification must not become generic repository-read authority.",
+      missingEvidence:
+        "Frozen operation-bound PublishedCreationVerificationTarget / CreationAfterStateEvidence contract and implementation that cannot target caller-supplied or other-operation paths.",
+      closureCondition:
+        "Opaque publication-earned verification token gates the read; evidence is not RepositoryEntry/ContentObservation; C-F9 and Stage 2/3 evidence close the defect.",
+    },
   ],
 };
 

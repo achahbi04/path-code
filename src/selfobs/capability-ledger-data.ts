@@ -453,11 +453,9 @@ const RECORDS: CapabilityRecord[] = [
         "Explicit authorization and single-use semantics",
       ),
     ],
-    freezeEvidence: {
-      kind: "sameCommit",
-      implementationCommit: SHA.phase3AImpl,
-      reportPath: "docs/reports/PHASE_3A_REPORT.md",
-    },
+    // freezeEvidence removed in Phase 3C-H1 Stage 0: 3A shipped without CREATE_FILE
+    // ActionClass mapping required by frozen Master (STOP AND REPORT). Historical
+    // sameCommit freeze at SHA.phase3AImpl remains in Git ancestry.
     dependencies: [
       "safe-editing",
       "repository-reader",
@@ -629,11 +627,9 @@ const RECORDS: CapabilityRecord[] = [
         "Safe single-file creation orchestration with verified candidate publication",
       ),
     ],
-    freezeEvidence: {
-      kind: "sameCommit",
-      implementationCommit: SHA.phase3CImpl,
-      reportPath: "docs/reports/PHASE_3C_REPORT.md",
-    },
+    // freezeEvidence removed in Phase 3C-H1 Stage 0 pending contract correction
+    // (CREATE_FILE disable-action + post-creation verification authority).
+    // Historical sameCommit freeze at SHA.phase3CImpl remains in Git ancestry.
     dependencies: [
       "edit-contracts",
       "safe-editing",
