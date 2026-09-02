@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
-import { link, readFile, stat, utimes, writeFile } from "node:fs/promises";
+import { link, readFile, readdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +17,7 @@ import { replaceExistingFile } from "../../src/editing/replace-existing-file.js"
 import {
   cleanupInventoryFixtures,
   createCanonicalTempRoot,
+  writeDenyConfig,
 } from "../inventory/fixture-helpers.js";
 import { earnAdmittedFile, sha256Hex } from "./helpers.js";
 
@@ -24,6 +25,14 @@ afterEach(async () => {
   resetAuthorizationRegistryForTests();
   await cleanupInventoryFixtures();
 });
+
+async function writePathcodeConfig(root: string, fenceBody: string): Promise<void> {
+  await writeFile(
+    join(root, "PATHCODE.md"),
+    `# Config\n\n\`\`\`pathcode-config\n${fenceBody}\n\`\`\`\n`,
+    "utf8",
+  );
+}
 
 async function earnAuthorizedMutation(
   root: string,
@@ -304,5 +313,220 @@ describe("replaceExistingFile — platform policy", () => {
     } finally {
       platformSpy.mockRestore();
     }
+  });
+});
+
+describe("replaceExistingFile — mutation-time config fail-closed", () => {
+  it("C1: corrupted PATHCODE.md after authorize → REFUSED_PRECOMMIT CONFIG_RELOAD_FAILED", async () => {
+    const root = await createCanonicalTempRoot("pc-3bh1-c1-");
+    const before = "keep-c1\n";
+    const { prepared, authorization } = await earnAuthorizedMutation(
+      root,
+      "c1.txt",
+      before,
+      "new-c1\n",
+    );
+    await writeFile(
+      join(root, "PATHCODE.md"),
+      "# Broken\n\n```pathcode-config\ndeny-path = unterminated\n",
+      "utf8",
+    );
+
+    const result = await replaceExistingFile(authorization, prepared);
+    expect(result.outcome).toBe("REFUSED_PRECOMMIT");
+    expect(result.commitPointReached).toBe(false);
+    if (result.outcome !== "REFUSED_PRECOMMIT") {
+      return;
+    }
+    expect(result.refusalReason).toBe("CONFIG_RELOAD_FAILED");
+    expect((await readFile(join(root, "c1.txt"))).toString()).toBe(before);
+    const names = await readdir(root);
+    expect(names.some((name) => name.startsWith(".path-code-replace-"))).toBe(false);
+
+    const second = await replaceExistingFile(authorization, prepared);
+    expect(second.outcome).toBe("REFUSED_PRECOMMIT");
+  });
+
+  it("C2: delete PATHCODE.md after authorize → successful ABSENT, mutation proceeds", async () => {
+    const root = await createCanonicalTempRoot("pc-3bh1-c2-");
+    await writePathcodeConfig(root, "deny-path = unrelated-secret");
+    const before = "keep-c2\n";
+    const after = "new-c2\n";
+    const { prepared, authorization } = await earnAuthorizedMutation(
+      root,
+      "c2.txt",
+      before,
+      after,
+    );
+    await unlink(join(root, "PATHCODE.md"));
+
+    const result = await replaceExistingFile(authorization, prepared);
+    expect(result.outcome).toBe("SUCCESS");
+    if (result.outcome !== "SUCCESS") {
+      return;
+    }
+    expect(result.configFreshness).toBe("MUTATION_TIME_RE_RESOLVED");
+    expect((await readFile(join(root, "c2.txt"))).toString()).toBe(after);
+  });
+
+  it("C3: deny-path covering target after authorize → TARGET_DENIED not CONFIG_RELOAD_FAILED", async () => {
+    const root = await createCanonicalTempRoot("pc-3bh1-c3-");
+    const before = "keep-c3\n";
+    const { prepared, authorization } = await earnAuthorizedMutation(
+      root,
+      "c3.txt",
+      before,
+      "new-c3\n",
+    );
+    await writeDenyConfig(root, ["c3.txt"]);
+
+    const result = await replaceExistingFile(authorization, prepared);
+    expect(result.outcome).toBe("REFUSED_PRECOMMIT");
+    expect(result.commitPointReached).toBe(false);
+    if (result.outcome !== "REFUSED_PRECOMMIT") {
+      return;
+    }
+    expect(result.refusalReason).toBe("TARGET_DENIED");
+    expect(result.refusalReason).not.toBe("CONFIG_RELOAD_FAILED");
+    expect((await readFile(join(root, "c3.txt"))).toString()).toBe(before);
+  });
+
+  it("C4: disable mapped EDIT action after authorize → ACTION_DISABLED", async () => {
+    const root = await createCanonicalTempRoot("pc-3bh1-c4-");
+    const before = "keep-c4\n";
+    const { prepared, authorization } = await earnAuthorizedMutation(
+      root,
+      "c4.txt",
+      before,
+      "new-c4\n",
+    );
+    await writePathcodeConfig(root, "disable-action = EDIT");
+
+    const result = await replaceExistingFile(authorization, prepared);
+    expect(result.outcome).toBe("REFUSED_PRECOMMIT");
+    expect(result.commitPointReached).toBe(false);
+    if (result.outcome !== "REFUSED_PRECOMMIT") {
+      return;
+    }
+    expect(result.refusalReason).toBe("ACTION_DISABLED");
+    expect((await readFile(join(root, "c4.txt"))).toString()).toBe(before);
+  });
+});
+
+describe("replaceExistingFile — temp-creation recovery", () => {
+  it("injected createTempExclusive failure returns FAILED_PRECOMMIT without escaping", async () => {
+    const root = await createCanonicalTempRoot("pc-3bh1-temp-");
+    const before = "keep-temp\n";
+    const { prepared, authorization } = await earnAuthorizedMutation(
+      root,
+      "temp.txt",
+      before,
+      "new-temp\n",
+    );
+    const fsOps: AtomicReplaceFsOps = {
+      ...productionAtomicReplaceFs,
+      createTempExclusive: async () => {
+        throw new Error("injected createTempExclusive failure");
+      },
+    };
+
+    let thrown: unknown = null;
+    let result: Awaited<ReturnType<typeof replaceExistingFile>> | null = null;
+    try {
+      result = await replaceExistingFile(authorization, prepared, { fsOps });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeNull();
+    expect(result).not.toBeNull();
+    if (result === null) {
+      return;
+    }
+    expect(result.outcome).toBe("FAILED_PRECOMMIT");
+    expect(result.commitPointReached).toBe(false);
+    expect((await readFile(join(root, "temp.txt"))).toString()).toBe(before);
+    const names = await readdir(root);
+    expect(names.some((name) => name.startsWith(".path-code-replace-"))).toBe(false);
+  });
+
+  it("partial mid-stream write failure recovers with original target intact", async () => {
+    const root = await createCanonicalTempRoot("pc-3bh1-partial-");
+    const before = "keep-partial\n";
+    const after = "abcdefghij\n";
+    const { prepared, authorization } = await earnAuthorizedMutation(
+      root,
+      "partial.txt",
+      before,
+      after,
+    );
+    const fsOps: AtomicReplaceFsOps = {
+      ...productionAtomicReplaceFs,
+      writeAll: async (handle, bytes) => {
+        const slice = bytes.subarray(0, Math.min(1, bytes.byteLength));
+        await productionAtomicReplaceFs.writeAll(handle, slice);
+        throw new Error("injected mid-stream write failure");
+      },
+    };
+    const result = await replaceExistingFile(authorization, prepared, { fsOps });
+    expect(result.outcome).toBe("FAILED_PRECOMMIT");
+    expect(result.commitPointReached).toBe(false);
+    expect((await readFile(join(root, "partial.txt"))).toString()).toBe(before);
+  });
+
+  it("cleanup unlink failure surfaces cleanupFailure after pre-commit recovery", async () => {
+    const root = await createCanonicalTempRoot("pc-3bh1-unlink-");
+    const before = "keep-unlink\n";
+    const { prepared, authorization } = await earnAuthorizedMutation(
+      root,
+      "unlink.txt",
+      before,
+      "new-unlink\n",
+    );
+    const fsOps: AtomicReplaceFsOps = {
+      ...productionAtomicReplaceFs,
+      readCandidateBytes: async (handle, expectedLength) => {
+        await writeFile(join(root, "unlink.txt"), "mutated during temp\n", "utf8");
+        return productionAtomicReplaceFs.readCandidateBytes(handle, expectedLength);
+      },
+      unlink: async () => {
+        throw new Error("injected unlink failure");
+      },
+    };
+    const result = await replaceExistingFile(authorization, prepared, { fsOps });
+    expect(result.outcome).toBe("FAILED_PRECOMMIT");
+    expect(result.commitPointReached).toBe(false);
+    if (result.outcome !== "FAILED_PRECOMMIT") {
+      return;
+    }
+    expect(result.cleanupFailure).toBe(true);
+    expect((await readFile(join(root, "unlink.txt"))).toString()).toBe(
+      "mutated during temp\n",
+    );
+  });
+
+  it("after-state mismatch via rename seam yields COMMITTED_FAILURE", async () => {
+    const root = await createCanonicalTempRoot("pc-3bh1-after-");
+    const before = "keep-after\n";
+    const after = "new-after\n";
+    const { prepared, authorization } = await earnAuthorizedMutation(
+      root,
+      "after.txt",
+      before,
+      after,
+    );
+    const fsOps: AtomicReplaceFsOps = {
+      ...productionAtomicReplaceFs,
+      renameAtomic: async (tempPath, targetPath) => {
+        await productionAtomicReplaceFs.renameAtomic(tempPath, targetPath);
+        await writeFile(targetPath, "corrupted-after-rename\n", "utf8");
+      },
+    };
+    const result = await replaceExistingFile(authorization, prepared, { fsOps });
+    expect(result.outcome).toBe("COMMITTED_FAILURE");
+    expect(result.commitPointReached).toBe(true);
+    expect((await readFile(join(root, "after.txt"))).toString()).toBe(
+      "corrupted-after-rename\n",
+    );
   });
 });

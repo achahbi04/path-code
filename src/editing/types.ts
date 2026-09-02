@@ -201,13 +201,35 @@ export type ReplaceExistingFileFailure = {
   readonly message: string;
 };
 
+/**
+ * Mutation-time config freshness.
+ *
+ * `MUTATION_TIME_RE_RESOLVED` — `loadProjectConfig` succeeded at mutation time
+ * (including successful ABSENT when PATHCODE.md is missing).
+ *
+ * `SUPPLIED_ONLY` — retained only for terminal outcomes that refuse *before*
+ * mutation-time config reload is attempted (bounds/platform/auth gates). It is
+ * never used as a stale-config fallback to continue mutation after reload failure.
+ */
+export type ConfigFreshness = "MUTATION_TIME_RE_RESOLVED" | "SUPPLIED_ONLY";
+
+/**
+ * Distinguishing refusal reasons required for mutation-time policy evidence.
+ * Optional on other terminal outcomes that do not need this discrimination.
+ */
+export type MutationTimeRefusalReason =
+  | "CONFIG_RELOAD_FAILED"
+  | "TARGET_DENIED"
+  | "ACTION_DISABLED"
+  | "TARGET_STALE";
+
 export type ReplaceExistingFileSuccess = {
   readonly outcome: "SUCCESS";
   readonly commitPointReached: true;
   readonly durabilityVerified: true;
   readonly editRecord: EditRecordExistingFile;
   readonly knowledgeInvalidation: KnowledgeInvalidation;
-  readonly configFreshness: "MUTATION_TIME_RE_RESOLVED" | "SUPPLIED_ONLY";
+  readonly configFreshness: "MUTATION_TIME_RE_RESOLVED";
 };
 
 export type ReplaceExistingFileTerminalFailure = {
@@ -217,7 +239,8 @@ export type ReplaceExistingFileTerminalFailure = {
   readonly editRecord: EditRecordExistingFile;
   readonly knowledgeInvalidation: KnowledgeInvalidation | null;
   readonly cleanupFailure?: boolean;
-  readonly configFreshness: "MUTATION_TIME_RE_RESOLVED" | "SUPPLIED_ONLY";
+  readonly configFreshness: ConfigFreshness;
+  readonly refusalReason?: MutationTimeRefusalReason;
 };
 
 export type ReplaceExistingFileResult =

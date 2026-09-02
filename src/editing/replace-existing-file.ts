@@ -31,6 +31,7 @@ import {
 } from "./internal/record.js";
 import { isMutationActionDisabledByConfig } from "./policy.js";
 import type {
+  ConfigFreshness,
   EditAuthorization,
   EditRecordExistingFile,
   KnowledgeInvalidation,
@@ -45,19 +46,43 @@ export type ReplaceExistingFileOptions = {
   readonly fsOps?: AtomicReplaceFsOps;
 };
 
-type ConfigFreshness = "MUTATION_TIME_RE_RESOLVED" | "SUPPLIED_ONLY";
-
 type BeforeReadEvidence = {
   readonly fingerprint: ContentFingerprint;
   readonly byteLength: number;
 };
 
 function terminalFailure(
-  input: Omit<ReplaceExistingFileTerminalFailure, "configFreshness"> & {
-    readonly configFreshness: ConfigFreshness;
-  },
+  input: ReplaceExistingFileTerminalFailure,
 ): ReplaceExistingFileTerminalFailure {
   return input;
+}
+
+function preReloadRefusal(
+  prepared: PreparedMutation,
+  authorizationId: string,
+  gitContext: ReplaceExistingFileOptions["gitContext"],
+): ReplaceExistingFileTerminalFailure {
+  return terminalFailure({
+    outcome: "REFUSED_PRECOMMIT",
+    commitPointReached: false,
+    durabilityVerified: false,
+    editRecord: buildExistingFileEditRecord({
+      target: prepared.target,
+      authorizationId,
+      beforeFingerprint: prepared.beforeFingerprint,
+      beforeByteLength: prepared.beforeByteLength,
+      expectedAfterFingerprint: prepared.afterFingerprint,
+      expectedAfterByteLength: prepared.afterByteLength,
+      observedAfterFingerprint: null,
+      observedAfterByteLength: null,
+      outcome: "REFUSED_PRECOMMIT",
+      commitPointReached: false,
+      durabilityVerified: false,
+      ...(gitContext !== undefined ? { gitContext } : {}),
+    }),
+    knowledgeInvalidation: null,
+    configFreshness: "SUPPLIED_ONLY",
+  });
 }
 
 function fingerprintsEqual(
@@ -76,28 +101,58 @@ function metadataIdentityEqual(
 
 async function resolveMutationConfig(
   prepared: PreparedMutation,
+  authorizationId: string,
+  gitContext: ReplaceExistingFileOptions["gitContext"],
 ): Promise<
   Result<
-    { readonly config: ResolvedProjectConfig; readonly freshness: ConfigFreshness },
+    {
+      readonly config: ResolvedProjectConfig;
+      readonly freshness: "MUTATION_TIME_RE_RESOLVED";
+    },
     ReplaceExistingFileTerminalFailure
   >
 > {
   const reloaded = await loadProjectConfig(prepared.workspace);
   if (reloaded.ok) {
+    // CASE A (valid present) and CASE B (successful ABSENT) both succeed here.
+    // ConfigFailure is never reinterpreted as ABSENT.
     return success({
       config: reloaded.value,
       freshness: "MUTATION_TIME_RE_RESOLVED",
     });
   }
-  return success({
-    config: prepared.config,
-    freshness: "SUPPLIED_ONLY",
-  });
+  // CASE C — present but load/parse/validation failed: refuse closed.
+  // No prepared.config fallback, no defaultProjectConfig, no SUPPLIED_ONLY continuation.
+  return failure(
+    terminalFailure({
+      outcome: "REFUSED_PRECOMMIT",
+      commitPointReached: false,
+      durabilityVerified: false,
+      editRecord: buildExistingFileEditRecord({
+        target: prepared.target,
+        authorizationId,
+        beforeFingerprint: prepared.beforeFingerprint,
+        beforeByteLength: prepared.beforeByteLength,
+        expectedAfterFingerprint: prepared.afterFingerprint,
+        expectedAfterByteLength: prepared.afterByteLength,
+        observedAfterFingerprint: null,
+        observedAfterByteLength: null,
+        outcome: "REFUSED_PRECOMMIT",
+        commitPointReached: false,
+        durabilityVerified: false,
+        ...(gitContext !== undefined ? { gitContext } : {}),
+      }),
+      knowledgeInvalidation: null,
+      configFreshness: "SUPPLIED_ONLY",
+      refusalReason: "CONFIG_RELOAD_FAILED",
+    }),
+  );
 }
 
 async function readBeforeState(
   prepared: PreparedMutation,
   config: ResolvedProjectConfig,
+  configFreshness: ConfigFreshness,
 ): Promise<
   Result<BeforeReadEvidence, ReplaceExistingFileTerminalFailure>
 > {
@@ -126,7 +181,7 @@ async function readBeforeState(
           durabilityVerified: false,
         }),
         knowledgeInvalidation: null,
-        configFreshness: "SUPPLIED_ONLY",
+        configFreshness,
       }),
     );
   }
@@ -152,7 +207,7 @@ async function readBeforeState(
           durabilityVerified: false,
         }),
         knowledgeInvalidation: null,
-        configFreshness: "SUPPLIED_ONLY",
+        configFreshness,
       }),
     );
   }
@@ -195,6 +250,7 @@ function refuseIfBeforeMismatch(
         }),
         knowledgeInvalidation: null,
         configFreshness,
+        refusalReason: "TARGET_STALE",
       }),
     );
   }
@@ -287,6 +343,7 @@ async function runRestrictionRechecks(
         }),
         knowledgeInvalidation: null,
         configFreshness,
+        refusalReason: "ACTION_DISABLED",
       }),
     );
   }
@@ -317,6 +374,7 @@ async function runRestrictionRechecks(
         }),
         knowledgeInvalidation: null,
         configFreshness,
+        refusalReason: "TARGET_DENIED",
       }),
     );
   }
@@ -419,8 +477,9 @@ async function prepareTempCandidate(
     Error
   >
 > {
-  const tempHandle = await fsOps.createTempExclusive(parentDir, PATH_CODE_TEMP_PREFIX);
+  let tempHandle: TempCandidateHandle | null = null;
   try {
+    tempHandle = await fsOps.createTempExclusive(parentDir, PATH_CODE_TEMP_PREFIX);
     await fsOps.writeAll(tempHandle.handle, bytes);
     await fsOps.fsyncHandle(tempHandle.handle);
 
@@ -448,7 +507,9 @@ async function prepareTempCandidate(
     await fsOps.closeHandle(tempHandle.handle);
     return success({ handle: tempHandle, closed: true });
   } catch (error) {
-    await cleanupTemp(fsOps, tempHandle);
+    if (tempHandle !== null) {
+      await cleanupTemp(fsOps, tempHandle);
+    }
     if (error instanceof Error) {
       return failure(error);
     }
@@ -472,108 +533,33 @@ export async function replaceExistingFile(
   const gitContext = options.gitContext;
 
   if (prepared.action !== "MODIFY_EXISTING_FILE") {
-    return terminalFailure({
-      outcome: "REFUSED_PRECOMMIT",
-      commitPointReached: false,
-      durabilityVerified: false,
-      editRecord: buildExistingFileEditRecord({
-        target: prepared.target,
-        authorizationId: authorization.authorizationId,
-        beforeFingerprint: prepared.beforeFingerprint,
-        beforeByteLength: prepared.beforeByteLength,
-        expectedAfterFingerprint: prepared.afterFingerprint,
-        expectedAfterByteLength: prepared.afterByteLength,
-        observedAfterFingerprint: null,
-        observedAfterByteLength: null,
-        outcome: "REFUSED_PRECOMMIT",
-        commitPointReached: false,
-        durabilityVerified: false,
-        ...(gitContext !== undefined ? { gitContext } : {}),
-      }),
-      knowledgeInvalidation: null,
-      configFreshness: "SUPPLIED_ONLY",
-    });
+    return preReloadRefusal(prepared, authorization.authorizationId, gitContext);
   }
 
   const consumed = consumeEditAuthorization(authorization, prepared);
   if (!consumed.ok) {
-    return terminalFailure({
-      outcome: "REFUSED_PRECOMMIT",
-      commitPointReached: false,
-      durabilityVerified: false,
-      editRecord: buildExistingFileEditRecord({
-        target: prepared.target,
-        authorizationId: authorization.authorizationId,
-        beforeFingerprint: prepared.beforeFingerprint,
-        beforeByteLength: prepared.beforeByteLength,
-        expectedAfterFingerprint: prepared.afterFingerprint,
-        expectedAfterByteLength: prepared.afterByteLength,
-        observedAfterFingerprint: null,
-        observedAfterByteLength: null,
-        outcome: "REFUSED_PRECOMMIT",
-        commitPointReached: false,
-        durabilityVerified: false,
-        ...(gitContext !== undefined ? { gitContext } : {}),
-      }),
-      knowledgeInvalidation: null,
-      configFreshness: "SUPPLIED_ONLY",
-    });
+    return preReloadRefusal(prepared, authorization.authorizationId, gitContext);
   }
 
   const authorizationId = authorization.authorizationId;
 
   if (prepared.afterByteLength > MAX_EDIT_FILE_BYTES) {
-    return terminalFailure({
-      outcome: "REFUSED_PRECOMMIT",
-      commitPointReached: false,
-      durabilityVerified: false,
-      editRecord: buildExistingFileEditRecord({
-        target: prepared.target,
-        authorizationId,
-        beforeFingerprint: prepared.beforeFingerprint,
-        beforeByteLength: prepared.beforeByteLength,
-        expectedAfterFingerprint: prepared.afterFingerprint,
-        expectedAfterByteLength: prepared.afterByteLength,
-        observedAfterFingerprint: null,
-        observedAfterByteLength: null,
-        outcome: "REFUSED_PRECOMMIT",
-        commitPointReached: false,
-        durabilityVerified: false,
-        ...(gitContext !== undefined ? { gitContext } : {}),
-      }),
-      knowledgeInvalidation: null,
-      configFreshness: "SUPPLIED_ONLY",
-    });
+    return preReloadRefusal(prepared, authorizationId, gitContext);
   }
 
   if (!isAtomicReplacePlatformSupported()) {
-    return terminalFailure({
-      outcome: "REFUSED_PRECOMMIT",
-      commitPointReached: false,
-      durabilityVerified: false,
-      editRecord: buildExistingFileEditRecord({
-        target: prepared.target,
-        authorizationId,
-        beforeFingerprint: prepared.beforeFingerprint,
-        beforeByteLength: prepared.beforeByteLength,
-        expectedAfterFingerprint: prepared.afterFingerprint,
-        expectedAfterByteLength: prepared.afterByteLength,
-        observedAfterFingerprint: null,
-        observedAfterByteLength: null,
-        outcome: "REFUSED_PRECOMMIT",
-        commitPointReached: false,
-        durabilityVerified: false,
-        ...(gitContext !== undefined ? { gitContext } : {}),
-      }),
-      knowledgeInvalidation: null,
-      configFreshness: "SUPPLIED_ONLY",
-    });
+    return preReloadRefusal(prepared, authorizationId, gitContext);
   }
 
-  const configResult = await resolveMutationConfig(prepared);
-  const { config, freshness: configFreshness } = configResult.ok
-    ? configResult.value
-    : { config: prepared.config, freshness: "SUPPLIED_ONLY" as const };
+  const configResult = await resolveMutationConfig(
+    prepared,
+    authorizationId,
+    gitContext,
+  );
+  if (!configResult.ok) {
+    return configResult.error;
+  }
+  const { config, freshness: configFreshness } = configResult.value;
 
   const restrictions = await runRestrictionRechecks(
     prepared,
@@ -615,7 +601,7 @@ export async function replaceExistingFile(
   const targetPath = canonical.value;
   const parentDir = path.dirname(targetPath);
 
-  const initialRead = await readBeforeState(prepared, config);
+  const initialRead = await readBeforeState(prepared, config, configFreshness);
   if (!initialRead.ok) {
     const record = buildExistingFileEditRecord({
       ...initialRead.error.editRecord,
@@ -722,7 +708,7 @@ export async function replaceExistingFile(
     return withCleanup(finalRestrictions.error, cleanupFailure);
   }
 
-  const finalRead = await readBeforeState(prepared, config);
+  const finalRead = await readBeforeState(prepared, config, configFreshness);
   if (!finalRead.ok) {
     const cleanupFailure = await cleanupTemp(fsOps, tempHandle);
     const record = buildExistingFileEditRecord({

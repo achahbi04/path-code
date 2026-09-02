@@ -661,6 +661,42 @@ Every entry should contain:
 **Required condition to close:** Platform-specific preservation or explicit detection-and-refusal mechanism.
 
 ---
+
+### GAP-038 — Mutation-time config stale fallback after loadProjectConfig failure
+
+**Discovered in / source:** Phase 3B failed evidence 035cb5f36b989496b30c289ee931b950bd61fa7d
+
+**Description:** resolveMutationConfig treated loadProjectConfig ConfigFailure as success by substituting stale prepared.config (SUPPLIED_ONLY), allowing mutation to continue instead of REFUSED_PRECOMMIT before temp creation.
+
+**Implementer proposed class:** BLOCKING_INVARIANT
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Blocking — fail-closed mutation-time config reload is required; stale fallback permits mutation under failed trust revalidation.
+
+**Required condition to close:** Immutable H1 corrective implementation commit with permanent fail-closed tests and live falsifications.
+
+---
+
+### GAP-039 — Temp-creation createTempExclusive throw escapes replaceExistingFile
+
+**Discovered in / source:** Phase 3B failed evidence 035cb5f36b989496b30c289ee931b950bd61fa7d
+
+**Description:** prepareTempCandidate invoked createTempExclusive outside the inner try/catch, so injected or real creation failures escaped as uncaught exceptions instead of terminal FAILED_PRECOMMIT with commitPointReached=false.
+
+**Implementer proposed class:** BLOCKING_INVARIANT
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** Blocking — pre-commit recovery must surface controlled FAILED_PRECOMMIT rather than escaping throws.
+
+**Required condition to close:** Immutable H1 corrective implementation commit with permanent temp-creation recovery test and live falsification.
+
+---
 ## GAP CLOSURE CONDUCT
 
 When a later pass closes a gap:

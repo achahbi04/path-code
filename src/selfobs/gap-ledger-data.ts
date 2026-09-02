@@ -542,6 +542,40 @@ const GAP_LEDGER_V1: GapLedger = {
       closureCondition:
         "Platform-specific preservation or explicit detection-and-refusal mechanism.",
     },
+    {
+      id: "GAP-038",
+      title: "Mutation-time config stale fallback after loadProjectConfig failure",
+      sourceCheckpoint:
+        "Phase 3B failed evidence 035cb5f36b989496b30c289ee931b950bd61fa7d",
+      description:
+        "resolveMutationConfig treated loadProjectConfig ConfigFailure as success by substituting stale prepared.config (SUPPLIED_ONLY), allowing mutation to continue instead of REFUSED_PRECOMMIT before temp creation.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: "BLOCKING_INVARIANT",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Blocking — fail-closed mutation-time config reload is required; stale fallback permits mutation under failed trust revalidation.",
+      closureCondition:
+        "ConfigFailure refuses with CONFIG_RELOAD_FAILED before temp/write/rename; ABSENT remains successful reload; permanent C1–C4 and FAL-C1/C2/C3 evidence; immutable H1 implementation checkpoint.",
+      missingEvidence:
+        "Immutable H1 corrective implementation commit with permanent fail-closed tests and live falsifications.",
+    },
+    {
+      id: "GAP-039",
+      title: "Temp-creation createTempExclusive throw escapes replaceExistingFile",
+      sourceCheckpoint:
+        "Phase 3B failed evidence 035cb5f36b989496b30c289ee931b950bd61fa7d",
+      description:
+        "prepareTempCandidate invoked createTempExclusive outside the inner try/catch, so injected or real creation failures escaped as uncaught exceptions instead of terminal FAILED_PRECOMMIT with commitPointReached=false.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: "BLOCKING_INVARIANT",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "Blocking — pre-commit recovery must surface controlled FAILED_PRECOMMIT rather than escaping throws.",
+      closureCondition:
+        "createTempExclusive failures map to FAILED_PRECOMMIT without escape; permanent adapter-fault test and FAL-T1; immutable H1 implementation checkpoint.",
+      missingEvidence:
+        "Immutable H1 corrective implementation commit with permanent temp-creation recovery test and live falsification.",
+    },
   ],
 };
 
