@@ -1,6 +1,6 @@
 # PATH CODE — PHASE 3B EVIDENCE COMPLETION — FULL RE-RUN REPORT
 
-**Result:** **COMPLETE**
+**Result:** **NOT COMPLETE** (evidence re-established; capability PASS_FROZEN linkage blocked)
 
 **Baseline HEAD:** `6889fff87e08d6e5db1465f903357bdd217efbac`
 
@@ -87,6 +87,18 @@ All corruptions applied to **current** `ad85c9f` sources, observed failure captu
 | F12 | ignore fresh reload; use `prepared.config` restrictions | YES | `expected undefined to be 'TARGET_DENIED'` | YES | YES |
 
 Machine-readable capture: `/tmp/pc-3b-audit-results.json` (ephemeral runner output, not committed).
+
+### Mirrored derivation falsification (linkage prep, not committed)
+
+Before attempting Commit D, `freezeEvidence` (`twoCommit` → `ad85c9f` / `2b63531`) was temporarily removed while the derivation test expected `PASS_FROZEN`.
+
+| Step | Result |
+|---|---|
+| freezeEvidence temporarily removed | YES |
+| focused derivation test failed | YES |
+| exact failure | `expected "PASS_FROZEN"` → received `"IMPLEMENTED"` |
+| freezeEvidence restored | YES |
+| linkage `ledger:verify` with twoCommit | **FAIL** — see NOT COMPLETE linkage section |
 
 ---
 
@@ -202,4 +214,10 @@ Pre-commit failures: `commitPointReached=false`, original fingerprint/bytes pres
 
 This report **supersedes the FAIL conclusion at `035cb5f` for corrected-code progression** only. Historical reports at `035cb5f`, `PHASE_3B_REPORT.md`, and `PHASE_3B_H1_REPORT.md` remain preserved as immutable evidence of process detection and correction.
 
-**Phase 3B evidence completion:** **COMPLETE** against corrected implementation `ad85c9f1262635f9a81b5608b20c198a7b8b489d`.
+**Phase 3B evidence completion:** **NOT COMPLETE for PASS_FROZEN promotion** — all F1–F12, recovery, config, and write-boundary evidence re-established against corrected implementation `ad85c9f1262635f9a81b5608b20c198a7b8b489d`, but **Capability Ledger `TWO_COMMIT_FREEZE` linkage cannot pass `ledger:verify`** with required `implementationCommit: ad85c9f` and `evidenceCommit: 2b63531` because intermediate H1 bookkeeping commit `6889fff` introduced `src/selfobs/**` changes in the `ad85c9f..evidenceCommit` range. Verifier error: `[FREEZE] existing-file-replacement: evidence commit introduces production src changes: src/selfobs/capability-ledger-data.ts, src/selfobs/citation-helpers.ts, src/selfobs/gap-ledger-data.ts`.
+
+**Evidence Commit C:** `2b635316f7f08c0cf08ef42ec40ab2cd513d3969` (record preserved; does not grant PASS_FROZEN).
+
+**Capability linkage Commit D:** not created.
+
+**Current capability state at HEAD:** `existing-file-replacement` → **VERIFIED IMPLEMENTED**; `safe-editing` → **DECLARED**.
