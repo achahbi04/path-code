@@ -837,11 +837,36 @@ const RECORDS: CapabilityRecord[] = [
         "Phase 3 Safe Editing master contract frozen declaration",
       ),
     ],
-    implementationEvidence: [],
+    implementationEvidence: [
+      mod(
+        "src/editing/index.ts",
+        SHA.phase3PublicAuthorityHardening,
+        "Phase 3 editing public surface after public authority-surface internalization",
+      ),
+    ],
+    phaseAuditEvidence: {
+      auditReportPath: "docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md",
+      auditCommit: SHA.phase3Reaudit,
+      auditConclusionNeedle: "**Conclusion:** PHASE 3 SAFE EDITING — COMPLETE",
+      closureDocumentPath: "docs/PHASE_3_CLOSURE.md",
+      closureCommit: SHA.phase3Closure,
+      auditCheckpointNeedle: "5606b49ec753b8988213b6c912d7de5de51d52ee",
+    },
     dependencies: ["repository-intelligence"],
     proofObligations: [],
     knownLimitations: [
       { kind: "gap", id: "GAP-051", admissibility: "REPOSITORY_RECORDED" },
+    ],
+    recordedFigures: [
+      {
+        kind: "recordedFigure",
+        label: "Runtime tests",
+        value: "607",
+        exactEvidenceNeedle: "| Runtime tests | **607** PASS |",
+        inDocument: "docs/PHASE_3_CLOSURE.md",
+        atCommit: SHA.phase3Closure,
+        admissibility: "REPOSITORY_RECORDED",
+      },
     ],
   },
 ];

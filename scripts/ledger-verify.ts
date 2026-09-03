@@ -45,9 +45,12 @@ async function main(): Promise<void> {
       "foundation-kernel",
     );
 
-    if (safeEditing?.kind !== "VERIFIED_CAPABILITY_STATE" || safeEditing.state !== "DECLARED") {
+    if (
+      safeEditing?.kind !== "VERIFIED_CAPABILITY_STATE" ||
+      safeEditing.state !== "PHASE_VERIFIED"
+    ) {
       console.error(
-        "[DERIVATION] safe-editing must derive VERIFIED DECLARED with verification",
+        "[DERIVATION] safe-editing must derive VERIFIED PHASE_VERIFIED with verification",
       );
       process.exit(1);
     }

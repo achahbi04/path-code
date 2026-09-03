@@ -86,4 +86,6 @@ export const SHA = {
   phase3DImpl: "4fd4567e1ed2b9e5bef303fb6bb90a23d83927d9",
   phase3PublicAuthorityHardening:
     "5386f349eccd7c69ff696619ffc426757e3e91d0",
+  phase3Reaudit: "5606b49ec753b8988213b6c912d7de5de51d52ee",
+  phase3Closure: "04591e400f6b8efe7190ce01faef4da97d0eb984",
 } as const;

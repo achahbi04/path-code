@@ -128,7 +128,7 @@ describe("Phase 3 re-audit — public authority surface P1–P14", () => {
   });
 
   it(
-    "capability/gap ledger — affected caps PASS_FROZEN; GAP-048/049/050 CLOSED; GAP-051 OPEN; safe-editing DECLARED",
+    "capability/gap ledger — affected caps PASS_FROZEN; GAP-048/049/050/051 CLOSED; safe-editing PHASE_VERIFIED",
     async () => {
       const { verifyLedgers } = await import("../../scripts/lib/ledger-verifier.js");
       const capabilityLedger = getCanonicalCapabilityLedger();
@@ -156,7 +156,7 @@ describe("Phase 3 re-audit — public authority surface P1–P14", () => {
       }
       expect(observations.find((o) => o.capabilityId === "safe-editing")).toMatchObject({
         kind: "VERIFIED_CAPABILITY_STATE",
-        state: "DECLARED",
+        state: "PHASE_VERIFIED",
       });
 
       const byId = Object.fromEntries(
@@ -165,7 +165,7 @@ describe("Phase 3 re-audit — public authority surface P1–P14", () => {
       expect(byId["GAP-048"]?.lifecycle).toBe("CLOSED");
       expect(byId["GAP-049"]?.lifecycle).toBe("CLOSED");
       expect(byId["GAP-050"]?.lifecycle).toBe("CLOSED");
-      expect(byId["GAP-051"]?.lifecycle).toBe("OPEN");
+      expect(byId["GAP-051"]?.lifecycle).toBe("CLOSED");
     },
     60_000,
   );

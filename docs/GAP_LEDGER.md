@@ -934,9 +934,15 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Required condition to close:** Immutable corrective hardening chain plus fresh full Phase 3 integration re-audit COMPLETE.
+
+**Closed by checkpoint:** `5606b49ec753b8988213b6c912d7de5de51d52ee`
+
+**Evidence:** docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md
+
+**Notes:** Closed after Stage 5 re-audit COMPLETE at 5606b49… and Phase 3 closure document at 04591e4…; first audit 696ef4f remains immutable and superseded for progression only.
 
 ---
 ## GAP CLOSURE CONDUCT

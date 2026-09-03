@@ -126,6 +126,10 @@ Master contract:
 
 [`docs/FOUNDATION_EXTENSIBILITY_CONSTITUTION_V1.md`](docs/FOUNDATION_EXTENSIBILITY_CONSTITUTION_V1.md)
 
+**Foundation Extensibility Constitution V1 Amendment 1 — Public Authority Surfaces: FROZEN**
+
+[`docs/FOUNDATION_EXTENSIBILITY_CONSTITUTION_V1_AMENDMENT_1_PUBLIC_AUTHORITY_SURFACE.md`](docs/FOUNDATION_EXTENSIBILITY_CONSTITUTION_V1_AMENDMENT_1_PUBLIC_AUTHORITY_SURFACE.md)
+
 **Phase 3D — Multi-File Coordination Master Contract: FROZEN**
 
 [`docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md`](docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md)
@@ -134,13 +138,25 @@ Master contract:
 
 [`docs/reports/PHASE_3D_REPORT.md`](docs/reports/PHASE_3D_REPORT.md)
 
+**Capabilities:**
+
+- `edit-contracts` PASS_FROZEN
+- `existing-file-replacement` PASS_FROZEN
+- `safe-file-creation` PASS_FROZEN
+- `multi-file-coordination` PASS_FROZEN
+- `safe-editing` PHASE_VERIFIED
+
 Existing-file replacement is available as a bounded internal capability through the Phase 3B mechanism.
 
 Safe-file-creation is available as a bounded internal capability through the Phase 3C mechanism (CREATE_FILE ActionClass + operation-bound post-creation verification).
 
 Multi-file coordination is available as a bounded internal capability through the Phase 3D mechanism (opaque plan, read-only preflight, sequential 3B/3C execution, honest partial results).
 
-**Phase 3 — Safe Editing Engine: DECLARED / IN PROGRESS**
+**Phase 3 — Safe Editing Engine: COMPLETE / FROZEN**
+
+[`docs/PHASE_3_CLOSURE.md`](docs/PHASE_3_CLOSURE.md)
+
+[`docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md`](docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md)
 
 Path Code may:
 
@@ -153,10 +169,12 @@ It still cannot:
 - delete files
 - create directories
 - roll back a partially applied multi-file plan
-- claim Phase 3 closure or a frozen `safe-editing` engine
-
-Phase 3 is not complete.
+- claim plan-level atomicity
+- mutate Git state
+- execute models or edit autonomously
 
 Next permitted operation:
 
-**Phase 3 integration audit / Phase 3 closure only after all declared Phase 3 capabilities and governing closure criteria are satisfied.**
+**ONE bounded Closed-Vocabulary & Foundation Extensibility Audit combined with preparation of the Phase 4 Master Contract.**
+
+No Phase 4 implementation yet.

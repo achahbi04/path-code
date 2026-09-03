@@ -795,11 +795,15 @@ const GAP_LEDGER_V1: GapLedger = {
       description:
         "The first Phase 3 integration audit returned COMPLETE while public fsOps/targetOps mechanism-substitution seams remained active. That audit remains immutable historical evidence, but its COMPLETE conclusion is progression-ineligible until a fresh full re-audit returns COMPLETE after correction.",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       missingEvidence:
         "Immutable corrective hardening chain plus fresh full Phase 3 integration re-audit COMPLETE.",
       closureCondition:
         "Fresh full Phase 3 integration re-audit returns COMPLETE after correction and supersedes the first audit for progression while preserving it as historical evidence.",
+      closedByCommit: "5606b49ec753b8988213b6c912d7de5de51d52ee",
+      closureEvidence: "docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md",
+      notes:
+        "Closed after Stage 5 re-audit COMPLETE at 5606b49… and Phase 3 closure document at 04591e4…; first audit 696ef4f remains immutable and superseded for progression only.",
     },
   ],
 };
