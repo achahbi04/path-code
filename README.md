@@ -122,6 +122,16 @@ Master contract:
 
 [`docs/reports/PHASE_3C_H1_REPORT.md`](docs/reports/PHASE_3C_H1_REPORT.md)
 
+**Foundation Extensibility Constitution V1: FROZEN**
+
+[`docs/FOUNDATION_EXTENSIBILITY_CONSTITUTION_V1.md`](docs/FOUNDATION_EXTENSIBILITY_CONSTITUTION_V1.md)
+
+**Phase 3D — Multi-File Coordination Master Contract: FROZEN**
+
+[`docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md`](docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md)
+
+**Phase 3D implementation: NOT STARTED**
+
 Existing-file replacement is available as a bounded internal capability through the Phase 3B mechanism.
 
 Safe-file-creation is available as a bounded internal capability through the Phase 3C mechanism (CREATE_FILE ActionClass + operation-bound post-creation verification).
@@ -137,10 +147,10 @@ It still cannot:
 
 - delete files
 - create directories
-- coordinate multi-file changes
+- coordinate multi-file changes (Master frozen; implementation not started)
 
-Phase 3 is not complete. Next: Phase 3D.
+Phase 3 is not complete.
 
-Next permitted implementation phase:
+Next permitted operation:
 
-**Phase 3D — Multi-File Coordination**
+**Draft and execute the Phase 3D implementation pass contract under `docs/passes/`.**
