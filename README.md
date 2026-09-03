@@ -130,11 +130,15 @@ Master contract:
 
 [`docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md`](docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md)
 
-**Phase 3D implementation: NOT STARTED**
+**Phase 3D — Multi-File Coordination: PASS_FROZEN**
+
+[`docs/reports/PHASE_3D_REPORT.md`](docs/reports/PHASE_3D_REPORT.md)
 
 Existing-file replacement is available as a bounded internal capability through the Phase 3B mechanism.
 
 Safe-file-creation is available as a bounded internal capability through the Phase 3C mechanism (CREATE_FILE ActionClass + operation-bound post-creation verification).
+
+Multi-file coordination is available as a bounded internal capability through the Phase 3D mechanism (opaque plan, read-only preflight, sequential 3B/3C execution, honest partial results).
 
 **Phase 3 — Safe Editing Engine: DECLARED / IN PROGRESS**
 
@@ -142,15 +146,17 @@ Path Code may:
 
 - replace the content of an existing authorized regular file through the bounded 3B mechanism
 - create one new authorized regular file under an admitted parent through the bounded 3C mechanism
+- coordinate a bounded sequence of already-prepared, separately authorized 3B/3C mutations in one workspace through the Phase 3D mechanism
 
 It still cannot:
 
 - delete files
 - create directories
-- coordinate multi-file changes (Master frozen; implementation not started)
+- roll back a partially applied multi-file plan
+- claim Phase 3 closure or a frozen `safe-editing` engine
 
 Phase 3 is not complete.
 
 Next permitted operation:
 
-**Draft and execute the Phase 3D implementation pass contract under `docs/passes/`.**
+**Phase 3 integration audit / Phase 3 closure only after all declared Phase 3 capabilities and governing closure criteria are satisfied.**

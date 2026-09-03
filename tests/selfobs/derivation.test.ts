@@ -165,6 +165,15 @@ describe("selfobs derivation", () => {
         capabilityId: "safe-file-creation",
         state: "PASS_FROZEN",
       });
+
+      const multiFile = observations.find(
+        (o) => o.capabilityId === "multi-file-coordination",
+      );
+      expect(multiFile).toMatchObject({
+        kind: "VERIFIED_CAPABILITY_STATE",
+        capabilityId: "multi-file-coordination",
+        state: "PASS_FROZEN",
+      });
     },
     60_000,
   );

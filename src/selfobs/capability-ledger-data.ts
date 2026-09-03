@@ -733,6 +733,92 @@ const RECORDS: CapabilityRecord[] = [
     ],
   },
   {
+    capabilityId: "multi-file-coordination",
+    title: "Phase 3D Multi-File Coordination",
+    phaseId: "phase-3",
+    declarationEvidence: [
+      doc(
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "Phase 3 roadmap includes multi-file coordination",
+      ),
+      doc(
+        "docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md",
+        SHA.phase3DMaster,
+        "Phase 3D Multi-File Coordination master contract",
+      ),
+    ],
+    implementationEvidence: [
+      mod(
+        "src/editing/multi-file-plan.ts",
+        SHA.phase3DImpl,
+        "Opaque multi-file plan construction",
+      ),
+      mod(
+        "src/editing/multi-file-preflight.ts",
+        SHA.phase3DImpl,
+        "Read-only non-consuming plan preflight",
+      ),
+      mod(
+        "src/editing/multi-file-execute.ts",
+        SHA.phase3DImpl,
+        "Sequential coordinated 3B/3C execution",
+      ),
+      mod(
+        "src/editing/internal/authorization-readiness.ts",
+        SHA.phase3DImpl,
+        "Private non-consuming authorization readiness peek",
+      ),
+      mod(
+        "src/editing/index.ts",
+        SHA.phase3DImpl,
+        "Public multi-file coordination surface",
+      ),
+    ],
+    freezeEvidence: {
+      kind: "sameCommit",
+      implementationCommit: SHA.phase3DImpl,
+      reportPath: "docs/reports/PHASE_3D_REPORT.md",
+    },
+    dependencies: [
+      "edit-contracts",
+      "existing-file-replacement",
+      "safe-file-creation",
+      "safe-editing",
+      "repository-reader",
+      "repository-inventory",
+      "project-configuration",
+      "canonical-workspace-path",
+    ],
+    proofObligations: [
+      obligation(
+        "SE-020",
+        "docs/PHASE_3_SAFE_EDITING_MASTER.md",
+        SHA.phase3Master,
+        "SE-020 — MULTI-FILE PARTIAL HONESTY",
+      ),
+      obligation(
+        "P3D-002",
+        "docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md",
+        SHA.phase3DMaster,
+        "P3D-002 — NON-CONSUMING PREFLIGHT",
+      ),
+      obligation(
+        "P3D-009",
+        "docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md",
+        SHA.phase3DMaster,
+        "P3D-009 — SEQUENTIAL STOP",
+      ),
+      obligation(
+        "P3D-015",
+        "docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md",
+        SHA.phase3DMaster,
+        "P3D-015 — ONE WRITE MODULE PRESERVED",
+      ),
+    ],
+    knownLimitations: [],
+  },
+  {
     capabilityId: "safe-editing",
     title: "Phase 3 Safe Editing Engine",
     phaseId: "phase-3",
