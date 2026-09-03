@@ -795,15 +795,13 @@ const GAP_LEDGER_V1: GapLedger = {
       description:
         "The first Phase 3 integration audit returned COMPLETE while public fsOps/targetOps mechanism-substitution seams remained active. That audit remains immutable historical evidence, but its COMPLETE conclusion is progression-ineligible until a fresh full re-audit returns COMPLETE after correction.",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "CLOSED",
+      lifecycle: "OPEN",
       missingEvidence:
-        "Immutable corrective hardening chain plus fresh full Phase 3 integration re-audit COMPLETE.",
+        "Immutable corrective hardening chain plus fresh full Phase 3 integration re-audit COMPLETE by an independent Stage 3 R1 auditor.",
       closureCondition:
-        "Fresh full Phase 3 integration re-audit returns COMPLETE after correction and supersedes the first audit for progression while preserving it as historical evidence.",
-      closedByCommit: "5606b49ec753b8988213b6c912d7de5de51d52ee",
-      closureEvidence: "docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md",
+        "Fresh full Phase 3 re-audit R1 returns COMPLETE after correction and supersedes both the first audit and the non-independent 5606b49 re-audit for progression while preserving them as historical evidence.",
       notes:
-        "Closed after Stage 5 re-audit COMPLETE at 5606b49… and Phase 3 closure document at 04591e4…; first audit 696ef4f remains immutable and superseded for progression only.",
+        "Prior canonical closure landed in ee58673 and cited 5606b49 / docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md. Superseded for progression by GAP-052 and Phase 3-R1 reconciliation. Historical commits/reports remain immutable.",
     },
     {
       id: "GAP-052",
@@ -814,10 +812,14 @@ const GAP_LEDGER_V1: GapLedger = {
       description:
         "The fresh auditor task required by the hardening contract failed with resource_exhausted before writing or committing. The Stage 0–4 writer session then executed Stage 5 and committed 5606b49. The committed report does not record that provenance break.",
       proposedClass: "BLOCKING_INVARIANT",
-      reviewClassification: null,
+      reviewClassification: "BLOCKING_INVARIANT",
       lifecycle: "OPEN",
+      missingEvidence:
+        "A fresh full Phase 3 re-audit at the corrected/reconciled checkpoint by an executor session with no prior write in this R1 chain, plus a complete auditor provenance/attestation block and immutable audit evidence.",
+      closureCondition:
+        "A fresh Stage 3 R1 auditor returns COMPLETE at the Stage 2 checkpoint; its report contains the required provenance block; safe-editing phaseAuditEvidence is later relinked to that immutable re-audit.",
       notes:
-        "missingEvidence: A fresh full Phase 3 re-audit at the corrected/reconciled checkpoint by an executor session with no prior write in this R1 chain, plus a complete auditor provenance/attestation block and immutable audit evidence. closureCondition: A fresh Stage 3 R1 auditor returns COMPLETE at the Stage 2 checkpoint; its report contains the required provenance block; safe-editing phaseAuditEvidence is later relinked to that immutable re-audit. The prior GAP-051 canonical closure landed in ee58673 while its closedByCommit / closureEvidence pointed to 5606b49. Those historical records remain immutable; this gap supersedes them for progression.",
+        "The prior GAP-051 canonical closure landed in ee58673 while its closedByCommit / closureEvidence pointed to 5606b49. Those historical records remain immutable; this gap supersedes them for progression. Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.",
     },
     {
       id: "GAP-053",
@@ -827,10 +829,14 @@ const GAP_LEDGER_V1: GapLedger = {
       description:
         "The census asserted §1.4 success, but the live restore script raised IndexError before capturing the required MUST-FAIL evidence; the restore-back line did not run in that process; the following focused test failed in a state consistent with freezeEvidence remaining restored; ledger:verify evidence cited the pre-Stage-1 baseline rather than the committed downgrade checkpoint.",
       proposedClass: "BLOCKING_INVARIANT",
-      reviewClassification: null,
+      reviewClassification: "BLOCKING_INVARIANT",
       lifecycle: "OPEN",
+      missingEvidence:
+        "A historical derivation at immutable eabbc19 establishing the committed downgrade state, the restore direction using exact pre-downgrade freezeEvidence from the preceding canonical checkpoint, and current bidirectional freeze falsifications.",
+      closureCondition:
+        "The missing original live run remains explicitly recorded as NOT PROVEN; historical verification at eabbc19 establishes the semantic state the commit actually encodes; both restore and removal directions are proven without rewriting history; an immutable evidence report records the disposition.",
       notes:
-        "missingEvidence: A historical derivation at immutable eabbc19 establishing the committed downgrade state, the restore direction using exact pre-downgrade freezeEvidence from the preceding canonical checkpoint, and current bidirectional freeze falsifications. closureCondition: The missing original live run remains explicitly recorded as NOT PROVEN; historical verification at eabbc19 establishes the semantic state the commit actually encodes; both restore and removal directions are proven without rewriting history; an immutable evidence report records the disposition.",
+        "Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.",
     },
     {
       id: "GAP-054",
@@ -841,10 +847,14 @@ const GAP_LEDGER_V1: GapLedger = {
       description:
         "Prior §6.6 simultaneously required PHASE_VERIFIED/GAP-051 CLOSED, unchanged audit tests, and final npm test PASS while those audit tests bound live canonical state. ee58673 edited two audit suites and scripts/ledger-verify.ts without contract authorization and removed the historical half-citation issueLedgerVerification probe.",
       proposedClass: "BLOCKING_INVARIANT",
-      reviewClassification: null,
+      reviewClassification: "BLOCKING_INVARIANT",
       lifecycle: "OPEN",
+      missingEvidence:
+        "Restored historical probe; a ledger:verify consistency mechanism that derives expectations from ledger shape rather than hardcoding phase status; an explicit bounded rule authorizing only live-state assertion updates during closure.",
+      closureCondition:
+        "The deleted probe is restored without weakening; the ledger consistency gate is shape-driven and falsified; this immutable R1 contract explicitly authorizes only bounded live-state pin updates and forbids deletion/weakening of audit mechanisms; the reconciliation report records the contract defect.",
       notes:
-        "missingEvidence: Restored historical probe; a ledger:verify consistency mechanism that derives expectations from ledger shape rather than hardcoding phase status; an explicit bounded rule authorizing only live-state assertion updates during closure. closureCondition: The deleted probe is restored without weakening; the ledger consistency gate is shape-driven and falsified; this immutable R1 contract explicitly authorizes only bounded live-state pin updates and forbids deletion/weakening of audit mechanisms; the reconciliation report records the contract defect. Primary origin in the corrective report: CONTRACT. Contributing cause: EVIDENCE shape. No Gap Ledger schema field is added for origin.",
+        "Primary origin in the corrective report: CONTRACT. Contributing cause: EVIDENCE shape. No Gap Ledger schema field is added for origin. Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.",
     },
     {
       id: "GAP-055",
@@ -855,10 +865,16 @@ const GAP_LEDGER_V1: GapLedger = {
       description:
         "The repository can record an auditor's report and operator attestation, but the current self-observation model has no mechanical mechanism proving that the auditor session received no forbidden transcript/context or performed no prior write.",
       proposedClass: "NON_BLOCKING_LIMITATION",
-      reviewClassification: null,
+      reviewClassification: "NON_BLOCKING_LIMITATION",
       lifecycle: "OPEN",
+      whyNonBlocking:
+        "R1 can structurally enforce executor separation and record the audit result mechanically while explicitly labeling the independence claim ASSERTED. The limitation concerns proof of process provenance, not the audit's repository-recorded tests/results themselves.",
+      missingEvidence:
+        "An approved repository-visible mechanism, if later required, that can bind an independent audit execution to mechanically verifiable provenance rather than operator testimony alone.",
+      closureCondition:
+        "A future Master/preflight deliberately defines and proves such a mechanism, or explicitly dispositions the limitation while preserving truthful admissibility. Do not preselect a schema field or force a foundation change in this pass.",
       notes:
-        "missingEvidence: An approved repository-visible mechanism, if later required, that can bind an independent audit execution to mechanically verifiable provenance rather than operator testimony alone. closureCondition: A future Master/preflight deliberately defines and proves such a mechanism, or explicitly dispositions the limitation while preserving truthful admissibility. Do not preselect a schema field or force a foundation change in this pass. whyNonBlocking (pending human review confirmation): R1 can structurally enforce executor separation and record the audit result mechanically while explicitly labeling the independence claim ASSERTED. The limitation concerns proof of process provenance, not the audit's repository-recorded tests/results themselves. The R1 report presence is REPOSITORY_RECORDED; the truth of independence attestation is ASSERTED. Do not invent OPERATOR_ATTESTED or another evidence tier. Not attached to any capability.",
+        "The R1 report presence is REPOSITORY_RECORDED; the truth of independence attestation is ASSERTED. Do not invent OPERATOR_ATTESTED or another evidence tier. Not attached to any capability. Operator approved reviewClassification NON_BLOCKING_LIMITATION unchanged at Stage 1.",
     },
     {
       id: "GAP-056",
@@ -868,10 +884,16 @@ const GAP_LEDGER_V1: GapLedger = {
       description:
         "Closure A correctly binds 607 runtime tests to 04591e4. Final validation at ee58673 reported 608 runtime tests, but no immutable closure/report/recordedFigure records that final-head figure.",
       proposedClass: "NON_BLOCKING_LIMITATION",
-      reviewClassification: null,
+      reviewClassification: "NON_BLOCKING_LIMITATION",
       lifecycle: "OPEN",
+      whyNonBlocking:
+        "The historical 607 figure is already truthful and correctly bound. Missing 608 recording is a final reporting/evidence-completeness defect, not evidence that Safe Editing behavior is incorrect.",
+      missingEvidence:
+        "A final reconciliation closure artifact carrying the exact runtime total at its immutable checkpoint plus a Capability Ledger recordedFigure bound to that artifact/commit.",
+      closureCondition:
+        "The R1 closure reconciliation artifact records the exact final runtime total at its own immutable commit; Capability Ledger binds the figure to that document and commit; the historical 607 figure remains unchanged.",
       notes:
-        "missingEvidence: A final reconciliation closure artifact carrying the exact runtime total at its immutable checkpoint plus a Capability Ledger recordedFigure bound to that artifact/commit. closureCondition: The R1 closure reconciliation artifact records the exact final runtime total at its own immutable commit; Capability Ledger binds the figure to that document and commit; the historical 607 figure remains unchanged. whyNonBlocking (pending human review confirmation): The historical 607 figure is already truthful and correctly bound. Missing 608 recording is a final reporting/evidence-completeness defect, not evidence that Safe Editing behavior is incorrect.",
+        "Operator approved reviewClassification NON_BLOCKING_LIMITATION unchanged at Stage 1 (explicit confirmation that F4 / Stage 0 contract text directs this gap).",
     },
   ],
 };

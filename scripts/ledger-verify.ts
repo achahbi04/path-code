@@ -8,11 +8,11 @@ import { dirname, join } from "node:path";
 
 import {
   deriveAllCapabilityObservations,
-  findCapabilityObservation,
   getCanonicalCapabilityLedger,
   getCanonicalGapLedger,
 } from "../src/selfobs/index.js";
 import { verifyLedgers } from "./lib/ledger-verifier.js";
+import { checkPhaseAuditEvidenceShapeConsistency } from "./lib/phase-audit-shape.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -35,41 +35,16 @@ async function main(): Promise<void> {
       gapLedger,
       result.verification,
     );
-    const safeEditing = findCapabilityObservation(observations, "safe-editing");
-    const repositoryIntelligence = findCapabilityObservation(
+    const shapeFailures = checkPhaseAuditEvidenceShapeConsistency(
+      capabilityLedger,
       observations,
-      "repository-intelligence",
     );
-    const foundationKernel = findCapabilityObservation(
-      observations,
-      "foundation-kernel",
-    );
-
-    if (
-      safeEditing?.kind !== "VERIFIED_CAPABILITY_STATE" ||
-      safeEditing.state !== "PHASE_VERIFIED"
-    ) {
-      console.error(
-        "[DERIVATION] safe-editing must derive VERIFIED PHASE_VERIFIED with verification",
-      );
-      process.exit(1);
-    }
-    if (
-      repositoryIntelligence?.kind !== "VERIFIED_CAPABILITY_STATE" ||
-      repositoryIntelligence.state !== "PHASE_VERIFIED"
-    ) {
-      console.error(
-        "[DERIVATION] repository-intelligence must derive VERIFIED PHASE_VERIFIED",
-      );
-      process.exit(1);
-    }
-    if (
-      foundationKernel?.kind !== "VERIFIED_CAPABILITY_STATE" ||
-      foundationKernel.state !== "PHASE_VERIFIED"
-    ) {
-      console.error(
-        "[DERIVATION] foundation-kernel must derive VERIFIED PHASE_VERIFIED",
-      );
+    if (shapeFailures.length > 0) {
+      for (const failure of shapeFailures) {
+        console.error(
+          `[DERIVATION] ${failure.capabilityId}: ${failure.message}`,
+        );
+      }
       process.exit(1);
     }
   }

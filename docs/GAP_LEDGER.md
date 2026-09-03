@@ -934,15 +934,11 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** CLOSED
+**Lifecycle:** OPEN
 
-**Required condition to close:** Immutable corrective hardening chain plus fresh full Phase 3 integration re-audit COMPLETE.
+**Required condition to close:** Immutable corrective hardening chain plus fresh full Phase 3 integration re-audit COMPLETE by an independent Stage 3 R1 auditor.
 
-**Closed by checkpoint:** `5606b49ec753b8988213b6c912d7de5de51d52ee`
-
-**Evidence:** docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md
-
-**Notes:** Closed after Stage 5 re-audit COMPLETE at 5606b49… and Phase 3 closure document at 04591e4…; first audit 696ef4f remains immutable and superseded for progression only.
+**Notes:** Prior canonical closure landed in ee58673 and cited 5606b49 / docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md. Superseded for progression by GAP-052 and Phase 3-R1 reconciliation. Historical commits/reports remain immutable.
 
 ---
 
@@ -954,11 +950,13 @@ Every entry should contain:
 
 **Implementer proposed class:** BLOCKING_INVARIANT
 
-**Review classification:** (unreviewed)
+**Review classification:** BLOCKING_INVARIANT
 
 **Lifecycle:** OPEN
 
-**Notes:** missingEvidence: A fresh full Phase 3 re-audit at the corrected/reconciled checkpoint by an executor session with no prior write in this R1 chain, plus a complete auditor provenance/attestation block and immutable audit evidence. closureCondition: A fresh Stage 3 R1 auditor returns COMPLETE at the Stage 2 checkpoint; its report contains the required provenance block; safe-editing phaseAuditEvidence is later relinked to that immutable re-audit. The prior GAP-051 canonical closure landed in ee58673 while its closedByCommit / closureEvidence pointed to 5606b49. Those historical records remain immutable; this gap supersedes them for progression.
+**Required condition to close:** A fresh full Phase 3 re-audit at the corrected/reconciled checkpoint by an executor session with no prior write in this R1 chain, plus a complete auditor provenance/attestation block and immutable audit evidence.
+
+**Notes:** The prior GAP-051 canonical closure landed in ee58673 while its closedByCommit / closureEvidence pointed to 5606b49. Those historical records remain immutable; this gap supersedes them for progression. Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.
 
 ---
 
@@ -970,11 +968,13 @@ Every entry should contain:
 
 **Implementer proposed class:** BLOCKING_INVARIANT
 
-**Review classification:** (unreviewed)
+**Review classification:** BLOCKING_INVARIANT
 
 **Lifecycle:** OPEN
 
-**Notes:** missingEvidence: A historical derivation at immutable eabbc19 establishing the committed downgrade state, the restore direction using exact pre-downgrade freezeEvidence from the preceding canonical checkpoint, and current bidirectional freeze falsifications. closureCondition: The missing original live run remains explicitly recorded as NOT PROVEN; historical verification at eabbc19 establishes the semantic state the commit actually encodes; both restore and removal directions are proven without rewriting history; an immutable evidence report records the disposition.
+**Required condition to close:** A historical derivation at immutable eabbc19 establishing the committed downgrade state, the restore direction using exact pre-downgrade freezeEvidence from the preceding canonical checkpoint, and current bidirectional freeze falsifications.
+
+**Notes:** Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.
 
 ---
 
@@ -986,11 +986,13 @@ Every entry should contain:
 
 **Implementer proposed class:** BLOCKING_INVARIANT
 
-**Review classification:** (unreviewed)
+**Review classification:** BLOCKING_INVARIANT
 
 **Lifecycle:** OPEN
 
-**Notes:** missingEvidence: Restored historical probe; a ledger:verify consistency mechanism that derives expectations from ledger shape rather than hardcoding phase status; an explicit bounded rule authorizing only live-state assertion updates during closure. closureCondition: The deleted probe is restored without weakening; the ledger consistency gate is shape-driven and falsified; this immutable R1 contract explicitly authorizes only bounded live-state pin updates and forbids deletion/weakening of audit mechanisms; the reconciliation report records the contract defect. Primary origin in the corrective report: CONTRACT. Contributing cause: EVIDENCE shape. No Gap Ledger schema field is added for origin.
+**Required condition to close:** Restored historical probe; a ledger:verify consistency mechanism that derives expectations from ledger shape rather than hardcoding phase status; an explicit bounded rule authorizing only live-state assertion updates during closure.
+
+**Notes:** Primary origin in the corrective report: CONTRACT. Contributing cause: EVIDENCE shape. No Gap Ledger schema field is added for origin. Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.
 
 ---
 
@@ -1002,11 +1004,15 @@ Every entry should contain:
 
 **Implementer proposed class:** NON_BLOCKING_LIMITATION
 
-**Review classification:** (unreviewed)
+**Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
 
-**Notes:** missingEvidence: An approved repository-visible mechanism, if later required, that can bind an independent audit execution to mechanically verifiable provenance rather than operator testimony alone. closureCondition: A future Master/preflight deliberately defines and proves such a mechanism, or explicitly dispositions the limitation while preserving truthful admissibility. Do not preselect a schema field or force a foundation change in this pass. whyNonBlocking (pending human review confirmation): R1 can structurally enforce executor separation and record the audit result mechanically while explicitly labeling the independence claim ASSERTED. The limitation concerns proof of process provenance, not the audit's repository-recorded tests/results themselves. The R1 report presence is REPOSITORY_RECORDED; the truth of independence attestation is ASSERTED. Do not invent OPERATOR_ATTESTED or another evidence tier. Not attached to any capability.
+**Why non-blocking:** R1 can structurally enforce executor separation and record the audit result mechanically while explicitly labeling the independence claim ASSERTED. The limitation concerns proof of process provenance, not the audit's repository-recorded tests/results themselves.
+
+**Required condition to close:** An approved repository-visible mechanism, if later required, that can bind an independent audit execution to mechanically verifiable provenance rather than operator testimony alone.
+
+**Notes:** The R1 report presence is REPOSITORY_RECORDED; the truth of independence attestation is ASSERTED. Do not invent OPERATOR_ATTESTED or another evidence tier. Not attached to any capability. Operator approved reviewClassification NON_BLOCKING_LIMITATION unchanged at Stage 1.
 
 ---
 
@@ -1018,11 +1024,15 @@ Every entry should contain:
 
 **Implementer proposed class:** NON_BLOCKING_LIMITATION
 
-**Review classification:** (unreviewed)
+**Review classification:** NON_BLOCKING_LIMITATION
 
 **Lifecycle:** OPEN
 
-**Notes:** missingEvidence: A final reconciliation closure artifact carrying the exact runtime total at its immutable checkpoint plus a Capability Ledger recordedFigure bound to that artifact/commit. closureCondition: The R1 closure reconciliation artifact records the exact final runtime total at its own immutable commit; Capability Ledger binds the figure to that document and commit; the historical 607 figure remains unchanged. whyNonBlocking (pending human review confirmation): The historical 607 figure is already truthful and correctly bound. Missing 608 recording is a final reporting/evidence-completeness defect, not evidence that Safe Editing behavior is incorrect.
+**Why non-blocking:** The historical 607 figure is already truthful and correctly bound. Missing 608 recording is a final reporting/evidence-completeness defect, not evidence that Safe Editing behavior is incorrect.
+
+**Required condition to close:** A final reconciliation closure artifact carrying the exact runtime total at its immutable checkpoint plus a Capability Ledger recordedFigure bound to that artifact/commit.
+
+**Notes:** Operator approved reviewClassification NON_BLOCKING_LIMITATION unchanged at Stage 1 (explicit confirmation that F4 / Stage 0 contract text directs this gap).
 
 ---
 ## GAP CLOSURE CONDUCT

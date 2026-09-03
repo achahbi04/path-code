@@ -22,7 +22,9 @@ import {
   getCanonicalCapabilityLedger,
   getCanonicalGapLedger,
   deriveCapabilityObservation,
+  deriveAllCapabilityObservations,
 } from "../../src/selfobs/index.js";
+import { issueLedgerVerification } from "../../src/selfobs/internal/issue-verification.js";
 import { cleanupInventoryFixtures } from "../inventory/fixture-helpers.js";
 import { cleanupGitFixtures } from "../git/fixture-helpers.js";
 import { annotationFor } from "../git/baseline-helpers.js";
@@ -940,8 +942,75 @@ describe("Phase 3 integration audit — recovery shapes (induced)", () => {
   });
 });
 
-describe("Phase 3 integration audit — D3 safe-editing phase verification after closure linkage", () => {
-  it("safe-editing derives PHASE_VERIFIED after re-audit and closure linkage", () => {
+describe("Phase 3 integration audit — D3 safe-editing phase evidence", () => {
+  it("historical half-citation probe — declaration-only evidence cannot yield PHASE_VERIFIED", () => {
+    const capabilityLedger = getCanonicalCapabilityLedger();
+    const gapLedger = getCanonicalGapLedger();
+    const live = capabilityLedger.records.find(
+      (r) => r.capabilityId === "safe-editing",
+    )!;
+    expect(live).toBeDefined();
+    expect(live.phaseAuditEvidence).toBeUndefined();
+
+    // Semantic restoration of the Closure A half-citation mechanism:
+    // declaration-only citation resolution must not produce PHASE_VERIFIED.
+    const { freezeEvidence: _f, phaseAuditEvidence: _p, ...base } = live;
+    const declarationOnly = {
+      ...base,
+      implementationEvidence: [] as typeof live.implementationEvidence,
+    };
+    const forgedLedger = {
+      ...capabilityLedger,
+      records: capabilityLedger.records.map((r) =>
+        r.capabilityId === "safe-editing" ? declarationOnly : r,
+      ),
+    };
+
+    const unverified = deriveCapabilityObservation(
+      declarationOnly,
+      undefined,
+      forgedLedger,
+      gapLedger,
+    );
+    expect(unverified).toEqual({
+      kind: "UNVERIFIED_DERIVATION",
+      capabilityId: "safe-editing",
+      candidateState: "DECLARED",
+    });
+
+    const verification = issueLedgerVerification({
+      verifiedAtHead: "a35b42de86c1d22d36bb214cf950f22355da0818",
+      capabilityLedger: forgedLedger,
+      gapLedger,
+      citationOutcomes: declarationOnly.declarationEvidence.map((c) => ({
+        citationKey: `document|${c.path}|${c.atCommit}`,
+        resolved: true,
+      })),
+    });
+    const withHalf = deriveCapabilityObservation(
+      declarationOnly,
+      verification,
+      forgedLedger,
+      gapLedger,
+    );
+    expect(
+      withHalf.kind === "VERIFIED_CAPABILITY_STATE"
+        ? withHalf.state
+        : withHalf.candidateState,
+    ).toBe("DECLARED");
+    expect(
+      deriveAllCapabilityObservations(forgedLedger, gapLedger, verification).some(
+        (o) =>
+          o.capabilityId === "safe-editing" &&
+          ((o.kind === "VERIFIED_CAPABILITY_STATE" &&
+            o.state === "PHASE_VERIFIED") ||
+            (o.kind === "UNVERIFIED_DERIVATION" &&
+              o.candidateState === "PHASE_VERIFIED")),
+      ),
+    ).toBe(false);
+  });
+
+  it("live canonical state — safe-editing derives IMPLEMENTED without phaseAuditEvidence", () => {
     const capabilityLedger = getCanonicalCapabilityLedger();
     const gapLedger = getCanonicalGapLedger();
     const record = capabilityLedger.records.find(
@@ -949,13 +1018,8 @@ describe("Phase 3 integration audit — D3 safe-editing phase verification after
     );
     expect(record).toBeDefined();
     expect(record?.implementationEvidence.length).toBeGreaterThan(0);
-    expect(record?.phaseAuditEvidence).toBeDefined();
-    expect(record?.phaseAuditEvidence).toMatchObject({
-      auditReportPath: "docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md",
-      auditCommit: "5606b49ec753b8988213b6c912d7de5de51d52ee",
-      closureDocumentPath: "docs/PHASE_3_CLOSURE.md",
-      closureCommit: "04591e400f6b8efe7190ce01faef4da97d0eb984",
-    });
+    expect(record?.phaseAuditEvidence).toBeUndefined();
+    expect(record?.freezeEvidence).toBeUndefined();
 
     const unverified = deriveCapabilityObservation(
       record!,
@@ -966,7 +1030,7 @@ describe("Phase 3 integration audit — D3 safe-editing phase verification after
     expect(unverified).toEqual({
       kind: "UNVERIFIED_DERIVATION",
       capabilityId: "safe-editing",
-      candidateState: "PHASE_VERIFIED",
+      candidateState: "IMPLEMENTED",
     });
   });
 

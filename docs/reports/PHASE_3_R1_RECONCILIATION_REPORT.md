@@ -191,4 +191,77 @@ No Stage 1 work proceeds until the operator explicitly approves or revises these
 
 ## Later sections
 
-§1 (Stage 1 supersession / downgrade), §2 (§1.4 historical disposition), Stage 3/4 evidence: **not written in Stage 0**.
+§2 (§1.4 historical disposition), Stage 3/4 evidence: **not written in Stage 0**.
+
+---
+
+## §1 — Stage 1: review classification + downgrade invalid closure
+
+**Operator classification approval:** proposed classes unchanged (explicit message after Stage 0 gate).
+
+| Gap | reviewClassification |
+|---|---|
+| GAP-052 | BLOCKING_INVARIANT |
+| GAP-053 | BLOCKING_INVARIANT |
+| GAP-054 | BLOCKING_INVARIANT |
+| GAP-055 | NON_BLOCKING_LIMITATION (whyNonBlocking applied) |
+| GAP-056 | NON_BLOCKING_LIMITATION (whyNonBlocking applied; operator confirmed F4/Stage 0 direction) |
+
+### Current-state supersession of safe-editing phaseAuditEvidence
+
+Removed only `phaseAuditEvidence` from `safe-editing`.
+
+| Field | Previous value (immutable history) |
+|---|---|
+| Previous derived state | PHASE_VERIFIED |
+| Previous auditReportPath | `docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md` |
+| Previous auditCommit | `5606b49ec753b8988213b6c912d7de5de51d52ee` |
+| Previous auditConclusionNeedle | `**Conclusion:** PHASE 3 SAFE EDITING — COMPLETE` |
+| Previous closureDocumentPath | `docs/PHASE_3_CLOSURE.md` |
+| Previous closureCommit | `04591e400f6b8efe7190ce01faef4da97d0eb984` |
+| Previous auditCheckpointNeedle | `5606b49ec753b8988213b6c912d7de5de51d52ee` |
+| Superseding finding | GAP-052 |
+| Historical artifacts | Every cited historical artifact/commit remains immutable in Git |
+
+Retained: `implementationEvidence` and the 607 `recordedFigure` bound to Closure A `04591e4`.
+
+**Actual derived state after removal (verified):** `IMPLEMENTED`
+
+### GAP-051 reopen
+
+Lifecycle CLOSED → OPEN. Prior `closedByCommit` / `closureEvidence` removed from fields and preserved in notes as historical facts citing ee58673 / 5606b49. GAP-051 remains in `safe-editing.knownLimitations` while OPEN.
+
+### Half-citation probe restoration
+
+Restored from `git show 04591e4:tests/integration/phase3-safe-editing-audit.test.ts` semantic effect:
+
+- declaration-only `issueLedgerVerification` path cannot yield PHASE_VERIFIED;
+- imports `issueLedgerVerification` / `deriveAllCapabilityObservations` restored for that probe.
+
+Live-state pins updated separately to actual post-downgrade state (`IMPLEMENTED`, GAP-051 OPEN). Obsolete Closure-B PHASE_VERIFIED live pins not restored.
+
+### ledger:verify shape rule
+
+Hardcoded safe-editing PHASE_VERIFIED expectation removed. Universal helper:
+
+`scripts/lib/phase-audit-shape.ts` → `checkPhaseAuditEvidenceShapeConsistency`
+
+Permanent falsifications: `tests/selfobs/phase-audit-shape.test.ts` (1-F1, 1-F2, truthful accept).
+
+### Live Stage 1 downgrade falsification
+
+Pre-commit on intended Stage 1 working tree:
+
+| Step | Expectation | Result |
+|---|---|---|
+| A | focused derivation expecting PHASE_VERIFIED | **MUST FAIL** — got `IMPLEMENTED` (exit 1) |
+| B | focused derivation expecting IMPLEMENTED | **PASS** (exit 0) |
+| C | `npm run ledger:verify` | **PASS** |
+
+No script errored before producing the intended evidence.
+
+---
+
+## Later sections (Stage 2+)
+
+§2 (§1.4 historical disposition), Stage 3/4 evidence: written in later stages.

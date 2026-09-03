@@ -37,7 +37,7 @@ describe("selfobs derivation", () => {
     }
   });
 
-  it("derives safe-editing as candidate PHASE_VERIFIED without verification", () => {
+  it("derives safe-editing as candidate IMPLEMENTED without verification", () => {
     const observation = deriveCapabilityObservation(
       getCanonicalCapabilityLedger().records.find(
         (r) => r.capabilityId === "safe-editing",
@@ -49,7 +49,7 @@ describe("selfobs derivation", () => {
     expect(observation).toEqual({
       kind: "UNVERIFIED_DERIVATION",
       capabilityId: "safe-editing",
-      candidateState: "PHASE_VERIFIED",
+      candidateState: "IMPLEMENTED",
     });
   });
 
@@ -145,7 +145,7 @@ describe("selfobs derivation", () => {
       expect(safeEditing).toMatchObject({
         kind: "VERIFIED_CAPABILITY_STATE",
         capabilityId: "safe-editing",
-        state: "PHASE_VERIFIED",
+        state: "IMPLEMENTED",
       });
 
       for (const id of [
@@ -161,14 +161,16 @@ describe("selfobs derivation", () => {
         });
       }
 
-      for (const id of ["GAP-048", "GAP-049", "GAP-050", "GAP-051"] as const) {
+      for (const id of ["GAP-048", "GAP-049", "GAP-050"] as const) {
         const gap = gapLedger.records.find((r) => r.id === id);
         expect(gap?.lifecycle).toBe("CLOSED");
       }
       expect(gapLedger.records.find((r) => r.id === "GAP-051")).toMatchObject({
-        closedByCommit: "5606b49ec753b8988213b6c912d7de5de51d52ee",
-        closureEvidence: "docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md",
+        lifecycle: "OPEN",
       });
+      for (const id of ["GAP-052", "GAP-053", "GAP-054", "GAP-055", "GAP-056"] as const) {
+        expect(gapLedger.records.find((r) => r.id === id)?.lifecycle).toBe("OPEN");
+      }
     },
     60_000,
   );
@@ -186,11 +188,47 @@ describe("selfobs derivation", () => {
         return;
       }
 
+      // After Stage 1 downgrade, live safe-editing already lacks phaseAuditEvidence.
+      // Restore a forged phaseAuditEvidence then remove it to prove the direction.
       const original = capabilityLedger.records.find(
         (r) => r.capabilityId === "safe-editing",
       )!;
-      expect(original.phaseAuditEvidence).toBeDefined();
-      const { phaseAuditEvidence: _removed, ...withoutPhase } = original;
+      expect(original.phaseAuditEvidence).toBeUndefined();
+      const withPhase = {
+        ...original,
+        phaseAuditEvidence: {
+          auditReportPath: "docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md",
+          auditCommit: "5606b49ec753b8988213b6c912d7de5de51d52ee",
+          auditConclusionNeedle: "**Conclusion:** PHASE 3 SAFE EDITING — COMPLETE",
+          closureDocumentPath: "docs/PHASE_3_CLOSURE.md",
+          closureCommit: "04591e400f6b8efe7190ce01faef4da97d0eb984",
+          auditCheckpointNeedle: "5606b49ec753b8988213b6c912d7de5de51d52ee",
+        },
+      };
+      const raisedLedger = {
+        ...capabilityLedger,
+        records: capabilityLedger.records.map((r) =>
+          r.capabilityId === "safe-editing" ? withPhase : r,
+        ),
+      };
+      const raisedResult = await verifyLedgers(repoRoot, raisedLedger, gapLedger);
+      expect(raisedResult.ok).toBe(true);
+      if (!raisedResult.verification) {
+        return;
+      }
+      const raisedObs = deriveCapabilityObservation(
+        withPhase,
+        raisedResult.verification,
+        raisedLedger,
+        gapLedger,
+      );
+      expect(raisedObs).toMatchObject({
+        kind: "VERIFIED_CAPABILITY_STATE",
+        capabilityId: "safe-editing",
+        state: "PHASE_VERIFIED",
+      });
+
+      const { phaseAuditEvidence: _removed, ...withoutPhase } = withPhase;
       const forgedLedger = {
         ...capabilityLedger,
         records: capabilityLedger.records.map((r) =>
