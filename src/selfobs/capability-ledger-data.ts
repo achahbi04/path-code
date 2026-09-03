@@ -557,10 +557,16 @@ const RECORDS: CapabilityRecord[] = [
       ),
       mod(
         "src/editing/replace-existing-file.ts",
-        SHA.phase3BH1Impl,
-        "Existing-file atomic replacement with fail-closed mutation-time config and temp-creation recovery",
+        SHA.phase3PublicAuthorityHardening,
+        "Existing-file atomic replacement with public fsOps internalized (authority-surface corrected)",
       ),
     ],
+    freezeEvidence: {
+      kind: "sameCommit",
+      implementationCommit: SHA.phase3PublicAuthorityHardening,
+      reportPath:
+        "docs/reports/PHASE_3_PUBLIC_AUTHORITY_SURFACE_HARDENING_REPORT.md",
+    },
     dependencies: [
       "edit-contracts",
       "safe-editing",
@@ -651,8 +657,8 @@ const RECORDS: CapabilityRecord[] = [
       ),
       mod(
         "src/editing/create-file.ts",
-        SHA.phase3CH1Impl,
-        "Safe single-file creation orchestration with CREATE_FILE policy and opaque after-state verify",
+        SHA.phase3PublicAuthorityHardening,
+        "Safe single-file creation with public fsOps internalized (authority-surface corrected)",
       ),
       mod(
         "src/editing/internal/creation-verification.ts",
@@ -660,6 +666,12 @@ const RECORDS: CapabilityRecord[] = [
         "Opaque PublishedCreationVerificationTarget minting and operation binding",
       ),
     ],
+    freezeEvidence: {
+      kind: "sameCommit",
+      implementationCommit: SHA.phase3PublicAuthorityHardening,
+      reportPath:
+        "docs/reports/PHASE_3_PUBLIC_AUTHORITY_SURFACE_HARDENING_REPORT.md",
+    },
     dependencies: [
       "edit-contracts",
       "safe-editing",
@@ -749,8 +761,13 @@ const RECORDS: CapabilityRecord[] = [
       ),
       mod(
         "src/editing/multi-file-execute.ts",
-        SHA.phase3DImpl,
-        "Sequential coordinated 3B/3C execution",
+        SHA.phase3PublicAuthorityHardening,
+        "Sequential coordinated 3B/3C execution with public targetOps internalized",
+      ),
+      mod(
+        "src/editing/multi-file-types.ts",
+        SHA.phase3PublicAuthorityHardening,
+        "Multi-file public option types without targetOps mechanism substitution",
       ),
       mod(
         "src/editing/internal/authorization-readiness.ts",
@@ -763,6 +780,12 @@ const RECORDS: CapabilityRecord[] = [
         "Public multi-file coordination surface",
       ),
     ],
+    freezeEvidence: {
+      kind: "sameCommit",
+      implementationCommit: SHA.phase3PublicAuthorityHardening,
+      reportPath:
+        "docs/reports/PHASE_3_PUBLIC_AUTHORITY_SURFACE_HARDENING_REPORT.md",
+    },
     dependencies: [
       "edit-contracts",
       "existing-file-replacement",

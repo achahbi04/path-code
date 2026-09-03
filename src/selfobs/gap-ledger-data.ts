@@ -735,11 +735,16 @@ const GAP_LEDGER_V1: GapLedger = {
       description:
         "Public ReplaceExistingFileOptions.fsOps is accepted by the Phase 3 editing barrel and honored at runtime as options.fsOps ?? productionAtomicReplaceFs, allowing caller substitution of the frozen 3B filesystem mutation and evidence operation set.",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       missingEvidence:
         "Public wrapper without fsOps; internal-only dependency-bound helper; malicious runtime proof; standing public-surface guard; immutable corrective checkpoint.",
       closureCondition:
         "Supported public replaceExistingFile cannot accept, forward, or resolve filesystem mechanism substitution; internal test seam is non-public; malicious runtime and standing architecture guard pass.",
+      closedByCommit: "5386f349eccd7c69ff696619ffc426757e3e91d0",
+      closureEvidence:
+        "docs/reports/PHASE_3_PUBLIC_AUTHORITY_SURFACE_HARDENING_REPORT.md",
+      notes:
+        "Closed by Stage 3 public authority-surface internalization: public replaceExistingFile binds productionAtomicReplaceFs only; fsOps confined to non-barrel replaceExistingFileWithDependencies; malicious runtime and standing architecture guard pass at correction SHA.",
     },
     {
       id: "GAP-049",
@@ -750,11 +755,16 @@ const GAP_LEDGER_V1: GapLedger = {
       description:
         "Public CreateFileOptions.fsOps is accepted by the Phase 3 editing barrel and honored at runtime as options.fsOps ?? productionAtomicCreateFs, allowing caller substitution of the frozen 3C filesystem mutation and verification operation set.",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       missingEvidence:
         "Public wrapper without fsOps; internal-only dependency-bound helper; malicious runtime proof; standing public-surface guard; immutable corrective checkpoint.",
       closureCondition:
         "Supported public createFile cannot accept, forward, or resolve filesystem or verification mechanism substitution; internal test seam is non-public; malicious runtime and standing architecture guard pass.",
+      closedByCommit: "5386f349eccd7c69ff696619ffc426757e3e91d0",
+      closureEvidence:
+        "docs/reports/PHASE_3_PUBLIC_AUTHORITY_SURFACE_HARDENING_REPORT.md",
+      notes:
+        "Closed by Stage 3 public authority-surface internalization: public createFile binds productionAtomicCreateFs only; fsOps confined to non-barrel createFileWithDependencies; malicious runtime and standing architecture guard pass at correction SHA.",
     },
     {
       id: "GAP-050",
@@ -765,11 +775,16 @@ const GAP_LEDGER_V1: GapLedger = {
       description:
         "Public ExecuteMultiFilePlanOptions.targetOps is accepted by the Phase 3 editing barrel and honored at runtime as options.targetOps ?? productionOps, allowing caller substitution of the frozen 3D delegation path to real replaceExistingFile and createFile.",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       missingEvidence:
         "Public executeMultiFilePlan(plan) only; internal-only test executor; malicious runtime proof; standing public-surface guard; immutable corrective checkpoint.",
       closureCondition:
         "Supported public multi-file execution cannot accept, forward, or resolve target-operation substitution; internal test seam is non-public; malicious runtime and standing architecture guard pass.",
+      closedByCommit: "5386f349eccd7c69ff696619ffc426757e3e91d0",
+      closureEvidence:
+        "docs/reports/PHASE_3_PUBLIC_AUTHORITY_SURFACE_HARDENING_REPORT.md",
+      notes:
+        "Closed by Stage 3 public authority-surface internalization: public executeMultiFilePlan binds productionOps only; targetOps confined to non-barrel executeMultiFilePlanWithDependencies; malicious runtime and standing architecture guard pass at correction SHA.",
     },
     {
       id: "GAP-051",

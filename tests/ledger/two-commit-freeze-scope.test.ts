@@ -34,6 +34,37 @@ function existingFileReplacementRecord(freeze: FreezeEvidence): CapabilityRecord
   return { ...base, freezeEvidence: freeze };
 }
 
+/** Historical H1-era module cites used by two-commit freeze probes (not live freeze). */
+function phase3BH1ImplementationEvidence(): CapabilityRecord["implementationEvidence"] {
+  return [
+    {
+      kind: "module",
+      path: "src/editing/atomic-fs.ts",
+      atCommit: PHASE3B_IMPL,
+      meaning: "Authorized low-level filesystem mutation adapter (H1-corrected)",
+      admissibility: "MECHANICALLY_VERIFIABLE",
+    },
+    {
+      kind: "module",
+      path: "src/editing/replace-existing-file.ts",
+      atCommit: PHASE3B_IMPL,
+      meaning:
+        "Existing-file atomic replacement with fail-closed mutation-time config and temp-creation recovery",
+      admissibility: "MECHANICALLY_VERIFIABLE",
+    },
+  ];
+}
+
+function existingFileReplacementRecordAtPhase3BH1(
+  freeze: FreezeEvidence,
+): CapabilityRecord {
+  const base = existingFileReplacementRecord(freeze);
+  return {
+    ...base,
+    implementationEvidence: phase3BH1ImplementationEvidence(),
+  };
+}
+
 function canonicalExistingFileReplacementRecord(): CapabilityRecord {
   return getCanonicalCapabilityLedger().records.find(
     (record) => record.capabilityId === "existing-file-replacement",
@@ -169,7 +200,7 @@ describe("H2 live falsifications", () => {
   });
 
   it("H2-F3 — bypassing module/scope consistency must fail validation", () => {
-    const record = existingFileReplacementRecord({
+    const record = existingFileReplacementRecordAtPhase3BH1({
       kind: "twoCommit",
       implementationCommit: PHASE3B_IMPL,
       evidenceCommit: PHASE3B_EVIDENCE,
@@ -214,6 +245,7 @@ describe("Phase 3B relink probe", () => {
         record.capabilityId === "existing-file-replacement"
           ? {
               ...record,
+              implementationEvidence: phase3BH1ImplementationEvidence(),
               freezeEvidence: {
                 kind: "twoCommit",
                 implementationCommit: PHASE3B_IMPL,

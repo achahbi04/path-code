@@ -997,7 +997,7 @@ describe("Phase 3 integration audit — D3 safe-editing cannot derive PHASE_VERI
     ).toBe(false);
   });
 
-  it("Phase 3 leaf capabilities: edit-contracts PASS_FROZEN; corrected trio IMPLEMENTED", () => {
+  it("Phase 3 leaf capabilities: edit-contracts and corrected trio PASS_FROZEN", () => {
     const ledger = getCanonicalCapabilityLedger();
     const gaps = getCanonicalGapLedger();
 
@@ -1022,7 +1022,13 @@ describe("Phase 3 integration audit — D3 safe-editing cannot derive PHASE_VERI
       "multi-file-coordination",
     ] as const) {
       const record = ledger.records.find((r) => r.capabilityId === id);
-      expect(record?.freezeEvidence).toBeUndefined();
+      expect(record?.freezeEvidence).toBeDefined();
+      expect(record?.freezeEvidence).toMatchObject({
+        kind: "sameCommit",
+        implementationCommit: "5386f349eccd7c69ff696619ffc426757e3e91d0",
+        reportPath:
+          "docs/reports/PHASE_3_PUBLIC_AUTHORITY_SURFACE_HARDENING_REPORT.md",
+      });
       expect(record?.implementationEvidence.length).toBeGreaterThan(0);
       const obs = deriveCapabilityObservation(
         record!,
@@ -1032,7 +1038,7 @@ describe("Phase 3 integration audit — D3 safe-editing cannot derive PHASE_VERI
       );
       expect(obs.kind).toBe("UNVERIFIED_DERIVATION");
       if (obs.kind === "UNVERIFIED_DERIVATION") {
-        expect(obs.candidateState).toBe("IMPLEMENTED");
+        expect(obs.candidateState).toBe("PASS_FROZEN");
       }
     }
   });
