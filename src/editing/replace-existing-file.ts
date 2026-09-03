@@ -40,10 +40,15 @@ import type {
   ReplaceExistingFileTerminalFailure,
 } from "./types.js";
 
+/** Public caller options — no mechanism-substitution fields. */
 export type ReplaceExistingFileOptions = {
   readonly gitContext?: import("../git/types.js").GitStateBaseline;
-  /** Internal test seam — production uses productionAtomicReplaceFs. */
-  readonly fsOps?: AtomicReplaceFsOps;
+};
+
+/** Internal test/recovery seam — not part of the public editing barrel. */
+export type ReplaceExistingFileWithDependenciesOptions = {
+  readonly fsOps: AtomicReplaceFsOps;
+  readonly gitContext?: import("../git/types.js").GitStateBaseline;
 };
 
 type BeforeReadEvidence = {
@@ -524,12 +529,16 @@ function withCleanup(
   return cleanupFailure ? { ...base, cleanupFailure: true } : base;
 }
 
-export async function replaceExistingFile(
+/**
+ * Internal orchestration with injectable filesystem ops (tests/recovery only).
+ * Not exported from the public editing barrel.
+ */
+export async function replaceExistingFileWithDependencies(
   authorization: EditAuthorization,
   prepared: PreparedMutation,
-  options: ReplaceExistingFileOptions = {},
+  options: ReplaceExistingFileWithDependenciesOptions,
 ): Promise<ReplaceExistingFileResult> {
-  const fsOps = options.fsOps ?? productionAtomicReplaceFs;
+  const fsOps = options.fsOps;
   const gitContext = options.gitContext;
 
   if (prepared.action !== "MODIFY_EXISTING_FILE") {
@@ -957,6 +966,29 @@ export async function replaceExistingFile(
     knowledgeInvalidation,
     configFreshness,
   };
+}
+
+/**
+ * Public existing-file replacement — always binds productionAtomicReplaceFs.
+ * Constructs a fresh internal options object from gitContext only; unknown
+ * caller fields (including fsOps via JS widening) are ignored.
+ */
+export async function replaceExistingFile(
+  authorization: EditAuthorization,
+  prepared: PreparedMutation,
+  options: ReplaceExistingFileOptions = {},
+): Promise<ReplaceExistingFileResult> {
+  const internalOptions: ReplaceExistingFileWithDependenciesOptions = {
+    fsOps: productionAtomicReplaceFs,
+    ...(options.gitContext !== undefined
+      ? { gitContext: options.gitContext }
+      : {}),
+  };
+  return replaceExistingFileWithDependencies(
+    authorization,
+    prepared,
+    internalOptions,
+  );
 }
 
 /** Test-only export for record construction evidence. */

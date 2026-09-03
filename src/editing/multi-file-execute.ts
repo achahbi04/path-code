@@ -6,6 +6,7 @@ import { createFile } from "./create-file.js";
 import { runMultiFilePreflight } from "./multi-file-preflight.js";
 import type {
   ExecuteMultiFilePlanOptions,
+  ExecuteMultiFilePlanWithDependenciesOptions,
   MultiFileExecutionTargetOutcome,
   MultiFilePlan,
   MultiFilePlanResult,
@@ -101,15 +102,15 @@ function collectInvalidations(
 }
 
 /**
- * Execute an opaque multi-file plan: fresh preflight, then sequential 3B/3C.
- * Preflight config is never handed to target operations.
+ * Internal executor with injectable target operations (tests/recovery only).
+ * Not exported from the public editing barrel.
  */
-export async function executeMultiFilePlan(
+export async function executeMultiFilePlanWithDependencies(
   plan: MultiFilePlan,
-  options?: ExecuteMultiFilePlanOptions,
+  options: ExecuteMultiFilePlanWithDependenciesOptions,
 ): Promise<MultiFilePlanResult> {
-  const ops = options?.targetOps ?? productionOps;
-  const gitContext = options?.gitContext;
+  const ops = options.targetOps;
+  const gitContext = options.gitContext;
 
   const preflight = await runMultiFilePreflight(plan, gitContext);
   if (!preflight.ready) {
@@ -152,4 +153,22 @@ export async function executeMultiFilePlan(
     targetOutcomes: outcomes,
     knowledgeInvalidations: collectInvalidations(outcomes),
   });
+}
+
+/**
+ * Execute an opaque multi-file plan: fresh preflight, then sequential 3B/3C.
+ * Always binds public replaceExistingFile / createFile (production FS).
+ * Does not consult options.targetOps even if passed via JS widening.
+ */
+export async function executeMultiFilePlan(
+  plan: MultiFilePlan,
+  options?: ExecuteMultiFilePlanOptions,
+): Promise<MultiFilePlanResult> {
+  const internalOptions: ExecuteMultiFilePlanWithDependenciesOptions = {
+    targetOps: productionOps,
+    ...(options?.gitContext !== undefined
+      ? { gitContext: options.gitContext }
+      : {}),
+  };
+  return executeMultiFilePlanWithDependencies(plan, internalOptions);
 }

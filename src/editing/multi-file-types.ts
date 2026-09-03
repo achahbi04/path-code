@@ -118,14 +118,22 @@ export type CreateMultiFilePlanResult = Result<
   MultiFilePlanBuildFailure
 >;
 
-/** Internal test seam — production binds real replace/create. */
+/**
+ * Internal test seam — production binds real replace/create.
+ * Not exported from the public editing barrel.
+ */
 export type MultiFileTargetOperations = {
   readonly replaceExistingFile: typeof import("./replace-existing-file.js").replaceExistingFile;
   readonly createFile: typeof import("./create-file.js").createFile;
 };
 
+/** Public caller options — no mechanism-substitution fields. */
 export type ExecuteMultiFilePlanOptions = {
   readonly gitContext?: import("../git/types.js").GitStateBaseline;
-  /** Internal test seam only — not a public authority surface. */
-  readonly targetOps?: MultiFileTargetOperations;
+};
+
+/** Internal test/recovery seam — not part of the public editing barrel. */
+export type ExecuteMultiFilePlanWithDependenciesOptions = {
+  readonly gitContext?: import("../git/types.js").GitStateBaseline;
+  readonly targetOps: MultiFileTargetOperations;
 };

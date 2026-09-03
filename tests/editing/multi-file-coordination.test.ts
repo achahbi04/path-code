@@ -14,6 +14,7 @@ import {
   prepareCreateFile,
   prepareModifyExistingFile,
 } from "../../src/editing/index.js";
+import { executeMultiFilePlanWithDependencies } from "../../src/editing/multi-file-execute.js";
 import type {
   MultiFilePlanEntry,
   PreparedCreation,
@@ -340,7 +341,7 @@ describe("executeMultiFilePlan — success and order", () => {
     }
 
     const order: string[] = [];
-    const result = await executeMultiFilePlan(built.value, {
+    const result = await executeMultiFilePlanWithDependencies(built.value, {
       targetOps: {
         replaceExistingFile: async (authorization, prepared, options) => {
           order.push(prepared.target.relativePath);
@@ -566,7 +567,7 @@ describe("executeMultiFilePlan — stop and partial commit", () => {
     }
 
     let call = 0;
-    const result = await executeMultiFilePlan(built.value, {
+    const result = await executeMultiFilePlanWithDependencies(built.value, {
       targetOps: {
         replaceExistingFile: async (authorization, prepared, options) => {
           call += 1;
@@ -623,7 +624,7 @@ describe("executeMultiFilePlan — stop and partial commit", () => {
       configFreshness: "MUTATION_TIME_RE_RESOLVED",
     } as unknown as ReplaceExistingFileResult;
 
-    const result = await executeMultiFilePlan(built.value, {
+    const result = await executeMultiFilePlanWithDependencies(built.value, {
       targetOps: {
         replaceExistingFile: async (_auth, prepared) => {
           if (prepared.target.relativePath === "a.txt") {
@@ -664,7 +665,7 @@ describe("executeMultiFilePlan — stop and partial commit", () => {
       refusalReason: "TARGET_STALE",
     } as unknown as ReplaceExistingFileResult;
 
-    const result = await executeMultiFilePlan(built.value, {
+    const result = await executeMultiFilePlanWithDependencies(built.value, {
       targetOps: {
         replaceExistingFile: async () => refusal,
         createFile: async () => {
@@ -795,7 +796,7 @@ describe("executeMultiFilePlan — knowledge and nesting", () => {
       return;
     }
     let captured: ReplaceExistingFileResult | undefined;
-    const result = await executeMultiFilePlan(built.value, {
+    const result = await executeMultiFilePlanWithDependencies(built.value, {
       targetOps: {
         replaceExistingFile: async (authorization, prepared, options) => {
           const { replaceExistingFile } = await import(

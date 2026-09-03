@@ -13,7 +13,10 @@ import {
 import type { AtomicReplaceFsOps } from "../../src/editing/atomic-fs.js";
 import { productionAtomicReplaceFs } from "../../src/editing/atomic-fs.js";
 import { resetAuthorizationRegistryForTests } from "../../src/editing/internal/registry.js";
-import { replaceExistingFile } from "../../src/editing/replace-existing-file.js";
+import {
+  replaceExistingFile,
+  replaceExistingFileWithDependencies,
+} from "../../src/editing/replace-existing-file.js";
 import {
   cleanupInventoryFixtures,
   createCanonicalTempRoot,
@@ -241,7 +244,7 @@ describe("replaceExistingFile — concurrency detection", () => {
       },
     };
 
-    const result = await replaceExistingFile(authorization, prepared, { fsOps });
+    const result = await replaceExistingFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("FAILED_PRECOMMIT");
     expect(result.commitPointReached).toBe(false);
     expect((await readFile(join(root, "during.txt"))).toString()).toBe(
@@ -266,7 +269,7 @@ describe("replaceExistingFile — recovery", () => {
         throw new Error("injected write failure");
       },
     };
-    const result = await replaceExistingFile(authorization, prepared, { fsOps });
+    const result = await replaceExistingFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("FAILED_PRECOMMIT");
     expect(result.commitPointReached).toBe(false);
     expect((await readFile(join(root, "recover.txt"))).toString()).toBe(before);
@@ -287,7 +290,7 @@ describe("replaceExistingFile — recovery", () => {
         throw new Error("injected directory fsync failure");
       },
     };
-    const result = await replaceExistingFile(authorization, prepared, { fsOps });
+    const result = await replaceExistingFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("COMMITTED_FAILURE");
     expect(result.commitPointReached).toBe(true);
     expect(result.durabilityVerified).toBe(false);
@@ -433,7 +436,7 @@ describe("replaceExistingFile — temp-creation recovery", () => {
     let thrown: unknown = null;
     let result: Awaited<ReturnType<typeof replaceExistingFile>> | null = null;
     try {
-      result = await replaceExistingFile(authorization, prepared, { fsOps });
+      result = await replaceExistingFileWithDependencies(authorization, prepared, { fsOps });
     } catch (error) {
       thrown = error;
     }
@@ -468,7 +471,7 @@ describe("replaceExistingFile — temp-creation recovery", () => {
         throw new Error("injected mid-stream write failure");
       },
     };
-    const result = await replaceExistingFile(authorization, prepared, { fsOps });
+    const result = await replaceExistingFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("FAILED_PRECOMMIT");
     expect(result.commitPointReached).toBe(false);
     expect((await readFile(join(root, "partial.txt"))).toString()).toBe(before);
@@ -493,7 +496,7 @@ describe("replaceExistingFile — temp-creation recovery", () => {
         throw new Error("injected unlink failure");
       },
     };
-    const result = await replaceExistingFile(authorization, prepared, { fsOps });
+    const result = await replaceExistingFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("FAILED_PRECOMMIT");
     expect(result.commitPointReached).toBe(false);
     if (result.outcome !== "FAILED_PRECOMMIT") {
@@ -522,7 +525,7 @@ describe("replaceExistingFile — temp-creation recovery", () => {
         await writeFile(targetPath, "corrupted-after-rename\n", "utf8");
       },
     };
-    const result = await replaceExistingFile(authorization, prepared, { fsOps });
+    const result = await replaceExistingFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("COMMITTED_FAILURE");
     expect(result.commitPointReached).toBe(true);
     expect((await readFile(join(root, "after.txt"))).toString()).toBe(

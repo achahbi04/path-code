@@ -15,6 +15,9 @@ import { resetAuthorizationRegistryForTests } from "../../src/editing/internal/r
 import { inspectAuthorizationReadiness } from "../../src/editing/internal/authorization-readiness.js";
 import type { AtomicReplaceFsOps } from "../../src/editing/atomic-fs.js";
 import { productionAtomicReplaceFs } from "../../src/editing/atomic-fs.js";
+import { replaceExistingFileWithDependencies } from "../../src/editing/replace-existing-file.js";
+import { createFileWithDependencies } from "../../src/editing/create-file.js";
+import { executeMultiFilePlanWithDependencies } from "../../src/editing/multi-file-execute.js";
 import {
   getCanonicalCapabilityLedger,
   getCanonicalGapLedger,
@@ -767,7 +770,7 @@ describe("Phase 3 integration audit — B8 partial plan then reobserve", () => {
     }
 
     let call = 0;
-    const result = await executeMultiFilePlan(built.value, {
+    const result = await executeMultiFilePlanWithDependencies(built.value, {
       targetOps: {
         replaceExistingFile: async (authorization, prepared, options) => {
           call += 1;
@@ -831,7 +834,7 @@ describe("Phase 3 integration audit — recovery shapes (induced)", () => {
         throw new Error("induced temp create failure");
       },
     };
-    const result = await replaceExistingFile(mod.authorization, mod.prepared, {
+    const result = await replaceExistingFileWithDependencies(mod.authorization, mod.prepared, {
       fsOps,
     });
     expect(result.outcome).toBe("FAILED_PRECOMMIT");
@@ -851,7 +854,7 @@ describe("Phase 3 integration audit — recovery shapes (induced)", () => {
         await writeFile(targetPath, "corrupted-after-rename\n", "utf8");
       },
     };
-    const result = await replaceExistingFile(mod.authorization, mod.prepared, {
+    const result = await replaceExistingFileWithDependencies(mod.authorization, mod.prepared, {
       fsOps,
     });
     expect(result.outcome).toBe("COMMITTED_FAILURE");
@@ -866,7 +869,7 @@ describe("Phase 3 integration audit — recovery shapes (induced)", () => {
     const cre = await earnCreate(fixture, "src", "f.txt", "data\n");
     const { productionAtomicCreateFs, PATH_CODE_CREATE_TEMP_PREFIX } =
       await import("../../src/editing/atomic-fs.js");
-    const result = await createFile(cre.authorization, cre.prepared, {
+    const result = await createFileWithDependencies(cre.authorization, cre.prepared, {
       fsOps: {
         ...productionAtomicCreateFs,
         writeAll: async () => {
@@ -891,7 +894,7 @@ describe("Phase 3 integration audit — recovery shapes (induced)", () => {
     );
     const { sha256Hex } = await import("../editing/helpers.js");
     const tampered = Buffer.from("tampered\n");
-    const result = await createFile(cre.authorization, cre.prepared, {
+    const result = await createFileWithDependencies(cre.authorization, cre.prepared, {
       fsOps: {
         ...productionAtomicCreateFs,
         verifyPublishedCreation: async () =>
@@ -920,7 +923,7 @@ describe("Phase 3 integration audit — recovery shapes (induced)", () => {
     if (!built.ok) {
       return;
     }
-    const result = await executeMultiFilePlan(built.value, {
+    const result = await executeMultiFilePlanWithDependencies(built.value, {
       targetOps: {
         replaceExistingFile: async (authorization, prepared, options) => {
           if (prepared.target.relativePath === "b.txt") {
@@ -994,25 +997,42 @@ describe("Phase 3 integration audit — D3 safe-editing cannot derive PHASE_VERI
     ).toBe(false);
   });
 
-  it("four Phase 3 capabilities remain PASS_FROZEN candidates with freeze evidence", () => {
+  it("Phase 3 leaf capabilities: edit-contracts PASS_FROZEN; corrected trio IMPLEMENTED", () => {
     const ledger = getCanonicalCapabilityLedger();
+    const gaps = getCanonicalGapLedger();
+
+    const editContracts = ledger.records.find(
+      (r) => r.capabilityId === "edit-contracts",
+    );
+    expect(editContracts?.freezeEvidence).toBeDefined();
+    const editObs = deriveCapabilityObservation(
+      editContracts!,
+      undefined,
+      ledger,
+      gaps,
+    );
+    expect(editObs.kind).toBe("UNVERIFIED_DERIVATION");
+    if (editObs.kind === "UNVERIFIED_DERIVATION") {
+      expect(editObs.candidateState).toBe("PASS_FROZEN");
+    }
+
     for (const id of [
-      "edit-contracts",
       "existing-file-replacement",
       "safe-file-creation",
       "multi-file-coordination",
     ] as const) {
       const record = ledger.records.find((r) => r.capabilityId === id);
-      expect(record?.freezeEvidence).toBeDefined();
+      expect(record?.freezeEvidence).toBeUndefined();
+      expect(record?.implementationEvidence.length).toBeGreaterThan(0);
       const obs = deriveCapabilityObservation(
         record!,
         undefined,
         ledger,
-        getCanonicalGapLedger(),
+        gaps,
       );
       expect(obs.kind).toBe("UNVERIFIED_DERIVATION");
       if (obs.kind === "UNVERIFIED_DERIVATION") {
-        expect(obs.candidateState).toBe("PASS_FROZEN");
+        expect(obs.candidateState).toBe("IMPLEMENTED");
       }
     }
   });

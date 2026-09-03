@@ -12,6 +12,7 @@ import {
   PATH_CODE_CREATE_TEMP_PREFIX,
   prepareCreateFile,
 } from "../../src/editing/index.js";
+import { createFileWithDependencies } from "../../src/editing/create-file.js";
 import type { AtomicCreateFsOps } from "../../src/editing/atomic-fs.js";
 import { productionAtomicCreateFs } from "../../src/editing/atomic-fs.js";
 import { resetAuthorizationRegistryForTests } from "../../src/editing/internal/registry.js";
@@ -237,7 +238,7 @@ describe("createFile — target exists / window race", () => {
       },
     };
 
-    const result = await createFile(authorization, prepared, { fsOps });
+    const result = await createFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("REFUSED_PRECOMMIT");
     expect(result.commitPointReached).toBe(false);
     if (result.outcome === "REFUSED_PRECOMMIT") {
@@ -347,7 +348,7 @@ describe("createFile — absence vs inconclusive", () => {
         throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       },
     };
-    const result = await createFile(auth.value, prepared.value, { fsOps });
+    const result = await createFileWithDependencies(auth.value, prepared.value, { fsOps });
     expect(result.outcome).toBe("REFUSED_PRECOMMIT");
     expect(result.commitPointReached).toBe(false);
     void entry;
@@ -456,7 +457,7 @@ describe("createFile — recovery", () => {
         throw new Error("injected write failure");
       },
     };
-    const result = await createFile(authorization, prepared, { fsOps });
+    const result = await createFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("FAILED_PRECOMMIT");
     expect(result.commitPointReached).toBe(false);
     const names = await readdir(join(root, "src"));
@@ -483,7 +484,7 @@ describe("createFile — recovery", () => {
         return productionAtomicCreateFs.unlink(filePath);
       },
     };
-    const result = await createFile(authorization, prepared, { fsOps });
+    const result = await createFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("COMMITTED_FAILURE");
     expect(result.commitPointReached).toBe(true);
     if (result.outcome === "COMMITTED_FAILURE") {
@@ -506,7 +507,7 @@ describe("createFile — recovery", () => {
         throw new Error("injected dir fsync failure");
       },
     };
-    const result = await createFile(authorization, prepared, { fsOps });
+    const result = await createFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("COMMITTED_FAILURE");
     expect(result.commitPointReached).toBe(true);
     expect(await readFile(join(root, "src/d.txt"), "utf8")).toBe("d\n");
@@ -531,7 +532,7 @@ describe("createFile — recovery", () => {
           observedByteLength: tampered.byteLength,
         }),
     };
-    const result = await createFile(authorization, prepared, { fsOps });
+    const result = await createFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.outcome).toBe("COMMITTED_FAILURE");
     expect(result.commitPointReached).toBe(true);
     expect(await readFile(join(root, "src/m.txt"), "utf8")).toBe("auth\n");
@@ -590,7 +591,7 @@ describe("createFile — live falsification scaffolding", () => {
         }
       },
     };
-    const result = await createFile(authorization, prepared, { fsOps });
+    const result = await createFileWithDependencies(authorization, prepared, { fsOps });
     expect(result.commitPointReached).toBe(true);
     // External bytes were overwritten — proving why EEXIST-based publication is required.
     expect(await readFile(join(root, "src/cf2.txt"), "utf8")).toBe("pc\n");

@@ -43,10 +43,15 @@ import type {
   PreparedCreation,
 } from "./types.js";
 
+/** Public caller options — no mechanism-substitution fields. */
 export type CreateFileOptions = {
   readonly gitContext?: import("../git/types.js").GitStateBaseline;
-  /** Internal test seam — production uses productionAtomicCreateFs. */
-  readonly fsOps?: AtomicCreateFsOps;
+};
+
+/** Internal test/recovery seam — not part of the public editing barrel. */
+export type CreateFileWithDependenciesOptions = {
+  readonly fsOps: AtomicCreateFsOps;
+  readonly gitContext?: import("../git/types.js").GitStateBaseline;
 };
 
 type NodeErrnoException = Error & { readonly code?: string };
@@ -505,12 +510,16 @@ async function prepareCreateCandidate(
   }
 }
 
-export async function createFile(
+/**
+ * Internal orchestration with injectable filesystem ops (tests/recovery only).
+ * Not exported from the public editing barrel.
+ */
+export async function createFileWithDependencies(
   authorization: EditAuthorization,
   prepared: PreparedCreation,
-  options: CreateFileOptions = {},
+  options: CreateFileWithDependenciesOptions,
 ): Promise<CreateFileResult> {
-  const fsOps = options.fsOps ?? productionAtomicCreateFs;
+  const fsOps = options.fsOps;
   const gitContext = options.gitContext;
 
   if (prepared.action !== "CREATE_FILE") {
@@ -775,6 +784,25 @@ export async function createFile(
     knowledgeInvalidation: invalidation,
     configFreshness: "MUTATION_TIME_RE_RESOLVED",
   };
+}
+
+/**
+ * Public file creation — always binds productionAtomicCreateFs.
+ * Constructs a fresh internal options object from gitContext only; unknown
+ * caller fields (including fsOps via JS widening) are ignored.
+ */
+export async function createFile(
+  authorization: EditAuthorization,
+  prepared: PreparedCreation,
+  options: CreateFileOptions = {},
+): Promise<CreateFileResult> {
+  const internalOptions: CreateFileWithDependenciesOptions = {
+    fsOps: productionAtomicCreateFs,
+    ...(options.gitContext !== undefined
+      ? { gitContext: options.gitContext }
+      : {}),
+  };
+  return createFileWithDependencies(authorization, prepared, internalOptions);
 }
 
 export { buildCreationEditRecord, buildKnowledgeInvalidation };
