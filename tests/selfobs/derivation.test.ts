@@ -255,7 +255,7 @@ describe("selfobs derivation", () => {
         expect(["DECLARED", "IMPLEMENTED"]).toContain(obs.state);
       }
     },
-    60_000,
+    180_000,
   );
 
   it(

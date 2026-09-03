@@ -260,8 +260,57 @@ Pre-commit on intended Stage 1 working tree:
 
 No script errored before producing the intended evidence.
 
+**Stage 1 commit:** `7f4267d5d59feee8a73e5e3217c6ab2b1abd7a48`  
+**Runtime tests at Stage 1 check:** **612** PASS  
+**Post-commit `ledger:verify`:** PASS at Stage 1 HEAD  
+**Post-commit derived states:** trio PASS_FROZEN; `safe-editing` IMPLEMENTED; GAP-051…056 OPEN
+
 ---
 
 ## Later sections (Stage 2+)
 
 §2 (§1.4 historical disposition), Stage 3/4 evidence: written in later stages.
+
+---
+
+## §2 — Stage 2A: §1.4 historical disposition
+
+**Original live §1.4 MUST-FAIL sequence:** **NOT PROVEN** and remains so historically.
+
+**Census prose at `eabbc19` claiming §1.4 success:** narrative claim without the required live run log.
+
+### Historical worktree
+
+| Item | Value |
+|---|---|
+| Detached worktree path | `/Users/achahbi/Projects/path-code-r1-eabbc19.Hc0ynS` (removed after probes) |
+| Checkpoint | `eabbc19da3916e050f9015fafdd8735026a17b45` |
+| Pre-downgrade freeze source | `eabbc19^` = `696ef4fe58c21cdd527869309a2b9fd5abcd19a8` |
+| Dependency install | NONE — temporary `node_modules` symlink to main only; removed before worktree removal |
+| Tracked file mutations in worktree | NONE |
+
+### Committed downgrade state at immutable eabbc19 (re-derived)
+
+| Capability | freezeEvidence at eabbc19 | Derived verified state |
+|---|---|---|
+| `existing-file-replacement` | absent | **IMPLEMENTED** |
+| `safe-file-creation` | absent | **IMPLEMENTED** |
+| `multi-file-coordination` | absent | **IMPLEMENTED** |
+
+### In-memory restore direction (exact historical freezeEvidence from `696ef4f`)
+
+Freeze objects mechanically extracted from `git show 696ef4f:src/selfobs/capability-ledger-data.ts` with SHA constants resolved from `citation-helpers.ts` at that commit. Applied only to in-memory Capability Ledger copies; no tracked file modified.
+
+| Capability | Restored freeze form | Derived after restore |
+|---|---|---|
+| `existing-file-replacement` | twoCommit (`ad85c9f…` / `2b63531…` / PHASE_3B_EVIDENCE_COMPLETION_REPORT) | **PASS_FROZEN** |
+| `safe-file-creation` | twoCommit (`1136c40…` / `2a57330…` / PHASE_3C_H1_REPORT) | **PASS_FROZEN** |
+| `multi-file-coordination` | sameCommit (`4fd4567…` / PHASE_3D_REPORT) | **PASS_FROZEN** |
+
+### Current forward relink falsification (main)
+
+Test: `relink falsification — removing freezeEvidence lowers trio to IMPLEMENTED` in `tests/selfobs/derivation.test.ts` — PASS.
+
+No history rewritten.
+
+---
