@@ -561,13 +561,6 @@ const RECORDS: CapabilityRecord[] = [
         "Existing-file atomic replacement with fail-closed mutation-time config and temp-creation recovery",
       ),
     ],
-    freezeEvidence: {
-      kind: "twoCommit",
-      implementationCommit: SHA.phase3BH1Impl,
-      evidenceCommit: "2b635316f7f08c0cf08ef42ec40ab2cd513d3969",
-      reportPath: "docs/reports/PHASE_3B_EVIDENCE_COMPLETION_REPORT.md",
-      productionScopes: ["src/editing/"],
-    },
     dependencies: [
       "edit-contracts",
       "safe-editing",
@@ -631,6 +624,7 @@ const RECORDS: CapabilityRecord[] = [
       { kind: "gap", id: "GAP-036", admissibility: "REPOSITORY_RECORDED" },
       { kind: "gap", id: "GAP-037", admissibility: "REPOSITORY_RECORDED" },
       { kind: "gap", id: "GAP-040", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-048", admissibility: "REPOSITORY_RECORDED" },
     ],
   },
   {
@@ -666,13 +660,6 @@ const RECORDS: CapabilityRecord[] = [
         "Opaque PublishedCreationVerificationTarget minting and operation binding",
       ),
     ],
-    freezeEvidence: {
-      kind: "twoCommit",
-      implementationCommit: SHA.phase3CH1Impl,
-      evidenceCommit: SHA.phase3CH1Evidence,
-      reportPath: "docs/reports/PHASE_3C_H1_REPORT.md",
-      productionScopes: ["src/editing/"],
-    },
     dependencies: [
       "edit-contracts",
       "safe-editing",
@@ -730,6 +717,7 @@ const RECORDS: CapabilityRecord[] = [
       { kind: "gap", id: "GAP-044", admissibility: "REPOSITORY_RECORDED" },
       { kind: "gap", id: "GAP-045", admissibility: "REPOSITORY_RECORDED" },
       { kind: "gap", id: "GAP-040", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-049", admissibility: "REPOSITORY_RECORDED" },
     ],
   },
   {
@@ -775,11 +763,6 @@ const RECORDS: CapabilityRecord[] = [
         "Public multi-file coordination surface",
       ),
     ],
-    freezeEvidence: {
-      kind: "sameCommit",
-      implementationCommit: SHA.phase3DImpl,
-      reportPath: "docs/reports/PHASE_3D_REPORT.md",
-    },
     dependencies: [
       "edit-contracts",
       "existing-file-replacement",
@@ -816,7 +799,9 @@ const RECORDS: CapabilityRecord[] = [
         "P3D-015 — ONE WRITE MODULE PRESERVED",
       ),
     ],
-    knownLimitations: [],
+    knownLimitations: [
+      { kind: "gap", id: "GAP-050", admissibility: "REPOSITORY_RECORDED" },
+    ],
   },
   {
     capabilityId: "safe-editing",
@@ -832,7 +817,9 @@ const RECORDS: CapabilityRecord[] = [
     implementationEvidence: [],
     dependencies: ["repository-intelligence"],
     proofObligations: [],
-    knownLimitations: [],
+    knownLimitations: [
+      { kind: "gap", id: "GAP-051", admissibility: "REPOSITORY_RECORDED" },
+    ],
   },
 ];
 

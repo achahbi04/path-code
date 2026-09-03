@@ -116,7 +116,7 @@ describe("selfobs derivation", () => {
   });
 
   it(
-    "derives edit-contracts and safe-file-creation PASS_FROZEN after 3C-H1 correction",
+    "derives Phase 3 editing capabilities after public authority-surface downgrade",
     async () => {
       const { verifyLedgers } = await import("../../scripts/lib/ledger-verifier.js");
       const repoRoot = new URL("../..", import.meta.url).pathname;
@@ -154,7 +154,7 @@ describe("selfobs derivation", () => {
       expect(existingFileReplacement).toMatchObject({
         kind: "VERIFIED_CAPABILITY_STATE",
         capabilityId: "existing-file-replacement",
-        state: "PASS_FROZEN",
+        state: "IMPLEMENTED",
       });
 
       const safeFileCreation = observations.find(
@@ -163,7 +163,7 @@ describe("selfobs derivation", () => {
       expect(safeFileCreation).toMatchObject({
         kind: "VERIFIED_CAPABILITY_STATE",
         capabilityId: "safe-file-creation",
-        state: "PASS_FROZEN",
+        state: "IMPLEMENTED",
       });
 
       const multiFile = observations.find(
@@ -172,9 +172,92 @@ describe("selfobs derivation", () => {
       expect(multiFile).toMatchObject({
         kind: "VERIFIED_CAPABILITY_STATE",
         capabilityId: "multi-file-coordination",
-        state: "PASS_FROZEN",
+        state: "IMPLEMENTED",
       });
     },
     60_000,
+  );
+
+  it(
+    "downgrade falsification — restored freezeEvidence yields PASS_FROZEN not IMPLEMENTED",
+    async () => {
+      const { verifyLedgers } = await import("../../scripts/lib/ledger-verifier.js");
+      const repoRoot = new URL("../..", import.meta.url).pathname;
+      const capabilityLedger = getCanonicalCapabilityLedger();
+      const gapLedger = getCanonicalGapLedger();
+      const result = await verifyLedgers(repoRoot, capabilityLedger, gapLedger);
+      expect(result.ok).toBe(true);
+      if (!result.verification) {
+        return;
+      }
+
+      const restorations = [
+        {
+          capabilityId: "existing-file-replacement",
+          freezeEvidence: {
+            kind: "twoCommit" as const,
+            implementationCommit: "ad85c9f1262635f9a81b5608b20c198a7b8b489d",
+            evidenceCommit: "2b635316f7f08c0cf08ef42ec40ab2cd513d3969",
+            reportPath: "docs/reports/PHASE_3B_EVIDENCE_COMPLETION_REPORT.md",
+            productionScopes: ["src/editing/"],
+          },
+        },
+        {
+          capabilityId: "safe-file-creation",
+          freezeEvidence: {
+            kind: "twoCommit" as const,
+            implementationCommit: "1136c40ab1667e4a5b70185c8bef68ce67d675a2",
+            evidenceCommit: "2a573301f871ae506491ddbfa8f6407521b4b956",
+            reportPath: "docs/reports/PHASE_3C_H1_REPORT.md",
+            productionScopes: ["src/editing/"],
+          },
+        },
+        {
+          capabilityId: "multi-file-coordination",
+          freezeEvidence: {
+            kind: "sameCommit" as const,
+            implementationCommit: "4fd4567e1ed2b9e5bef303fb6bb90a23d83927d9",
+            reportPath: "docs/reports/PHASE_3D_REPORT.md",
+          },
+        },
+      ];
+
+      for (const restoration of restorations) {
+        const original = capabilityLedger.records.find(
+          (r) => r.capabilityId === restoration.capabilityId,
+        )!;
+        expect(original.freezeEvidence).toBeUndefined();
+        const forged = {
+          ...original,
+          freezeEvidence: restoration.freezeEvidence,
+        };
+        const forgedLedger = {
+          ...capabilityLedger,
+          records: capabilityLedger.records.map((r) =>
+            r.capabilityId === restoration.capabilityId ? forged : r,
+          ),
+        };
+        // Re-verify against forged freezeEvidence citations at the restored commits.
+        const forgedResult = await verifyLedgers(repoRoot, forgedLedger, gapLedger);
+        expect(forgedResult.ok).toBe(true);
+        if (!forgedResult.verification) {
+          return;
+        }
+        const obs = deriveCapabilityObservation(
+          forged,
+          forgedResult.verification,
+          forgedLedger,
+          gapLedger,
+        );
+        // Focused expectation IMPLEMENTED must fail: restored freeze yields PASS_FROZEN.
+        expect(obs).toMatchObject({
+          kind: "VERIFIED_CAPABILITY_STATE",
+          capabilityId: restoration.capabilityId,
+          state: "PASS_FROZEN",
+        });
+        expect(obs).not.toMatchObject({ state: "IMPLEMENTED" });
+      }
+    },
+    120_000,
   );
 });

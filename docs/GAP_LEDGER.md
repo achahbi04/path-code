@@ -865,6 +865,62 @@ Every entry should contain:
 **Notes:** Closed by Phase 3C-H1: Phase 3 Safe Editing Amendment 1 + Stage 2 opaque verification + C-F9 type/runtime falsification. Evidence: docs/PHASE_3_SAFE_EDITING_AMENDMENT_1.md, docs/reports/PHASE_3C_H1_REPORT.md §2/§5.
 
 ---
+
+### GAP-048 — PUBLIC_AUTHORITY_SURFACE_LEAK — replaceExistingFile public fsOps mechanism substitution
+
+**Discovered in / source:** Phase 3 public authority-surface census at 696ef4fe58c21cdd527869309a2b9fd5abcd19a8
+
+**Description:** Public ReplaceExistingFileOptions.fsOps is accepted by the Phase 3 editing barrel and honored at runtime as options.fsOps ?? productionAtomicReplaceFs, allowing caller substitution of the frozen 3B filesystem mutation and evidence operation set.
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** OPEN
+
+**Required condition to close:** Public wrapper without fsOps; internal-only dependency-bound helper; malicious runtime proof; standing public-surface guard; immutable corrective checkpoint.
+
+---
+
+### GAP-049 — PUBLIC_AUTHORITY_SURFACE_LEAK — createFile public fsOps mechanism substitution
+
+**Discovered in / source:** Phase 3 public authority-surface census at 696ef4fe58c21cdd527869309a2b9fd5abcd19a8
+
+**Description:** Public CreateFileOptions.fsOps is accepted by the Phase 3 editing barrel and honored at runtime as options.fsOps ?? productionAtomicCreateFs, allowing caller substitution of the frozen 3C filesystem mutation and verification operation set.
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** OPEN
+
+**Required condition to close:** Public wrapper without fsOps; internal-only dependency-bound helper; malicious runtime proof; standing public-surface guard; immutable corrective checkpoint.
+
+---
+
+### GAP-050 — PUBLIC_AUTHORITY_SURFACE_LEAK — executeMultiFilePlan public targetOps mechanism substitution
+
+**Discovered in / source:** Phase 3 public authority-surface census at 696ef4fe58c21cdd527869309a2b9fd5abcd19a8
+
+**Description:** Public ExecuteMultiFilePlanOptions.targetOps is accepted by the Phase 3 editing barrel and honored at runtime as options.targetOps ?? productionOps, allowing caller substitution of the frozen 3D delegation path to real replaceExistingFile and createFile.
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** OPEN
+
+**Required condition to close:** Public executeMultiFilePlan(plan) only; internal-only test executor; malicious runtime proof; standing public-surface guard; immutable corrective checkpoint.
+
+---
+
+### GAP-051 — First Phase 3 integration audit conclusion superseded by missed public authority-surface leak
+
+**Discovered in / source:** Phase 3 public authority-surface census after first integration audit 696ef4fe58c21cdd527869309a2b9fd5abcd19a8
+
+**Description:** The first Phase 3 integration audit returned COMPLETE while public fsOps/targetOps mechanism-substitution seams remained active. That audit remains immutable historical evidence, but its COMPLETE conclusion is progression-ineligible until a fresh full re-audit returns COMPLETE after correction.
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** OPEN
+
+**Required condition to close:** Immutable corrective hardening chain plus fresh full Phase 3 integration re-audit COMPLETE.
+
+---
 ## GAP CLOSURE CONDUCT
 
 When a later pass closes a gap:
