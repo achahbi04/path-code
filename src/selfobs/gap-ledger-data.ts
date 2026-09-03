@@ -805,6 +805,74 @@ const GAP_LEDGER_V1: GapLedger = {
       notes:
         "Closed after Stage 5 re-audit COMPLETE at 5606b49… and Phase 3 closure document at 04591e4…; first audit 696ef4f remains immutable and superseded for progression only.",
     },
+    {
+      id: "GAP-052",
+      title:
+        "Phase 3 re-audit at 5606b49 executed by a non-independent auditor",
+      sourceCheckpoint:
+        "Phase 3-R1 reconciliation at ee586732ac602eabbf310888b7b44c9bdf8ef519",
+      description:
+        "The fresh auditor task required by the hardening contract failed with resource_exhausted before writing or committing. The Stage 0–4 writer session then executed Stage 5 and committed 5606b49. The committed report does not record that provenance break.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: null,
+      lifecycle: "OPEN",
+      notes:
+        "missingEvidence: A fresh full Phase 3 re-audit at the corrected/reconciled checkpoint by an executor session with no prior write in this R1 chain, plus a complete auditor provenance/attestation block and immutable audit evidence. closureCondition: A fresh Stage 3 R1 auditor returns COMPLETE at the Stage 2 checkpoint; its report contains the required provenance block; safe-editing phaseAuditEvidence is later relinked to that immutable re-audit. The prior GAP-051 canonical closure landed in ee58673 while its closedByCommit / closureEvidence pointed to 5606b49. Those historical records remain immutable; this gap supersedes them for progression.",
+    },
+    {
+      id: "GAP-053",
+      title: "Stage 1 §1.4 downgrade falsification not proven at eabbc19",
+      sourceCheckpoint:
+        "Phase 3-R1 reconciliation at ee586732ac602eabbf310888b7b44c9bdf8ef519",
+      description:
+        "The census asserted §1.4 success, but the live restore script raised IndexError before capturing the required MUST-FAIL evidence; the restore-back line did not run in that process; the following focused test failed in a state consistent with freezeEvidence remaining restored; ledger:verify evidence cited the pre-Stage-1 baseline rather than the committed downgrade checkpoint.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: null,
+      lifecycle: "OPEN",
+      notes:
+        "missingEvidence: A historical derivation at immutable eabbc19 establishing the committed downgrade state, the restore direction using exact pre-downgrade freezeEvidence from the preceding canonical checkpoint, and current bidirectional freeze falsifications. closureCondition: The missing original live run remains explicitly recorded as NOT PROVEN; historical verification at eabbc19 establishes the semantic state the commit actually encodes; both restore and removal directions are proven without rewriting history; an immutable evidence report records the disposition.",
+    },
+    {
+      id: "GAP-054",
+      title:
+        "Closure B §6.6 jointly unsatisfiable and historical audit mechanism removed",
+      sourceCheckpoint:
+        "Phase 3-R1 reconciliation at ee586732ac602eabbf310888b7b44c9bdf8ef519",
+      description:
+        "Prior §6.6 simultaneously required PHASE_VERIFIED/GAP-051 CLOSED, unchanged audit tests, and final npm test PASS while those audit tests bound live canonical state. ee58673 edited two audit suites and scripts/ledger-verify.ts without contract authorization and removed the historical half-citation issueLedgerVerification probe.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: null,
+      lifecycle: "OPEN",
+      notes:
+        "missingEvidence: Restored historical probe; a ledger:verify consistency mechanism that derives expectations from ledger shape rather than hardcoding phase status; an explicit bounded rule authorizing only live-state assertion updates during closure. closureCondition: The deleted probe is restored without weakening; the ledger consistency gate is shape-driven and falsified; this immutable R1 contract explicitly authorizes only bounded live-state pin updates and forbids deletion/weakening of audit mechanisms; the reconciliation report records the contract defect. Primary origin in the corrective report: CONTRACT. Contributing cause: EVIDENCE shape. No Gap Ledger schema field is added for origin.",
+    },
+    {
+      id: "GAP-055",
+      title:
+        "Auditor independence is not mechanically verifiable from repository evidence",
+      sourceCheckpoint:
+        "Phase 3-R1 reconciliation at ee586732ac602eabbf310888b7b44c9bdf8ef519",
+      description:
+        "The repository can record an auditor's report and operator attestation, but the current self-observation model has no mechanical mechanism proving that the auditor session received no forbidden transcript/context or performed no prior write.",
+      proposedClass: "NON_BLOCKING_LIMITATION",
+      reviewClassification: null,
+      lifecycle: "OPEN",
+      notes:
+        "missingEvidence: An approved repository-visible mechanism, if later required, that can bind an independent audit execution to mechanically verifiable provenance rather than operator testimony alone. closureCondition: A future Master/preflight deliberately defines and proves such a mechanism, or explicitly dispositions the limitation while preserving truthful admissibility. Do not preselect a schema field or force a foundation change in this pass. whyNonBlocking (pending human review confirmation): R1 can structurally enforce executor separation and record the audit result mechanically while explicitly labeling the independence claim ASSERTED. The limitation concerns proof of process provenance, not the audit's repository-recorded tests/results themselves. The R1 report presence is REPOSITORY_RECORDED; the truth of independence attestation is ASSERTED. Do not invent OPERATOR_ATTESTED or another evidence tier. Not attached to any capability.",
+    },
+    {
+      id: "GAP-056",
+      title: "Final-head Phase 3 runtime test figure not durably recorded",
+      sourceCheckpoint:
+        "Phase 3-R1 reconciliation at ee586732ac602eabbf310888b7b44c9bdf8ef519",
+      description:
+        "Closure A correctly binds 607 runtime tests to 04591e4. Final validation at ee58673 reported 608 runtime tests, but no immutable closure/report/recordedFigure records that final-head figure.",
+      proposedClass: "NON_BLOCKING_LIMITATION",
+      reviewClassification: null,
+      lifecycle: "OPEN",
+      notes:
+        "missingEvidence: A final reconciliation closure artifact carrying the exact runtime total at its immutable checkpoint plus a Capability Ledger recordedFigure bound to that artifact/commit. closureCondition: The R1 closure reconciliation artifact records the exact final runtime total at its own immutable commit; Capability Ledger binds the figure to that document and commit; the historical 607 figure remains unchanged. whyNonBlocking (pending human review confirmation): The historical 607 figure is already truthful and correctly bound. Missing 608 recording is a final reporting/evidence-completeness defect, not evidence that Safe Editing behavior is incorrect.",
+    },
   ],
 };
 

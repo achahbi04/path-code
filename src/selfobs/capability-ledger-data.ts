@@ -856,6 +856,10 @@ const RECORDS: CapabilityRecord[] = [
     proofObligations: [],
     knownLimitations: [
       { kind: "gap", id: "GAP-051", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-052", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-053", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-054", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-056", admissibility: "REPOSITORY_RECORDED" },
     ],
     recordedFigures: [
       {
