@@ -37,6 +37,10 @@ export type { ReplaceExistingFileOptions } from "./replace-existing-file.js";
 export { createFile } from "./create-file.js";
 export type { CreateFileOptions } from "./create-file.js";
 
+export { createMultiFilePlan } from "./multi-file-plan.js";
+export { executeMultiFilePlan } from "./multi-file-execute.js";
+export type { ExecuteMultiFilePlanOptions } from "./multi-file-types.js";
+
 export {
   computeCreatedFileMode,
   CREATED_FILE_BASE_MODE,
@@ -78,3 +82,17 @@ export type {
   ReplaceExistingFileSuccess,
   ReplaceExistingFileTerminalFailure,
 } from "./types.js";
+
+export type {
+  CreateMultiFilePlanResult,
+  MultiFileExecutionTargetOutcome,
+  MultiFilePlan,
+  MultiFilePlanBuildFailure,
+  MultiFilePlanBuildFailureCode,
+  MultiFilePlanEntry,
+  MultiFilePlanResult,
+  MultiFilePlanStatus,
+  MultiFilePlanTargetOutcome,
+  MultiFilePreflightOutcome,
+  MultiFilePreflightReasonCode,
+} from "./multi-file-types.js";

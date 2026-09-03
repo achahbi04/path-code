@@ -96,6 +96,15 @@ describe("editing architecture", () => {
     expect(barrel).not.toMatch(/creation-verification/);
   });
 
+  it("does not export multi-file preflight, plan constructors, or readiness from the public barrel", () => {
+    const barrel = readFileSync(join(editingDir, "index.ts"), "utf8");
+    expect(barrel).not.toMatch(/runMultiFilePreflight/);
+    expect(barrel).not.toMatch(/inspectAuthorizationReadiness/);
+    expect(barrel).not.toMatch(/authorization-readiness/);
+    expect(barrel).not.toMatch(/multi-file-preflight/);
+    expect(barrel).not.toMatch(/brandPlan/);
+  });
+
   it("forbids unrestricted path-shaped published creation reads", () => {
     const violations: string[] = [];
     for (const filePath of listTsFiles(editingDir)) {

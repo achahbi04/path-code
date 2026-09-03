@@ -17,6 +17,8 @@ describe("editing import side effects", () => {
         "authorizePreparedChange",
         "computeCreatedFileMode",
         "createFile",
+        "createMultiFilePlan",
+        "executeMultiFilePlan",
         "explicitEditApproval",
         "isAtomicCreatePlatformSupported",
         "isAtomicReplacePlatformSupported",
