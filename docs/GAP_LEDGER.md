@@ -970,11 +970,15 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Required condition to close:** A historical derivation at immutable eabbc19 establishing the committed downgrade state, the restore direction using exact pre-downgrade freezeEvidence from the preceding canonical checkpoint, and current bidirectional freeze falsifications.
 
-**Notes:** Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.
+**Closed by checkpoint:** `2208dfa91e8f16571c3df884441aef7c75b1a062`
+
+**Evidence:** docs/reports/PHASE_3_R1_RECONCILIATION_REPORT.md §2
+
+**Notes:** Original live §1.4 run remains NOT PROVEN. Closure means the historical semantic disposition is now independently evidenced at eabbc19 (IMPLEMENTED) with in-memory restore to PASS_FROZEN and current forward relink falsification, not that the original failed script is retroactively repaired. Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.
 
 ---
 
@@ -988,11 +992,15 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Required condition to close:** Restored historical probe; a ledger:verify consistency mechanism that derives expectations from ledger shape rather than hardcoding phase status; an explicit bounded rule authorizing only live-state assertion updates during closure.
 
-**Notes:** Primary origin in the corrective report: CONTRACT. Contributing cause: EVIDENCE shape. No Gap Ledger schema field is added for origin. Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.
+**Closed by checkpoint:** `7f4267d5d59feee8a73e5e3217c6ab2b1abd7a48`
+
+**Evidence:** docs/reports/PHASE_3_R1_RECONCILIATION_REPORT.md §1 plus docs/passes/PHASE_3_R1_CLOSURE_RECONCILIATION_CONTRACT.md Stage 4 bounded live-state update rule
+
+**Notes:** Historical probe restored; ledger gate generalized and falsified; prior unsatisfiable §6.6 preserved as historical contract evidence. Primary origin: CONTRACT. Contributing cause: EVIDENCE shape. Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.
 
 ---
 

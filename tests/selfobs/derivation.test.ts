@@ -168,9 +168,21 @@ describe("selfobs derivation", () => {
       expect(gapLedger.records.find((r) => r.id === "GAP-051")).toMatchObject({
         lifecycle: "OPEN",
       });
-      for (const id of ["GAP-052", "GAP-053", "GAP-054", "GAP-055", "GAP-056"] as const) {
-        expect(gapLedger.records.find((r) => r.id === id)?.lifecycle).toBe("OPEN");
-      }
+      expect(gapLedger.records.find((r) => r.id === "GAP-052")?.lifecycle).toBe(
+        "OPEN",
+      );
+      expect(gapLedger.records.find((r) => r.id === "GAP-053")?.lifecycle).toBe(
+        "CLOSED",
+      );
+      expect(gapLedger.records.find((r) => r.id === "GAP-054")?.lifecycle).toBe(
+        "CLOSED",
+      );
+      expect(gapLedger.records.find((r) => r.id === "GAP-055")?.lifecycle).toBe(
+        "OPEN",
+      );
+      expect(gapLedger.records.find((r) => r.id === "GAP-056")?.lifecycle).toBe(
+        "OPEN",
+      );
     },
     60_000,
   );

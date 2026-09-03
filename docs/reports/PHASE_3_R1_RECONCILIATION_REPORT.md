@@ -313,4 +313,15 @@ Test: `relink falsification — removing freezeEvidence lowers trio to IMPLEMENT
 
 No history rewritten.
 
+### Stage 2B gap linkage
+
+| Gap | lifecycle | closedByCommit | closureEvidence |
+|---|---|---|---|
+| GAP-053 | CLOSED | `2208dfa91e8f16571c3df884441aef7c75b1a062` (Stage 2A) | `docs/reports/PHASE_3_R1_RECONCILIATION_REPORT.md §2` |
+| GAP-054 | CLOSED | `7f4267d5d59feee8a73e5e3217c6ab2b1abd7a48` (Stage 1) | report §1 + R1 contract Stage 4 live-state update rule |
+
+GAP-053 and GAP-054 removed from `safe-editing.knownLimitations`.  
+GAP-051, GAP-052, GAP-056 remain attached while OPEN.  
+GAP-055 remains OPEN and unattached.
+
 ---

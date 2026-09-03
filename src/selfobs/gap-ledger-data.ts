@@ -830,13 +830,15 @@ const GAP_LEDGER_V1: GapLedger = {
         "The census asserted §1.4 success, but the live restore script raised IndexError before capturing the required MUST-FAIL evidence; the restore-back line did not run in that process; the following focused test failed in a state consistent with freezeEvidence remaining restored; ledger:verify evidence cited the pre-Stage-1 baseline rather than the committed downgrade checkpoint.",
       proposedClass: "BLOCKING_INVARIANT",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       missingEvidence:
         "A historical derivation at immutable eabbc19 establishing the committed downgrade state, the restore direction using exact pre-downgrade freezeEvidence from the preceding canonical checkpoint, and current bidirectional freeze falsifications.",
       closureCondition:
         "The missing original live run remains explicitly recorded as NOT PROVEN; historical verification at eabbc19 establishes the semantic state the commit actually encodes; both restore and removal directions are proven without rewriting history; an immutable evidence report records the disposition.",
+      closedByCommit: "2208dfa91e8f16571c3df884441aef7c75b1a062",
+      closureEvidence: "docs/reports/PHASE_3_R1_RECONCILIATION_REPORT.md §2",
       notes:
-        "Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.",
+        "Original live §1.4 run remains NOT PROVEN. Closure means the historical semantic disposition is now independently evidenced at eabbc19 (IMPLEMENTED) with in-memory restore to PASS_FROZEN and current forward relink falsification, not that the original failed script is retroactively repaired. Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.",
     },
     {
       id: "GAP-054",
@@ -848,13 +850,16 @@ const GAP_LEDGER_V1: GapLedger = {
         "Prior §6.6 simultaneously required PHASE_VERIFIED/GAP-051 CLOSED, unchanged audit tests, and final npm test PASS while those audit tests bound live canonical state. ee58673 edited two audit suites and scripts/ledger-verify.ts without contract authorization and removed the historical half-citation issueLedgerVerification probe.",
       proposedClass: "BLOCKING_INVARIANT",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       missingEvidence:
         "Restored historical probe; a ledger:verify consistency mechanism that derives expectations from ledger shape rather than hardcoding phase status; an explicit bounded rule authorizing only live-state assertion updates during closure.",
       closureCondition:
         "The deleted probe is restored without weakening; the ledger consistency gate is shape-driven and falsified; this immutable R1 contract explicitly authorizes only bounded live-state pin updates and forbids deletion/weakening of audit mechanisms; the reconciliation report records the contract defect.",
+      closedByCommit: "7f4267d5d59feee8a73e5e3217c6ab2b1abd7a48",
+      closureEvidence:
+        "docs/reports/PHASE_3_R1_RECONCILIATION_REPORT.md §1 plus docs/passes/PHASE_3_R1_CLOSURE_RECONCILIATION_CONTRACT.md Stage 4 bounded live-state update rule",
       notes:
-        "Primary origin in the corrective report: CONTRACT. Contributing cause: EVIDENCE shape. No Gap Ledger schema field is added for origin. Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.",
+        "Historical probe restored; ledger gate generalized and falsified; prior unsatisfiable §6.6 preserved as historical contract evidence. Primary origin: CONTRACT. Contributing cause: EVIDENCE shape. Operator approved reviewClassification BLOCKING_INVARIANT unchanged at Stage 1.",
     },
     {
       id: "GAP-055",
