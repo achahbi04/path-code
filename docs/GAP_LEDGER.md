@@ -1048,21 +1048,17 @@ Every entry should contain:
 
 **Discovered in / source:** Phase 3-R1 Stage 3 independent re-audit at ecda537
 
-**Description:** authorizePreparedChange is exported from the public editing barrel and issues authorization. Its options type is declared in src/editing/types.ts and re-exported by name. The standing guard hardcodes three option types in three files, performs no export-driven census and no recursive type-graph traversal, and never inspects that type. An authority-bearing callable member added to it was not detected by the guard, the P1–P14 suite, or the full test suite. Hardening report §9 recorded the standing-guard deferral as scoped "beyond the Phase 3 editing option types already guarded", which is false for this type and masked the omission during the first audit.
+**Description:** authorizePreparedChange is exported from the public editing barrel and issues authorization. Its options type is declared in src/editing/types.ts and re-exported by name. The standing guard hardcodes three option types in three files, performs no export-driven census and no recursive type-graph traversal, and never inspects that type. An authority-bearing callable member added to it was not detected by the guard, the P1–P14 suite, or the full test suite. Hardening report §9 recorded the standing-guard deferral as scoped "beyond the Phase 3 editing option types already guarded", which is false for this type and masked the omission during the first audit. After R2, discovery was derived but recursive traversal remained gated on parameterName === 'options' or a /Options$/ type-name pattern, leaving 24 of 28 public parameter roots uninspected.
 
 **Implementer proposed class:** BLOCKING_INVARIANT
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** CLOSED
+**Lifecycle:** OPEN
 
-**Required condition to close:** export-driven public-surface discovery; named re-export resolution; recursive cycle-safe project type-graph traversal; detection of the auditor's exact authorityOps corruption; detection of an unlisted future public options type; preserved legitimate data/context; immutable corrective evidence
+**Required condition to close:** export-driven public-surface discovery; named re-export resolution; recursive cycle-safe project type-graph traversal; detection of the auditor's exact authorityOps corruption; detection of an unlisted future public options type; preserved legitimate data/context; immutable corrective evidence; unconditional structural traversal of every derived public parameter root with explicit dispositions
 
-**Closed by checkpoint:** `4aadb06047173b09cfceee542f140ad6fce7b06f`
-
-**Evidence:** docs/reports/PHASE_3_R2_CORRECTION_REPORT.md
-
-**Notes:** Closed by Phase 3-R2 Stage 1 derived walker. Defect reproduced at the R2 baseline before correction. Hardening report §9 statement remains false in that immutable report and is corrected here. No active leak ever existed — AuthorizePreparedChangeOptions held only { gitContext?: GitStateBaseline }. Primary origin IMPLEMENTATION, contributing EVIDENCE (operator decision D1). Component capabilities were not downgraded.
+**Notes:** Closed at 4aadb06047173b09cfceee542f140ad6fce7b06f with evidence docs/reports/PHASE_3_R2_CORRECTION_REPORT.md. Independent re-audit at c60c78254ce273235921694faac57ec5e4a30d5f (F-R1-003) proved that closure evidence insufficient: recursive traversal remained gated on parameter/type naming, so 'follows project-defined parameter graphs' was not met. Prior closure commits remain immutable. Reopened by Phase 3-R2-H1.
 
 ---
 
@@ -1083,6 +1079,26 @@ Every entry should contain:
 **Required condition to close:** a derived manifest rooted at package.json exports and src/index.ts, with the same detection rules
 
 **Notes:** Operator decision D2 — editing-barrel scope only for this pass. Not attached to any capability.
+
+---
+
+### GAP-059 — Full npm run check exhibits widespread wall-clock timeout instability under host contention
+
+**Discovered in / source:** Phase 3-R1 Stage 3 fresh re-audit at c60c782
+
+**Description:** 3 of 4 full check runs timed out (16, 1, 23 tests respectively); zero assertion failures; suspect files pass in isolation (52/52); excluding both R2 architecture files still left 4 timeouts; host load 26–30 on 8 CPUs; R2's 2-F6 timed out against its own 60s budget. Extent exceeds the previously recorded two-file flake.
+
+**Implementer proposed class:** NON_BLOCKING_LIMITATION
+
+**Review classification:** NON_BLOCKING_LIMITATION
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** no assertion defect established; all affected suites pass in isolation; one complete run passed; no production-semantic failure demonstrated.
+
+**Required condition to close:** deterministic worker/concurrency policy or bounded test-program reuse, plus representative repeated clean checks under recorded load.
+
+**Notes:** supersedes the narrower two-file disposition cited in the census baseline and hardening report §9 as the current description of this behavior. Not attached to any capability.
 
 ---
 ## GAP CLOSURE CONDUCT

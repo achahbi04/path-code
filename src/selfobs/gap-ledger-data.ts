@@ -907,18 +907,16 @@ const GAP_LEDGER_V1: GapLedger = {
       sourceCheckpoint:
         "Phase 3-R1 Stage 3 independent re-audit at ecda537",
       description:
-        "authorizePreparedChange is exported from the public editing barrel and issues authorization. Its options type is declared in src/editing/types.ts and re-exported by name. The standing guard hardcodes three option types in three files, performs no export-driven census and no recursive type-graph traversal, and never inspects that type. An authority-bearing callable member added to it was not detected by the guard, the P1–P14 suite, or the full test suite. Hardening report §9 recorded the standing-guard deferral as scoped \"beyond the Phase 3 editing option types already guarded\", which is false for this type and masked the omission during the first audit.",
+        "authorizePreparedChange is exported from the public editing barrel and issues authorization. Its options type is declared in src/editing/types.ts and re-exported by name. The standing guard hardcodes three option types in three files, performs no export-driven census and no recursive type-graph traversal, and never inspects that type. An authority-bearing callable member added to it was not detected by the guard, the P1–P14 suite, or the full test suite. Hardening report §9 recorded the standing-guard deferral as scoped \"beyond the Phase 3 editing option types already guarded\", which is false for this type and masked the omission during the first audit. After R2, discovery was derived but recursive traversal remained gated on parameterName === 'options' or a /Options$/ type-name pattern, leaving 24 of 28 public parameter roots uninspected.",
       proposedClass: "BLOCKING_INVARIANT",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "CLOSED",
+      lifecycle: "OPEN",
       missingEvidence:
-        "export-driven public-surface discovery; named re-export resolution; recursive cycle-safe project type-graph traversal; detection of the auditor's exact authorityOps corruption; detection of an unlisted future public options type; preserved legitimate data/context; immutable corrective evidence",
+        "export-driven public-surface discovery; named re-export resolution; recursive cycle-safe project type-graph traversal; detection of the auditor's exact authorityOps corruption; detection of an unlisted future public options type; preserved legitimate data/context; immutable corrective evidence; unconditional structural traversal of every derived public parameter root with explicit dispositions",
       closureCondition:
-        "the standing guard derives its coverage from the complete supported public editing surface rather than an enumerated list; follows named re-exports and project-defined parameter graphs; fails on the auditor's corruption naming the function, the type and the member; fails on a new unlisted public options type; passes legitimate data and context; every falsification corrupts, fails for the intended reason, restores exactly, and passes",
-      closedByCommit: "4aadb06047173b09cfceee542f140ad6fce7b06f",
-      closureEvidence: "docs/reports/PHASE_3_R2_CORRECTION_REPORT.md",
+        "the standing guard derives its coverage from the complete supported public editing surface rather than an enumerated list; follows named re-exports and project-defined parameter graphs; fails on the auditor's corruption naming the function, the type and the member; fails on a new unlisted public options type; passes legitimate data and context; every falsification corrupts, fails for the intended reason, restores exactly, and passes; every derived public parameter root receives exactly one explicit structural disposition; no root is skipped by parameter name or type-name pattern; an adversarially named parameter and type carrying a mechanism-substitution member is detected.",
       notes:
-        "Closed by Phase 3-R2 Stage 1 derived walker. Defect reproduced at the R2 baseline before correction. Hardening report §9 statement remains false in that immutable report and is corrected here. No active leak ever existed — AuthorizePreparedChangeOptions held only { gitContext?: GitStateBaseline }. Primary origin IMPLEMENTATION, contributing EVIDENCE (operator decision D1). Component capabilities were not downgraded.",
+        "Closed at 4aadb06047173b09cfceee542f140ad6fce7b06f with evidence docs/reports/PHASE_3_R2_CORRECTION_REPORT.md. Independent re-audit at c60c78254ce273235921694faac57ec5e4a30d5f (F-R1-003) proved that closure evidence insufficient: recursive traversal remained gated on parameter/type naming, so 'follows project-defined parameter graphs' was not met. Prior closure commits remain immutable. Reopened by Phase 3-R2-H1.",
     },
     {
       id: "GAP-058",
@@ -939,6 +937,26 @@ const GAP_LEDGER_V1: GapLedger = {
         "the derived walker is rooted at the supported package exports in addition to the editing barrel, with falsifications proving coverage of both roots",
       notes:
         "Operator decision D2 — editing-barrel scope only for this pass. Not attached to any capability.",
+    },
+    {
+      id: "GAP-059",
+      title:
+        "Full npm run check exhibits widespread wall-clock timeout instability under host contention",
+      sourceCheckpoint:
+        "Phase 3-R1 Stage 3 fresh re-audit at c60c782",
+      description:
+        "3 of 4 full check runs timed out (16, 1, 23 tests respectively); zero assertion failures; suspect files pass in isolation (52/52); excluding both R2 architecture files still left 4 timeouts; host load 26–30 on 8 CPUs; R2's 2-F6 timed out against its own 60s budget. Extent exceeds the previously recorded two-file flake.",
+      proposedClass: "NON_BLOCKING_LIMITATION",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "no assertion defect established; all affected suites pass in isolation; one complete run passed; no production-semantic failure demonstrated.",
+      missingEvidence:
+        "deterministic worker/concurrency policy or bounded test-program reuse, plus representative repeated clean checks under recorded load.",
+      closureCondition:
+        "a proven load-control mechanism and repeated clean full checks with recorded host conditions.",
+      notes:
+        "supersedes the narrower two-file disposition cited in the census baseline and hardening report §9 as the current description of this behavior. Not attached to any capability.",
     },
   ],
 };
