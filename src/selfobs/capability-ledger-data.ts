@@ -536,7 +536,9 @@ const RECORDS: CapabilityRecord[] = [
         "SE-016 — WRITE BOUNDARY HOLDS",
       ),
     ],
-    knownLimitations: [],
+    knownLimitations: [
+      { kind: "gap", id: "GAP-057", admissibility: "REPOSITORY_RECORDED" },
+    ],
   },
   {
     capabilityId: "existing-file-replacement",
@@ -850,6 +852,7 @@ const RECORDS: CapabilityRecord[] = [
       { kind: "gap", id: "GAP-051", admissibility: "REPOSITORY_RECORDED" },
       { kind: "gap", id: "GAP-052", admissibility: "REPOSITORY_RECORDED" },
       { kind: "gap", id: "GAP-056", admissibility: "REPOSITORY_RECORDED" },
+      { kind: "gap", id: "GAP-057", admissibility: "REPOSITORY_RECORDED" },
     ],
     recordedFigures: [
       {

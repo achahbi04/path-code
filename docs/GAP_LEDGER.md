@@ -1043,6 +1043,44 @@ Every entry should contain:
 **Notes:** Operator approved reviewClassification NON_BLOCKING_LIMITATION unchanged at Stage 1 (explicit confirmation that F4 / Stage 0 contract text directs this gap).
 
 ---
+
+### GAP-057 — Standing public authority-surface guard omits AuthorizePreparedChangeOptions and does not derive complete public parameter coverage
+
+**Discovered in / source:** Phase 3-R1 Stage 3 independent re-audit at ecda537
+
+**Description:** authorizePreparedChange is exported from the public editing barrel and issues authorization. Its options type is declared in src/editing/types.ts and re-exported by name. The standing guard hardcodes three option types in three files, performs no export-driven census and no recursive type-graph traversal, and never inspects that type. An authority-bearing callable member added to it was not detected by the guard, the P1–P14 suite, or the full test suite. Hardening report §9 recorded the standing-guard deferral as scoped "beyond the Phase 3 editing option types already guarded", which is false for this type and masked the omission during the first audit.
+
+**Implementer proposed class:** BLOCKING_INVARIANT
+
+**Review classification:** BLOCKING_INVARIANT
+
+**Lifecycle:** OPEN
+
+**Required condition to close:** export-driven public-surface discovery; named re-export resolution; recursive cycle-safe project type-graph traversal; detection of the auditor's exact authorityOps corruption; detection of an unlisted future public options type; preserved legitimate data/context; immutable corrective evidence
+
+**Notes:** no active leak at ecda537 — the type holds only { gitContext?: GitStateBaseline }. The defect is absent standing detection. Component capabilities are not downgraded. Primary origin IMPLEMENTATION, contributing EVIDENCE (operator decision D1).
+
+---
+
+### GAP-058 — Derived public-surface guard covers the editing barrel only, not the package root
+
+**Discovered in / source:** Phase 3-R2 correction at the Stage 0 commit
+
+**Description:** Amendment 1 A/B permit a package-root callable-surface manifest. This pass scopes the derived walker to src/editing/index.ts, where the authority surface and the finding live. package.json exports only "." and src/index.ts does not re-export editing, so no editing surface is reachable through a supported package subpath today.
+
+**Implementer proposed class:** NON_BLOCKING_LIMITATION
+
+**Review classification:** NON_BLOCKING_LIMITATION
+
+**Lifecycle:** OPEN
+
+**Why non-blocking:** the omitted scope contains no authority-bearing surface reachable by a package consumer at this checkpoint; the editing barrel is where authority is issued and mutation is performed
+
+**Required condition to close:** a derived manifest rooted at package.json exports and src/index.ts, with the same detection rules
+
+**Notes:** Operator decision D2 — editing-barrel scope only for this pass. Not attached to any capability.
+
+---
 ## GAP CLOSURE CONDUCT
 
 When a later pass closes a gap:

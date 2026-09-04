@@ -900,6 +900,44 @@ const GAP_LEDGER_V1: GapLedger = {
       notes:
         "Operator approved reviewClassification NON_BLOCKING_LIMITATION unchanged at Stage 1 (explicit confirmation that F4 / Stage 0 contract text directs this gap).",
     },
+    {
+      id: "GAP-057",
+      title:
+        "Standing public authority-surface guard omits AuthorizePreparedChangeOptions and does not derive complete public parameter coverage",
+      sourceCheckpoint:
+        "Phase 3-R1 Stage 3 independent re-audit at ecda537",
+      description:
+        "authorizePreparedChange is exported from the public editing barrel and issues authorization. Its options type is declared in src/editing/types.ts and re-exported by name. The standing guard hardcodes three option types in three files, performs no export-driven census and no recursive type-graph traversal, and never inspects that type. An authority-bearing callable member added to it was not detected by the guard, the P1–P14 suite, or the full test suite. Hardening report §9 recorded the standing-guard deferral as scoped \"beyond the Phase 3 editing option types already guarded\", which is false for this type and masked the omission during the first audit.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: "BLOCKING_INVARIANT",
+      lifecycle: "OPEN",
+      missingEvidence:
+        "export-driven public-surface discovery; named re-export resolution; recursive cycle-safe project type-graph traversal; detection of the auditor's exact authorityOps corruption; detection of an unlisted future public options type; preserved legitimate data/context; immutable corrective evidence",
+      closureCondition:
+        "the standing guard derives its coverage from the complete supported public editing surface rather than an enumerated list; follows named re-exports and project-defined parameter graphs; fails on the auditor's corruption naming the function, the type and the member; fails on a new unlisted public options type; passes legitimate data and context; every falsification corrupts, fails for the intended reason, restores exactly, and passes",
+      notes:
+        "no active leak at ecda537 — the type holds only { gitContext?: GitStateBaseline }. The defect is absent standing detection. Component capabilities are not downgraded. Primary origin IMPLEMENTATION, contributing EVIDENCE (operator decision D1).",
+    },
+    {
+      id: "GAP-058",
+      title:
+        "Derived public-surface guard covers the editing barrel only, not the package root",
+      sourceCheckpoint:
+        "Phase 3-R2 correction at the Stage 0 commit",
+      description:
+        "Amendment 1 A/B permit a package-root callable-surface manifest. This pass scopes the derived walker to src/editing/index.ts, where the authority surface and the finding live. package.json exports only \".\" and src/index.ts does not re-export editing, so no editing surface is reachable through a supported package subpath today.",
+      proposedClass: "NON_BLOCKING_LIMITATION",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "the omitted scope contains no authority-bearing surface reachable by a package consumer at this checkpoint; the editing barrel is where authority is issued and mutation is performed",
+      missingEvidence:
+        "a derived manifest rooted at package.json exports and src/index.ts, with the same detection rules",
+      closureCondition:
+        "the derived walker is rooted at the supported package exports in addition to the editing barrel, with falsifications proving coverage of both roots",
+      notes:
+        "Operator decision D2 — editing-barrel scope only for this pass. Not attached to any capability.",
+    },
   ],
 };
 
