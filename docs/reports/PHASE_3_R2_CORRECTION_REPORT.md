@@ -2,7 +2,7 @@ PATH CODE — PHASE 3-R2
 PUBLIC AUTHORITY-SURFACE GUARD CORRECTION REPORT
 
 Implementation Result:
-NOT YET — Stage 0 finding/gap record only. Stage 1 fills the correction evidence.
+PASS
 
 ==================================================
 §0 — STAGE 0 FINDING / GAP RECORD
@@ -189,4 +189,260 @@ docs/passes/PHASE_3_R2_PUBLIC_SURFACE_GUARD_CORRECTION_CONTRACT.md
 §1 — STAGE 1 CORRECTION EVIDENCE
 ==================================================
 
-(Stage 1 fills this section before the Stage 1 commit.)
+Implementation Result:
+PASS
+
+The Stage 1 implementation SHA is intentionally absent from this report and
+will be bound by Stage 2 (non-circularity).
+
+## Pre-correction failure-to-detect evidence (§1.1)
+
+Before corruption:
+- git hash-object src/editing/types.ts =
+  68a641cdcda3041b24559f78f771a7558c113dfd
+- git status --porcelain = empty
+
+Applied exact auditor corruption to AuthorizePreparedChangeOptions:
+
+  readonly authorityOps?: { readonly issue: (input: unknown) => unknown };
+
+During corruption blob:
+  1c257469440ff8a37aee69d4a188c4402618b15b
+
+Existing standing guard (verbatim summary):
+  ✓ tests/architecture/public-authority-surface.test.ts (5 tests) 38ms
+  Test Files  1 passed (1)
+  Tests  5 passed (5)
+
+Existing P1–P14 suite (verbatim summary):
+  ✓ tests/integration/phase3-reaudit-public-surface.test.ts (9 tests) 5877ms
+  Test Files  1 passed (1)
+  Tests  9 passed (9)
+
+Defect reproduced at the R2 baseline by this executor: both suites PASS under
+the corruption (failure to detect).
+
+Restore:
+  git restore --source=HEAD -- src/editing/types.ts
+  post hash = 68a641cdcda3041b24559f78f771a7558c113dfd (MATCH)
+  git diff --exit-code -- src/editing/types.ts PASS
+  git status --porcelain empty for that path
+  no authorityOps residue
+
+## Analyzer design
+
+Canonical path:
+  tests/architecture/public-authority-surface-analyzer.ts
+  function analyzePublicAuthoritySurface(...)
+
+Standing guard and every permanent proof call this exact analyzer.
+Cross-file src-corruption mutex:
+  tests/architecture/public-authority-src-lock.ts
+
+Export source of truth (operator D2):
+  src/editing/index.ts as a resolved TypeScript module export surface
+
+Resolution:
+- load repository TypeScript Program from tsconfig (typescript already
+  a devDependency; program cached per process, cleared after src corruption)
+- TypeChecker.getExportsOfModule on the editing barrel
+- resolve aliases to declarations; include named re-exports
+- select exported callables; enumerate every call signature and parameter
+- deep-inspect options parameters and *Options types recursively:
+  type aliases, interfaces + extends, nested objects, unions, intersections,
+  tuples/arrays to project-defined element types, generic wrappers present
+  on the surface
+- resolve index.ts → types.ts for AuthorizePreparedChangeOptions
+- cycle-safe visited set keyed by resolved symbol/type identity (anonymous
+  `__type` constituents discriminated by typeToString)
+- stop at non-project symbols (typescript lib / node_modules); Buffer and
+  Uint8Array method graphs are boundaries
+- deterministic manifest sorted by export, signature, parameter, type path,
+  member path (locale-independent stable comparator)
+
+Detection semantics (Amendment 1 §4 D preserved; no new vocabulary):
+- unreviewed user-defined call signatures on options/input members or on
+  parameters that are themselves callable
+- operation / adaptor / adapter / bindings / executor / loader / reader /
+  writer / verifier / *Ops mechanism-substitution shapes
+- any / unknown / index / rest escapes on the inspected surface
+- positional earned opaques are represented in the manifest but are not
+  recursive method-graph roots (preserves 2-F5 positive controls such as
+  WorkspaceBoundary.canonicalize)
+
+Exceptions:
+- PUBLIC_AUTHORITY_APPROVED_EXCEPTIONS remains empty
+- entries require function + parameter + optional exact memberPath +
+  governing contract + reason + targeted test; wildcards FAIL
+
+unknown/any/rest/index: fail when present on the inspected public options /
+callable surface per Amendment 1 D and the empty approved-exception policy.
+
+## Legacy mechanism removed / retained
+
+Removed as coverage mechanism:
+- hardcoded option type names ReplaceExistingFileOptions /
+  CreateFileOptions / ExecuteMultiFilePlanOptions
+- hardcoded source files replace-existing-file.ts / create-file.ts /
+  multi-file-types.ts
+- shallow optionTypePropertyNames allowlist discovery
+
+Those three types are now covered by the derived walker (plus
+AuthorizePreparedChangeOptions).
+
+Retained as cheap additional checks (not coverage mechanism):
+- package exports map assert ["."]
+- barrel named-export + source regex bans for fsOps / targetOps /
+  WithDependencies
+- public wrapper body forbidden-input regexes
+- empty approved-exception allowlist assertion
+
+Legacy enumerated discovery remains available only behind
+useLegacyEnumeratedDiscovery for 2-F7 falsification.
+
+## Files changed (Stage 1 candidate)
+
+- tests/architecture/public-authority-surface-analyzer.ts (new, canonical)
+- tests/architecture/public-authority-surface-derived.test.ts (new, 2-F1–2-F7)
+- tests/architecture/public-authority-src-lock.ts (new, cross-file mutex)
+- tests/architecture/public-authority-surface.test.ts (derived standing guard)
+- tests/architecture/public-authority-approved-exceptions.ts (memberPath field;
+  canonical list still empty)
+- docs/reports/PHASE_3_R2_CORRECTION_REPORT.md (this section)
+
+src/ committed changes: NONE
+Historical report changes: NONE
+
+## Derived public editing census (post-correction)
+
+Exported callables (16):
+authorizePreparedChange, computeCreatedFileMode, createFile,
+createMultiFilePlan, executeMultiFilePlan, explicitEditApproval,
+isAtomicCreatePlatformSupported, isAtomicReplacePlatformSupported,
+isCreateFileDisabled, isModifyExistingFileDisabled,
+isMutationActionDisabledByConfig, prepareCreateFile,
+prepareModifyExistingFile, replaceExistingFile,
+validatePreparedBatchBounds, validateReaderByteLimit
+
+Manifest entries: 148
+Findings on clean tree: 0
+
+Options members (all four *Options types):
+- authorizePreparedChange / options / AuthorizePreparedChangeOptions / gitContext
+- createFile / options / CreateFileOptions / gitContext
+- executeMultiFilePlan / options / ExecuteMultiFilePlanOptions / gitContext
+- replaceExistingFile / options / ReplaceExistingFileOptions / gitContext
+
+Compared with preflight census: the omitted AuthorizePreparedChangeOptions
+graph is now covered; the original three remain covered via the same derived
+path; other public editing functions appear in the callable/parameter
+manifest.
+
+## Falsifications 2-F1 … 2-F7
+
+2-F1 AUTHORIZE OPTIONS REGRESSION — REAL SURFACE
+- corruption: authorityOps on src/editing/types.ts AuthorizePreparedChangeOptions
+- pre/post blob hash: 68a641cdcda3041b24559f78f771a7558c113dfd (match)
+- standing-guard findings empty assertion FAILED as intended
+- finding named: authorizePreparedChange, AuthorizePreparedChangeOptions,
+  authorityOps, parameter options / resolved member path
+- restore + focused PASS
+
+2-F2 FUTURE PUBLIC FUNCTION AUTO-DISCOVERY
+- isolated fixture: futurePublicMutate + FutureMutateOptions.fsOps
+- type name added to NO list
+- analyzer discovered and failed naming function, options type, member
+- fixture removed; repository PASS
+
+2-F3 NAMED RE-EXPORT
+- options type in other module, re-exported by name through barrel
+- seeded adaptor callable; guard followed re-export and failed naming chain
+- fixture removed; PASS
+
+2-F4 RECURSIVE PROJECT TYPE GRAPH
+- nested object, type alias, extended interface, union, intersection,
+  generic wrapper all reached seeded mechanism members
+  (executor/loader/writer/verifier/bindings)
+- fixture removed; PASS
+
+2-F5 FALSE-POSITIVE BOUNDARY
+- clean repo: findings []; gitContext on all four options types; parameter
+  roots include PreparedChange/EditAuthorization/MultiFilePlan/
+  ResolvedProjectConfig; Buffer/Uint8Array-bearing params present without
+  findings
+- synthetic external .d.ts ExternalBlob.danger treated as boundary (no finding)
+- ownership decision corrupted → danger surfaced; analyzer candidate bytes
+  restored (§1.5 B); PASS
+
+2-F6 APPROVED EXCEPTION MODEL
+- canonical PUBLIC_AUTHORITY_APPROVED_EXCEPTIONS remains empty
+- synthetic exact function+parameter+member exception permits only that member
+- wildcard / missing rationale / broader parameter / sibling member rejected
+- no real exception added
+
+2-F7 STRUCTURAL LEGACY-MECHANISM FALSIFICATION
+- useLegacyEnumeratedDiscovery=true
+- under authorityOps corruption: no finding for AuthorizePreparedChangeOptions
+  (2-F1 regression fails to detect); authorizePreparedChange absent from
+  legacy callables
+- future fixture function absent from enumerated set (2-F2 fails)
+- structural completeness: legacy callable coverage incomplete vs derived
+- candidate analyzer bytes restored (§1.5 B); focused PASS
+
+No falsification errored before its intended assertion.
+No mechanism-shaped member other than seeded corruptions was discovered on
+the clean public surface.
+
+## F-R1-002 disposition
+
+Cast-read form detected only by the P4 runtime proof remains governed by
+GAP-005 (ACCEPTED_PERMANENT hostile casts). No new gap. Declaration guard
+not expanded toward defeating arbitrary hostile casts (operator D4).
+
+## GAP-058
+
+Recorded OPEN at Stage 0. Derived walker scoped to editing barrel only.
+Package-root expansion not implemented (operator D2).
+
+## Totals / dependencies / gates
+
+Baseline runtime total at ecda537: 612
+Stage 1 runtime total: 619 PASS (7 permanent derived-walker proofs added)
+
+Runtime dependencies: 0 (unchanged)
+typescript remains a devDependency only
+
+src/ diff scan for Stage 1 candidate: empty (no path under src/ changed)
+Historical reports: unchanged
+
+npm run check (Stage 1 final):
+- attempt history prior to analyzer program-narrowing included unconstrained-worker
+  and default-5s timeouts under load (recorded honestly in working notes; not a
+  product failure class beyond the existing flake)
+- final gate after barrel-rooted program narrowing: PASS
+  - typecheck PASS
+  - build PASS
+  - tests 619/619 PASS
+  - cli:smoke PASS
+  - ledger:verify PASS at Stage 0 HEAD (pre-Stage-1-commit)
+
+## NOT VALIDATED
+
+- the correction is not independently audited by this pass; a fresh executor
+  must re-run R1 Stage 3 in full
+- package-root callable-surface coverage is not implemented (GAP-058)
+- hostile TypeScript casts and cast-read forms remain outside declaration-guard
+  responsibility (GAP-005); the runtime P4 layer owns them (F-R1-002)
+- auditor independence remains ASSERTED, not mechanically proven (GAP-055)
+- the false statement in hardening report §9 remains in that immutable report;
+  it is corrected only by this pass's report and GAP-057's description
+- single host (darwin, Node); no live Windows validation (GAP-002)
+- residual filesystem races remain (GAP-035, GAP-036, GAP-037, GAP-044,
+  GAP-045)
+- no rollback, no delete, no directory creation
+- npm run check timing behavior remains an unconstrained-worker flake
+- Foundation §10 audit not run; Phase 4 absent
+- a guard that derives coverage is not a proof that no authority can leak; it
+  is a proof that declared public option graphs are inspected
+- vitest worker RPC timeout observed once during a long parallel architecture
+  run after all assertions already passed; not treated as a product defect

@@ -1,21 +1,27 @@
 /**
  * Constitution Amendment 1 standing guard — public authority surfaces.
  *
- * Practical implementation with existing typescript/vitest tooling (no new runtime deps):
- * package exports map, public editing barrel source, public option types,
- * public wrapper hidden-input patterns, and approved-exception allowlist.
+ * Phase 3-R2: discovery is derived from the editing barrel via the canonical
+ * TypeScript Program/TypeChecker analyzer. Legacy enumerated three-type
+ * discovery is retired as the coverage mechanism. Cheap barrel-source regex
+ * bans (fsOps / targetOps / WithDependencies) are retained as additional
+ * checks only.
  */
 
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { PUBLIC_AUTHORITY_APPROVED_EXCEPTIONS } from "./public-authority-approved-exceptions.js";
+import {
+  analyzePublicAuthoritySurface,
+  architectureTestsRepoRoot,
+} from "./public-authority-surface-analyzer.js";
+import { withPublicAuthoritySrcLock } from "./public-authority-src-lock.js";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const repoRoot = architectureTestsRepoRoot();
 
 function readRepo(relativePath: string): string {
   return readFileSync(join(repoRoot, relativePath), "utf8");
@@ -49,40 +55,6 @@ function extractExportedNames(barrelSource: string): string[] {
     }
   }
   return names;
-}
-
-function optionTypePropertyNames(
-  sourceText: string,
-  typeName: string,
-): string[] {
-  const source = ts.createSourceFile(
-    "module.ts",
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
-  const props: string[] = [];
-  const visit = (node: ts.Node): void => {
-    if (
-      ts.isTypeAliasDeclaration(node) &&
-      node.name.text === typeName &&
-      ts.isTypeLiteralNode(node.type)
-    ) {
-      for (const member of node.type.members) {
-        if (ts.isPropertySignature(member) && member.name !== undefined) {
-          if (ts.isIdentifier(member.name)) {
-            props.push(member.name.text);
-          } else if (ts.isStringLiteral(member.name)) {
-            props.push(member.name.text);
-          }
-        }
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return props;
 }
 
 function publicWrapperReadsForbiddenInput(
@@ -119,7 +91,10 @@ function publicWrapperReadsForbiddenInput(
     .map((pattern) => pattern.source);
 }
 
-describe("public authority surface — Amendment 1 standing guard", () => {
+describe(
+  "public authority surface — Amendment 1 standing guard",
+  { timeout: 60_000 },
+  () => {
   it("package exports map exposes only the root specifier", () => {
     const exportsMap = parsePackageExports();
     expect(Object.keys(exportsMap)).toEqual(["."]);
@@ -140,20 +115,49 @@ describe("public authority surface — Amendment 1 standing guard", () => {
     expect(barrel).not.toMatch(/WithDependencies/);
   });
 
-  it("public option types lack fsOps and targetOps", () => {
-    const replaceSource = readRepo("src/editing/replace-existing-file.ts");
-    const createSource = readRepo("src/editing/create-file.ts");
-    const multiTypes = readRepo("src/editing/multi-file-types.ts");
+  it("derived walker covers complete public editing parameter/options surfaces", () => {
+    withPublicAuthoritySrcLock(() => {
+    const analysis = analyzePublicAuthoritySurface({
+      repoRoot,
+      exceptions: PUBLIC_AUTHORITY_APPROVED_EXCEPTIONS,
+    });
 
-    expect(optionTypePropertyNames(replaceSource, "ReplaceExistingFileOptions")).toEqual([
-      "gitContext",
+    // Structural completeness: export-driven callable census (not a name list).
+    expect(analysis.exportedCallables).toEqual(
+      expect.arrayContaining([
+        "authorizePreparedChange",
+        "replaceExistingFile",
+        "createFile",
+        "executeMultiFilePlan",
+        "prepareModifyExistingFile",
+        "prepareCreateFile",
+        "createMultiFilePlan",
+        "explicitEditApproval",
+      ]),
+    );
+    expect(analysis.exportedCallables.length).toBeGreaterThanOrEqual(8);
+
+    // Original three option types plus the authority-issuing fourth are covered
+    // by the derived walker (names retained so P2/P3 still observe them).
+    const typeNames = new Set(analysis.manifest.map((m) => m.typeName));
+    expect(typeNames.has("ReplaceExistingFileOptions")).toBe(true);
+    expect(typeNames.has("CreateFileOptions")).toBe(true);
+    expect(typeNames.has("ExecuteMultiFilePlanOptions")).toBe(true);
+    expect(typeNames.has("AuthorizePreparedChangeOptions")).toBe(true);
+
+    const gitContextMembers = analysis.manifest.filter(
+      (m) => m.memberPath === "gitContext",
+    );
+    expect(gitContextMembers.map((m) => m.typeName).sort()).toEqual([
+      "AuthorizePreparedChangeOptions",
+      "CreateFileOptions",
+      "ExecuteMultiFilePlanOptions",
+      "ReplaceExistingFileOptions",
     ]);
-    expect(optionTypePropertyNames(createSource, "CreateFileOptions")).toEqual([
-      "gitContext",
-    ]);
-    expect(
-      optionTypePropertyNames(multiTypes, "ExecuteMultiFilePlanOptions"),
-    ).toEqual(["gitContext"]);
+
+    expect(analysis.findings).toEqual([]);
+    expect(PUBLIC_AUTHORITY_APPROVED_EXCEPTIONS).toHaveLength(0);
+    });
   });
 
   it("public wrappers do not read options.fsOps, options.targetOps, or arguments[", () => {
