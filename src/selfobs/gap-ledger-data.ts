@@ -910,13 +910,15 @@ const GAP_LEDGER_V1: GapLedger = {
         "authorizePreparedChange is exported from the public editing barrel and issues authorization. Its options type is declared in src/editing/types.ts and re-exported by name. The standing guard hardcodes three option types in three files, performs no export-driven census and no recursive type-graph traversal, and never inspects that type. An authority-bearing callable member added to it was not detected by the guard, the P1–P14 suite, or the full test suite. Hardening report §9 recorded the standing-guard deferral as scoped \"beyond the Phase 3 editing option types already guarded\", which is false for this type and masked the omission during the first audit. After R2, discovery was derived but recursive traversal remained gated on parameterName === 'options' or a /Options$/ type-name pattern, leaving 24 of 28 public parameter roots uninspected.",
       proposedClass: "BLOCKING_INVARIANT",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       missingEvidence:
         "export-driven public-surface discovery; named re-export resolution; recursive cycle-safe project type-graph traversal; detection of the auditor's exact authorityOps corruption; detection of an unlisted future public options type; preserved legitimate data/context; immutable corrective evidence; unconditional structural traversal of every derived public parameter root with explicit dispositions",
       closureCondition:
         "the standing guard derives its coverage from the complete supported public editing surface rather than an enumerated list; follows named re-exports and project-defined parameter graphs; fails on the auditor's corruption naming the function, the type and the member; fails on a new unlisted public options type; passes legitimate data and context; every falsification corrupts, fails for the intended reason, restores exactly, and passes; every derived public parameter root receives exactly one explicit structural disposition; no root is skipped by parameter name or type-name pattern; an adversarially named parameter and type carrying a mechanism-substitution member is detected.",
+      closedByCommit: "c6b922c8dc4950e7f0da8ff34fceaee132495c76",
+      closureEvidence: "docs/reports/PHASE_3_R2_H1_TRAVERSAL_REPORT.md",
       notes:
-        "Closed at 4aadb06047173b09cfceee542f140ad6fce7b06f with evidence docs/reports/PHASE_3_R2_CORRECTION_REPORT.md. Independent re-audit at c60c78254ce273235921694faac57ec5e4a30d5f (F-R1-003) proved that closure evidence insufficient: recursive traversal remained gated on parameter/type naming, so 'follows project-defined parameter graphs' was not met. Prior closure commits remain immutable. Reopened by Phase 3-R2-H1.",
+        "First closure at 4aadb06047173b09cfceee542f140ad6fce7b06f / docs/reports/PHASE_3_R2_CORRECTION_REPORT.md was superseded as insufficient by independent re-audit c60c78254ce273235921694faac57ec5e4a30d5f (F-R1-003). Re-closed by Phase 3-R2-H1 Stage 1 c6b922c8dc4950e7f0da8ff34fceaee132495c76 against unconditional structural traversal proven by H1-F1, H1-F2, H1-F3 and H1-F7. No active leak ever existed. Prior closure commits remain immutable.",
     },
     {
       id: "GAP-058",

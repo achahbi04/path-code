@@ -1054,11 +1054,15 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Required condition to close:** export-driven public-surface discovery; named re-export resolution; recursive cycle-safe project type-graph traversal; detection of the auditor's exact authorityOps corruption; detection of an unlisted future public options type; preserved legitimate data/context; immutable corrective evidence; unconditional structural traversal of every derived public parameter root with explicit dispositions
 
-**Notes:** Closed at 4aadb06047173b09cfceee542f140ad6fce7b06f with evidence docs/reports/PHASE_3_R2_CORRECTION_REPORT.md. Independent re-audit at c60c78254ce273235921694faac57ec5e4a30d5f (F-R1-003) proved that closure evidence insufficient: recursive traversal remained gated on parameter/type naming, so 'follows project-defined parameter graphs' was not met. Prior closure commits remain immutable. Reopened by Phase 3-R2-H1.
+**Closed by checkpoint:** `c6b922c8dc4950e7f0da8ff34fceaee132495c76`
+
+**Evidence:** docs/reports/PHASE_3_R2_H1_TRAVERSAL_REPORT.md
+
+**Notes:** First closure at 4aadb06047173b09cfceee542f140ad6fce7b06f / docs/reports/PHASE_3_R2_CORRECTION_REPORT.md was superseded as insufficient by independent re-audit c60c78254ce273235921694faac57ec5e4a30d5f (F-R1-003). Re-closed by Phase 3-R2-H1 Stage 1 c6b922c8dc4950e7f0da8ff34fceaee132495c76 against unconditional structural traversal proven by H1-F1, H1-F2, H1-F3 and H1-F7. No active leak ever existed. Prior closure commits remain immutable.
 
 ---
 
