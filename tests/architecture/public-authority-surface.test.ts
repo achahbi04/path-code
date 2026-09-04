@@ -18,7 +18,12 @@ import { PUBLIC_AUTHORITY_APPROVED_EXCEPTIONS } from "./public-authority-approve
 import {
   analyzePublicAuthoritySurface,
   architectureTestsRepoRoot,
+  clearRepositoryTypeScriptProgramCache,
+  discoveredPublicRoots,
+  manifestedDispositionRoots,
+  publicRootOccurrenceKey,
 } from "./public-authority-surface-analyzer.js";
+import { reviewedTerminalIdentity } from "./public-authority-reviewed-terminals.js";
 import { withPublicAuthoritySrcLock } from "./public-authority-src-lock.js";
 
 const repoRoot = architectureTestsRepoRoot();
@@ -117,6 +122,7 @@ describe(
 
   it("derived walker covers complete public editing parameter/options surfaces", () => {
     withPublicAuthoritySrcLock(() => {
+    clearRepositoryTypeScriptProgramCache();
     const analysis = analyzePublicAuthoritySurface({
       repoRoot,
       exceptions: PUBLIC_AUTHORITY_APPROVED_EXCEPTIONS,
@@ -157,6 +163,28 @@ describe(
 
     expect(analysis.findings).toEqual([]);
     expect(PUBLIC_AUTHORITY_APPROVED_EXCEPTIONS).toHaveLength(0);
+
+    // Disposition completeness: every discovered public root has exactly one
+    // root disposition (no naming-gate skips). Counts are derived, not hardcoded.
+    const discovered = discoveredPublicRoots(analysis);
+    const manifested = manifestedDispositionRoots(analysis);
+    expect(manifested.map(publicRootOccurrenceKey).sort()).toEqual(
+      discovered.map(publicRootOccurrenceKey).sort(),
+    );
+    expect(analysis.programConstructionCount).toBeLessThanOrEqual(1);
+
+    const workspaceIdentity = reviewedTerminalIdentity({
+      declarationPath: "src/domain/workspace.ts",
+      symbolName: "WorkspaceBoundary",
+      declarationKind: "interface",
+    });
+    const workspaceRoots = manifested.filter(
+      (d) => d.canonicalTypeIdentity === workspaceIdentity,
+    );
+    expect(workspaceRoots.length).toBeGreaterThanOrEqual(1);
+    expect(
+      workspaceRoots.every((d) => d.disposition === "REVIEWED_TERMINAL"),
+    ).toBe(true);
     });
   });
 

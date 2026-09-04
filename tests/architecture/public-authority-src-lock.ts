@@ -24,7 +24,7 @@ export function withPublicAuthoritySrcLock<T>(fn: () => T): T {
   mkdirSync(join(architectureTestsRepoRoot(), "node_modules/.cache"), {
     recursive: true,
   });
-  const deadline = Date.now() + 120_000;
+  const deadline = Date.now() + 300_000;
   let fd: number | undefined;
   while (fd === undefined) {
     try {

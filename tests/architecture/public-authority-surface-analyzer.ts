@@ -1,9 +1,11 @@
 /**
- * Canonical public authority-surface analyzer (Phase 3-R2).
+ * Canonical public authority-surface analyzer (Phase 3-R2 / R2-H1).
  *
  * Discovery is driven by the TypeScript Program / TypeChecker from the editing
- * barrel export surface. Standing guard and permanent proofs MUST call this
- * module — do not duplicate the rule set elsewhere.
+ * barrel export surface. Every public parameter root is traversed or explicitly
+ * classified terminal — never skipped by parameter/type naming. Standing guard
+ * and permanent proofs MUST call this module — do not duplicate the rule set
+ * elsewhere.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -13,6 +15,12 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 import type { PublicAuthorityApprovedException } from "./public-authority-approved-exceptions.js";
+import {
+  PUBLIC_AUTHORITY_REVIEWED_TERMINALS,
+  reviewedTerminalIdentity,
+  type ReviewedTerminalDeclarationKind,
+  type ReviewedTerminalEntry,
+} from "./public-authority-reviewed-terminals.js";
 
 const DEFAULT_BARREL = "src/editing/index.ts";
 
@@ -35,10 +43,39 @@ export type PublicAuthorityFinding = {
   readonly reason: string;
 };
 
+/** Closed disposition vocabulary — no seventh value. */
+export type TraversalDisposition =
+  | "TRAVERSED_PROJECT_GRAPH"
+  | "PRIMITIVE_TERMINAL"
+  | "EXTERNAL_LIBRARY_TERMINAL"
+  | "REVIEWED_TERMINAL"
+  | "CALLABLE_REJECTED"
+  | "UNSAFE_ESCAPE_REJECTED";
+
+export type DispositionRecord = {
+  readonly exportName: string;
+  readonly signatureIndex: number;
+  readonly parameterIndex: number;
+  readonly parameterName: string;
+  /** Canonical resolved type identity (repo path + symbol + kind, or structural). */
+  readonly canonicalTypeIdentity: string;
+  readonly typePath: string;
+  readonly memberPath: string;
+  readonly typeName: string;
+  readonly disposition: TraversalDisposition;
+};
+
 export type PublicAuthorityAnalysis = {
   readonly exportedCallables: readonly string[];
   readonly manifest: readonly DerivedMemberRecord[];
   readonly findings: readonly PublicAuthorityFinding[];
+  readonly dispositions: readonly DispositionRecord[];
+  /**
+   * Number of TypeScript Programs constructed during this invocation.
+   * At most one when `program` is not supplied (0 on cache hit, 1 on create).
+   * 0 when a prebuilt `program` is supplied.
+   */
+  readonly programConstructionCount: number;
 };
 
 export type AnalyzePublicAuthorityOptions = {
@@ -61,6 +98,18 @@ export type AnalyzePublicAuthorityOptions = {
    * the derived walker (2-F7 structural falsification only).
    */
   readonly useLegacyEnumeratedDiscovery?: boolean;
+  /**
+   * When true, restore the exact R2 naming gate that skipped non-options roots
+   * (H1-F7 falsification only). Default false. Under the legacy gate, only
+   * deep-inspected roots receive dispositions; skipped roots remain in
+   * discoveredPublicRoots / manifest but lack root dispositions.
+   */
+  readonly useLegacyNamingGate?: boolean;
+  /**
+   * Override reviewed-terminal registry (H1-F5 falsification only).
+   * Default: PUBLIC_AUTHORITY_REVIEWED_TERMINALS.
+   */
+  readonly reviewedTerminals?: readonly ReviewedTerminalEntry[];
 };
 
 const MECHANISM_NAME =
@@ -92,13 +141,22 @@ function compareFinding(a: PublicAuthorityFinding, b: PublicAuthorityFinding): n
   );
 }
 
+function compareDisposition(a: DispositionRecord, b: DispositionRecord): number {
+  return (
+    stableCompare(a.exportName, b.exportName) ||
+    a.signatureIndex - b.signatureIndex ||
+    a.parameterIndex - b.parameterIndex ||
+    stableCompare(a.parameterName, b.parameterName) ||
+    stableCompare(a.typePath, b.typePath) ||
+    stableCompare(a.memberPath, b.memberPath) ||
+    stableCompare(a.disposition, b.disposition) ||
+    stableCompare(a.canonicalTypeIdentity, b.canonicalTypeIdentity)
+  );
+}
+
 const programCache = new Map<string, ts.Program>();
 
-export function loadRepositoryTypeScriptProgram(repoRoot: string): ts.Program {
-  const cached = programCache.get(repoRoot);
-  if (cached !== undefined) {
-    return cached;
-  }
+function createRepositoryTypeScriptProgram(repoRoot: string): ts.Program {
   const configPath = ts.findConfigFile(
     repoRoot,
     (p) => existsSync(p),
@@ -127,12 +185,31 @@ export function loadRepositoryTypeScriptProgram(repoRoot: string): ts.Program {
   // Root the program at the editing barrel so the TypeChecker pulls only the
   // reachable project graph — far cheaper than the full tsconfig file list.
   const barrel = resolve(repoRoot, DEFAULT_BARREL);
-  const program = ts.createProgram({
+  return ts.createProgram({
     rootNames: [barrel],
     options: { ...parsed.options, noEmit: true },
   });
+}
+
+/**
+ * Load (or return cached) repository Program. Prefer
+ * `loadRepositoryTypeScriptProgramWithMeta` when construction must be counted.
+ */
+export function loadRepositoryTypeScriptProgram(repoRoot: string): ts.Program {
+  return loadRepositoryTypeScriptProgramWithMeta(repoRoot).program;
+}
+
+function loadRepositoryTypeScriptProgramWithMeta(repoRoot: string): {
+  readonly program: ts.Program;
+  readonly constructed: boolean;
+} {
+  const cached = programCache.get(repoRoot);
+  if (cached !== undefined) {
+    return { program: cached, constructed: false };
+  }
+  const program = createRepositoryTypeScriptProgram(repoRoot);
   programCache.set(repoRoot, program);
-  return program;
+  return { program, constructed: true };
 }
 
 /** Drop cached programs after temporary src/ corruption or restore. */
@@ -210,6 +287,125 @@ function symbolDeclaringFile(symbol: ts.Symbol | undefined): string | undefined 
   return decl?.getSourceFile().fileName;
 }
 
+function declarationKindOf(
+  symbol: ts.Symbol,
+): ReviewedTerminalDeclarationKind | undefined {
+  for (const decl of symbol.declarations ?? []) {
+    if (ts.isInterfaceDeclaration(decl)) return "interface";
+    if (ts.isClassDeclaration(decl)) return "class";
+    if (ts.isTypeAliasDeclaration(decl)) return "type-alias";
+    if (ts.isEnumDeclaration(decl)) return "enum";
+  }
+  return undefined;
+}
+
+function repoRelativePath(repoRoot: string, absolutePath: string): string {
+  return relative(resolve(repoRoot), resolve(absolutePath)).split(sep).join("/");
+}
+
+/**
+ * Canonical identity after alias resolution. Anonymous types use a stable
+ * declaration-location + structural key and can never match the reviewed
+ * terminal registry.
+ */
+function canonicalTypeIdentity(
+  type: ts.Type,
+  checker: ts.TypeChecker,
+  repoRoot: string,
+): string {
+  if (isPrimitiveType(type)) {
+    return `primitive:${checker.typeToString(type)}`;
+  }
+  if (type.flags & ts.TypeFlags.TypeParameter) {
+    const name = type.getSymbol()?.getName() ?? checker.typeToString(type);
+    return `type-param:${name}`;
+  }
+
+  let symbol = type.aliasSymbol ?? type.getSymbol();
+  if (symbol !== undefined) {
+    symbol = resolveAlias(symbol, checker);
+  }
+
+  if (symbol !== undefined) {
+    const name = String(symbol.escapedName);
+    if (name === "__type" || isAnonymousObjectType(type)) {
+      const decl = symbol.declarations?.[0];
+      const loc =
+        decl !== undefined
+          ? `${repoRelativePath(repoRoot, decl.getSourceFile().fileName)}:${decl.pos}`
+          : "unknown";
+      // Do not embed typeToString — recursive anonymous shapes can overflow.
+      return `anon:${loc}`;
+    }
+    const file = symbolDeclaringFile(symbol);
+    const kind = declarationKindOf(symbol);
+    if (file !== undefined && kind !== undefined) {
+      return reviewedTerminalIdentity({
+        declarationPath: repoRelativePath(repoRoot, file),
+        symbolName: symbol.getName(),
+        declarationKind: kind,
+      });
+    }
+    if (file !== undefined) {
+      return `${repoRelativePath(repoRoot, file)}#${symbol.getName()}#unknown`;
+    }
+  }
+
+  return `ty:${checker.typeToString(type)}`;
+}
+
+function isPrimitiveType(type: ts.Type): boolean {
+  // Exclude NonPrimitive ("object") — not a scalar terminal.
+  const flags = type.flags & ~ts.TypeFlags.NonPrimitive;
+  if (
+    flags &
+    (ts.TypeFlags.String |
+      ts.TypeFlags.Number |
+      ts.TypeFlags.Boolean |
+      ts.TypeFlags.BigInt |
+      ts.TypeFlags.ESSymbol |
+      ts.TypeFlags.UniqueESSymbol |
+      ts.TypeFlags.Null |
+      ts.TypeFlags.Undefined |
+      ts.TypeFlags.Void |
+      ts.TypeFlags.Never |
+      ts.TypeFlags.StringLiteral |
+      ts.TypeFlags.NumberLiteral |
+      ts.TypeFlags.BooleanLiteral |
+      ts.TypeFlags.BigIntLiteral |
+      ts.TypeFlags.Enum |
+      ts.TypeFlags.EnumLiteral |
+      ts.TypeFlags.TemplateLiteral)
+  ) {
+    // Object-flagged types are only primitive when they are enum/literal.
+    if (type.flags & ts.TypeFlags.Object) {
+      return (
+        (type.flags &
+          (ts.TypeFlags.Enum |
+            ts.TypeFlags.EnumLiteral |
+            ts.TypeFlags.StringLiteral |
+            ts.TypeFlags.NumberLiteral |
+            ts.TypeFlags.BooleanLiteral |
+            ts.TypeFlags.BigIntLiteral)) !==
+        0
+      );
+    }
+    return true;
+  }
+  const intrinsic = (type as { intrinsicName?: string }).intrinsicName;
+  return (
+    intrinsic === "string" ||
+    intrinsic === "number" ||
+    intrinsic === "boolean" ||
+    intrinsic === "bigint" ||
+    intrinsic === "symbol" ||
+    intrinsic === "null" ||
+    intrinsic === "undefined" ||
+    intrinsic === "void" ||
+    intrinsic === "never"
+  );
+}
+
 function isProjectType(
   type: ts.Type,
   _checker: ts.TypeChecker,
@@ -284,55 +480,181 @@ function pushFinding(
   findings.push(finding);
 }
 
+function reviewedTerminalsAreInvalid(
+  entries: readonly ReviewedTerminalEntry[],
+): PublicAuthorityFinding | undefined {
+  for (const entry of entries) {
+    if (
+      entry.declarationPath.includes("*") ||
+      entry.symbolName.includes("*") ||
+      entry.declarationPath.includes("?") ||
+      entry.symbolName.includes("?") ||
+      /[\[\]{}()|]/.test(entry.declarationPath) ||
+      /[\[\]{}()|]/.test(entry.symbolName) ||
+      entry.symbolName === "__type" ||
+      entry.symbolName.length === 0 ||
+      entry.declarationPath.length === 0
+    ) {
+      return {
+        functionName: "(reviewed-terminal-registry)",
+        parameterName: entry.symbolName || "*",
+        memberPath: entry.declarationPath || "*",
+        typeName: entry.symbolName,
+        typePath: reviewedTerminalIdentity(entry),
+        reason:
+          "reviewed terminal wildcard/pattern/anonymous entries are forbidden",
+      };
+    }
+  }
+  return undefined;
+}
+
+function buildReviewedTerminalMap(
+  entries: readonly ReviewedTerminalEntry[],
+): Map<string, ReviewedTerminalEntry> {
+  const map = new Map<string, ReviewedTerminalEntry>();
+  for (const entry of entries) {
+    map.set(reviewedTerminalIdentity(entry), entry);
+  }
+  return map;
+}
+
+type WalkContext = {
+  readonly functionName: string;
+  readonly parameterName: string;
+  readonly typePath: string;
+  readonly typeName: string;
+  readonly memberPath: string;
+  readonly visited: Set<string>;
+  /** Active recursion stack keyed by canonical type identity (cycle break). */
+  readonly traversalStack: Set<string>;
+  readonly isProjectSourceFile: (fileName: string) => boolean;
+  readonly exceptions: readonly PublicAuthorityApprovedException[];
+  readonly findings: PublicAuthorityFinding[];
+  readonly manifest: DerivedMemberRecord[];
+  readonly dispositions: DispositionRecord[];
+  readonly signatureIndex: number;
+  readonly parameterIndex: number;
+  readonly repoRoot: string;
+  readonly reviewedByIdentity: ReadonlyMap<string, ReviewedTerminalEntry>;
+};
+
+function pushDisposition(
+  ctx: WalkContext,
+  type: ts.Type,
+  checker: ts.TypeChecker,
+  disposition: TraversalDisposition,
+): void {
+  ctx.dispositions.push({
+    exportName: ctx.functionName,
+    signatureIndex: ctx.signatureIndex,
+    parameterIndex: ctx.parameterIndex,
+    parameterName: ctx.parameterName,
+    canonicalTypeIdentity: canonicalTypeIdentity(type, checker, ctx.repoRoot),
+    typePath: ctx.typePath,
+    memberPath: ctx.memberPath,
+    typeName: ctx.typeName,
+    disposition,
+  });
+}
+
+function inspectTypeArguments(
+  type: ts.Type,
+  checker: ts.TypeChecker,
+  ctx: WalkContext,
+): void {
+  const typeArgs =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (type as any).typeArguments ??
+    (type.flags & ts.TypeFlags.Object
+      ? checker.getTypeArguments(type as ts.TypeReference)
+      : undefined);
+  for (const arg of typeArgs ?? []) {
+    walkType(arg, checker, {
+      ...ctx,
+      typePath: `${ctx.typePath}<${typeDisplayName(arg, checker)}>`,
+      typeName: typeDisplayName(arg, checker),
+    });
+  }
+}
+
+function walkUnionOrIntersectionParts(
+  type: ts.Type,
+  checker: ts.TypeChecker,
+  ctx: WalkContext,
+): void {
+  if (!type.isUnionOrIntersection()) {
+    return;
+  }
+  for (const part of type.types) {
+    if (
+      part.flags & ts.TypeFlags.Undefined ||
+      part.flags & ts.TypeFlags.Null
+    ) {
+      continue;
+    }
+    walkType(part, checker, {
+      ...ctx,
+      typePath: `${ctx.typePath}|${checker.typeToString(part)}`,
+      typeName: typeDisplayName(part, checker),
+    });
+  }
+}
+
+/** Inspect alias target union/intersection constituents without member-graph walk. */
+function inspectAliasUnionConstituents(
+  type: ts.Type,
+  checker: ts.TypeChecker,
+  ctx: WalkContext,
+): void {
+  if (type.aliasSymbol === undefined) {
+    return;
+  }
+  const declared = checker.getDeclaredTypeOfSymbol(type.aliasSymbol);
+  if (declared.isUnionOrIntersection()) {
+    walkUnionOrIntersectionParts(unwrapNonNullish(declared), checker, ctx);
+  }
+}
+
 function walkType(
   type: ts.Type,
   checker: ts.TypeChecker,
-  ctx: {
-    readonly functionName: string;
-    readonly parameterName: string;
-    readonly typePath: string;
-    readonly typeName: string;
-    readonly memberPath: string;
-    readonly visited: Set<string>;
-    readonly isProjectSourceFile: (fileName: string) => boolean;
-    readonly exceptions: readonly PublicAuthorityApprovedException[];
-    readonly findings: PublicAuthorityFinding[];
-    readonly manifest: DerivedMemberRecord[];
-    readonly signatureIndex: number;
-    readonly parameterIndex: number;
-  },
+  ctx: WalkContext,
 ): void {
   type = unwrapNonNullish(type);
-  // Resolve type-alias unions/intersections (`type U = A | B`) without
-  // collapsing generic aliases that still carry type arguments.
-  if (type.aliasSymbol !== undefined) {
-    const declared = checker.getDeclaredTypeOfSymbol(type.aliasSymbol);
-    if (declared.isUnionOrIntersection()) {
-      type = unwrapNonNullish(declared);
-    }
-  }
-  const symbolKey = (() => {
-    const sym = type.aliasSymbol ?? type.getSymbol();
-    const rendered = checker.typeToString(type);
-    if (sym !== undefined) {
-      const name = String(sym.escapedName);
-      // Anonymous object types share the symbol name "__type"; discriminate by
-      // structural rendering so union/intersection constituents stay distinct.
-      if (name === "__type") {
-        return `anon:${rendered}`;
-      }
-      return `sym:${name}:${symbolDeclaringFile(sym) ?? ""}`;
-    }
-    return `ty:${rendered}`;
-  })();
-  const identity = `${symbolKey}@${ctx.typePath}#${ctx.memberPath}`;
-  if (ctx.visited.has(identity)) {
+
+  // Cycle / diamond key: canonical type identity only — never typeToString of a
+  // recursive alias (that can stack-overflow). Path-specific disposition is still
+  // emitted below when a type is re-encountered.
+  const typeVisitKey = canonicalTypeIdentity(type, checker, ctx.repoRoot);
+  const pathKey = `${typeVisitKey}@${ctx.typePath}#${ctx.memberPath}`;
+  if (ctx.visited.has(pathKey)) {
     return;
   }
-  ctx.visited.add(identity);
+  if (ctx.traversalStack.has(typeVisitKey)) {
+    // Self-reference along the active walk: preserve an occurrence, do not re-descend.
+    pushDisposition(ctx, type, checker, "TRAVERSED_PROJECT_GRAPH");
+    ctx.visited.add(pathKey);
+    return;
+  }
+  ctx.visited.add(pathKey);
+  ctx.traversalStack.add(typeVisitKey);
+  try {
+    walkTypeBody(type, checker, ctx);
+  } finally {
+    ctx.traversalStack.delete(typeVisitKey);
+  }
+}
+
+function walkTypeBody(
+  type: ts.Type,
+  checker: ts.TypeChecker,
+  ctx: WalkContext,
+): void {
 
   // Escape hatches on the public surface (Amendment 1 §4 D).
   if (type.flags & ts.TypeFlags.Any || type.flags & ts.TypeFlags.Unknown) {
+    pushDisposition(ctx, type, checker, "UNSAFE_ESCAPE_REJECTED");
     pushFinding(
       ctx.findings,
       {
@@ -348,70 +670,138 @@ function walkType(
     return;
   }
 
-  if (type.isUnionOrIntersection()) {
-    for (const part of type.types) {
-      if (
-        part.flags & ts.TypeFlags.Undefined ||
-        part.flags & ts.TypeFlags.Null
-      ) {
-        continue;
-      }
-      walkType(part, checker, {
+  // Unconstrained / unresolved type parameters on authority-sensitive surfaces.
+  if (type.flags & ts.TypeFlags.TypeParameter) {
+    const constraint = type.getConstraint();
+    const defaultType = type.getDefault();
+    if (constraint !== undefined) {
+      pushDisposition(ctx, type, checker, "TRAVERSED_PROJECT_GRAPH");
+      walkType(constraint, checker, {
         ...ctx,
-        typePath: `${ctx.typePath}|${checker.typeToString(part)}`,
+        typePath: `${ctx.typePath}:constraint`,
+        typeName: typeDisplayName(constraint, checker),
       });
+      return;
     }
+    if (defaultType !== undefined) {
+      pushDisposition(ctx, type, checker, "TRAVERSED_PROJECT_GRAPH");
+      walkType(defaultType, checker, {
+        ...ctx,
+        typePath: `${ctx.typePath}:default`,
+        typeName: typeDisplayName(defaultType, checker),
+      });
+      return;
+    }
+    pushDisposition(ctx, type, checker, "UNSAFE_ESCAPE_REJECTED");
+    pushFinding(
+      ctx.findings,
+      {
+        functionName: ctx.functionName,
+        parameterName: ctx.parameterName,
+        memberPath: ctx.memberPath || ctx.parameterName,
+        typeName: ctx.typeName,
+        typePath: ctx.typePath,
+        reason:
+          "unconstrained/unresolved type parameter on authority-sensitive public surface",
+      },
+      ctx.exceptions,
+    );
     return;
   }
 
+  if (isPrimitiveType(type)) {
+    pushDisposition(ctx, type, checker, "PRIMITIVE_TERMINAL");
+    return;
+  }
+
+  // Reviewed / external classification MUST use the pre-collapse symbol so
+  // external aliases like ArrayBufferLike are not mislabeled TRAVERSED after
+  // expanding to a union. Type arguments and alias constituents are inspected
+  // first so containers cannot hide project-owned structure.
+  const canon = canonicalTypeIdentity(type, checker, ctx.repoRoot);
+  const reviewed = ctx.reviewedByIdentity.get(canon);
+  if (reviewed !== undefined && !isAnonymousObjectType(type)) {
+    inspectTypeArguments(type, checker, ctx);
+    inspectAliasUnionConstituents(type, checker, ctx);
+    pushDisposition(ctx, type, checker, "REVIEWED_TERMINAL");
+    return;
+  }
+
+  const anonymous = isAnonymousObjectType(type);
+  const projectOwned = isProjectType(type, checker, ctx.isProjectSourceFile);
+  if (!projectOwned) {
+    if (!anonymous) {
+      inspectTypeArguments(type, checker, ctx);
+      inspectAliasUnionConstituents(type, checker, ctx);
+      if (type.isUnionOrIntersection()) {
+        walkUnionOrIntersectionParts(type, checker, ctx);
+      } else if (checker.isArrayType(type) || checker.isTupleType(type)) {
+        const typeArgs =
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (type as any).typeArguments ??
+          checker.getTypeArguments(type as ts.TypeReference);
+        for (const arg of typeArgs ?? []) {
+          walkType(arg, checker, {
+            ...ctx,
+            typePath: `${ctx.typePath}[]`,
+            typeName: typeDisplayName(arg, checker),
+          });
+        }
+      }
+      pushDisposition(ctx, type, checker, "EXTERNAL_LIBRARY_TERMINAL");
+      return;
+    }
+    const anonFile = symbolDeclaringFile(type.getSymbol());
+    if (anonFile !== undefined && !ctx.isProjectSourceFile(anonFile)) {
+      pushDisposition(ctx, type, checker, "EXTERNAL_LIBRARY_TERMINAL");
+      return;
+    }
+  }
+
+  // Project-defined: resolve type-alias unions/intersections (`type U = A | B`)
+  // without collapsing generic aliases that still carry type arguments.
+  if (type.aliasSymbol !== undefined) {
+    const declared = checker.getDeclaredTypeOfSymbol(type.aliasSymbol);
+    if (declared.isUnionOrIntersection()) {
+      type = unwrapNonNullish(declared);
+    }
+  }
+
+  if (type.isUnionOrIntersection()) {
+    pushDisposition(ctx, type, checker, "TRAVERSED_PROJECT_GRAPH");
+    walkUnionOrIntersectionParts(type, checker, ctx);
+    return;
+  }
+
+  // Arrays / tuples: inspect element types; project arrays are traversed as
+  // structural containers (elements already walked).
   if (checker.isArrayType(type) || checker.isTupleType(type)) {
     const typeArgs =
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (type as any).typeArguments ??
       checker.getTypeArguments(type as ts.TypeReference);
     for (const arg of typeArgs ?? []) {
-      if (isProjectType(arg, checker, ctx.isProjectSourceFile)) {
-        walkType(arg, checker, {
-          ...ctx,
-          typePath: `${ctx.typePath}[]`,
-          typeName: typeDisplayName(arg, checker),
-        });
-      }
+      walkType(arg, checker, {
+        ...ctx,
+        typePath: `${ctx.typePath}[]`,
+        typeName: typeDisplayName(arg, checker),
+      });
     }
+    pushDisposition(ctx, type, checker, "TRAVERSED_PROJECT_GRAPH");
     return;
   }
 
-  // Generic wrappers: inspect project-defined type arguments.
-  if (type.flags & ts.TypeFlags.Object) {
-    const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
-    if (typeArgs !== undefined && typeArgs.length > 0) {
-      for (const arg of typeArgs) {
-        if (isProjectType(arg, checker, ctx.isProjectSourceFile)) {
-          walkType(arg, checker, {
-            ...ctx,
-            typePath: `${ctx.typePath}<${typeDisplayName(arg, checker)}>`,
-            typeName: typeDisplayName(arg, checker),
-          });
-        }
-      }
-    }
+  // Generic project wrappers: inspect type arguments, then members.
+  if (
+    (type.flags & ts.TypeFlags.Object) !== 0 &&
+    (checker.getTypeArguments(type as ts.TypeReference)?.length ?? 0) > 0
+  ) {
+    inspectTypeArguments(type, checker, ctx);
   }
 
-  if (!isProjectType(type, checker, ctx.isProjectSourceFile)) {
-    // External/library boundary — do not walk Buffer / Node method graphs.
-    // Anonymous object literals that appear as union/intersection constituents
-    // of project aliases are still walked (they are user-defined shapes).
-    if (!isAnonymousObjectType(type)) {
-      return;
-    }
-    const anonFile = symbolDeclaringFile(type.getSymbol());
-    if (anonFile !== undefined && !ctx.isProjectSourceFile(anonFile)) {
-      return;
-    }
-  }
+  // Project-defined structural type — traverse members / bases.
+  pushDisposition(ctx, type, checker, "TRAVERSED_PROJECT_GRAPH");
 
-  const symbol = type.aliasSymbol ?? type.getSymbol();
-  // Interface extends chains.
   const bases = type.getBaseTypes?.() ?? [];
   for (const base of bases) {
     walkType(base, checker, {
@@ -422,10 +812,7 @@ function walkType(
   }
 
   // Resolve alias target when the alias itself has no properties.
-  if (
-    type.aliasSymbol !== undefined &&
-    type.getProperties().length === 0
-  ) {
+  if (type.aliasSymbol !== undefined && type.getProperties().length === 0) {
     const resolved = checker.getDeclaredTypeOfSymbol(type.aliasSymbol);
     if (resolved !== type) {
       walkType(resolved, checker, ctx);
@@ -447,10 +834,28 @@ function walkType(
       },
       ctx.exceptions,
     );
+    // Index signature is an unsafe escape on this node; record a linked
+    // rejection disposition in addition to the TRAVERSED ancestor path via a
+    // synthetic child occurrence so the root/ancestor disposition stays.
+    ctx.dispositions.push({
+      exportName: ctx.functionName,
+      signatureIndex: ctx.signatureIndex,
+      parameterIndex: ctx.parameterIndex,
+      parameterName: ctx.parameterName,
+      canonicalTypeIdentity: `${canon}#index`,
+      typePath: `${ctx.typePath}#index`,
+      memberPath: ctx.memberPath,
+      typeName: ctx.typeName,
+      disposition: "UNSAFE_ESCAPE_REJECTED",
+    });
   }
 
   for (const prop of type.getProperties()) {
     const propName = prop.getName();
+    // Skip well-known symbol properties (iterators) — not caller substitution.
+    if (propName.startsWith("__@")) {
+      continue;
+    }
     const memberPath =
       ctx.memberPath.length === 0 ? propName : `${ctx.memberPath}.${propName}`;
     const propType = checker.getTypeOfSymbol(prop);
@@ -465,7 +870,9 @@ function walkType(
       typeName: ctx.typeName,
     });
 
+    let rejected = false;
     if (hasUserDefinedCallSignatures(propType)) {
+      rejected = true;
       pushFinding(
         ctx.findings,
         {
@@ -481,6 +888,7 @@ function walkType(
     }
 
     if (mechanismNameHit(propName)) {
+      rejected = true;
       // Amendment 1 §4 D — operation / adaptor / bindings / executor / loader /
       // reader / writer / verifier (and *Ops) shapes on the public surface.
       pushFinding(
@@ -497,21 +905,36 @@ function walkType(
       );
     }
 
+    if (rejected) {
+      ctx.dispositions.push({
+        exportName: ctx.functionName,
+        signatureIndex: ctx.signatureIndex,
+        parameterIndex: ctx.parameterIndex,
+        parameterName: ctx.parameterName,
+        canonicalTypeIdentity: canonicalTypeIdentity(
+          unwrapNonNullish(propType),
+          checker,
+          ctx.repoRoot,
+        ),
+        typePath: ctx.typePath,
+        memberPath,
+        typeName: ctx.typeName,
+        disposition: "CALLABLE_REJECTED",
+      });
+    }
+
     const unwrappedProp = unwrapNonNullish(propType);
+    const nestedCtx: WalkContext = {
+      ...ctx,
+      memberPath,
+      typePath: `${ctx.typePath}.${propName}`,
+      typeName: typeDisplayName(unwrappedProp, checker),
+    };
+
     if (isProjectType(unwrappedProp, checker, ctx.isProjectSourceFile)) {
-      walkType(unwrappedProp, checker, {
-        ...ctx,
-        memberPath,
-        typePath: `${ctx.typePath}.${propName}`,
-        typeName: typeDisplayName(unwrappedProp, checker),
-      });
+      walkType(unwrappedProp, checker, nestedCtx);
     } else if (unwrappedProp.isUnionOrIntersection()) {
-      walkType(unwrappedProp, checker, {
-        ...ctx,
-        memberPath,
-        typePath: `${ctx.typePath}.${propName}`,
-        typeName: typeDisplayName(unwrappedProp, checker),
-      });
+      walkType(unwrappedProp, checker, nestedCtx);
     } else if (isAnonymousObjectType(unwrappedProp)) {
       // Inline object shapes on project surfaces (e.g. authorityOps?: { issue })
       // are walked; String/Array/Buffer lib graphs are not anonymous in this sense
@@ -522,17 +945,13 @@ function walkType(
         nestedFile === undefined ||
         ctx.isProjectSourceFile(nestedFile)
       ) {
-        walkType(unwrappedProp, checker, {
-          ...ctx,
-          memberPath,
-          typePath: `${ctx.typePath}.${propName}`,
-          typeName: typeDisplayName(unwrappedProp, checker),
-        });
+        walkType(unwrappedProp, checker, nestedCtx);
         // If walkType returned immediately at the external boundary, walk
         // properties explicitly for project-owned anonymous literals.
         if (!isProjectType(unwrappedProp, checker, ctx.isProjectSourceFile)) {
           for (const nested of unwrappedProp.getProperties()) {
             const nestedName = nested.getName();
+            if (nestedName.startsWith("__@")) continue;
             const nestedPath = `${memberPath}.${nestedName}`;
             const nestedType = unwrapNonNullish(
               checker.getTypeOfSymbol(nested),
@@ -546,7 +965,9 @@ function walkType(
               memberPath: nestedPath,
               typeName: ctx.typeName,
             });
+            let nestedRejected = false;
             if (hasUserDefinedCallSignatures(nestedType)) {
+              nestedRejected = true;
               pushFinding(
                 ctx.findings,
                 {
@@ -561,6 +982,7 @@ function walkType(
               );
             }
             if (mechanismNameHit(nestedName)) {
+              nestedRejected = true;
               pushFinding(
                 ctx.findings,
                 {
@@ -574,13 +996,34 @@ function walkType(
                 ctx.exceptions,
               );
             }
+            if (nestedRejected) {
+              ctx.dispositions.push({
+                exportName: ctx.functionName,
+                signatureIndex: ctx.signatureIndex,
+                parameterIndex: ctx.parameterIndex,
+                parameterName: ctx.parameterName,
+                canonicalTypeIdentity: canonicalTypeIdentity(
+                  nestedType,
+                  checker,
+                  ctx.repoRoot,
+                ),
+                typePath: ctx.typePath,
+                memberPath: nestedPath,
+                typeName: ctx.typeName,
+                disposition: "CALLABLE_REJECTED",
+              });
+            }
           }
         }
+      } else if (!rejected) {
+        // External anonymous — classify the property type occurrence.
+        walkType(unwrappedProp, checker, nestedCtx);
       }
+    } else if (!rejected) {
+      // External / primitive property types still receive a disposition node.
+      walkType(unwrappedProp, checker, nestedCtx);
     }
   }
-
-  void symbol;
 }
 
 /**
@@ -679,6 +1122,20 @@ function legacyEnumeratedFindings(
     exportedCallables: [...exportedCallables].sort(stableCompare),
     manifest: [...manifest].sort(compareManifest),
     findings: [...findings].sort(compareFinding),
+    dispositions: [],
+    programConstructionCount: 0,
+  };
+}
+
+function emptyAnalysisWithFinding(
+  finding: PublicAuthorityFinding,
+): PublicAuthorityAnalysis {
+  return {
+    exportedCallables: [],
+    manifest: [],
+    findings: [finding],
+    dispositions: [],
+    programConstructionCount: 0,
   };
 }
 
@@ -691,6 +1148,9 @@ export function analyzePublicAuthoritySurface(
   const isProjectSourceFile =
     options.isProjectSourceFile ??
     ((fileName: string) => defaultIsProjectSourceFile(repoRoot, fileName));
+  const useLegacyNamingGate = options.useLegacyNamingGate === true;
+  const reviewedTerminalEntries =
+    options.reviewedTerminals ?? PUBLIC_AUTHORITY_REVIEWED_TERMINALS;
 
   if (options.useLegacyEnumeratedDiscovery === true) {
     return legacyEnumeratedFindings(repoRoot, exceptions);
@@ -703,45 +1163,48 @@ export function analyzePublicAuthoritySurface(
       entry.parameterName.includes("*") ||
       (entry.memberPath !== undefined && entry.memberPath.includes("*"))
     ) {
-      return {
-        exportedCallables: [],
-        manifest: [],
-        findings: [
-          {
-            functionName: entry.functionName,
-            parameterName: entry.parameterName,
-            memberPath: entry.memberPath ?? "*",
-            typeName: "",
-            typePath: "",
-            reason: "approved exception wildcards are forbidden",
-          },
-        ],
-      };
+      return emptyAnalysisWithFinding({
+        functionName: entry.functionName,
+        parameterName: entry.parameterName,
+        memberPath: entry.memberPath ?? "*",
+        typeName: "",
+        typePath: "",
+        reason: "approved exception wildcards are forbidden",
+      });
     }
     if (
       entry.governingContract.length === 0 ||
       entry.reason.length === 0 ||
       entry.targetedTest.length === 0
     ) {
-      return {
-        exportedCallables: [],
-        manifest: [],
-        findings: [
-          {
-            functionName: entry.functionName,
-            parameterName: entry.parameterName,
-            memberPath: entry.memberPath ?? "",
-            typeName: "",
-            typePath: "",
-            reason:
-              "approved exception missing governingContract, reason, or targetedTest",
-          },
-        ],
-      };
+      return emptyAnalysisWithFinding({
+        functionName: entry.functionName,
+        parameterName: entry.parameterName,
+        memberPath: entry.memberPath ?? "",
+        typeName: "",
+        typePath: "",
+        reason:
+          "approved exception missing governingContract, reason, or targetedTest",
+      });
     }
   }
 
-  const program = options.program ?? loadRepositoryTypeScriptProgram(repoRoot);
+  const reviewedInvalid = reviewedTerminalsAreInvalid(reviewedTerminalEntries);
+  if (reviewedInvalid !== undefined) {
+    return emptyAnalysisWithFinding(reviewedInvalid);
+  }
+  const reviewedByIdentity = buildReviewedTerminalMap(reviewedTerminalEntries);
+
+  let program: ts.Program;
+  let programConstructionCount = 0;
+  if (options.program !== undefined) {
+    program = options.program;
+  } else {
+    const loaded = loadRepositoryTypeScriptProgramWithMeta(repoRoot);
+    program = loaded.program;
+    programConstructionCount = loaded.constructed ? 1 : 0;
+  }
+
   const checker = program.getTypeChecker();
   const barrelPath = resolve(repoRoot, barrelRelativePath);
   const sourceFile = program.getSourceFile(barrelPath);
@@ -757,11 +1220,19 @@ export function analyzePublicAuthoritySurface(
     return analyzeWithSourceFile(match, checker, {
       exceptions,
       isProjectSourceFile,
+      repoRoot,
+      reviewedByIdentity,
+      useLegacyNamingGate,
+      programConstructionCount,
     });
   }
   return analyzeWithSourceFile(sourceFile, checker, {
     exceptions,
     isProjectSourceFile,
+    repoRoot,
+    reviewedByIdentity,
+    useLegacyNamingGate,
+    programConstructionCount,
   });
 }
 
@@ -771,6 +1242,10 @@ function analyzeWithSourceFile(
   opts: {
     readonly exceptions: readonly PublicAuthorityApprovedException[];
     readonly isProjectSourceFile: (fileName: string) => boolean;
+    readonly repoRoot: string;
+    readonly reviewedByIdentity: ReadonlyMap<string, ReviewedTerminalEntry>;
+    readonly useLegacyNamingGate: boolean;
+    readonly programConstructionCount: number;
   },
 ): PublicAuthorityAnalysis {
   const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
@@ -781,6 +1256,7 @@ function analyzeWithSourceFile(
   const exportedCallables: string[] = [];
   const findings: PublicAuthorityFinding[] = [];
   const manifest: DerivedMemberRecord[] = [];
+  const dispositions: DispositionRecord[] = [];
 
   for (const exportedSymbol of exported) {
     const resolved = resolveAlias(exportedSymbol, checker);
@@ -798,7 +1274,14 @@ function analyzeWithSourceFile(
 
     signatures.forEach((signature, signatureIndex) => {
       // Rest parameters: Amendment 1 D escape.
-      if (signature.parameters.some((p) => p.valueDeclaration && ts.isParameter(p.valueDeclaration) && p.valueDeclaration.dotDotDotToken !== undefined)) {
+      if (
+        signature.parameters.some(
+          (p) =>
+            p.valueDeclaration &&
+            ts.isParameter(p.valueDeclaration) &&
+            p.valueDeclaration.dotDotDotToken !== undefined,
+        )
+      ) {
         pushFinding(
           findings,
           {
@@ -811,6 +1294,17 @@ function analyzeWithSourceFile(
           },
           opts.exceptions,
         );
+        dispositions.push({
+          exportName: name,
+          signatureIndex,
+          parameterIndex: -1,
+          parameterName: "...",
+          canonicalTypeIdentity: "rest",
+          typePath: "",
+          memberPath: "...",
+          typeName: "",
+          disposition: "UNSAFE_ESCAPE_REJECTED",
+        });
       }
 
       signature.parameters.forEach((paramSymbol, parameterIndex) => {
@@ -850,12 +1344,9 @@ function analyzeWithSourceFile(
           );
         }
 
-        // Deep option/input graph inspection: options parameters and *Options
-        // types (Amendment 1 §4 C/D). Positional earned opaques are represented
-        // in the manifest but are not recursive method-graph roots — otherwise
-        // WorkspaceBoundary.canonicalize and similar create false positives
-        // against contracted 2-F5 positive controls.
+        // H1-F7 only: exact R2 naming gate. Default path traverses every root.
         const deepInspect =
+          !opts.useLegacyNamingGate ||
           parameterName === "options" ||
           /Options$/.test(typeName) ||
           hasUserDefinedCallSignatures(paramType);
@@ -868,12 +1359,16 @@ function analyzeWithSourceFile(
             typeName,
             memberPath: "",
             visited: new Set<string>(),
+            traversalStack: new Set<string>(),
             isProjectSourceFile: opts.isProjectSourceFile,
             exceptions: opts.exceptions,
             findings,
             manifest,
+            dispositions,
             signatureIndex,
             parameterIndex,
+            repoRoot: opts.repoRoot,
+            reviewedByIdentity: opts.reviewedByIdentity,
           });
         }
       });
@@ -883,12 +1378,56 @@ function analyzeWithSourceFile(
   exportedCallables.sort(stableCompare);
   manifest.sort(compareManifest);
   findings.sort(compareFinding);
+  dispositions.sort(compareDisposition);
 
   return {
     exportedCallables,
     manifest,
     findings,
+    dispositions,
+    programConstructionCount: opts.programConstructionCount,
   };
+}
+
+/** Roots discovered by public parameter enumeration (manifest empty memberPath). */
+export function discoveredPublicRoots(
+  analysis: PublicAuthorityAnalysis,
+): readonly DerivedMemberRecord[] {
+  return analysis.manifest.filter((m) => m.memberPath === "");
+}
+
+/**
+ * Root disposition records: the first disposition emitted for each public
+ * parameter occurrence (empty memberPath). Union/alias expansions that keep
+ * empty memberPath while deepening typePath are type-path nodes, not roots.
+ */
+export function manifestedDispositionRoots(
+  analysis: PublicAuthorityAnalysis,
+): readonly DispositionRecord[] {
+  const seen = new Set<string>();
+  const roots: DispositionRecord[] = [];
+  for (const d of analysis.dispositions) {
+    if (d.memberPath !== "") {
+      continue;
+    }
+    const key = publicRootOccurrenceKey(d);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    roots.push(d);
+  }
+  return roots;
+}
+
+/** Stable root occurrence key for completeness comparison. */
+export function publicRootOccurrenceKey(root: {
+  readonly exportName: string;
+  readonly signatureIndex: number;
+  readonly parameterIndex: number;
+  readonly parameterName: string;
+}): string {
+  return `${root.exportName}#${root.signatureIndex}#${root.parameterIndex}#${root.parameterName}`;
 }
 
 /** Repository root helper for tests living under tests/architecture/. */
