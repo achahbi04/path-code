@@ -1054,11 +1054,15 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Required condition to close:** export-driven public-surface discovery; named re-export resolution; recursive cycle-safe project type-graph traversal; detection of the auditor's exact authorityOps corruption; detection of an unlisted future public options type; preserved legitimate data/context; immutable corrective evidence
 
-**Notes:** no active leak at ecda537 — the type holds only { gitContext?: GitStateBaseline }. The defect is absent standing detection. Component capabilities are not downgraded. Primary origin IMPLEMENTATION, contributing EVIDENCE (operator decision D1).
+**Closed by checkpoint:** `4aadb06047173b09cfceee542f140ad6fce7b06f`
+
+**Evidence:** docs/reports/PHASE_3_R2_CORRECTION_REPORT.md
+
+**Notes:** Closed by Phase 3-R2 Stage 1 derived walker. Defect reproduced at the R2 baseline before correction. Hardening report §9 statement remains false in that immutable report and is corrected here. No active leak ever existed — AuthorizePreparedChangeOptions held only { gitContext?: GitStateBaseline }. Primary origin IMPLEMENTATION, contributing EVIDENCE (operator decision D1). Component capabilities were not downgraded.
 
 ---
 

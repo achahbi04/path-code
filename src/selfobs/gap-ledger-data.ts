@@ -910,13 +910,15 @@ const GAP_LEDGER_V1: GapLedger = {
         "authorizePreparedChange is exported from the public editing barrel and issues authorization. Its options type is declared in src/editing/types.ts and re-exported by name. The standing guard hardcodes three option types in three files, performs no export-driven census and no recursive type-graph traversal, and never inspects that type. An authority-bearing callable member added to it was not detected by the guard, the P1–P14 suite, or the full test suite. Hardening report §9 recorded the standing-guard deferral as scoped \"beyond the Phase 3 editing option types already guarded\", which is false for this type and masked the omission during the first audit.",
       proposedClass: "BLOCKING_INVARIANT",
       reviewClassification: "BLOCKING_INVARIANT",
-      lifecycle: "OPEN",
+      lifecycle: "CLOSED",
       missingEvidence:
         "export-driven public-surface discovery; named re-export resolution; recursive cycle-safe project type-graph traversal; detection of the auditor's exact authorityOps corruption; detection of an unlisted future public options type; preserved legitimate data/context; immutable corrective evidence",
       closureCondition:
         "the standing guard derives its coverage from the complete supported public editing surface rather than an enumerated list; follows named re-exports and project-defined parameter graphs; fails on the auditor's corruption naming the function, the type and the member; fails on a new unlisted public options type; passes legitimate data and context; every falsification corrupts, fails for the intended reason, restores exactly, and passes",
+      closedByCommit: "4aadb06047173b09cfceee542f140ad6fce7b06f",
+      closureEvidence: "docs/reports/PHASE_3_R2_CORRECTION_REPORT.md",
       notes:
-        "no active leak at ecda537 — the type holds only { gitContext?: GitStateBaseline }. The defect is absent standing detection. Component capabilities are not downgraded. Primary origin IMPLEMENTATION, contributing EVIDENCE (operator decision D1).",
+        "Closed by Phase 3-R2 Stage 1 derived walker. Defect reproduced at the R2 baseline before correction. Hardening report §9 statement remains false in that immutable report and is corrected here. No active leak ever existed — AuthorizePreparedChangeOptions held only { gitContext?: GitStateBaseline }. Primary origin IMPLEMENTATION, contributing EVIDENCE (operator decision D1). Component capabilities were not downgraded.",
     },
     {
       id: "GAP-058",
