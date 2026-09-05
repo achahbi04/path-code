@@ -1116,11 +1116,15 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Required condition to close:** callable classification performed on the non-nullable type and on every union/intersection constituent, covering call signatures, construct signatures, methods, callable getters and callable index-signature value types; generated matrix coverage of the optionality dimension.
 
-**Notes:** No active leak at 328f6fc — this is absent detection, not present authority escape. Member-level counterpart to the root-level naming gate closed by GAP-057; GAP-057 remains CLOSED and correctly scoped. Primary origin: IMPLEMENTATION.
+**Closed by checkpoint:** `6a1d80b98f6743b97ce6ef56a7d145fb7208c892`
+
+**Evidence:** docs/reports/PHASE_3_R2_H2_MEMBER_SHAPE_REPORT.md
+
+**Notes:** CLOSED by Phase 3-R2-H2 Stage 1: callable classification is now performed by isCallableMemberType on the non-nullable type and on every union/intersection constituent, accepting call signatures, construct signatures and callable index-signature value types; methods, callable getters, overloaded and generic function types reduce to the same rule. Established by H2-F1(a) (optional callable on the real AuthorizePreparedChangeOptions now fails naming function, parameter, type and member), by H2-F2 groups A/B/C/D (890 expressible generated cells, every one rejected at the expected path with the member manifested), by H2-F2 group E (300 non-callable controls, zero findings), and decisively by H2-F7(a): restoring the un-unwrapped check together with the pre-R2-H2 node-level census reconstructs the 328f6fc shape and the optional callable escapes completely. H2-F7(a) additionally records that the classification fix and the node-level own-signature census are two independent mechanisms, so restoring only one is not sufficient to let the shape through. ORIGINAL RECORD: No active leak at 328f6fc — this is absent detection, not present authority escape. Member-level counterpart to the root-level naming gate closed by GAP-057; GAP-057 remains CLOSED and correctly scoped. Primary origin: IMPLEMENTATION.
 
 ---
 
@@ -1134,11 +1138,15 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Required condition to close:** unconditional member iteration with no name-based skip anywhere in the analyzer; symbol-keyed members manifested by declaration identity and classified; a per-node completeness proof that fails when any checker-visible member is omitted from the manifest.
 
-**Notes:** No active leak at 328f6fc — absent detection only. The manifest blindness is the load-bearing half: without it the omission would have been visible to the existing R2-H1 proof. Primary origin: IMPLEMENTATION.
+**Closed by checkpoint:** `6a1d80b98f6743b97ce6ef56a7d145fb7208c892`
+
+**Evidence:** docs/reports/PHASE_3_R2_H2_MEMBER_SHAPE_REPORT.md
+
+**Notes:** CLOSED by Phase 3-R2-H2 Stage 1: both name-pattern member skips are removed from the default path; the member census is unconditional over getPropertiesOfType, every call signature, every construct signature and every index info, and the manifest push happens for all of them. Symbol-keyed members are serialized by declaration identity (declaring file plus symbol description), decided from the declaration shape and key type flags rather than from the member name. Per-node completeness (checker members equals manifested members) is asserted for all 911 nodes of the clean surface with zero mismatches. Established by H2-F1(b) (the symbol-keyed callable now fails AND the corrupted manifest digest is no longer byte-identical to clean, the exact property F-R1-005 exploited), by H2-F3 (restoring the skip breaks completeness with no corruption at all, because the real surface carries a unique-symbol member; withholding one censused member also breaks it), and by H2-F7(b). The correction immediately surfaced six REAL symbol-keyed members on the live public surface, the editAuthorizationBrand unique symbol on EditAuthorization, which the guard had never represented; they are correctly classified primitive and non-rejected, and H2-F8 now pins them. ORIGINAL RECORD: No active leak at 328f6fc — absent detection only. The manifest blindness is the load-bearing half: without it the omission would have been visible to the existing R2-H1 proof. Primary origin: IMPLEMENTATION.
 
 ---
 
@@ -1152,11 +1160,15 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Required condition to close:** an export-disposition record for every value export of the barrel; traversal of object-valued exports; promotion of their callable members to roots with their own parameter roots traversed; an export-level completeness proof.
 
-**Notes:** No active leak at 328f6fc — the editing barrel exports no object-valued value today; this is absent detection of a shape a future export could take. Scope remains the editing barrel per operator decision D4; package-root coverage stays GAP-058. Primary origin: IMPLEMENTATION.
+**Closed by checkpoint:** `6a1d80b98f6743b97ce6ef56a7d145fb7208c892`
+
+**Evidence:** docs/reports/PHASE_3_R2_H2_MEMBER_SHAPE_REPORT.md
+
+**Notes:** CLOSED by Phase 3-R2-H2 Stage 1: every value export of the barrel now receives a disposition on a separate closed ExportDisposition axis, so TraversalDisposition remains exactly six values with no seventh. Object-valued exports are traversed by the same walker used for parameter graphs and every callable member is promoted to a CALLABLE_ROOT whose own parameters are traversed through the one canonical analyzeCallableRoot path. The clean surface reports 24 export dispositions (16 CALLABLE_ROOT, 8 PRIMITIVE_TERMINAL) plus 44 type-only exports. Established by H2-F1(c), by H2-F4 (restoring the callable-only export exclusion makes the object export escape and fails an export-completeness assertion derived independently from the TypeChecker), by H2-F7(c), and by H2-F2 group C which exercises all three DIM-7 root kinds including object-valued export members. ORIGINAL RECORD: No active leak at 328f6fc — the editing barrel exports no object-valued value today; this is absent detection of a shape a future export could take. Scope remains the editing barrel per operator decision D4; package-root coverage stays GAP-058. Primary origin: IMPLEMENTATION.
 
 ---
 
@@ -1170,11 +1182,15 @@ Every entry should contain:
 
 **Review classification:** BLOCKING_INVARIANT
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Required condition to close:** a Program cache key derived from the content of every input source file plus the compiler options, and a same-process both-direction freshness falsification performed with size and mtime preserved and no explicit cache-clear call.
 
-**Notes:** No incorrect result was produced at 328f6fc because the standing guard and every existing proof call clearRepositoryTypeScriptProgramCache(). Closing this gap makes that call a belt rather than the suspenders. Primary origin: IMPLEMENTATION.
+**Closed by checkpoint:** `6a1d80b98f6743b97ce6ef56a7d145fb7208c892`
+
+**Evidence:** docs/reports/PHASE_3_R2_H2_MEMBER_SHAPE_REPORT.md
+
+**Notes:** CLOSED by Phase 3-R2-H2 Stage 1: the Program cache key is the sorted list of (repository-relative path, SHA-256 of current content) for every source file in the Program plus a hash of the compiler options; path, size and mtime are not keys, and an unreadable file hashes as missing so deletion invalidates too. clearRepositoryTypeScriptProgramCache() is retained for compatibility with existing proofs but correctness no longer depends on any caller invoking it. Established by H2-F5: same process, both directions, file size preserved exactly and mtime preserved to the millisecond, with no clear call between steps, the corruption is detected and the restoration is observed. Recorded consequence: the previous repoRoot-only cache had been masking a latent race in the 2-F2 probe, whose real-repository clean read did not hold the repository's own src mutex; the content-hash key made that visible and the probe now takes the lock, with its assertion unchanged. ORIGINAL RECORD: No incorrect result was produced at 328f6fc because the standing guard and every existing proof call clearRepositoryTypeScriptProgramCache(). Closing this gap makes that call a belt rather than the suspenders. Primary origin: IMPLEMENTATION.
 
 ---
 
@@ -1188,13 +1204,17 @@ Every entry should contain:
 
 **Review classification:** NON_BLOCKING_LIMITATION
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Why non-blocking:** the dependence degrades fail-closed — a lib that fails to resolve yields unresolved types that are rejected rather than silently admitted — and every current invocation path runs from the repository root. No incorrect admission has been demonstrated. The defect is determinism of an evidence tool, not authority leakage.
 
 **Required condition to close:** repository root, tsconfig and lib directory resolved from the analyzer module location or an explicit root argument rather than process.cwd(), plus a proof that analyzer output is identical from two different working directories.
 
-**Notes:** Recorded as a distinct mechanism from GAP-063 so each is closed by its own proof. Not attached to any capability per operator decision D2.
+**Closed by checkpoint:** `6a1d80b98f6743b97ce6ef56a7d145fb7208c892`
+
+**Evidence:** docs/reports/PHASE_3_R2_H2_MEMBER_SHAPE_REPORT.md
+
+**Notes:** CLOSED by Phase 3-R2-H2 Stage 1: parseJsonConfigFileContent now receives an explicit ParseConfigHost with an absolute basePath, and the Program is built with an explicit CompilerHost whose getCurrentDirectory() returns the repository root; nothing resolves through process.cwd(). Established by H2-F6: the full manifest SHA-256, the findings, the disposition count and exportedCallables are identical when the analyzer runs from the repository root and from a temporary directory, with the cache cleared after the directory change so a new Program is genuinely constructed from the foreign working directory. The pre-correction reproduction recorded in the closure evidence section 1.1(e) showed the defect was live: from a foreign cwd the analyzer produced 2 spurious any-escape findings and 5286 rather than 5302 dispositions. ORIGINAL RECORD: Recorded as a distinct mechanism from GAP-063 so each is closed by its own proof. Not attached to any capability per operator decision D2.
 
 ---
 
@@ -1208,13 +1228,17 @@ Every entry should contain:
 
 **Review classification:** NON_BLOCKING_LIMITATION
 
-**Lifecycle:** OPEN
+**Lifecycle:** CLOSED
 
 **Why non-blocking:** this is a defect in evidence design, not in repository behavior. Every code defect it allowed through is separately recorded as GAP-060, GAP-061 and GAP-062 and is separately blocking. No production semantic is incorrect because of this gap alone.
 
 **Required condition to close:** an operator-reviewed dimension table committed as data, a generator that produces one fixture per enumerated cell, and evidence that every required cell is exercised against the canonical analyzer with cell identity carried into each failure message.
 
-**Notes:** Process finding, closed by the generated matrix within this pass for this detector only. Making generated falsification a Constitution rule for ALL future detection mechanisms is a Phase 4 Master / Amendment 2 candidate and is explicitly NOT done here. Not attached to any capability per operator decision D2. Contributing origin: EVIDENCE.
+**Closed by checkpoint:** `6a1d80b98f6743b97ce6ef56a7d145fb7208c892`
+
+**Evidence:** docs/reports/PHASE_3_R2_H2_MEMBER_SHAPE_REPORT.md
+
+**Notes:** CLOSED by Phase 3-R2-H2 Stage 1: the reviewed dimension table is committed as data at tests/architecture/public-authority-surface-dimensions.ts and the generator at tests/architecture/public-authority-surface-matrix.ts produces one fixture per enumerated cell as an in-memory virtual source overlay analyzed by the canonical analyzer. 922 cells were generated across the five required selections: group A 300, group B 128, group C 12, group D 182 pairwise, group E 300 controls. 890 are expressible and all pass; 32 are INEXPRESSIBLE for one recorded and justified reason (a method signature cannot be unioned with null or undefined at its declaration site). Group D's covering property is asserted rather than assumed: zero uncovered pairs across all seven dimensions. Cell identity is carried into every assertion message so a failure names the cell. Established by H2-F2. Scope: this closes the process finding for THIS detector only. Making generated falsification a Constitution rule for all future detection mechanisms remains a Phase 4 Master / Amendment 2 candidate and is deliberately NOT done in this pass. ORIGINAL RECORD: Process finding, closed by the generated matrix within this pass for this detector only. Making generated falsification a Constitution rule for ALL future detection mechanisms is a Phase 4 Master / Amendment 2 candidate and is explicitly NOT done here. Not attached to any capability per operator decision D2. Contributing origin: EVIDENCE.
 
 ---
 ## GAP CLOSURE CONDUCT
