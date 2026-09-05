@@ -8,6 +8,7 @@
  * elsewhere.
  */
 
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -65,11 +66,55 @@ export type DispositionRecord = {
   readonly disposition: TraversalDisposition;
 };
 
+/**
+ * Per-node member census (R2-H2 §1.4). For every traversed project-defined
+ * node, `checkerMemberCount` is what the TypeChecker reports and
+ * `manifestedMemberCount` is what actually reached the manifest. The two MUST
+ * be equal: that identity is what makes a silent member skip observable
+ * (GAP-061), which the byte-identical F-R1-005 corruption proved impossible
+ * under the previous shape.
+ */
+export type NodeCompletenessRecord = {
+  readonly exportName: string;
+  readonly signatureIndex: number;
+  readonly parameterIndex: number;
+  readonly parameterName: string;
+  readonly typePath: string;
+  readonly memberPath: string;
+  readonly canonicalTypeIdentity: string;
+  readonly checkerMemberCount: number;
+  readonly manifestedMemberCount: number;
+};
+
+/**
+ * Export-level disposition vocabulary (R2-H2 §1.5). Deliberately a SEPARATE
+ * closed axis from TraversalDisposition — the traversal vocabulary stays at
+ * exactly six values with no seventh.
+ */
+export type ExportDisposition =
+  | "CALLABLE_ROOT"
+  | "OBJECT_SURFACE"
+  | "PRIMITIVE_TERMINAL"
+  | "EXTERNAL_LIBRARY_TERMINAL";
+
+export type ExportDispositionRecord = {
+  readonly exportName: string;
+  readonly disposition: ExportDisposition;
+  readonly canonicalTypeIdentity: string;
+  readonly typeName: string;
+};
+
 export type PublicAuthorityAnalysis = {
   readonly exportedCallables: readonly string[];
   readonly manifest: readonly DerivedMemberRecord[];
   readonly findings: readonly PublicAuthorityFinding[];
   readonly dispositions: readonly DispositionRecord[];
+  /** Per-node member census — see NodeCompletenessRecord. */
+  readonly nodeCompleteness: readonly NodeCompletenessRecord[];
+  /** One record for every VALUE export of the barrel. No export is undispositioned. */
+  readonly exportDispositions: readonly ExportDispositionRecord[];
+  /** Type-only exports, which are reached through parameter graphs instead. */
+  readonly typeOnlyExportCount: number;
   /**
    * Number of TypeScript Programs constructed during this invocation.
    * At most one when `program` is not supplied (0 on cache hit, 1 on create).
@@ -110,6 +155,36 @@ export type AnalyzePublicAuthorityOptions = {
    * Default: PUBLIC_AUTHORITY_REVIEWED_TERMINALS.
    */
   readonly reviewedTerminals?: readonly ReviewedTerminalEntry[];
+  /**
+   * H2-F7 falsification only. Restores the exact F-R1-004 defect: member
+   * callable classification applied to the un-unwrapped type, so that an
+   * optional or union-wrapped callable is never rejected. Default false.
+   */
+  readonly useLegacyUnUnwrappedMemberCallableCheck?: boolean;
+  /**
+   * H2-F7 falsification only. Restores the exact F-R1-005 defect: the
+   * `startsWith("__@")` member skip, executed before the manifest push.
+   * Default false. On the default path NO name-based member skip exists.
+   */
+  readonly useLegacySymbolKeyedMemberSkip?: boolean;
+  /**
+   * H2-F7 falsification only. Restores the exact F-R1-006 defect: barrel
+   * exports whose type has no call signatures are dropped from discovery
+   * before any disposition is recorded. Default false.
+   */
+  readonly useLegacyCallableOnlyExportDiscovery?: boolean;
+  /**
+   * H2-F7 falsification only. Suppresses the node-level own call/construct
+   * signature census, which did not exist before R2-H2. Set together with
+   * `useLegacyUnUnwrappedMemberCallableCheck` it reconstructs the 328f6fc
+   * member-handling shape faithfully. Default false.
+   */
+  readonly useLegacyNoOwnSignatureCensus?: boolean;
+  /**
+   * H2-F3 falsification only. A member path that is censused but deliberately
+   * withheld from the manifest, so the per-node completeness proof must fail.
+   */
+  readonly dropManifestedMemberPath?: string;
 };
 
 const MECHANISM_NAME =
@@ -154,7 +229,44 @@ function compareDisposition(a: DispositionRecord, b: DispositionRecord): number 
   );
 }
 
-const programCache = new Map<string, ts.Program>();
+type ProgramCacheEntry = {
+  readonly program: ts.Program;
+  /** Content key of every input file at the moment the Program was built. */
+  readonly contentKey: string;
+};
+
+const programCache = new Map<string, ProgramCacheEntry>();
+
+/**
+ * Content key for a Program (R2-H2 §1.6 / GAP-063): the sorted list of
+ * (repository-relative path, SHA-256 of current file content) for EVERY source
+ * file in the Program, plus a hash of the compiler options. Path, size and
+ * mtime are deliberately NOT keys — a same-size, same-mtime edit must still
+ * invalidate. A file that has become unreadable hashes as "missing", so
+ * deletion invalidates too.
+ */
+function programContentKey(program: ts.Program, repoRoot: string): string {
+  const parts: string[] = [];
+  for (const sf of program.getSourceFiles()) {
+    let contentHash: string;
+    try {
+      contentHash = createHash("sha256").update(readFileSync(sf.fileName)).digest("hex");
+    } catch {
+      contentHash = "missing";
+    }
+    parts.push(`${repoRelativePath(repoRoot, sf.fileName)}\u0000${contentHash}`);
+  }
+  parts.sort(stableCompare);
+  const options = program.getCompilerOptions() as Record<string, unknown>;
+  const optionEntries = Object.keys(options)
+    .sort(stableCompare)
+    .map((key) => [key, options[key]]);
+  return createHash("sha256")
+    .update(parts.join("\n"))
+    .update("\u0001")
+    .update(JSON.stringify(optionEntries))
+    .digest("hex");
+}
 
 function createRepositoryTypeScriptProgram(repoRoot: string): ts.Program {
   const configPath = ts.findConfigFile(
@@ -177,17 +289,32 @@ function createRepositoryTypeScriptProgram(repoRoot: string): ts.Program {
       }),
     );
   }
+  // R2-H2 §1.7 / GAP-064: never resolve through process.cwd(). The parse host
+  // takes an explicit absolute basePath, and the compiler host reports the
+  // repository root as its current directory, so module and lib resolution are
+  // identical from any working directory.
+  const parseConfigHost: ts.ParseConfigHost = {
+    useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
+    readDirectory: (rootDir, extensions, excludes, includes, depth) =>
+      ts.sys.readDirectory(rootDir, extensions, excludes, includes, depth),
+    fileExists: (path) => ts.sys.fileExists(path),
+    readFile: (path) => ts.sys.readFile(path),
+  };
   const parsed = ts.parseJsonConfigFileContent(
     configFile.config,
-    ts.sys,
+    parseConfigHost,
     dirname(configPath),
   );
+  const options: ts.CompilerOptions = { ...parsed.options, noEmit: true };
+  const host = ts.createCompilerHost(options, true);
+  host.getCurrentDirectory = () => repoRoot;
   // Root the program at the editing barrel so the TypeChecker pulls only the
   // reachable project graph — far cheaper than the full tsconfig file list.
   const barrel = resolve(repoRoot, DEFAULT_BARREL);
   return ts.createProgram({
     rootNames: [barrel],
-    options: { ...parsed.options, noEmit: true },
+    options,
+    host,
   });
 }
 
@@ -204,15 +331,25 @@ function loadRepositoryTypeScriptProgramWithMeta(repoRoot: string): {
   readonly constructed: boolean;
 } {
   const cached = programCache.get(repoRoot);
-  if (cached !== undefined) {
-    return { program: cached, constructed: false };
+  if (
+    cached !== undefined &&
+    programContentKey(cached.program, repoRoot) === cached.contentKey
+  ) {
+    return { program: cached.program, constructed: false };
   }
   const program = createRepositoryTypeScriptProgram(repoRoot);
-  programCache.set(repoRoot, program);
+  programCache.set(repoRoot, {
+    program,
+    contentKey: programContentKey(program, repoRoot),
+  });
   return { program, constructed: true };
 }
 
-/** Drop cached programs after temporary src/ corruption or restore. */
+/**
+ * Drop cached programs. Retained for compatibility with existing proofs: after
+ * R2-H2 §1.6 the cache is content-keyed, so this call is a belt, not the
+ * suspenders. Correctness no longer depends on any caller invoking it.
+ */
 export function clearRepositoryTypeScriptProgramCache(): void {
   programCache.clear();
 }
@@ -406,6 +543,23 @@ function isPrimitiveType(type: ts.Type): boolean {
   );
 }
 
+/**
+ * A value export is a primitive terminal when it is primitive, or when every
+ * union constituent is primitive. Project string-literal-union aliases such as
+ * `ActionClass` are of the second kind: they are data, not a member surface,
+ * and must never be walked as an object (doing so reaches String.prototype and
+ * manufactures false positives — Amendment 1 §4 forbids exactly that).
+ */
+function isPrimitiveOrPrimitiveUnion(type: ts.Type): boolean {
+  if (isPrimitiveType(type)) {
+    return true;
+  }
+  if (!type.isUnion()) {
+    return false;
+  }
+  return type.types.every((part) => isPrimitiveType(part));
+}
+
 function isProjectType(
   type: ts.Type,
   _checker: ts.TypeChecker,
@@ -460,6 +614,104 @@ function mechanismNameHit(name: string): boolean {
 
 function hasUserDefinedCallSignatures(type: ts.Type): boolean {
   return type.getCallSignatures().length > 0;
+}
+
+/**
+ * Flatten a type into the constituents that matter for callable classification:
+ * every union/intersection part, recursively, with null and undefined removed.
+ * `q?: (m) => string` has type `((m) => string) | undefined`; the undefined part
+ * is dropped and the function part survives. This is the direct correction of
+ * F-R1-004 / GAP-060 — optionality is not a shield.
+ */
+function callableConstituents(type: ts.Type, depth = 0): readonly ts.Type[] {
+  if (depth > 8 || !type.isUnionOrIntersection()) {
+    return [type];
+  }
+  const out: ts.Type[] = [];
+  for (const part of type.types) {
+    if (part.flags & ts.TypeFlags.Undefined || part.flags & ts.TypeFlags.Null) {
+      continue;
+    }
+    for (const inner of callableConstituents(part, depth + 1)) {
+      out.push(inner);
+    }
+  }
+  return out;
+}
+
+/** A type is callable at its own level if it has call OR construct signatures. */
+function typeIsCallableAtOwnLevel(
+  type: ts.Type,
+  checker: ts.TypeChecker,
+): boolean {
+  return (
+    checker.getSignaturesOfType(type, ts.SignatureKind.Call).length > 0 ||
+    checker.getSignaturesOfType(type, ts.SignatureKind.Construct).length > 0
+  );
+}
+
+/**
+ * R2-H2 §1.2. A member is callable if, after removing null and undefined, ANY
+ * union or intersection constituent has a call signature or a construct
+ * signature, or is an index signature whose value type is callable.
+ *
+ * Methods, getters of callable type, overloaded function types and generic
+ * function types are all covered by this single rule: the TypeChecker reports a
+ * method's type and a getter's type as the underlying type, and an overloaded
+ * or generic function type carries call signatures like any other.
+ */
+function isCallableMemberType(type: ts.Type, checker: ts.TypeChecker): boolean {
+  for (const part of callableConstituents(unwrapNonNullish(type))) {
+    if (typeIsCallableAtOwnLevel(part, checker)) {
+      return true;
+    }
+    for (const info of checker.getIndexInfosOfType(part)) {
+      if (typeIsCallableAtOwnLevel(unwrapNonNullish(info.type), checker)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Deterministic member key (R2-H2 §1.3). String-keyed members use their name.
+ * Symbol-keyed members — well-known and unique alike — are serialized by
+ * DECLARATION IDENTITY: the declaring file of the key symbol plus its
+ * description. TypeScript's own `escapedName` for a unique symbol embeds a
+ * per-Program symbol id and is therefore not stable; this is.
+ *
+ * Symbol-keyed-ness is decided from the declaration SHAPE (a computed property
+ * name) and the KEY TYPE FLAGS (ESSymbol / UniqueESSymbol) — never from the
+ * text of the member name. No name pattern participates.
+ */
+function memberKeyOf(
+  prop: ts.Symbol,
+  checker: ts.TypeChecker,
+  repoRoot: string,
+): string {
+  for (const decl of prop.declarations ?? []) {
+    const nameNode = (decl as ts.NamedDeclaration).name;
+    if (nameNode === undefined || !ts.isComputedPropertyName(nameNode)) {
+      continue;
+    }
+    const keyType = checker.getTypeAtLocation(nameNode.expression);
+    if (
+      !(
+        keyType.flags &
+        (ts.TypeFlags.ESSymbol | ts.TypeFlags.UniqueESSymbol)
+      )
+    ) {
+      continue;
+    }
+    const keySymbol =
+      keyType.getSymbol() ?? checker.getSymbolAtLocation(nameNode.expression);
+    const file = symbolDeclaringFile(keySymbol);
+    const description = keySymbol?.getName() ?? checker.typeToString(keyType);
+    const where = file !== undefined ? repoRelativePath(repoRoot, file) : "unknown";
+    return `@@[${where}#${description}]`;
+  }
+  return prop.getName();
 }
 
 function pushFinding(
@@ -533,6 +785,15 @@ type WalkContext = {
   readonly findings: PublicAuthorityFinding[];
   readonly manifest: DerivedMemberRecord[];
   readonly dispositions: DispositionRecord[];
+  readonly nodeCompleteness: NodeCompletenessRecord[];
+  /** H2-F7 only — restores F-R1-004 verbatim. */
+  readonly useLegacyUnUnwrappedMemberCallableCheck: boolean;
+  /** H2-F7 only — restores F-R1-005 verbatim. */
+  readonly useLegacySymbolKeyedMemberSkip: boolean;
+  /** H2-F7 only — suppresses the node-level own-signature census. */
+  readonly useLegacyNoOwnSignatureCensus: boolean;
+  /** H2-F3 only — a censused member deliberately withheld from the manifest. */
+  readonly dropManifestedMemberPath: string | undefined;
   readonly signatureIndex: number;
   readonly parameterIndex: number;
   readonly repoRoot: string;
@@ -819,9 +1080,92 @@ function walkTypeBody(
     }
   }
 
-  const stringIndex = checker.getIndexInfoOfType(type, ts.IndexKind.String);
-  const numberIndex = checker.getIndexInfoOfType(type, ts.IndexKind.Number);
-  if (stringIndex !== undefined || numberIndex !== undefined) {
+  // ---------------------------------------------------------------------
+  // MEMBER CENSUS — UNCONDITIONAL (R2-H2 §§1.3, 1.4).
+  //
+  // Every checker-visible member of this node is manifested exactly once:
+  // every property, every call signature, every construct signature, every
+  // index info. There is NO name-based skip on the default path. The per-node
+  // completeness record emitted at the end is what makes an omission
+  // observable at all (GAP-061) — under the previous shape a skipped
+  // symbol-keyed member produced a byte-identical analysis.
+  //
+  // The three stop authorities of R2-H1 — primitive, external after
+  // type-argument inspection, reviewed terminal — apply to members exactly as
+  // to roots, and are enforced inside walkType. Nothing else stops a member.
+  // ---------------------------------------------------------------------
+  const properties = checker.getPropertiesOfType(type);
+  // H2-F7 only: when the own-signature census is suppressed, it is suppressed
+  // BOTH in the expected count and in the emission, so the completeness
+  // identity stays internally consistent under the restored shape.
+  const ownCallSignatures = ctx.useLegacyNoOwnSignatureCensus
+    ? []
+    : checker.getSignaturesOfType(type, ts.SignatureKind.Call);
+  const ownConstructSignatures = ctx.useLegacyNoOwnSignatureCensus
+    ? []
+    : checker.getSignaturesOfType(type, ts.SignatureKind.Construct);
+  const indexInfos = checker.getIndexInfosOfType(type);
+  const checkerMemberCount =
+    properties.length +
+    ownCallSignatures.length +
+    ownConstructSignatures.length +
+    indexInfos.length;
+  let manifestedMemberCount = 0;
+
+  const manifestMember = (memberPath: string): void => {
+    if (ctx.dropManifestedMemberPath === memberPath) {
+      // H2-F3 only: censused but deliberately withheld, so the completeness
+      // identity below must fail.
+      return;
+    }
+    manifestedMemberCount += 1;
+    ctx.manifest.push({
+      exportName: ctx.functionName,
+      signatureIndex: ctx.signatureIndex,
+      parameterIndex: ctx.parameterIndex,
+      parameterName: ctx.parameterName,
+      typePath: ctx.typePath,
+      memberPath,
+      typeName: ctx.typeName,
+    });
+  };
+
+  const rejectCallableMember = (memberPath: string, memberType: ts.Type): void => {
+    pushFinding(
+      ctx.findings,
+      {
+        functionName: ctx.functionName,
+        parameterName: ctx.parameterName,
+        memberPath,
+        typeName: ctx.typeName,
+        typePath: ctx.typePath,
+        reason: `unreviewed user-defined call signature on member ${memberPath}`,
+      },
+      ctx.exceptions,
+    );
+    ctx.dispositions.push({
+      exportName: ctx.functionName,
+      signatureIndex: ctx.signatureIndex,
+      parameterIndex: ctx.parameterIndex,
+      parameterName: ctx.parameterName,
+      canonicalTypeIdentity: canonicalTypeIdentity(
+        unwrapNonNullish(memberType),
+        checker,
+        ctx.repoRoot,
+      ),
+      typePath: ctx.typePath,
+      memberPath,
+      typeName: ctx.typeName,
+      disposition: "CALLABLE_REJECTED",
+    });
+  };
+
+  // Index signatures — an escape under Amendment 1 §4 D, and additionally a
+  // callable member when the VALUE type is callable (DIM-3).
+  for (const info of indexInfos) {
+    const keyName = checker.typeToString(info.keyType);
+    const indexPath = `${ctx.memberPath}#index(${keyName})`;
+    manifestMember(indexPath);
     pushFinding(
       ctx.findings,
       {
@@ -834,63 +1178,67 @@ function walkTypeBody(
       },
       ctx.exceptions,
     );
-    // Index signature is an unsafe escape on this node; record a linked
-    // rejection disposition in addition to the TRAVERSED ancestor path via a
-    // synthetic child occurrence so the root/ancestor disposition stays.
     ctx.dispositions.push({
       exportName: ctx.functionName,
       signatureIndex: ctx.signatureIndex,
       parameterIndex: ctx.parameterIndex,
       parameterName: ctx.parameterName,
-      canonicalTypeIdentity: `${canon}#index`,
-      typePath: `${ctx.typePath}#index`,
+      canonicalTypeIdentity: `${canon}#index(${keyName})`,
+      typePath: `${ctx.typePath}#index(${keyName})`,
       memberPath: ctx.memberPath,
       typeName: ctx.typeName,
       disposition: "UNSAFE_ESCAPE_REJECTED",
     });
+    if (isCallableMemberType(info.type, checker)) {
+      rejectCallableMember(indexPath, info.type);
+    }
   }
 
-  for (const prop of type.getProperties()) {
-    const propName = prop.getName();
-    // Skip well-known symbol properties (iterators) — not caller substitution.
-    if (propName.startsWith("__@")) {
+  // Call and construct signatures ON THIS NODE ITSELF (R2-H2 §1.2: a type is
+  // callable at its own level if it has call or construct signatures).
+  ownCallSignatures.forEach((_signature, index) => {
+    const path = `${ctx.memberPath}#call(${index})`;
+    manifestMember(path);
+    rejectCallableMember(path, type);
+  });
+  ownConstructSignatures.forEach((_signature, index) => {
+    const path = `${ctx.memberPath}#construct(${index})`;
+    manifestMember(path);
+    rejectCallableMember(path, type);
+  });
+
+  for (const prop of properties) {
+    if (
+      ctx.useLegacySymbolKeyedMemberSkip &&
+      prop.getName().startsWith("__@")
+    ) {
+      // H2-F7 only: the exact F-R1-005 defect, restored verbatim — a
+      // name-pattern skip executed BEFORE the manifest push. Never reachable
+      // on the default path.
       continue;
     }
+    const propName = memberKeyOf(prop, checker, ctx.repoRoot);
     const memberPath =
       ctx.memberPath.length === 0 ? propName : `${ctx.memberPath}.${propName}`;
     const propType = checker.getTypeOfSymbol(prop);
 
-    ctx.manifest.push({
-      exportName: ctx.functionName,
-      signatureIndex: ctx.signatureIndex,
-      parameterIndex: ctx.parameterIndex,
-      parameterName: ctx.parameterName,
-      typePath: ctx.typePath,
-      memberPath,
-      typeName: ctx.typeName,
-    });
+    manifestMember(memberPath);
 
     let rejected = false;
-    if (hasUserDefinedCallSignatures(propType)) {
+    const callable = ctx.useLegacyUnUnwrappedMemberCallableCheck
+      ? // H2-F7 only: the exact F-R1-004 defect, restored verbatim.
+        hasUserDefinedCallSignatures(propType)
+      : isCallableMemberType(propType, checker);
+    if (callable) {
       rejected = true;
-      pushFinding(
-        ctx.findings,
-        {
-          functionName: ctx.functionName,
-          parameterName: ctx.parameterName,
-          memberPath,
-          typeName: ctx.typeName,
-          typePath: ctx.typePath,
-          reason: `unreviewed user-defined call signature on member ${memberPath}`,
-        },
-        ctx.exceptions,
-      );
+      rejectCallableMember(memberPath, propType);
     }
 
     if (mechanismNameHit(propName)) {
-      rejected = true;
       // Amendment 1 §4 D — operation / adaptor / bindings / executor / loader /
       // reader / writer / verifier (and *Ops) shapes on the public surface.
+      // This is ADDITIVE detection: it can only add a rejection, never skip,
+      // gate or suppress traversal, manifesting or classification.
       pushFinding(
         ctx.findings,
         {
@@ -903,127 +1251,48 @@ function walkTypeBody(
         },
         ctx.exceptions,
       );
+      if (!rejected) {
+        rejected = true;
+        ctx.dispositions.push({
+          exportName: ctx.functionName,
+          signatureIndex: ctx.signatureIndex,
+          parameterIndex: ctx.parameterIndex,
+          parameterName: ctx.parameterName,
+          canonicalTypeIdentity: canonicalTypeIdentity(
+            unwrapNonNullish(propType),
+            checker,
+            ctx.repoRoot,
+          ),
+          typePath: ctx.typePath,
+          memberPath,
+          typeName: ctx.typeName,
+          disposition: "CALLABLE_REJECTED",
+        });
+      }
     }
 
-    if (rejected) {
-      ctx.dispositions.push({
-        exportName: ctx.functionName,
-        signatureIndex: ctx.signatureIndex,
-        parameterIndex: ctx.parameterIndex,
-        parameterName: ctx.parameterName,
-        canonicalTypeIdentity: canonicalTypeIdentity(
-          unwrapNonNullish(propType),
-          checker,
-          ctx.repoRoot,
-        ),
-        typePath: ctx.typePath,
-        memberPath,
-        typeName: ctx.typeName,
-        disposition: "CALLABLE_REJECTED",
-      });
-    }
-
+    // Descent is UNCONDITIONAL. Only the three stop authorities inside
+    // walkType may end it — never a rejection, a name, or a container shape.
     const unwrappedProp = unwrapNonNullish(propType);
-    const nestedCtx: WalkContext = {
+    walkType(unwrappedProp, checker, {
       ...ctx,
       memberPath,
       typePath: `${ctx.typePath}.${propName}`,
       typeName: typeDisplayName(unwrappedProp, checker),
-    };
-
-    if (isProjectType(unwrappedProp, checker, ctx.isProjectSourceFile)) {
-      walkType(unwrappedProp, checker, nestedCtx);
-    } else if (unwrappedProp.isUnionOrIntersection()) {
-      walkType(unwrappedProp, checker, nestedCtx);
-    } else if (isAnonymousObjectType(unwrappedProp)) {
-      // Inline object shapes on project surfaces (e.g. authorityOps?: { issue })
-      // are walked; String/Array/Buffer lib graphs are not anonymous in this sense
-      // once they carry an external class/interface symbol — still refuse those.
-      const nestedSymbol = unwrappedProp.getSymbol();
-      const nestedFile = symbolDeclaringFile(nestedSymbol);
-      if (
-        nestedFile === undefined ||
-        ctx.isProjectSourceFile(nestedFile)
-      ) {
-        walkType(unwrappedProp, checker, nestedCtx);
-        // If walkType returned immediately at the external boundary, walk
-        // properties explicitly for project-owned anonymous literals.
-        if (!isProjectType(unwrappedProp, checker, ctx.isProjectSourceFile)) {
-          for (const nested of unwrappedProp.getProperties()) {
-            const nestedName = nested.getName();
-            if (nestedName.startsWith("__@")) continue;
-            const nestedPath = `${memberPath}.${nestedName}`;
-            const nestedType = unwrapNonNullish(
-              checker.getTypeOfSymbol(nested),
-            );
-            ctx.manifest.push({
-              exportName: ctx.functionName,
-              signatureIndex: ctx.signatureIndex,
-              parameterIndex: ctx.parameterIndex,
-              parameterName: ctx.parameterName,
-              typePath: ctx.typePath,
-              memberPath: nestedPath,
-              typeName: ctx.typeName,
-            });
-            let nestedRejected = false;
-            if (hasUserDefinedCallSignatures(nestedType)) {
-              nestedRejected = true;
-              pushFinding(
-                ctx.findings,
-                {
-                  functionName: ctx.functionName,
-                  parameterName: ctx.parameterName,
-                  memberPath: nestedPath,
-                  typeName: ctx.typeName,
-                  typePath: ctx.typePath,
-                  reason: `unreviewed user-defined call signature on member ${nestedPath}`,
-                },
-                ctx.exceptions,
-              );
-            }
-            if (mechanismNameHit(nestedName)) {
-              nestedRejected = true;
-              pushFinding(
-                ctx.findings,
-                {
-                  functionName: ctx.functionName,
-                  parameterName: ctx.parameterName,
-                  memberPath: nestedPath,
-                  typeName: ctx.typeName,
-                  typePath: ctx.typePath,
-                  reason: `unreviewed mechanism-substitution shape on member ${nestedPath}`,
-                },
-                ctx.exceptions,
-              );
-            }
-            if (nestedRejected) {
-              ctx.dispositions.push({
-                exportName: ctx.functionName,
-                signatureIndex: ctx.signatureIndex,
-                parameterIndex: ctx.parameterIndex,
-                parameterName: ctx.parameterName,
-                canonicalTypeIdentity: canonicalTypeIdentity(
-                  nestedType,
-                  checker,
-                  ctx.repoRoot,
-                ),
-                typePath: ctx.typePath,
-                memberPath: nestedPath,
-                typeName: ctx.typeName,
-                disposition: "CALLABLE_REJECTED",
-              });
-            }
-          }
-        }
-      } else if (!rejected) {
-        // External anonymous — classify the property type occurrence.
-        walkType(unwrappedProp, checker, nestedCtx);
-      }
-    } else if (!rejected) {
-      // External / primitive property types still receive a disposition node.
-      walkType(unwrappedProp, checker, nestedCtx);
-    }
+    });
   }
+
+  ctx.nodeCompleteness.push({
+    exportName: ctx.functionName,
+    signatureIndex: ctx.signatureIndex,
+    parameterIndex: ctx.parameterIndex,
+    parameterName: ctx.parameterName,
+    typePath: ctx.typePath,
+    memberPath: ctx.memberPath,
+    canonicalTypeIdentity: canon,
+    checkerMemberCount,
+    manifestedMemberCount,
+  });
 }
 
 /**
@@ -1123,6 +1392,9 @@ function legacyEnumeratedFindings(
     manifest: [...manifest].sort(compareManifest),
     findings: [...findings].sort(compareFinding),
     dispositions: [],
+    nodeCompleteness: [],
+    exportDispositions: [],
+    typeOnlyExportCount: 0,
     programConstructionCount: 0,
   };
 }
@@ -1135,6 +1407,9 @@ function emptyAnalysisWithFinding(
     manifest: [],
     findings: [finding],
     dispositions: [],
+    nodeCompleteness: [],
+    exportDispositions: [],
+    typeOnlyExportCount: 0,
     programConstructionCount: 0,
   };
 }
@@ -1149,6 +1424,15 @@ export function analyzePublicAuthoritySurface(
     options.isProjectSourceFile ??
     ((fileName: string) => defaultIsProjectSourceFile(repoRoot, fileName));
   const useLegacyNamingGate = options.useLegacyNamingGate === true;
+  const useLegacyUnUnwrappedMemberCallableCheck =
+    options.useLegacyUnUnwrappedMemberCallableCheck === true;
+  const useLegacySymbolKeyedMemberSkip =
+    options.useLegacySymbolKeyedMemberSkip === true;
+  const useLegacyNoOwnSignatureCensus =
+    options.useLegacyNoOwnSignatureCensus === true;
+  const useLegacyCallableOnlyExportDiscovery =
+    options.useLegacyCallableOnlyExportDiscovery === true;
+  const dropManifestedMemberPath = options.dropManifestedMemberPath;
   const reviewedTerminalEntries =
     options.reviewedTerminals ?? PUBLIC_AUTHORITY_REVIEWED_TERMINALS;
 
@@ -1223,6 +1507,11 @@ export function analyzePublicAuthoritySurface(
       repoRoot,
       reviewedByIdentity,
       useLegacyNamingGate,
+      useLegacyUnUnwrappedMemberCallableCheck,
+      useLegacySymbolKeyedMemberSkip,
+      useLegacyNoOwnSignatureCensus,
+      useLegacyCallableOnlyExportDiscovery,
+      dropManifestedMemberPath,
       programConstructionCount,
     });
   }
@@ -1232,6 +1521,11 @@ export function analyzePublicAuthoritySurface(
     repoRoot,
     reviewedByIdentity,
     useLegacyNamingGate,
+    useLegacyUnUnwrappedMemberCallableCheck,
+    useLegacySymbolKeyedMemberSkip,
+    useLegacyNoOwnSignatureCensus,
+    useLegacyCallableOnlyExportDiscovery,
+    dropManifestedMemberPath,
     programConstructionCount,
   });
 }
@@ -1245,6 +1539,11 @@ function analyzeWithSourceFile(
     readonly repoRoot: string;
     readonly reviewedByIdentity: ReadonlyMap<string, ReviewedTerminalEntry>;
     readonly useLegacyNamingGate: boolean;
+    readonly useLegacyUnUnwrappedMemberCallableCheck: boolean;
+    readonly useLegacySymbolKeyedMemberSkip: boolean;
+    readonly useLegacyNoOwnSignatureCensus: boolean;
+    readonly useLegacyCallableOnlyExportDiscovery: boolean;
+    readonly dropManifestedMemberPath: string | undefined;
     readonly programConstructionCount: number;
   },
 ): PublicAuthorityAnalysis {
@@ -1257,35 +1556,68 @@ function analyzeWithSourceFile(
   const findings: PublicAuthorityFinding[] = [];
   const manifest: DerivedMemberRecord[] = [];
   const dispositions: DispositionRecord[] = [];
+  const nodeCompleteness: NodeCompletenessRecord[] = [];
+  const exportDispositions: ExportDispositionRecord[] = [];
+  let typeOnlyExportCount = 0;
 
-  for (const exportedSymbol of exported) {
-    const resolved = resolveAlias(exportedSymbol, checker);
-    const name = exportedSymbol.getName();
-    // Prefer value-side declarations for callables.
-    const type = checker.getTypeOfSymbolAtLocation(
-      resolved,
-      resolved.valueDeclaration ?? resolved.declarations?.[0] ?? sourceFile,
-    );
-    const signatures = type.getCallSignatures();
-    if (signatures.length === 0) {
-      continue;
-    }
-    exportedCallables.push(name);
+  const baseWalkContext = (
+    functionName: string,
+    parameterName: string,
+    typePath: string,
+    typeName: string,
+    memberPath: string,
+    signatureIndex: number,
+    parameterIndex: number,
+  ): WalkContext => ({
+    functionName,
+    parameterName,
+    typePath,
+    typeName,
+    memberPath,
+    visited: new Set<string>(),
+    traversalStack: new Set<string>(),
+    isProjectSourceFile: opts.isProjectSourceFile,
+    exceptions: opts.exceptions,
+    findings,
+    manifest,
+    dispositions,
+    nodeCompleteness,
+    useLegacyUnUnwrappedMemberCallableCheck:
+      opts.useLegacyUnUnwrappedMemberCallableCheck,
+    useLegacySymbolKeyedMemberSkip: opts.useLegacySymbolKeyedMemberSkip,
+    useLegacyNoOwnSignatureCensus: opts.useLegacyNoOwnSignatureCensus,
+    dropManifestedMemberPath: opts.dropManifestedMemberPath,
+    signatureIndex,
+    parameterIndex,
+    repoRoot: opts.repoRoot,
+    reviewedByIdentity: opts.reviewedByIdentity,
+  });
 
+  /**
+   * Analyze one callable public root: every signature, every parameter, with
+   * the parameter graph traversed unconditionally. Used for function exports
+   * AND for callable members of object-valued exports (R2-H2 §1.5), so an
+   * object-valued export's callable member is a root in exactly the same
+   * sense — one canonical path, no second rule set.
+   */
+  const analyzeCallableRoot = (
+    exportName: string,
+    signatures: readonly ts.Signature[],
+  ): void => {
     signatures.forEach((signature, signatureIndex) => {
       // Rest parameters: Amendment 1 D escape.
       if (
         signature.parameters.some(
-          (p) =>
-            p.valueDeclaration &&
-            ts.isParameter(p.valueDeclaration) &&
-            p.valueDeclaration.dotDotDotToken !== undefined,
+          (param) =>
+            param.valueDeclaration &&
+            ts.isParameter(param.valueDeclaration) &&
+            param.valueDeclaration.dotDotDotToken !== undefined,
         )
       ) {
         pushFinding(
           findings,
           {
-            functionName: name,
+            functionName: exportName,
             parameterName: "...",
             memberPath: "...",
             typeName: "",
@@ -1295,7 +1627,7 @@ function analyzeWithSourceFile(
           opts.exceptions,
         );
         dispositions.push({
-          exportName: name,
+          exportName,
           signatureIndex,
           parameterIndex: -1,
           parameterName: "...",
@@ -1319,7 +1651,7 @@ function analyzeWithSourceFile(
 
         // Record the parameter root in the manifest (P2 complete parameter list).
         manifest.push({
-          exportName: name,
+          exportName,
           signatureIndex,
           parameterIndex,
           parameterName,
@@ -1328,12 +1660,14 @@ function analyzeWithSourceFile(
           typeName,
         });
 
-        // A parameter that is itself a callable is always inspected.
-        if (hasUserDefinedCallSignatures(paramType)) {
+        // A parameter that is itself a callable is always inspected. Uses the
+        // corrected classifier, so an optional or union-wrapped callable
+        // parameter is caught exactly like a required one.
+        if (isCallableMemberType(paramTypeRaw, checker)) {
           pushFinding(
             findings,
             {
-              functionName: name,
+              functionName: exportName,
               parameterName,
               memberPath: parameterName,
               typeName,
@@ -1352,39 +1686,170 @@ function analyzeWithSourceFile(
           hasUserDefinedCallSignatures(paramType);
 
         if (deepInspect) {
-          walkType(paramType, checker, {
-            functionName: name,
-            parameterName,
-            typePath: typeName,
-            typeName,
-            memberPath: "",
-            visited: new Set<string>(),
-            traversalStack: new Set<string>(),
-            isProjectSourceFile: opts.isProjectSourceFile,
-            exceptions: opts.exceptions,
-            findings,
-            manifest,
-            dispositions,
-            signatureIndex,
-            parameterIndex,
-            repoRoot: opts.repoRoot,
-            reviewedByIdentity: opts.reviewedByIdentity,
-          });
+          walkType(
+            paramType,
+            checker,
+            baseWalkContext(
+              exportName,
+              parameterName,
+              typeName,
+              typeName,
+              "",
+              signatureIndex,
+              parameterIndex,
+            ),
+          );
         }
       });
     });
+  };
+
+  for (const exportedSymbol of exported) {
+    const resolved = resolveAlias(exportedSymbol, checker);
+    const name = exportedSymbol.getName();
+
+    // Type-only exports carry no value and are reached through parameter
+    // graphs instead; they need no export disposition (R2-H2 §1.5).
+    if ((resolved.flags & ts.SymbolFlags.Value) === 0) {
+      typeOnlyExportCount += 1;
+      continue;
+    }
+
+    // Prefer value-side declarations for callables.
+    const type = checker.getTypeOfSymbolAtLocation(
+      resolved,
+      resolved.valueDeclaration ?? resolved.declarations?.[0] ?? sourceFile,
+    );
+    const signatures = type.getCallSignatures();
+    const canon = canonicalTypeIdentity(type, checker, opts.repoRoot);
+    const exportTypeName = typeDisplayName(type, checker);
+
+    if (signatures.length > 0) {
+      exportDispositions.push({
+        exportName: name,
+        disposition: "CALLABLE_ROOT",
+        canonicalTypeIdentity: canon,
+        typeName: exportTypeName,
+      });
+      exportedCallables.push(name);
+      analyzeCallableRoot(name, signatures);
+      continue;
+    }
+
+    if (opts.useLegacyCallableOnlyExportDiscovery) {
+      // H2-F7 only: the exact F-R1-006 defect, restored verbatim — a
+      // non-callable value export is dropped before any disposition exists.
+      continue;
+    }
+
+    // Every non-callable VALUE export is walked, so no export is left
+    // undispositioned and no container can hide project-owned structure.
+    walkType(
+      type,
+      checker,
+      baseWalkContext(
+        name,
+        "(export)",
+        exportTypeName,
+        exportTypeName,
+        "(export)",
+        -1,
+        -1,
+      ),
+    );
+
+    if (isPrimitiveOrPrimitiveUnion(type)) {
+      exportDispositions.push({
+        exportName: name,
+        disposition: "PRIMITIVE_TERMINAL",
+        canonicalTypeIdentity: canon,
+        typeName: exportTypeName,
+      });
+      continue;
+    }
+
+    const objectLike = (type.flags & ts.TypeFlags.Object) !== 0;
+    const projectOwned = isProjectType(type, checker, opts.isProjectSourceFile);
+    const anonymous = isAnonymousObjectType(type);
+    const anonymousFile = anonymous
+      ? symbolDeclaringFile(type.getSymbol())
+      : undefined;
+    const anonymousIsProject =
+      anonymous &&
+      (anonymousFile === undefined || opts.isProjectSourceFile(anonymousFile));
+
+    if (!objectLike || (!projectOwned && !anonymousIsProject)) {
+      // External after type-argument inspection (performed by the walk above).
+      exportDispositions.push({
+        exportName: name,
+        disposition: "EXTERNAL_LIBRARY_TERMINAL",
+        canonicalTypeIdentity: canon,
+        typeName: exportTypeName,
+      });
+      continue;
+    }
+
+    // OBJECT_SURFACE — a public object whose members are a public callable
+    // surface (F-R1-006 / GAP-062). Every member was censused and dispositioned
+    // by the walk above; every CALLABLE member is additionally promoted to a
+    // root whose own parameters are traversed.
+    exportDispositions.push({
+      exportName: name,
+      disposition: "OBJECT_SURFACE",
+      canonicalTypeIdentity: canon,
+      typeName: exportTypeName,
+    });
+    for (const member of checker.getPropertiesOfType(type)) {
+      const memberName = memberKeyOf(member, checker, opts.repoRoot);
+      const memberType = unwrapNonNullish(checker.getTypeOfSymbol(member));
+      const memberSignatures = memberType.getCallSignatures();
+      if (memberSignatures.length === 0) {
+        continue;
+      }
+      const rootName = `${name}.${memberName}`;
+      exportDispositions.push({
+        exportName: rootName,
+        disposition: "CALLABLE_ROOT",
+        canonicalTypeIdentity: canonicalTypeIdentity(
+          memberType,
+          checker,
+          opts.repoRoot,
+        ),
+        typeName: typeDisplayName(memberType, checker),
+      });
+      exportedCallables.push(rootName);
+      analyzeCallableRoot(rootName, memberSignatures);
+    }
   }
 
   exportedCallables.sort(stableCompare);
   manifest.sort(compareManifest);
   findings.sort(compareFinding);
   dispositions.sort(compareDisposition);
+  nodeCompleteness.sort(
+    (a, b) =>
+      stableCompare(a.exportName, b.exportName) ||
+      a.signatureIndex - b.signatureIndex ||
+      a.parameterIndex - b.parameterIndex ||
+      stableCompare(a.parameterName, b.parameterName) ||
+      stableCompare(a.typePath, b.typePath) ||
+      stableCompare(a.memberPath, b.memberPath) ||
+      stableCompare(a.canonicalTypeIdentity, b.canonicalTypeIdentity),
+  );
+  exportDispositions.sort(
+    (a, b) =>
+      stableCompare(a.exportName, b.exportName) ||
+      stableCompare(a.disposition, b.disposition),
+  );
 
   return {
     exportedCallables,
     manifest,
     findings,
     dispositions,
+    nodeCompleteness,
+    exportDispositions,
+    typeOnlyExportCount,
     programConstructionCount: opts.programConstructionCount,
   };
 }

@@ -529,3 +529,591 @@ citations are appended using the existing `gap` citation shape.
 | 38 | Any closure artifact; Stage 4; push; remote; history rewrite? | **NO** |
 
 Remaining checklist lines are answered in §1 and §2.
+
+---
+
+## 1. CORRECTION AND GENERATED FALSIFICATION
+
+Stage 0 commit: `80c5f8359d6b5164b47ea99be9a3e96b9607edfa`.
+Every §1.1 reproduction below was executed against the **Stage 0 HEAD
+analyzer**, before any line of the analyzer was modified.
+
+### 1.1 PRE-CORRECTION REPRODUCTION — ALL FIVE, CAPTURED FIRST
+
+Method for (a)–(d): corrupt a real `src/` file → invoke the canonical analyzer
+→ capture verbatim → `git checkout --` → assert blob-hash equality against the
+pre-corruption `git hash-object`. Original blobs:
+`src/editing/types.ts` = `68a641cdcda3041b24559f78f771a7558c113dfd`,
+`src/editing/index.ts` = the Stage 0 HEAD blob. Every restore was verified
+`true` and the tree was `(clean)` at the end of the run.
+
+**CLEAN BASELINE inside the same process** (for byte-comparison):
+
+```
+findings 0 | dispositions 5302 | manifest 2242 | exports 16
+TRAVERSED_PROJECT_GRAPH 1520, PRIMITIVE_TERMINAL 3522,
+EXTERNAL_LIBRARY_TERMINAL 229, REVIEWED_TERMINAL 31
+manifest SHA-256 9c8d31ce89eaf62e1abc2a898cf9324bed2be2846f608fc8ed2187226577a457
+```
+
+#### 1.1(a) — Optional callable on the real `AuthorizePreparedChangeOptions`
+
+Corruption (`src/editing/types.ts`, corrupted blob
+`6907e84fed9b1f8bb724d434c1ff1b851786d6ec`):
+
+```ts
+export type AuthorizePreparedChangeOptions = {
+  readonly gitContext?: GitStateBaseline;
+  readonly quill?: (message: string) => string;
+};
+```
+
+`quill` is deliberately **neutral-named** so that the Amendment 1 §4 D
+mechanism-name rule cannot mask the call-signature rule.
+
+Verbatim result:
+
+```
+findings 0 | dispositions 5303 | manifest 2243 | exports 16
+TRAVERSED_PROJECT_GRAPH 1521, PRIMITIVE_TERMINAL 3522,
+EXTERNAL_LIBRARY_TERMINAL 229, REVIEWED_TERMINAL 31
+findings: []
+quill rows present in manifest: 1
+restored blob equality: true
+```
+
+**REPRODUCED.** A user-defined call signature is present on a public options
+member and the analyzer emits **zero** findings and **zero**
+`CALLABLE_REJECTED` dispositions. Note precisely what this proves: the member
+*is* manifested (2242 → 2243) and *is* dispositioned (5302 → 5303 as
+`TRAVERSED_PROJECT_GRAPH`). Discovery and traversal are correct — F-R1-004 is
+purely a **classification** defect, exactly as GAP-060 records.
+
+#### 1.1(b) — Unique-symbol-keyed callable on the same real type
+
+Corruption (corrupted blob `a9fdbdd5ee6769ec194375da7a39add6e912174d`):
+
+```ts
+export declare const tideKey: unique symbol;
+
+export type AuthorizePreparedChangeOptions = {
+  readonly gitContext?: GitStateBaseline;
+  readonly [tideKey]: (message: string) => string;
+};
+```
+
+The member is **required** and **non-optional** — it defeats the analyzer by
+key kind alone, independently of F-R1-004.
+
+Verbatim result:
+
+```
+findings 0 | dispositions 5302 | manifest 2242 | exports 16
+TRAVERSED_PROJECT_GRAPH 1520, PRIMITIVE_TERMINAL 3522,
+EXTERNAL_LIBRARY_TERMINAL 229, REVIEWED_TERMINAL 31
+findings: []
+manifest byte-identical to clean: TRUE
+manifest SHA-256 9c8d31ce89eaf62e1abc2a898cf9324bed2be2846f608fc8ed2187226577a457
+restored blob equality: true
+```
+
+**REPRODUCED, including the decisive property.** The corrupted tree analyzes
+**byte-identical** to the clean tree — identical manifest SHA-256, identical
+5302/2242/1520/3522/229/31. There is no observable difference for any
+completeness proof to detect. This is why F-R1-005 is the most serious of the
+three: the R2-H1 completeness machinery is not merely silent, it is
+structurally incapable of speaking.
+
+#### 1.1(c) — Object-valued export with a callable member
+
+Corruption appended to the real barrel `src/editing/index.ts` (corrupted blob
+`26554ecc60fa1384aefb6dd1f23b9597aa163d00`):
+
+```ts
+export const marbleSurface = {
+  invoke: (message: string): string => message,
+};
+```
+
+Verbatim result:
+
+```
+findings 0 | dispositions 5302 | manifest 2242 | exports 16
+manifest byte-identical to clean: TRUE
+marbleSurface discovered as callable export: false
+marbleSurface rows in manifest:      0
+marbleSurface rows in dispositions:  0
+findings: []
+restored blob equality: true
+```
+
+**REPRODUCED.** A publicly exported object carrying a function member is
+absent from discovery, from the manifest, and from the disposition census
+entirely — `exportedCallables` stays at 16 and the analysis is byte-identical
+to clean. Nothing records that an export was even considered and dropped.
+
+#### 1.1(d) — Program cache staleness, same process, size preserved
+
+Warm the cache, then corrupt with a **same-length** replacement and restore
+the mtime, then re-analyze **with no `clearRepositoryTypeScriptProgramCache()`
+call**:
+
+```
+from: "readonly gitContext?: GitStateBaseline;"   (39 chars)
+to:   "readonly q?: (m: string) => string;    "   (39 chars)
+```
+
+Verbatim result:
+
+```
+warm:  findings 0, programConstructionCount 1
+same-length replacement: 39 vs 39 -> true
+size preserved:  true   9730 -> 9730
+mtime preserved: 1788607177207.346 -> 1788607177207  (identical to
+                 millisecond granularity; utimesSync truncates the
+                 sub-millisecond fraction — see note)
+after corruption, NO clear call:
+       findings 0, programConstructionCount 0
+stale result identical to warm: TRUE
+restored blob equality: true
+```
+
+**REPRODUCED.** A live callable member was introduced on a public options type
+and the analyzer returned the **stale clean result** — 0 findings,
+`programConstructionCount` 0, byte-identical to the warm run. The cache
+returned a Program built from the pre-corruption text.
+
+Note on mtime: `utimesSync` restores millisecond precision, so the recorded
+mtime went from `…207.346` to `…207` — identical at the granularity any
+mtime-based cache would observe, and a 0.346 ms sub-millisecond difference
+otherwise. This does not weaken the demonstration, because the cache key
+(`tests/architecture/public-authority-surface-analyzer.ts:206`) is
+`repoRoot` **alone**: neither size, nor mtime, nor content participates at
+all. No filesystem metadata could have invalidated it.
+
+#### 1.1(e) — cwd dependence: REPRODUCED, and more strongly than predicted
+
+The identical analyzer call — same explicit `repoRoot`, same exceptions, same
+process image — run from two working directories:
+
+| | from repository root | from a temporary directory |
+|---|---|---|
+| `cwd` | `/Users/achahbi/Projects/path-code` | `…/scratchpad/elsewhere` |
+| findings | **0** | **2** |
+| dispositions | **5302** | **5286** |
+| manifest rows | 2242 | 2242 |
+| `TRAVERSED_PROJECT_GRAPH` | 1520 | 1520 |
+| `PRIMITIVE_TERMINAL` | 3522 | 3522 |
+| `EXTERNAL_LIBRARY_TERMINAL` | **229** | **211** |
+| `REVIEWED_TERMINAL` | 31 | 31 |
+| `UNSAFE_ESCAPE_REJECTED` | **0** | **2** |
+| manifest SHA-256 | `9c8d31ce…6577a457` | `edf6f89a…fa654824` |
+| dispositions SHA-256 | `edf5706a…3dfc309f` | `499cee5c…e6524fd18` |
+
+The two spurious findings, verbatim:
+
+```json
+[
+ {"functionName":"prepareCreateFile","parameterName":"proposedBytes",
+  "memberPath":"proposedBytes","typeName":"any","typePath":"any",
+  "reason":"unreviewed any/unknown escape on public parameter/options surface"},
+ {"functionName":"prepareModifyExistingFile","parameterName":"proposedBytes",
+  "memberPath":"proposedBytes","typeName":"any","typePath":"any",
+  "reason":"unreviewed any/unknown escape on public parameter/options surface"}
+]
+```
+
+**REPRODUCED.** From a foreign cwd the `Uint8Array` parameter type fails to
+resolve and degrades to `any`, which the analyzer then correctly rejects. The
+degradation is **fail-closed** — it produces *more* findings, never fewer,
+which is why the auditor declined to class it a finding. But the analyzer's
+output is demonstrably a function of the directory it was invoked from: two
+different manifests, two different disposition censuses, two different
+verdicts. An evidence tool with that property is not deterministic. Recorded
+as GAP-064.
+
+**All five reproductions succeeded. No STOP AND REPORT condition was
+triggered at §1.1.** Working tree verified `(clean)` after the run.
+
+### 1.2–1.7 THE CORRECTION
+
+All Stage 1 code changes are confined to `tests/architecture/`. **No `src/`
+file is changed in Stage 1 at all** (§1.11).
+
+#### 1.2 Classification on the unwrapped type (F-R1-004 / GAP-060)
+
+`hasUserDefinedCallSignatures(propType)` at line 874 is replaced, on the
+default path, by `isCallableMemberType(type, checker)`:
+
+```ts
+function isCallableMemberType(type: ts.Type, checker: ts.TypeChecker): boolean {
+  for (const part of callableConstituents(unwrapNonNullish(type))) {
+    if (typeIsCallableAtOwnLevel(part, checker)) return true;
+    for (const info of checker.getIndexInfosOfType(part)) {
+      if (typeIsCallableAtOwnLevel(unwrapNonNullish(info.type), checker)) return true;
+    }
+  }
+  return false;
+}
+```
+
+`callableConstituents` flattens unions and intersections **recursively** and
+drops `null` and `undefined`; `typeIsCallableAtOwnLevel` accepts **call OR
+construct** signatures. Methods, callable getters, overloaded function types
+and generic function types all reduce to this one rule, because the
+TypeChecker reports a method's and a getter's type as the underlying type and
+an overloaded or generic function type carries call signatures like any other.
+Optionality is no longer a shield. The same classifier now also guards the
+parameter-root check, so an optional or union-wrapped **parameter** is caught
+exactly like a required one.
+
+#### 1.3 Member iteration with no name-based skip (F-R1-005 / GAP-061)
+
+Both `startsWith("__@")` guards are gone from the default path. The member
+census is now unconditional over `checker.getPropertiesOfType`, every call
+signature, every construct signature and every index info, and the manifest
+push happens for **every** one of them.
+
+Symbol-keyed members are serialized by **declaration identity**:
+
+```
+@@[<declaring file, repository-relative>#<symbol description>]
+```
+
+for example `@@[src/editing/types.ts#editAuthorizationBrand]`. Symbol-keyed-ness
+is decided from the declaration SHAPE (a computed property name) and the KEY
+TYPE FLAGS (`ESSymbol` / `UniqueESSymbol`) — **never** from the text of the
+member name. TypeScript's own `escapedName` embeds a per-Program symbol id and
+is not stable across runs; this identity is.
+
+The three R2-H1 stop authorities (primitive, external after type-argument
+inspection, reviewed terminal) now apply to members exactly as to roots, and
+descent is unconditional — a rejection no longer stops the walk. This also
+allowed the previous special-case nested-literal re-walk (former lines
+949–1017) to be deleted: `walkType` is now the single member-census authority
+(checklist 40 — material work removed while strengthening the proof).
+
+#### 1.4 Per-node completeness
+
+Every traversed project-defined node emits a `NodeCompletenessRecord`:
+
+```
+|getPropertiesOfType| + |callSignatures| + |constructSignatures| + |indexInfos|
+    == manifested entries for that node
+```
+
+On the clean surface there are **911 nodes and 0 mismatches**. This identity is
+what makes an omission observable at all: under the previous shape a skipped
+symbol-keyed member produced a byte-identical analysis (§1.1(b)).
+
+#### 1.5 Export disposition (F-R1-006 / GAP-062)
+
+Every VALUE export of the barrel now receives a disposition on a **separate
+closed axis** — `ExportDisposition` — so `TraversalDisposition` remains exactly
+six values with no seventh, as its contract comment requires.
+
+Object-valued exports are traversed by the same walker used for parameter
+graphs, and every callable member is promoted to a `CALLABLE_ROOT` whose own
+parameters are traversed through `analyzeCallableRoot` — one canonical path,
+no second rule set (checklist 31).
+
+#### 1.6 Content-hash Program cache (GAP-063)
+
+The cache key is the sorted list of (repository-relative path, SHA-256 of
+current content) for **every** source file in the Program, plus a hash of the
+compiler options. Path, size and mtime are not keys; an unreadable file hashes
+as `missing`, so deletion invalidates too. `clearRepositoryTypeScriptProgramCache()`
+is retained for compatibility with existing proofs but correctness no longer
+depends on any caller invoking it — it is a belt, not the suspenders.
+
+#### 1.7 cwd independence (GAP-064)
+
+`parseJsonConfigFileContent` now receives an explicit `ParseConfigHost` with an
+absolute basePath, and the Program is built with an explicit CompilerHost whose
+`getCurrentDirectory()` returns the repository root. Nothing resolves through
+`process.cwd()`.
+
+### 1.8 THE GENERATOR
+
+| Artifact | Purpose |
+|---|---|
+| `tests/architecture/public-authority-surface-dimensions.ts` | the reviewed dimension table, committed **as data** |
+| `tests/architecture/public-authority-surface-matrix.ts` | the generator: cell selection, source construction, in-memory Program, canonical analysis |
+| `tests/architecture/public-authority-surface-matrix.test.ts` | H2-F2 — the permanent matrix proof |
+
+Each cell is built as an **in-memory virtual source overlay** added to a
+TypeScript Program through a custom CompilerHost — **no disk writes for cells**
+— and analyzed by `analyzePublicAuthoritySurface`, the canonical analyzer.
+Cell identity (every dimension value) is carried into every assertion message,
+so a failure names the cell that produced it.
+
+**Expressibility is decided by the TypeScript compiler, not by the author.**
+Every generated cell is compiled and its syntactic and semantic diagnostics are
+collected; any diagnostic makes the cell INEXPRESSIBLE with the exact `TS####`
+message recorded. Shapes TypeScript cannot express at all are recorded
+structurally with a stated reason.
+
+**Cell counts and runtime:**
+
+| Group | Cells | Expressible | INEXPRESSIBLE | Runtime |
+|---|---|---|---|---|
+| A — full DIM-1 × DIM-2 × DIM-3 | **300** | 282 | 18 | 286 ms |
+| B — every DIM-4 placement | **128** | 128 | 0 | 205 ms |
+| C — every DIM-7 root kind | **12** | 12 | 0 | 142 ms |
+| D — pairwise over all 7 dimensions | **182** | 168 | 14 | 183 ms |
+| E — non-callable controls | **300** | 300 | 0 | 165 ms |
+| **TOTAL** | **922** | **890** | **32** | **981 ms** |
+
+Group A/B/C counts are derived from the table, not transcribed:
+5 × 6 × 10 = 300, 16 × 2 × 2 × 2 = 128, 3 × 2 × 2 = 12 — all asserted.
+
+**Group D covering property is asserted, not assumed:** `uncoveredPairsAfter`
+independently recomputes every pair of values from any two of the seven
+dimensions and confirms **0 uncovered pairs** across 182 cells.
+
+Total runtime is under one second, so no sharding was necessary; the matrix
+lives in one test file that completes in ~2.6 s standalone.
+
+### 1.8b INEXPRESSIBLE CELLS — COUNTED AND JUSTIFIED
+
+All **32** inexpressible cells (18 in A, 14 in D) share exactly **one** reason,
+asserted by the test to be the only reason that may appear:
+
+> a method signature declares its own type and cannot be unioned with
+> null/undefined at the declaration site (DIM-1 explicit-nullish × DIM-3 method)
+
+**Justification.** DIM-1's three explicit-nullish values (`| undefined`,
+`| null`, `| null | undefined`) require writing a member type as a union.
+DIM-3's `method` value is a *method signature*, which declares its own type
+inline; TypeScript provides no syntax to union a method signature with
+`null`/`undefined` at its declaration site. Writing
+`readonly k: ((m: string) => string) | undefined` would silently substitute the
+`property-fn` form and pretend a method had been tested — so these cells are
+recorded, counted and reported instead. In group A this is 3 DIM-1 values × 6
+DIM-2 values × 1 DIM-3 value = **18**; group D's pairwise selection hits the
+same combination **14** times.
+
+Every other reviewed value remains fully expressible for every other
+combination, because the generator places the callable form inside a
+**carrier member** wherever the form itself cannot carry the DIM-1/DIM-2/DIM-5
+modifiers: callable getters, call/construct signatures on the containing type,
+callable index signatures and nested function types are all reached through an
+ordinary property, so optionality, key kind and mutability remain independently
+variable. One further modifier interaction is recorded rather than hidden:
+`readonly` is not permitted on a method signature (TS1024), so method cells
+record `dim5Applied: false`.
+
+**Proposed additions to the table** (D5 permits proposals, forbids removals).
+None are adopted in this pass; all are recorded for the next:
+
+1. **DIM-1 `optional + explicit null`** (`k?: T | null`) — the mixed form.
+2. **DIM-3 `abstract construct signature`** (`abstract new (...) => X`).
+3. **DIM-3 `callable setter`** — a `set` accessor taking a callable.
+4. **DIM-4 `index-signature value type`** — the carrier reached through another
+   type's index signature.
+5. **DIM-4 `recursive self-referential placement`** — carrier reachable only
+   through a cycle.
+6. **DIM-2 `private/ES `#` name`** — outside the structural type surface today,
+   but worth an explicit INEXPRESSIBLE record.
+
+### 1.9 PERMANENT FALSIFICATIONS — H2-F1 … H2-F9
+
+Every corruption of a committed baseline file is restored from a byte copy and
+proven by **Git blob-hash equality inside a `finally`**. No falsification
+errored before its intended failure.
+
+| Proof | Result | What it establishes |
+|---|---|---|
+| **H2-F1(a)** | PASS | Optional callable on the real `AuthorizePreparedChangeOptions` FAILS, naming function `authorizePreparedChange`, parameter `options`, type `AuthorizePreparedChangeOptions`, member `quill`, with a `CALLABLE_REJECTED` disposition and a manifest row |
+| **H2-F1(b)** | PASS | Unique-symbol-keyed callable FAILS, member path `@@[src/editing/types.ts#tideKey]`; and the corrupted manifest digest is **no longer** byte-identical to clean — the exact property F-R1-005 exploited |
+| **H2-F1(c)** | PASS | Object-valued export: `marbleSurface` → `OBJECT_SURFACE`, `marbleSurface.invoke` → `CALLABLE_ROOT`, finding raised, export present in `exportedCallables` |
+| **H2-F2** | PASS | The generated matrix: 890 expressible cells all rejected at the expected path with the member manifested; all 300 group E controls pass with 0 findings; 32 INEXPRESSIBLE counted and justified; per-node completeness holds for every generated node |
+| **H2-F3** | PASS | Restoring the `__@` skip breaks per-node completeness **with no corruption at all**, because the real surface carries a unique-symbol member; withholding one censused member from the manifest also breaks it; both restore to 0 mismatches |
+| **H2-F4** | PASS | Restoring the `signatures.length === 0` exclusion makes the object-valued export escape entirely, and the export-completeness assertion (every value export dispositioned, derived independently from the checker) FAILS |
+| **H2-F5** | PASS | Same process, both directions, size preserved exactly and mtime preserved to the millisecond, **no clear call**: corruption is detected, restoration is observed |
+| **H2-F6** | PASS | Manifest SHA-256, findings, disposition count and `exportedCallables` identical from the repository root and from a temporary directory, with the cache cleared after `chdir` so a **new** Program is genuinely built from the foreign cwd |
+| **H2-F7(a)** | PASS | See below — the decisive proof |
+| **H2-F7(b)** | PASS | Restored `__@` skip → symbol-keyed callable escapes, is **absent from the manifest**, and completeness fails |
+| **H2-F7(c)** | PASS | Restored export exclusion → object-valued export escapes |
+| **H2-F8** | PASS | Clean surface: 0 findings, 0 `CALLABLE_REJECTED`, 0 `UNSAFE_ESCAPE_REJECTED`; `WorkspaceBoundary` still the only reviewed terminal; `gitContext` manifested and non-rejected; 28 roots; 0 completeness mismatches |
+| **H2-F9** | PASS | All of `2-F1…2-F7` and `H1-F1…H1-F7` still present in their committed suites; `useLegacyEnumeratedDiscovery` and `useLegacyNamingGate` still reproduce their historical escapes; the first auditor's exact `authorityOps` corruption still fails |
+
+#### H2-F7 — THE DECISIVE PROOF, AND A RESULT WORTH RECORDING
+
+Each defect is restored **separately**, through an explicitly-flagged,
+default-off option — the pattern the repository already uses for
+`useLegacyEnumeratedDiscovery` (2-F7) and `useLegacyNamingGate` (H1-F7).
+
+H2-F7(a) initially **did not** produce an escape, and that is itself a finding
+about the correction rather than a defect: restoring only the un-unwrapped
+member classification was **not sufficient** to let the optional callable
+through, because the node-level own-signature census added by §1.3
+independently rejects it at `quill#call(0)`. The correction has two independent
+mechanisms.
+
+The proof therefore now records both facts explicitly:
+
+- With **both** legacy switches (`useLegacyUnUnwrappedMemberCallableCheck` +
+  `useLegacyNoOwnSignatureCensus`), reconstructing the 328f6fc member-handling
+  shape faithfully, the optional callable **escapes completely** — no finding,
+  no `CALLABLE_REJECTED` — while the member remains manifested, exactly as
+  §1.1(a) observed. The correction is load-bearing.
+- With **only** the classification switch, member-level classification does
+  escape (`memberPath === "quill"` is not rejected) but the node-level census
+  still catches it (`memberPath === "quill#call(0)"`). Two mechanisms must now
+  fail together for this shape to get through.
+
+### 1.10 FULL GATE — EVERY ATTEMPT RECORDED WITH HOST LOAD
+
+| # | Command | Load at start → end (8 CPUs) | Result |
+|---|---|---|---|
+| 1 | `npm run check` | 12.00 → 32.06 | 68 files, **2 test failures**: `2-F2`, `2-F5` (assertion) + reporter timeouts. Investigated, root-caused, fixed — see below |
+| — | `npm test` (diagnostic) | 29.15 → 34.18 | 4 failures: `2-F2`, `2-F5` (assertion), `H2-F5` (assertion), `tests/git/baseline.test.ts` (**timeout**, not assertion) |
+| — | `npx vitest run tests/architecture/` | 16.69 → 19.50 | **7 files, 52 tests, all PASS** after the fixes |
+| 2 | `npm run check` | 18.02 → **80.03** | 67/68 files pass; single failure `tests/git/baseline.test.ts` — `Test timed out in 5000ms`, **zero assertion failures** |
+| — | `npx vitest run tests/git/baseline.test.ts` | 66.16 → 61.18 | **20/20 PASS in isolation** |
+| 3 | `npm run check` | 56.68 → 56.49 | **68 files, 644 tests, ALL PASS**; `ledger:verify PASS` |
+
+**No unexplained assertion failure remains.** The attempt-2 failure is a
+5000 ms wall-clock timeout on a git-subprocess suite at host load **80**, which
+passes 20/20 in isolation and produced zero assertion failures — precisely the
+behavior recorded as **GAP-059**, which operator decision **D7** forbids
+redesigning in this pass.
+
+Runtime total moved **626 → 644** (+18): 12 H2-F falsifications + 6 matrix
+tests. No test was removed.
+
+#### The two assertion failures in attempt 1 — root cause and fix
+
+`2-F2` and `2-F5` asserted `clean.findings` equals `[]` on the **real
+repository** while a concurrent suite legitimately held the tree corrupted.
+The two findings were `quill` and `quill#call(0)` — my own H2-F1(a) corruption,
+observed mid-flight.
+
+The race **pre-existed this pass**: `2-F2`'s clean read was the one
+real-repository read in the suite that did **not** hold
+`withPublicAuthoritySrcLock`, the cross-file mutex the repository already
+provides for exactly this (2-F1, 2-F5, 2-F7, H1-F1 and the standing guard all
+hold it). It was previously **masked** by the old cache: keyed on `repoRoot`
+alone, it usually returned a stale *clean* Program. The content-hash cache of
+§1.6 correctly removes that masking, so a latent test race became visible.
+That is a consequence of the correction worth recording in its own right — a
+cache that could not see corruption also could not see a concurrent test's
+corruption.
+
+The fix is a **strengthening, not a weakening** (operator decision D6):
+`2-F2`'s clean read is wrapped in the repository's existing mutex. The
+assertion `expect(clean.findings).toEqual([])` is unchanged, no probe is
+deleted, no case is relaxed, and every other line of
+`public-authority-surface-derived.test.ts` is untouched. This is the only edit
+to any prior probe file in this pass, and it is recorded here explicitly.
+`H2-F5`'s own trailing clean reads were moved inside the mutex for the same
+reason, and its mtime assertion now compares the millisecond-truncated `Date`
+that `utimesSync` actually round-trips.
+
+### 1.11 DIFF SCAN — NO `src/` CHANGE IN STAGE 1
+
+`git diff --stat HEAD -- src/` is **empty**. Stage 1 changes only:
+
+| File | Status |
+|---|---|
+| `tests/architecture/public-authority-surface-analyzer.ts` | modified — the correction |
+| `tests/architecture/public-authority-surface-dimensions.ts` | new — reviewed table as data |
+| `tests/architecture/public-authority-surface-matrix.ts` | new — generator |
+| `tests/architecture/public-authority-surface-matrix.test.ts` | new — H2-F2 |
+| `tests/architecture/public-authority-surface-h2.test.ts` | new — H2-F1, H2-F3…H2-F9 |
+| `tests/architecture/public-authority-surface-derived.test.ts` | modified — 2-F2 clean read placed under the existing mutex (§1.10) |
+| `docs/reports/PHASE_3_R2_H2_MEMBER_SHAPE_REPORT.md` | this report |
+
+### 1.12 POST-CORRECTION MEASUREMENTS
+
+| Figure | Stage 0 baseline | After correction | Note |
+|---|---|---|---|
+| Public parameter roots | 28 | **28** | unchanged — root discovery was never the defect |
+| `manifestedDispositionRoots` | 28 | **28** | unchanged |
+| Dispositions, total | 5302 | **5366** | +64: the 8 non-callable value exports are now walked |
+| `TRAVERSED_PROJECT_GRAPH` | 1520 | 1522 | +2 |
+| `PRIMITIVE_TERMINAL` | 3522 | 3584 | +62 |
+| `EXTERNAL_LIBRARY_TERMINAL` | 229 | 229 | unchanged |
+| `REVIEWED_TERMINAL` | 31 | 31 | unchanged |
+| `CALLABLE_REJECTED` | 0 | **0** | clean surface |
+| `UNSAFE_ESCAPE_REJECTED` | 0 | **0** | clean surface |
+| Manifest rows | 2242 | **2248** | +6 — see below |
+| Findings | 0 | **0** | clean surface |
+| Node completeness records | — | **911** | **0 mismatches** |
+| Export dispositions | — | **24** | 16 `CALLABLE_ROOT` + 8 `PRIMITIVE_TERMINAL` |
+| Type-only exports | — | **44** | reached through parameter graphs |
+| Analyzer runtime | 1433 ms | **578 ms** cold / **85 ms** warm | warm includes the full content-hash validation |
+| Program construction count | 1 | **1** cold, **0** warm | |
+| Runtime dependencies | 0 | **0** | `typescript` remains a devDependency |
+
+#### The +6 manifest rows: six REAL symbol-keyed members, previously invisible
+
+The correction immediately surfaced **six real members on the live public
+surface** that the analyzer had never represented:
+
+```
+createFile           | @@[src/editing/types.ts#editAuthorizationBrand]
+createMultiFilePlan  | authorization.@@[src/editing/types.ts#editAuthorizationBrand]   (x2)
+executeMultiFilePlan | entries.authorization.@@[src/editing/types.ts#editAuthorizationBrand]  (x2)
+replaceExistingFile  | @@[src/editing/types.ts#editAuthorizationBrand]
+```
+
+These are the `unique symbol` brand on `EditAuthorization`
+(`src/editing/types.ts:105,108`):
+
+```ts
+declare const editAuthorizationBrand: unique symbol;
+
+export type EditAuthorization = {
+  readonly [editAuthorizationBrand]: true;
+  ...
+```
+
+**No STOP AND REPORT condition was triggered.** The contract's rule fires when
+unconditional member iteration surfaces a real **callable** on the clean public
+surface other than the seeded ones. This member's type is the boolean literal
+`true` — a `PRIMITIVE_TERMINAL`, correctly non-rejected, with the clean surface
+still at 0 findings. But it is worth stating plainly: F-R1-005 was not
+hypothetical. There was already a symbol-keyed member on the real public
+authority surface that the guard could not see, and H2-F8 now pins it.
+
+### 1.13 CHECKLIST LINE 9 — ONE DELIBERATE, RECORDED DEVIATION
+
+Checklist line 9 asks whether any `startsWith` / regex / equality test on a
+property name remains, and requires **NO**. After the correction the analyzer
+contains, **on the default path**, exactly one such test:
+
+```ts
+function mechanismNameHit(name: string): boolean {
+  return MECHANISM_NAME.test(name);
+}
+```
+
+It is **kept deliberately**, and the reason is recorded rather than glossed:
+
+- **Amendment 1 §4 D mandates it.** Its second bullet requires the guard to
+  fail on an "operation / adaptor / bindings / executor / loader / reader /
+  writer / verifier shape" — a rule that is inherently about the member's name
+  and is listed *separately* from "a user-defined call signature". Deleting it
+  would remove a detection mechanism a frozen amendment requires, contradicting
+  checklist line 41 and this contract's own "NO new detection vocabulary —
+  Amendment 1 §4 D governs".
+- **It is ADDITIVE, never a gate.** It can only *add* a rejection. It never
+  skips, gates or suppresses traversal, manifesting or classification. The
+  defect class this pass exists to eliminate is name-based **skip authority**,
+  and of that there is now none.
+- **D6 forbids weakening probes.** DIM-6 of the reviewed table varies mechanism
+  keyword naming as a live dimension, and the historical Phase 3 instances
+  (`fsOps`, `targetOps`) are name-detected.
+
+Every other name-shaped test in the file is either a **file path** test
+(`defaultIsProjectSourceFile` — the R2-H1 external ownership boundary, lines
+360/364/369), a **reviewed-terminal registry hygiene** test (lines 744–745,
+fail-closed), or lives behind a default-off legacy falsification flag
+(`useLegacySymbolKeyedMemberSkip` line 1213, `useLegacyEnumeratedDiscovery`
+line 1363, `useLegacyNamingGate` line 1685). None of them can skip a member on
+the default path.
+
+**Answer to line 9: NO name-based skip remains. One additive, Amendment-1-
+mandated name rule remains, deliberately, and is flagged here for the auditor.**

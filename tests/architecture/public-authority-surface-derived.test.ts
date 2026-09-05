@@ -189,11 +189,16 @@ export function futurePublicMutate(options?: FutureMutateOptions): void {
     }
 
     // Repository standing analysis still PASS (fixture removed).
-    const clean = analyzePublicAuthoritySurface({
-      repoRoot,
-      exceptions: PUBLIC_AUTHORITY_APPROVED_EXCEPTIONS,
+    // Held under the src mutex like every other real-repository read in this
+    // suite (2-F1, 2-F5, 2-F7 and H1-F1 already do): a concurrent suite may
+    // legitimately hold the tree corrupted. The assertion itself is unchanged.
+    withPublicAuthoritySrcLock(() => {
+      const clean = analyzePublicAuthoritySurface({
+        repoRoot,
+        exceptions: PUBLIC_AUTHORITY_APPROVED_EXCEPTIONS,
+      });
+      expect(clean.findings).toEqual([]);
     });
-    expect(clean.findings).toEqual([]);
   });
 
   it("2-F3 — named re-export of options type is followed across modules", () => {
