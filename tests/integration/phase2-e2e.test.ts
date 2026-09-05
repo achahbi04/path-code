@@ -67,6 +67,14 @@ async function buildIntegratedFixture(): Promise<string> {
 }
 
 describe("Phase 2G E2E — Repository Intelligence integration", () => {
+  /**
+   * Filesystem/Git-heavy end-to-end integration test: it builds a real
+   * temporary worktree, runs `git init`/`add`/`commit`, then composes config,
+   * inventory, Git baseline, reader, metadata, search and three snapshot
+   * verification passes over that workspace. Its correctness is entirely
+   * assertion-based, so the explicit timeout below is a wall-clock execution
+   * budget for that I/O — not a weakened assertion.
+   */
   it("composes config → inventory → git → reader → metadata → search → snapshot freshness", async () => {
     const root = await buildIntegratedFixture();
     const workspace = await boundaryFor(root);
@@ -255,7 +263,7 @@ describe("Phase 2G E2E — Repository Intelligence integration", () => {
     ).toBe("STALE_CONTENT");
     expect(stale.value.honesty.repositoryUnchangedClaim).toBe(false);
     expect(snapshotResult.value.contentObservations.length).toBe(contentObservations.length);
-  });
+  }, 30_000);
 
   it("requires successful loadProjectConfig before inventory traversal", async () => {
     const root = await createCanonicalTempRoot("p2g-config-");
