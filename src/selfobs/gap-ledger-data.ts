@@ -918,7 +918,7 @@ const GAP_LEDGER_V1: GapLedger = {
       closedByCommit: "c6b922c8dc4950e7f0da8ff34fceaee132495c76",
       closureEvidence: "docs/reports/PHASE_3_R2_H1_TRAVERSAL_REPORT.md",
       notes:
-        "First closure at 4aadb06047173b09cfceee542f140ad6fce7b06f / docs/reports/PHASE_3_R2_CORRECTION_REPORT.md was superseded as insufficient by independent re-audit c60c78254ce273235921694faac57ec5e4a30d5f (F-R1-003). Re-closed by Phase 3-R2-H1 Stage 1 c6b922c8dc4950e7f0da8ff34fceaee132495c76 against unconditional structural traversal proven by H1-F1, H1-F2, H1-F3 and H1-F7. No active leak ever existed. Prior closure commits remain immutable.",
+        "First closure at 4aadb06047173b09cfceee542f140ad6fce7b06f / docs/reports/PHASE_3_R2_CORRECTION_REPORT.md was superseded as insufficient by independent re-audit c60c78254ce273235921694faac57ec5e4a30d5f (F-R1-003). Re-closed by Phase 3-R2-H1 Stage 1 c6b922c8dc4950e7f0da8ff34fceaee132495c76 against unconditional structural traversal proven by H1-F1, H1-F2, H1-F3 and H1-F7. No active leak ever existed. Prior closure commits remain immutable. SCOPE OF THIS CLOSURE (Phase 3-R2-H2 Stage 0, operator decision D1 — this gap stays CLOSED and is NOT reopened): the closure establishes export-driven ROOT DISCOVERY, unconditional ROOT-LEVEL TRAVERSAL, and the absence of any ROOT-LEVEL name gate. The independent re-audit at 328f6fc reproduced 28/28 roots and every disposition count, confirming that scope holds. The closure does NOT establish MEMBER-LEVEL or EXPORT-LEVEL completeness: member callable classification on the un-unwrapped type is GAP-060, the member-level name-pattern skip and the manifest blindness it creates are GAP-061, and object-valued export discovery is GAP-062. Consult those three records for member-level and export-level completeness.",
     },
     {
       id: "GAP-058",
@@ -959,6 +959,118 @@ const GAP_LEDGER_V1: GapLedger = {
         "a proven load-control mechanism and repeated clean full checks with recorded host conditions.",
       notes:
         "supersedes the narrower two-file disposition cited in the census baseline and hardening report §9 as the current description of this behavior. Not attached to any capability.",
+    },
+    {
+      id: "GAP-060",
+      title:
+        "Member callable classification applied to the un-unwrapped type, so optional and union-wrapped callables are never rejected",
+      sourceCheckpoint:
+        "Phase 3-R1 Stage 3 independent re-audit at 328f6fc (F-R1-004)",
+      description:
+        "tests/architecture/public-authority-surface-analyzer.ts:874 calls hasUserDefinedCallSignatures(propType) on the member type before null/undefined removal. An optional member `q?: (m) => string` has type `((m) => string) | undefined`; getCallSignatures() on a union returns [], so no CALLABLE_REJECTED disposition and no finding are emitted. The unwrapped type exists at line 926 and is used for disposition identity and descent, but never for classification. Adding such a member to the real AuthorizePreparedChangeOptions yields 0 findings with the standing guard 5/5 and P1-P14 9/9. Every existing option member on every options type in this repository is optional; this is the natural way to write one. Amendment 1 §4 D requires failure on an unreviewed member carrying a user-defined call signature without qualification by optionality.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: "BLOCKING_INVARIANT",
+      lifecycle: "OPEN",
+      missingEvidence:
+        "callable classification performed on the non-nullable type and on every union/intersection constituent, covering call signatures, construct signatures, methods, callable getters and callable index-signature value types; generated matrix coverage of the optionality dimension.",
+      closureCondition:
+        "callable classification is applied to the non-nullable type and to every union/intersection constituent; generated matrix cells A/B/C/D pass; restoring the un-unwrapped check makes the optional-callable falsification escape.",
+      notes:
+        "No active leak at 328f6fc — this is absent detection, not present authority escape. Member-level counterpart to the root-level naming gate closed by GAP-057; GAP-057 remains CLOSED and correctly scoped. Primary origin: IMPLEMENTATION.",
+    },
+    {
+      id: "GAP-061",
+      title:
+        "Symbol-keyed members skipped by a name pattern before the manifest push, leaving the completeness proof blind to the skip",
+      sourceCheckpoint:
+        "Phase 3-R1 Stage 3 independent re-audit at 328f6fc (F-R1-005)",
+      description:
+        "tests/architecture/public-authority-surface-analyzer.ts:856 and :954 execute `if (propName.startsWith(\"__@\")) continue;`. TypeScript escapedName begins `__@` for every symbol-keyed property — well-known and unique alike — so both guards fire far beyond the iterators their comment names. Decisively, both run BEFORE the ctx.manifest.push at lines 863-871 and 959-967, so a skipped member never enters the manifest and the R2-H1 per-root completeness proof cannot observe its absence: a corrupted tree analyzes byte-identical to a clean one (5302 dispositions, 2242 manifest rows, 0 findings). This is a name-pattern skip — the class eliminated at the root level by GAP-057 — surviving at the member level.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: "BLOCKING_INVARIANT",
+      lifecycle: "OPEN",
+      missingEvidence:
+        "unconditional member iteration with no name-based skip anywhere in the analyzer; symbol-keyed members manifested by declaration identity and classified; a per-node completeness proof that fails when any checker-visible member is omitted from the manifest.",
+      closureCondition:
+        "no name-based member skip (startsWith, regex, or equality on a property name) remains anywhere in the analyzer; symbol-keyed members are manifested by declaration identity and classified; the per-node completeness proof fails when any member is omitted, proven by temporarily restoring the skip.",
+      notes:
+        "No active leak at 328f6fc — absent detection only. The manifest blindness is the load-bearing half: without it the omission would have been visible to the existing R2-H1 proof. Primary origin: IMPLEMENTATION.",
+    },
+    {
+      id: "GAP-062",
+      title:
+        "Object-valued barrel exports dropped from discovery before any disposition is recorded",
+      sourceCheckpoint:
+        "Phase 3-R1 Stage 3 independent re-audit at 328f6fc (F-R1-006)",
+      description:
+        "tests/architecture/public-authority-surface-analyzer.ts:1270 executes `if (signatures.length === 0) { continue; }` in the barrel export loop. An exported value whose type carries no call signatures is excluded from discovery entirely, before any disposition is recorded. An exported object literal or namespace object whose members are functions is a public callable surface reachable by any consumer, and it never becomes a root. No export-level completeness proof exists to notice, because the export loop records nothing for a skipped export.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: "BLOCKING_INVARIANT",
+      lifecycle: "OPEN",
+      missingEvidence:
+        "an export-disposition record for every value export of the barrel; traversal of object-valued exports; promotion of their callable members to roots with their own parameter roots traversed; an export-level completeness proof.",
+      closureCondition:
+        "every value export receives a disposition; object-valued exports are traversed; their callable members become roots and their parameters are traversed; restoring the signatures.length === 0 exclusion makes an object-valued export with a callable member escape and fails the export-disposition completeness test.",
+      notes:
+        "No active leak at 328f6fc — the editing barrel exports no object-valued value today; this is absent detection of a shape a future export could take. Scope remains the editing barrel per operator decision D4; package-root coverage stays GAP-058. Primary origin: IMPLEMENTATION.",
+    },
+    {
+      id: "GAP-063",
+      title:
+        "TypeScript Program cache has no content-based invalidation and is stale in both directions",
+      sourceCheckpoint:
+        "Phase 3-R1 Stage 3 independent re-audit at 328f6fc (auditor hazard, not classed a finding by the auditor)",
+      description:
+        "tests/architecture/public-authority-surface-analyzer.ts:157 declares `const programCache = new Map<string, ts.Program>()` keyed at line 206 on repoRoot alone. No content, size, or mtime participates in the key. Across a src/ mutation that preserves size and mtime the cache returns a stale Program in both directions: a corruption is not observed, and a restoration is not observed either. Correctness currently depends on callers invoking clearRepositoryTypeScriptProgramCache() by convention. An evidence mechanism whose correctness rests on caller convention is not mechanically safe.",
+      proposedClass: "BLOCKING_INVARIANT",
+      reviewClassification: "BLOCKING_INVARIANT",
+      lifecycle: "OPEN",
+      missingEvidence:
+        "a Program cache key derived from the content of every input source file plus the compiler options, and a same-process both-direction freshness falsification performed with size and mtime preserved and no explicit cache-clear call.",
+      closureCondition:
+        "the Program cache key is the sorted list of (repository-relative path, SHA-256 of content) for every source file in the Program plus a compiler-options hash; path, size and mtime are not keys; same-process both-direction freshness is proven with size and mtime preserved and no explicit clear call between steps.",
+      notes:
+        "No incorrect result was produced at 328f6fc because the standing guard and every existing proof call clearRepositoryTypeScriptProgramCache(). Closing this gap makes that call a belt rather than the suspenders. Primary origin: IMPLEMENTATION.",
+    },
+    {
+      id: "GAP-064",
+      title:
+        "Analyzer Program construction resolves lib and config paths through process.cwd()",
+      sourceCheckpoint:
+        "Phase 3-R1 Stage 3 independent re-audit at 328f6fc (auditor hazard, not classed a finding by the auditor)",
+      description:
+        "createRepositoryTypeScriptProgram (tests/architecture/public-authority-surface-analyzer.ts:159-192) passes ts.sys to ts.parseJsonConfigFileContent and calls ts.createProgram with no explicit CompilerHost. The default host resolves the default lib and relative paths through ts.sys.getCurrentDirectory(), i.e. process.cwd(). Analyzer output can therefore depend on the directory from which it was invoked. architectureTestsRepoRoot() is already cwd-independent (it derives from import.meta.url); the residual dependence is inside Program construction only.",
+      proposedClass: "NON_BLOCKING_LIMITATION",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "the dependence degrades fail-closed — a lib that fails to resolve yields unresolved types that are rejected rather than silently admitted — and every current invocation path runs from the repository root. No incorrect admission has been demonstrated. The defect is determinism of an evidence tool, not authority leakage.",
+      missingEvidence:
+        "repository root, tsconfig and lib directory resolved from the analyzer module location or an explicit root argument rather than process.cwd(), plus a proof that analyzer output is identical from two different working directories.",
+      closureCondition:
+        "analyzer output is byte-identical when the analyzer runs from the repository root and from a temporary directory outside it.",
+      notes:
+        "Recorded as a distinct mechanism from GAP-063 so each is closed by its own proof. Not attached to any capability per operator decision D2.",
+    },
+    {
+      id: "GAP-065",
+      title:
+        "Falsification design for the public authority-surface detector shared the implementer's own assumptions across three passes",
+      sourceCheckpoint:
+        "Phase 3-R1 Stage 3 independent re-audit at 328f6fc (process finding)",
+      description:
+        "Three fresh independent auditors returned NOT COMPLETE at three checkpoints (ecda537 / F-R1-001, c60c782 / F-R1-003, 328f6fc / F-R1-004+005+006). Each found a defect the implementer's own falsifications did not reveal. R2's 2-F1..2-F7, R2-H1's H1-F1..H1-F7 and both prior auditors shared one unexamined assumption: every probe used a required, string-keyed member. Falsifications written from imagination test what the author imagined, so coverage of a detection mechanism cannot be established by hand-written probes alone.",
+      proposedClass: "NON_BLOCKING_LIMITATION",
+      reviewClassification: "NON_BLOCKING_LIMITATION",
+      lifecycle: "OPEN",
+      whyNonBlocking:
+        "this is a defect in evidence design, not in repository behavior. Every code defect it allowed through is separately recorded as GAP-060, GAP-061 and GAP-062 and is separately blocking. No production semantic is incorrect because of this gap alone.",
+      missingEvidence:
+        "an operator-reviewed dimension table committed as data, a generator that produces one fixture per enumerated cell, and evidence that every required cell is exercised against the canonical analyzer with cell identity carried into each failure message.",
+      closureCondition:
+        "the committed dimension table and its generator exist; every required cell in groups A, B, C, D passes and every group E control passes; inexpressible cells are counted and justified rather than silently omitted; the table — not hand-written imagination — is the falsification source for this detector.",
+      notes:
+        "Process finding, closed by the generated matrix within this pass for this detector only. Making generated falsification a Constitution rule for ALL future detection mechanisms is a Phase 4 Master / Amendment 2 candidate and is explicitly NOT done here. Not attached to any capability per operator decision D2. Contributing origin: EVIDENCE.",
     },
   ],
 };
