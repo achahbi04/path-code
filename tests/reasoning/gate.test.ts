@@ -19,7 +19,6 @@ import {
   describeReferenceCatalog,
   disposeReferenceCatalog,
 } from "../../src/reasoning/catalog.js";
-import { admittedEntry } from "../snapshot/helpers.js";
 import {
   cleanupReasoningFixtures,
   fixtureWithSourceAndManifest,
@@ -626,7 +625,8 @@ describe("reference binding gate", () => {
     }
     expect(descriptors.value.length).toBeGreaterThan(0);
     expect(() => {
-      (descriptors.value as { handle: string }[])[0]!.handle = "mutated";
+      (descriptors.value as unknown as { handle: string }[])[0]!.handle =
+        "mutated";
     }).toThrow();
 
     const bound = await bindReasoningProposalJson(
