@@ -5,9 +5,9 @@
 import type {
   PreparedValidationPlan,
   ValidationPlanResult,
-} from "../validation/types.js";
-import type { LocalProcessResult } from "../execution/types.js";
-import type { RunEvidenceAssociation, RunEvidenceRecord } from "./types.js";
+} from "../../validation/types.js";
+import type { LocalProcessResult } from "../../execution/types.js";
+import type { RunEvidenceAssociation, RunEvidenceRecord } from "../types.js";
 
 type Entry = {
   readonly association: RunEvidenceAssociation;

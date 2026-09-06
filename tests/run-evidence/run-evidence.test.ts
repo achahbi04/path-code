@@ -123,7 +123,9 @@ describe("run evidence", () => {
     expect(evidence.value.counts.pass).toBe(1);
     expect(evidence.value.counts.plannedChecks).toBe(1);
     expect(() => {
-      (evidence.value.checkRows as { verdict: string }[])[0]!.verdict = "FAIL";
+      (
+        evidence.value.checkRows as unknown as { verdict: string }[]
+      )[0]!.verdict = "FAIL";
     }).toThrow();
     expect(evidence.value.checkRows[0]?.verdict).toBe("PASS");
   });
