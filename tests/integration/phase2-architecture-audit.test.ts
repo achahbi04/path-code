@@ -159,6 +159,7 @@ describe("Phase 2G architecture audit — package surface", () => {
     expect(statSync(join(repoRoot, "src/editing"), { throwIfNoEntry: false })).toBeDefined();
     expect(statSync(join(repoRoot, "src/execution"), { throwIfNoEntry: false })).toBeDefined();
     expect(statSync(join(repoRoot, "src/validation"), { throwIfNoEntry: false })).toBeDefined();
+    expect(statSync(join(repoRoot, "src/run-evidence"), { throwIfNoEntry: false })).toBeDefined();
     expect(statSync(join(repoRoot, "src/model"), { throwIfNoEntry: false })).toBeUndefined();
     const rootSource = readFileSync(join(repoRoot, "src/index.ts"), "utf8");
     expect(rootSource).not.toMatch(/prepareLocalProcess/);
@@ -166,5 +167,6 @@ describe("Phase 2G architecture audit — package surface", () => {
     expect(rootSource).not.toMatch(/executeAuthorizedLocalProcess/);
     expect(rootSource).not.toMatch(/prepareValidationPlan/);
     expect(rootSource).not.toMatch(/executeValidationPlan/);
+    expect(rootSource).not.toMatch(/buildRunEvidence/);
   });
 });
