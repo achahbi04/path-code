@@ -28,7 +28,8 @@ export type ActionClass =
   | "GIT_PUSH"
   | "DEPLOYMENT"
   | "SYSTEM_LEVEL_OPERATION"
-  | "PRIVILEGED_EXECUTION";
+  | "PRIVILEGED_EXECUTION"
+  | "EXECUTE_PROCESS";
 
 export type AuthorityDecision = "ALLOW" | "ASK" | "DENY";
 

@@ -62,6 +62,7 @@ const ACTION_CLASSES: ReadonlySet<ActionClass> = new Set([
   "DEPLOYMENT",
   "SYSTEM_LEVEL_OPERATION",
   "PRIVILEGED_EXECUTION",
+  "EXECUTE_PROCESS",
 ]);
 
 type ExtractedContent = {
