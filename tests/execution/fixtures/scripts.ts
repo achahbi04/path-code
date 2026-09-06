@@ -20,10 +20,17 @@ const ms = Number(process.argv[2] ?? "5000");
 setTimeout(() => process.exit(0), ms);
 `;
 
+/**
+ * Must remain alive after SIGTERM so Path Code can escalate to SIGKILL.
+ * Handler is registered on the first tick of user code; callers must use a
+ * timeoutMs large enough that Node spawn + this registration complete first
+ * (otherwise default SIGTERM exits before the ignore handler exists).
+ */
 export const FIXTURE_IGNORE_SIGTERM = String.raw`
 process.on("SIGTERM", () => {
   process.stdout.write("ignored-sigterm\n");
 });
+process.stdout.write("ready\n");
 setInterval(() => {}, 1000);
 `;
 

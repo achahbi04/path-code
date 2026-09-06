@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { loadProjectConfig } from "../../src/config/index.js";
 import {
   DEFAULT_LOCAL_PROCESS_TIMEOUT_MS,
+  LOCAL_PROCESS_TERMINATION_GRACE_MS,
   MAX_LOCAL_PROCESS_ARGV_COUNT,
   MAX_LOCAL_PROCESS_ARGV_TOTAL_BYTES,
   MAX_LOCAL_PROCESS_TIMEOUT_MS,
@@ -626,16 +627,35 @@ describe("local process execution", () => {
     expect(timed.value.timedOut).toBe(true);
     expect(timed.value.terminationRequested).toBe(true);
 
+    // timeoutMs must exceed Node spawn + handler registration under suite load.
+    // With 200ms, SIGTERM could arrive before the ignore handler existed; the
+    // engine then correctly observed exit and skipped SIGKILL.
+    const ignoreTimeoutMs = 1_000;
     const ignored = await runNodeFixture(root, FIXTURE_IGNORE_SIGTERM, [], {
-      timeoutMs: 200,
+      timeoutMs: ignoreTimeoutMs,
     });
     expect(ignored.ok).toBe(true);
     if (!ignored.ok) {
       return;
     }
+    expect(ignored.value.timedOut).toBe(true);
     expect(ignored.value.terminationRequested).toBe(true);
-    expect(ignored.value.cleanup.signalsAttempted).toContain("SIGTERM");
-    expect(ignored.value.cleanup.signalsAttempted).toContain("SIGKILL");
+    expect(ignored.value.stdout.text).toContain("ready");
+    expect(ignored.value.stdout.text).toContain("ignored-sigterm");
+    expect(ignored.value.cleanup.signalsAttempted).toEqual([
+      "SIGTERM",
+      "SIGKILL",
+    ]);
+    expect(ignored.value.terminationObserved).toBe(true);
+    expect(ignored.value.cleanup.terminationNotConfirmed).toBe(false);
+    expect(ignored.value.outcome).toBe("TIMED_OUT");
+    expect(ignored.value.durationMs).toBeGreaterThanOrEqual(
+      ignoreTimeoutMs + LOCAL_PROCESS_TERMINATION_GRACE_MS,
+    );
+    expect(ignored.value.cleanup.descendantMayRemainAlive).toBe(false);
+    if (ignored.value.pid !== null) {
+      expect(() => process.kill(ignored.value.pid!, 0)).toThrow();
+    }
   }, 20_000);
 
   it("terminates on stdout and stderr overflow while continuing drain", async () => {
