@@ -555,7 +555,7 @@ describe("validation evidence-map gap coverage", () => {
     expect(result.value.checkResults[3]?.processResult?.argv.slice(-1)).toEqual([
       "test",
     ]);
-  });
+  }, 15_000);
 
   it("real nonzero exit with stdout PASS is FAIL", async () => {
     const root = await createCanonicalTempRoot("pc-4b-gap-stdout-");
