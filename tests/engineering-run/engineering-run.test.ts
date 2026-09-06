@@ -123,7 +123,7 @@ describe("engineering run composition", () => {
   it("composes authentic successful Validation into an EngineeringRunRecord", async () => {
     const root = await createCanonicalTempRoot("pc-4d-ok-");
     const ok = await writeScript(root, "ok.mjs", "process.exit(0);\n");
-    const { subject, plan, authorization } = await prepareAuthorized(
+    const { plan, authorization } = await prepareAuthorized(
       root,
       ["src/a.ts"],
       [{ id: "t", kind: "TYPECHECK", request: nodeRequest(root, ok) }],
