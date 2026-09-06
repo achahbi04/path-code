@@ -444,6 +444,23 @@ describe("loadProjectConfig — narrowing vocabulary / authority", () => {
     }
   });
 
+  it("accepts EXECUTE_PROCESS as a disable-action ActionClass", async () => {
+    const root = await createRoot("pc-config-execute-process-action-");
+    await writeFile(
+      path.join(root, "PATHCODE.md"),
+      "```pathcode-config\ndisable-action = EXECUTE_PROCESS\n```",
+      "utf8",
+    );
+
+    const loaded = await loadAt(root);
+    expect(loaded.ok).toBe(true);
+    if (loaded.ok) {
+      expect(loaded.value.restrictions.disabledActions).toEqual([
+        "EXECUTE_PROCESS",
+      ]);
+    }
+  });
+
   it.each([
     ["workspace-root", "workspace-root = /tmp"],
     ["allow-path", "allow-path = ../outside"],

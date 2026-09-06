@@ -133,8 +133,11 @@ describe("git baseline architecture", () => {
     expect(violations).toEqual([]);
   });
 
-  it("compiled dist production modules use execFile only for child_process", () => {
+  it("compiled dist production modules use execFile only for child_process except the Phase 4 process host", () => {
     const distRoot = join(repoRoot, "dist");
+    /** Sole authorized non-Git child_process owner (Phase 4). */
+    const AUTHORIZED_SPAWN_MODULE =
+      "dist/execution/internal/process-host.js";
     const hits: string[] = [];
 
     function walk(dir: string): void {
@@ -162,6 +165,9 @@ describe("git baseline architecture", () => {
         ) {
           continue;
         }
+        const relative = full.startsWith(repoRoot)
+          ? full.slice(repoRoot.length).replace(/^\//, "")
+          : full;
         const primitives: string[] = [];
         if (/\bexecFile\b/.test(source)) {
           primitives.push("execFile");
@@ -181,10 +187,15 @@ describe("git baseline architecture", () => {
           primitives.push("exec");
         }
         hits.push(`${full}: ${primitives.join(",") || "other"}`);
-        expect(primitives.includes("spawn"), full).toBe(false);
         expect(primitives.includes("exec"), full).toBe(false);
         expect(primitives.includes("fork"), full).toBe(false);
-        expect(primitives.includes("execFile"), full).toBe(true);
+        if (relative === AUTHORIZED_SPAWN_MODULE) {
+          expect(primitives.includes("spawn"), full).toBe(true);
+          expect(primitives.includes("execFile"), full).toBe(false);
+        } else {
+          expect(primitives.includes("spawn"), full).toBe(false);
+          expect(primitives.includes("execFile"), full).toBe(true);
+        }
       }
     }
 

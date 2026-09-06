@@ -155,9 +155,13 @@ describe("Phase 2G architecture audit — package surface", () => {
     expect(rootSource).not.toMatch(/verifyRepositorySnapshot/);
   });
 
-  it("Phase 3 execution/model modules remain absent while editing contracts exist", () => {
+  it("Phase 4 execution may exist; model modules remain absent; editing contracts exist", () => {
     expect(statSync(join(repoRoot, "src/editing"), { throwIfNoEntry: false })).toBeDefined();
-    expect(statSync(join(repoRoot, "src/execution"), { throwIfNoEntry: false })).toBeUndefined();
+    expect(statSync(join(repoRoot, "src/execution"), { throwIfNoEntry: false })).toBeDefined();
     expect(statSync(join(repoRoot, "src/model"), { throwIfNoEntry: false })).toBeUndefined();
+    const rootSource = readFileSync(join(repoRoot, "src/index.ts"), "utf8");
+    expect(rootSource).not.toMatch(/prepareLocalProcess/);
+    expect(rootSource).not.toMatch(/explicitLocalProcessApproval/);
+    expect(rootSource).not.toMatch(/executeAuthorizedLocalProcess/);
   });
 });
