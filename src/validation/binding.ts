@@ -5,11 +5,28 @@
 
 import type { Result } from "../domain/result.js";
 import { failure, success } from "../domain/result.js";
-import { lookupValidationResult } from "./internal/registry.js";
-import type { PreparedValidationPlan, ValidationPlanResult } from "./types.js";
+import type { ContentObservation } from "../reader/types.js";
+import type { RepositoryEntry } from "../inventory/types.js";
+import type { PreparedLocalProcess } from "../execution/types.js";
+import type { WorkspaceBoundary } from "../domain/workspace.js";
+import type { RepositorySnapshot } from "../snapshot/types.js";
+import type { ResolvedProjectConfig } from "../config/types.js";
+import {
+  lookupPreparedValidationPlan,
+  lookupValidationResult,
+} from "./internal/registry.js";
+import type {
+  PreparedValidationCheck,
+  PreparedValidationPlan,
+  ValidationCheckKind,
+  ValidationCriterionId,
+  ValidationPlanResult,
+  ValidationScopeId,
+} from "./types.js";
 
 export type ValidationBindingFailureCode =
   | "RESULT_NOT_REGISTERED"
+  | "PLAN_NOT_REGISTERED"
   | "PLAN_MISMATCH";
 
 export type ValidationBindingFailure = {
@@ -20,6 +37,29 @@ export type ValidationBindingFailure = {
 export type RegisteredValidationBinding = {
   readonly result: ValidationPlanResult;
   readonly plan: PreparedValidationPlan;
+};
+
+export type PreparedCheckAssociation = {
+  readonly id: string;
+  readonly kind: ValidationCheckKind;
+  readonly preparedProcess: PreparedLocalProcess;
+};
+
+/**
+ * Read-only projection of already-retained plan fields.
+ * Authenticity requires WeakMap registration from prepareValidationPlan.
+ */
+export type RegisteredPreparedValidationPlan = {
+  readonly plan: PreparedValidationPlan;
+  readonly planId: string;
+  readonly checks: readonly PreparedCheckAssociation[];
+  readonly workspace: WorkspaceBoundary;
+  readonly snapshot: RepositorySnapshot;
+  readonly config: ResolvedProjectConfig;
+  readonly declaredObservations: readonly ContentObservation[];
+  readonly declaredEntries: readonly RepositoryEntry[];
+  readonly criterionId: ValidationCriterionId;
+  readonly scopeId: ValidationScopeId;
 };
 
 /**
@@ -45,4 +85,44 @@ export function resolveRegisteredValidationBinding(
     });
   }
   return success({ result: entry.result, plan: entry.planRef });
+}
+
+/**
+ * Authenticate a prepared Validation plan and project retained
+ * check / subject / prepared-process association. Does not reconstruct
+ * original LocalProcessRequest objects (not retained by the owner).
+ */
+export function resolveRegisteredPreparedValidationPlan(
+  plan: PreparedValidationPlan,
+): Result<RegisteredPreparedValidationPlan, ValidationBindingFailure> {
+  const entry = lookupPreparedValidationPlan(plan);
+  if (entry === undefined || entry.plan !== plan) {
+    return failure({
+      code: "PLAN_NOT_REGISTERED",
+      message:
+        "PreparedValidationPlan is not registered or was reconstructed/copied",
+    });
+  }
+  const checks: PreparedCheckAssociation[] = entry.plan.checks.map(
+    (check: PreparedValidationCheck) =>
+      Object.freeze({
+        id: check.id,
+        kind: check.kind,
+        preparedProcess: check.preparedProcess,
+      }),
+  );
+  return success(
+    Object.freeze({
+      plan: entry.plan,
+      planId: entry.plan.planId,
+      checks: Object.freeze(checks),
+      workspace: entry.plan.workspace,
+      snapshot: entry.plan.snapshot,
+      config: entry.plan.config,
+      declaredObservations: entry.plan.declaredObservations,
+      declaredEntries: entry.plan.declaredEntries,
+      criterionId: entry.plan.criterionId,
+      scopeId: entry.plan.scopeId,
+    }),
+  );
 }

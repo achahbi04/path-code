@@ -21,7 +21,10 @@ import {
   VALIDATION_CRITERION_ID,
   VALIDATION_SCOPE_ID,
 } from "./bounds.js";
-import { nextPlanId } from "./internal/registry.js";
+import {
+  nextPlanId,
+  registerPreparedValidationPlan,
+} from "./internal/registry.js";
 import { isValidationExecutionDisabled } from "./policy.js";
 import { declaredEntriesFromObservations } from "./subject.js";
 import type {
@@ -224,7 +227,8 @@ export async function prepareValidationPlan(
     criterionId: VALIDATION_CRITERION_ID,
     scopeId: VALIDATION_SCOPE_ID,
     preparedAtMs: Date.now(),
-  });
+  }) as unknown as PreparedValidationPlan;
 
-  return success(plan as unknown as PreparedValidationPlan);
+  registerPreparedValidationPlan(plan);
+  return success(plan);
 }

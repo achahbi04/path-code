@@ -17,7 +17,10 @@ export { prepareValidationPlan } from "./preparation.js";
 export { authorizeValidationPlan } from "./authorization.js";
 export { executeValidationPlan } from "./execute.js";
 export { checkValidationResultApplicability } from "./applicability.js";
-export { resolveRegisteredValidationBinding } from "./binding.js";
+export {
+  resolveRegisteredPreparedValidationPlan,
+  resolveRegisteredValidationBinding,
+} from "./binding.js";
 export {
   actionClassForCheckKind,
   isCheckKindDisabled,
@@ -25,6 +28,8 @@ export {
 } from "./policy.js";
 
 export type {
+  PreparedCheckAssociation,
+  RegisteredPreparedValidationPlan,
   RegisteredValidationBinding,
   ValidationBindingFailure,
   ValidationBindingFailureCode,

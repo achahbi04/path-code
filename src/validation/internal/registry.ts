@@ -18,6 +18,11 @@ type ResultEntry = {
   readonly result: ValidationPlanResult;
 };
 
+type PlanEntry = {
+  readonly plan: PreparedValidationPlan;
+};
+
+const planRegistry = new WeakMap<PreparedValidationPlan, PlanEntry>();
 const authRegistry = new WeakMap<ValidationAuthorization, AuthEntry>();
 const resultRegistry = new WeakMap<ValidationPlanResult, ResultEntry>();
 
@@ -38,6 +43,18 @@ export function nextValidationAuthId(): string {
 export function nextValidationResultId(): string {
   resultCounter += 1;
   return `validation-result-${resultCounter}`;
+}
+
+export function registerPreparedValidationPlan(
+  plan: PreparedValidationPlan,
+): void {
+  planRegistry.set(plan, { plan });
+}
+
+export function lookupPreparedValidationPlan(
+  plan: PreparedValidationPlan,
+): PlanEntry | undefined {
+  return planRegistry.get(plan);
 }
 
 export function registerValidationAuthorization(

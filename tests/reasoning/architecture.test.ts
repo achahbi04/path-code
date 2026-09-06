@@ -23,7 +23,7 @@ const TYPES_ONLY_FILES = new Set([
   "src/reasoning/types.ts",
 ]);
 
-/** Runtime modules explicitly authorized by Phase 5B. */
+/** Runtime modules explicitly authorized by Phase 5B + Phase 5C Gate 2. */
 const RUNTIME_MODULE_FILES = new Set([
   "src/reasoning/index.ts",
   "src/reasoning/bounds.ts",
@@ -32,7 +32,17 @@ const RUNTIME_MODULE_FILES = new Set([
   "src/reasoning/parse.ts",
   "src/reasoning/bind.ts",
   "src/reasoning/applicability.ts",
+  "src/reasoning/association.ts",
   "src/reasoning/internal/registry.ts",
+  "src/reasoning/gate2/index.ts",
+  "src/reasoning/gate2/bounds.ts",
+  "src/reasoning/gate2/failures.ts",
+  "src/reasoning/gate2/types.ts",
+  "src/reasoning/gate2/registry.ts",
+  "src/reasoning/gate2/association.ts",
+  "src/reasoning/gate2/prepare.ts",
+  "src/reasoning/gate2/evaluate.ts",
+  "src/reasoning/gate2/applicability.ts",
 ]);
 
 const ALLOWED_RUNTIME_VALUE_EXPORTS = new Set([
@@ -43,13 +53,33 @@ const ALLOWED_RUNTIME_VALUE_EXPORTS = new Set([
   "checkReferenceBoundReasoningApplicability",
 ]);
 
+const ALLOWED_GATE2_VALUE_EXPORTS = new Set([
+  "prepareExecutionEvidencePlan",
+  "evaluateExecutionEvidence",
+  "checkExecutionEvidenceAssessmentApplicability",
+]);
+
 const ALLOWED_RUNTIME_IMPORT_PREFIXES = [
   "../config/",
+  "../../config/",
   "../domain/",
+  "../../domain/",
   "../inventory/",
+  "../../inventory/",
   "../metadata/",
+  "../../metadata/",
   "../reader/",
+  "../../reader/",
   "../snapshot/",
+  "../../snapshot/",
+  "../validation/",
+  "../../validation/",
+  "../engineering-run/",
+  "../../engineering-run/",
+  "../run-evidence/",
+  "../../run-evidence/",
+  "../execution/",
+  "../../execution/",
   "./",
   "node:crypto",
 ];
@@ -167,6 +197,7 @@ function inspectRuntimeModule(source: string, rel: string): string[] {
           spec.startsWith("../bounds") ||
           spec.startsWith("../types") ||
           spec.startsWith("../applicability") ||
+          spec.startsWith("../association") ||
           spec.startsWith("./internal/") ||
           spec.startsWith("../internal/");
         if (!allowed && !reasoningLocal) {
@@ -187,6 +218,16 @@ function inspectRuntimeModule(source: string, rel: string): string[] {
 
   if (/\bwriteFile\b|\bspawn\b|\bexecFile\b/.test(source)) {
     violations.push("forbidden-io-primitive");
+  }
+  if (
+    rel.startsWith("src/reasoning/gate2/") &&
+    (/executeEngineeringRun\s*\(/.test(source) ||
+      /executeValidationPlan\s*\(/.test(source) ||
+      /explicitLocalProcessApproval\s*\(/.test(source) ||
+      /prepareLocalProcess\s*\(/.test(source) ||
+      /authorizeValidationPlan\s*\(/.test(source))
+  ) {
+    violations.push("gate2-forbidden-execution-or-approval-call");
   }
   return [...new Set(violations)];
 }
@@ -252,6 +293,14 @@ describe("reasoning architecture", () => {
     expect(runtimeKeys).toEqual([...ALLOWED_RUNTIME_VALUE_EXPORTS].sort());
     for (const key of runtimeKeys) {
       expect(typeof (indexMod as Record<string, unknown>)[key]).toBe("function");
+    }
+
+    const distGate2 = join(repoRoot, "dist/reasoning/gate2/index.js");
+    const gate2Mod = await import(`${distGate2}?t=${Date.now()}`);
+    const gate2Keys = Object.keys(gate2Mod).sort();
+    expect(gate2Keys).toEqual([...ALLOWED_GATE2_VALUE_EXPORTS].sort());
+    for (const key of gate2Keys) {
+      expect(typeof (gate2Mod as Record<string, unknown>)[key]).toBe("function");
     }
 
     const typesSource = readFileSync(distTypes, "utf8");

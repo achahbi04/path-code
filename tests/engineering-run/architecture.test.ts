@@ -76,6 +76,7 @@ describe("engineering-run architecture", () => {
       expect(typeof mod.executeEngineeringRun).toBe("function");
       expect(typeof mod.checkEngineeringRunApplicability).toBe("function");
       expect(typeof mod.summarizeEngineeringRun).toBe("function");
+      expect(typeof mod.resolveRegisteredEngineeringRunBinding).toBe("function");
       expect(process.cwd()).toBe(cwdSnapshot);
       expect(process.env).toEqual(envSnapshot);
       expect(consoleLog).not.toHaveBeenCalled();

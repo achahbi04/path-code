@@ -12,8 +12,14 @@
 export { executeEngineeringRun } from "./execute.js";
 export { checkEngineeringRunApplicability } from "./applicability.js";
 export { summarizeEngineeringRun } from "./summary.js";
+export { resolveRegisteredEngineeringRunBinding } from "./binding.js";
 export { ENGINEERING_RUN_SCHEMA_VERSION } from "./types.js";
 
+export type {
+  EngineeringRunBindingFailure,
+  EngineeringRunBindingFailureCode,
+  RegisteredEngineeringRunBinding,
+} from "./binding.js";
 export type {
   EngineeringRunApplicabilityFailure,
   EngineeringRunApplicabilityFailureCode,
