@@ -1,6 +1,7 @@
 /**
- * Phase 5A Reasoning Ledger — package-internal type surface.
- * Explicit `export type` only. Not exported from the package root.
+ * Phase 5B Reasoning Ledger — package-internal surface.
+ * Types plus explicitly approved runtime reference-binding operations.
+ * Not exported from the package root.
  */
 
 export type {
@@ -23,3 +24,33 @@ export type {
   ReferenceBoundContext,
   ReferenceBoundReasoning,
 } from "./types.js";
+
+export type {
+  ReasoningApplicabilityFailure,
+  ReasoningBindFailure,
+  ReasoningCatalogFailure,
+  ReasoningCatalogFailureCode,
+  ReasoningClaimRefusalFailure,
+  ReasoningInputFailure,
+  ReasoningInputFailureCode,
+} from "./failures.js";
+
+export type {
+  CreateReferenceCatalogInput,
+  ReferenceCatalog,
+  ReferenceCatalogSelection,
+  ReferenceDescriptor,
+  ReferenceEvidenceKind,
+} from "./catalog.js";
+
+export type { ReasoningBindSuccess } from "./bind.js";
+export type { ReferenceBoundApplicabilitySuccess } from "./applicability.js";
+
+export {
+  createReferenceCatalog,
+  describeReferenceCatalog,
+  disposeReferenceCatalog,
+} from "./catalog.js";
+
+export { bindReasoningProposalJson } from "./bind.js";
+export { checkReferenceBoundReasoningApplicability } from "./applicability.js";

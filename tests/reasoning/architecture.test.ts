@@ -1,6 +1,6 @@
 /**
- * Phase 5A Reasoning Ledger architecture assertions.
- * Runtime tests for type-only production modules and dependency direction.
+ * Phase 5B Reasoning Ledger architecture assertions.
+ * Contract/type files remain types-only; runtime modules have an explicit allowlist.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -17,6 +17,42 @@ const reasoningDir = fileURLToPath(
 const srcDir = fileURLToPath(new URL("../../src", import.meta.url));
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const require = createRequire(import.meta.url);
+
+/** Contract files that must remain types-only (A01). */
+const TYPES_ONLY_FILES = new Set([
+  "src/reasoning/types.ts",
+]);
+
+/** Runtime modules explicitly authorized by Phase 5B. */
+const RUNTIME_MODULE_FILES = new Set([
+  "src/reasoning/index.ts",
+  "src/reasoning/bounds.ts",
+  "src/reasoning/failures.ts",
+  "src/reasoning/catalog.ts",
+  "src/reasoning/parse.ts",
+  "src/reasoning/bind.ts",
+  "src/reasoning/applicability.ts",
+  "src/reasoning/internal/registry.ts",
+]);
+
+const ALLOWED_RUNTIME_VALUE_EXPORTS = new Set([
+  "createReferenceCatalog",
+  "describeReferenceCatalog",
+  "disposeReferenceCatalog",
+  "bindReasoningProposalJson",
+  "checkReferenceBoundReasoningApplicability",
+]);
+
+const ALLOWED_RUNTIME_IMPORT_PREFIXES = [
+  "../config/",
+  "../domain/",
+  "../inventory/",
+  "../metadata/",
+  "../reader/",
+  "../snapshot/",
+  "./",
+  "node:crypto",
+];
 
 function listTsFiles(dir: string): string[] {
   const files: string[] = [];
@@ -52,7 +88,6 @@ function isTypeOnlyProductionSource(source: string, fileName: string): string[] 
       violations.push("enum");
     }
     if (ts.isVariableStatement(node)) {
-      // Allow `declare const ...: unique symbol` opacity brands only.
       const isDeclare = node.modifiers?.some(
         (m) => m.kind === ts.SyntaxKind.DeclareKeyword,
       );
@@ -100,30 +135,108 @@ function isTypeOnlyProductionSource(source: string, fileName: string): string[] 
   return [...new Set(violations)];
 }
 
+function inspectRuntimeModule(source: string, rel: string): string[] {
+  const violations: string[] = [];
+  const sf = ts.createSourceFile(
+    rel,
+    source,
+    ts.ScriptTarget.ES2022,
+    true,
+    ts.ScriptKind.TS,
+  );
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node)) {
+      const spec = (node.moduleSpecifier as ts.StringLiteral).text;
+      const clause = node.importClause;
+      const isTypeOnly = clause?.isTypeOnly === true;
+      if (!isTypeOnly) {
+        const allowed = ALLOWED_RUNTIME_IMPORT_PREFIXES.some(
+          (prefix) =>
+            spec === prefix ||
+            spec.startsWith(prefix) ||
+            (prefix.endsWith("/") && spec.startsWith(prefix)),
+        );
+        // Also allow same-package relative imports under reasoning
+        const reasoningLocal =
+          spec.startsWith("./") ||
+          spec.startsWith("../catalog") ||
+          spec.startsWith("../bind") ||
+          spec.startsWith("../parse") ||
+          spec.startsWith("../failures") ||
+          spec.startsWith("../bounds") ||
+          spec.startsWith("../types") ||
+          spec.startsWith("../applicability") ||
+          spec.startsWith("./internal/") ||
+          spec.startsWith("../internal/");
+        if (!allowed && !reasoningLocal) {
+          violations.push(`disallowed-import:${spec}`);
+        }
+        if (
+          /node:fs|node:child_process|node:net|node:http|child_process/.test(
+            spec,
+          )
+        ) {
+          violations.push(`forbidden-io-import:${spec}`);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+
+  if (/\bwriteFile\b|\bspawn\b|\bexecFile\b/.test(source)) {
+    violations.push("forbidden-io-primitive");
+  }
+  return [...new Set(violations)];
+}
+
 describe("reasoning architecture", () => {
-  it("A01: production reasoning modules are type declarations only", () => {
+  it("A01: contract type files remain types-only; runtime modules are explicitly allowlisted", () => {
     const files = listTsFiles(reasoningDir);
     expect(files.length).toBeGreaterThan(0);
     const allViolations: string[] = [];
+    const seenRel = new Set<string>();
+
     for (const filePath of files) {
       const source = readFileSync(filePath, "utf8");
-      const rel = relative(repoRoot, filePath);
-      const violations = isTypeOnlyProductionSource(source, rel);
-      for (const v of violations) {
+      const rel = relative(repoRoot, filePath).split("\\").join("/");
+      seenRel.add(rel);
+
+      if (TYPES_ONLY_FILES.has(rel)) {
+        const violations = isTypeOnlyProductionSource(source, rel);
+        for (const v of violations) {
+          allViolations.push(`${rel}: ${v}`);
+        }
+        if (/from\s+["']node:/.test(source)) {
+          allViolations.push(`${rel}: node-runtime-import`);
+        }
+        if (/\bWeakMap\b|\bwriteFile\b|\bspawn\b/.test(source)) {
+          allViolations.push(`${rel}: runtime-primitive`);
+        }
+        continue;
+      }
+
+      if (!RUNTIME_MODULE_FILES.has(rel)) {
+        allViolations.push(`${rel}: unexpected-reasoning-module`);
+        continue;
+      }
+
+      for (const v of inspectRuntimeModule(source, rel)) {
         allViolations.push(`${rel}: ${v}`);
       }
-      // No side-effectful Node I/O / process / registry patterns in source text.
-      if (/from\s+["']node:/.test(source)) {
-        allViolations.push(`${rel}: node-runtime-import`);
-      }
-      if (/\bWeakMap\b|\bwriteFile\b|\bspawn\b/.test(source)) {
-        allViolations.push(`${rel}: runtime-primitive`);
+    }
+
+    for (const expected of [...TYPES_ONLY_FILES, ...RUNTIME_MODULE_FILES]) {
+      if (!seenRel.has(expected)) {
+        allViolations.push(`${expected}: missing-expected-module`);
       }
     }
+
     expect(allViolations).toEqual([]);
   });
 
-  it("A02: emitted reasoning module has no runtime value exports; package surface unchanged", async () => {
+  it("A02: internal runtime exports are finite and explicit; package surface unchanged; types emit no values", async () => {
     const pkg = JSON.parse(
       readFileSync(join(repoRoot, "package.json"), "utf8"),
     ) as { exports?: Record<string, unknown> };
@@ -131,18 +244,23 @@ describe("reasoning architecture", () => {
 
     const distIndex = join(repoRoot, "dist/reasoning/index.js");
     const distTypes = join(repoRoot, "dist/reasoning/types.js");
-    const indexMod = await import(distIndex);
-    const typesMod = await import(distTypes);
-    expect(Object.keys(indexMod)).toEqual([]);
+    const indexMod = await import(`${distIndex}?t=${Date.now()}`);
+    const typesMod = await import(`${distTypes}?t=${Date.now()}`);
     expect(Object.keys(typesMod)).toEqual([]);
 
-    const indexSource = readFileSync(distIndex, "utf8");
+    const runtimeKeys = Object.keys(indexMod).sort();
+    expect(runtimeKeys).toEqual([...ALLOWED_RUNTIME_VALUE_EXPORTS].sort());
+    for (const key of runtimeKeys) {
+      expect(typeof (indexMod as Record<string, unknown>)[key]).toBe("function");
+    }
+
     const typesSource = readFileSync(distTypes, "utf8");
-    // Empty-module / compiler boilerplate only — no exported values.
-    expect(indexSource).not.toMatch(/exports\.\w+\s*=/);
     expect(typesSource).not.toMatch(/exports\.\w+\s*=/);
-    expect(indexSource).not.toMatch(/\bfunction\b|\bclass\b|\benum\b/);
     expect(typesSource).not.toMatch(/\bfunction\b|\bclass\b|\benum\b/);
+
+    // Package root must not re-export reasoning
+    const rootSource = readFileSync(join(repoRoot, "src/index.ts"), "utf8");
+    expect(rootSource).not.toMatch(/reasoning/);
   });
 
   it("A03: earlier production layers do not import reasoning", () => {
@@ -163,13 +281,15 @@ describe("reasoning architecture", () => {
     expect(violations).toEqual([]);
   });
 
-  it("imports without mutating host process state and exposes no runtime values", async () => {
+  it("imports without mutating host process state", async () => {
     const envSnapshot = { ...process.env };
     const cwdSnapshot = process.cwd();
     const consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
     try {
       const mod = await import("../../src/reasoning/index.js");
-      expect(Object.keys(mod)).toEqual([]);
+      expect(Object.keys(mod).sort()).toEqual(
+        [...ALLOWED_RUNTIME_VALUE_EXPORTS].sort(),
+      );
       expect(process.cwd()).toBe(cwdSnapshot);
       expect(process.env).toEqual(envSnapshot);
       expect(consoleLog).not.toHaveBeenCalled();
@@ -179,7 +299,6 @@ describe("reasoning architecture", () => {
   });
 
   it("TypeScript package is available for syntax inspection", () => {
-    // Anchors the installed parser dependency used by A01.
     expect(typeof require("typescript").createSourceFile).toBe("function");
   });
 });
