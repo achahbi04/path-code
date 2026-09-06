@@ -21,7 +21,7 @@ PHASE 5C GATE 2 IMPLEMENTED — CONFIGURED EXECUTION EVIDENCE ONLY — NOT SEMAN
 | Working branch | `cursor/phase5c-execution-evidence` (same worktree; no new worktree) |
 | Contract commit | `77d9f5b0ba7a12ab38d56705853b601c4e0d692c` |
 | Implementation commit | `7c2e4f0edcdba2d380bb109447e29fffdd4daa06` |
-| Report commit | docs-only after this PASS (see git log after report commit) |
+| Report commit | `c65404a919189c8c63db2ef81369ebcea66e2d82` (docs-only after PASS) |
 | Phase 5A branch preserved | yes (`cursor/phase5a-reasoning-contracts` → `7fcbf11…`) |
 | Phase 5B branch preserved | yes (`cursor/phase5b-reference-binding` → `72025ec…`) |
 | Phase 4 branch preserved | yes (`cursor/phase4-execution-core` → `bfd6fc5…`) |
