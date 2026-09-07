@@ -104,12 +104,14 @@ describe("engineering brain architecture", () => {
       }
     }
 
-    // Earlier layers must not import brain. Orchestrator (5D2) is a later consumer.
+    // Earlier layers must not import brain. Orchestrator (5D2) and adapters (5E1)
+    // are later consumers — see PHASE_5E1_OPENAI_TRANSPORT_AMENDMENT_1.
     for (const file of listTsFiles(srcDir)) {
       const rel = relative(repoRoot, file).replaceAll("\\", "/");
       if (rel.startsWith("src/brain/")) continue;
       if (rel.startsWith("src/orchestrator/")) continue;
       if (rel.startsWith("src/orchestrator/mutation/")) continue;
+      if (rel.startsWith("src/adapters/")) continue;
       const src = readFileSync(file, "utf8");
       expect(src).not.toMatch(/from ["']\.\/brain|from ["']\.\.\/brain/);
     }
