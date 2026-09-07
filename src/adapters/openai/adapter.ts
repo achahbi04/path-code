@@ -262,6 +262,7 @@ export function createOpenAIAdapter(
         invocationId,
         maxProposalTextUtf8Bytes: textCeiling,
         credentialCanary: frozenCredential,
+        profileKind: built.profileKind,
       });
 
       lastSafeReasonCode = translated.diag.safeReasonCode;

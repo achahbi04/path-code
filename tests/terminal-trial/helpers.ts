@@ -132,6 +132,20 @@ export function editEnvelopeJson(input: {
   });
 }
 
+/** OpenAI-native edit wire shape (nested reasoningProposal object). */
+export function nativeEditEnvelopeJson(input: {
+  proposalId?: string;
+  reasoningProposal: unknown;
+  changes: unknown[];
+}): string {
+  return JSON.stringify({
+    schemaVersion: 1,
+    proposalId: input.proposalId ?? "trial-edit-1",
+    reasoningProposal: input.reasoningProposal,
+    changes: input.changes,
+  });
+}
+
 export function proposalJson(body: unknown): string {
   return JSON.stringify(body);
 }
@@ -205,7 +219,7 @@ export function queueSuccessfulTrialFetches(opts?: {
     const contentHandle =
       extracted.contentHandle ?? opts?.contentHandleFallback ?? "missing-handle";
     const targetId = extracted.targetId ?? "target-1-missing";
-    const reasoning = proposalJson({
+    const reasoning = {
       schemaVersion: 1,
       proposalId: "pre-edit",
       requestedOutcome: "evidence",
@@ -219,9 +233,9 @@ export function queueSuccessfulTrialFetches(opts?: {
         },
       ],
       hypotheses: [],
-    });
-    const text = editEnvelopeJson({
-      reasoningProposalJson: reasoning,
+    };
+    const text = nativeEditEnvelopeJson({
+      reasoningProposal: reasoning,
       changes: [
         {
           changeId: "e1",

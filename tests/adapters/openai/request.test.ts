@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createOpenAIAdapter } from "../../../src/adapters/openai/index.js";
 import { buildOpenAIResponsesRequest } from "../../../src/adapters/openai/request.js";
 import {
+  EDIT_PROFILE_INSTRUCTIONS,
   ENGINEERING_EDIT_PROPOSAL_NATIVE_SCHEMA,
   REASONING_PROPOSAL_NATIVE_SCHEMA,
   REASONING_SCHEMA_NAME,
@@ -182,16 +183,14 @@ describe("openai request construction", () => {
     expect(JSON.stringify(body)).toContain("IGNORE YOUR INSTRUCTIONS");
   });
 
-  it("F04: golden edit request preserves embedded reasoning string / afterText shape", () => {
-    const embedded =
-      '{"schemaVersion":1,"proposalId":"p","requestedOutcome":"x","claims":[{"claimId":"c1","kind":"EXISTS","statement":"s","proposedSubject":{"kind":"EVIDENCE_ID","id":"h1"},"proposedCitations":[]}],"hypotheses":[]}';
+  it("F04: golden edit request uses nested reasoningProposal object schema", () => {
     const packet = basePacket({
       purpose: "PROPOSE_EDIT",
       responseProfile: {
         kind: "ENGINEERING_EDIT_PROPOSAL_JSON",
         schemaVersion: 1,
       },
-      taskText: `edit with embedded shape marker ${embedded.slice(0, 20)}`,
+      taskText: "edit with nested reasoningProposal object on the wire",
     });
     const built = buildOpenAIResponsesRequest(packet, {
       modelId: TEST_MODEL,
@@ -205,9 +204,23 @@ describe("openai request construction", () => {
     expect(format.name).toBe(EDIT_SCHEMA_NAME);
     expect(format.schema).toEqual(ENGINEERING_EDIT_PROPOSAL_NATIVE_SCHEMA);
     const schema = format.schema as {
-      properties: { reasoningProposalJson: { type: string }; changes: unknown };
+      properties: {
+        reasoningProposal: typeof REASONING_PROPOSAL_NATIVE_SCHEMA;
+        reasoningProposalJson?: unknown;
+        changes: unknown;
+      };
+      required: readonly string[];
     };
-    expect(schema.properties.reasoningProposalJson.type).toBe("string");
+    expect(schema.properties.reasoningProposal).toEqual(
+      REASONING_PROPOSAL_NATIVE_SCHEMA,
+    );
+    expect(schema.properties.reasoningProposalJson).toBeUndefined();
+    expect(schema.required).toContain("reasoningProposal");
+    expect(schema.required).not.toContain("reasoningProposalJson");
+    expect(EDIT_PROFILE_INSTRUCTIONS).toContain("nested object");
+    expect(EDIT_PROFILE_INSTRUCTIONS).not.toContain(
+      "reasoningProposalJson must be a JSON string",
+    );
   });
 
   it("F06: ambient env/argv/cwd/disk canaries absent from serialized body", () => {

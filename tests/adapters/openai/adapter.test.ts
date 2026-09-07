@@ -282,8 +282,21 @@ describe("openai adapter admission and composition", () => {
         JSON.stringify({
           schemaVersion: 1,
           proposalId: "e1",
-          reasoningProposalJson:
-            '{"schemaVersion":1,"proposalId":"p","requestedOutcome":"x","claims":[{"claimId":"c1","kind":"EXISTS","statement":"s","proposedSubject":{"kind":"EVIDENCE_ID","id":"h"},"proposedCitations":[]}],"hypotheses":[]}',
+          reasoningProposal: {
+            schemaVersion: 1,
+            proposalId: "p",
+            requestedOutcome: "x",
+            claims: [
+              {
+                claimId: "c1",
+                kind: "EXISTS",
+                statement: "s",
+                proposedSubject: { kind: "EVIDENCE_ID", id: "h" },
+                proposedCitations: [],
+              },
+            ],
+            hypotheses: [],
+          },
           changes: [
             {
               changeId: "ch1",
@@ -308,5 +321,14 @@ describe("openai adapter admission and composition", () => {
       maxOutputTokens: 128,
     });
     expect(edit.ok).toBe(true);
+    if (edit.ok) {
+      const app = JSON.parse(edit.value.response.text) as {
+        reasoningProposalJson: string;
+        reasoningProposal?: unknown;
+      };
+      expect(typeof app.reasoningProposalJson).toBe("string");
+      expect(app.reasoningProposal).toBeUndefined();
+      expect(JSON.parse(app.reasoningProposalJson).schemaVersion).toBe(1);
+    }
   });
 });

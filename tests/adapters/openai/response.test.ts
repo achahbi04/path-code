@@ -4,7 +4,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { translateOpenAITransportResult } from "../../../src/adapters/openai/response.js";
+import { translateOpenAITransportResult, translateNativeEditEnvelopeToApplication } from "../../../src/adapters/openai/response.js";
+import { parseEditProposalEnvelope } from "../../../src/orchestrator/mutation/envelope.js";
 
 const CTX = {
   invocationId: "inv-xyz",
@@ -250,5 +251,150 @@ describe("openai response translation", () => {
       translateOpenAITransportResult(httpJson(400, { error: {} }), CTX).diag
         .safeReasonCode,
     ).toBe("HTTP_400_REQUEST_REJECTED");
+  });
+
+  it("edit profile: nested reasoning translates to application envelope; string-mode rejected", () => {
+    const reasoning = {
+      schemaVersion: 1,
+      proposalId: "rp1",
+      requestedOutcome: "fix",
+      claims: [
+        {
+          claimId: "c1",
+          kind: "CONTENT",
+          statement: "s",
+          proposedSubject: { kind: "EVIDENCE_ID", id: "h1" },
+          proposedCitations: [],
+        },
+      ],
+      hypotheses: [],
+    };
+    const nativeText = JSON.stringify({
+      schemaVersion: 1,
+      proposalId: "e1",
+      reasoningProposal: reasoning,
+      changes: [
+        {
+          changeId: "ch1",
+          kind: "REPLACE_TEXT",
+          targetId: "t1",
+          supportingClaimIds: ["c1"],
+          afterText: "after\n",
+        },
+      ],
+    });
+    const direct = translateNativeEditEnvelopeToApplication(nativeText);
+    expect(direct.ok).toBe(true);
+    if (!direct.ok) return;
+    const parsed = parseEditProposalEnvelope(direct.applicationText);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.value.reasoningProposalJson).toBe(JSON.stringify(reasoning));
+      expect(JSON.parse(parsed.value.reasoningProposalJson)).toEqual(reasoning);
+    }
+
+    const viaTransport = translateOpenAITransportResult(
+      httpJson(200, {
+        id: "resp_edit",
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: nativeText }],
+          },
+        ],
+      }),
+      {
+        ...CTX,
+        profileKind: "ENGINEERING_EDIT_PROPOSAL_JSON",
+      },
+    );
+    expect(viaTransport.reply.kind).toBe("COMPLETE");
+    if (viaTransport.reply.kind === "COMPLETE") {
+      expect(viaTransport.reply.text).toBe(direct.applicationText);
+    }
+
+    // Reasoning profile leaves nested-looking text untouched (no edit translation).
+    const reasoningPassthrough = translateOpenAITransportResult(
+      httpJson(200, {
+        id: "resp_r",
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: nativeText }],
+          },
+        ],
+      }),
+      { ...CTX, profileKind: "REASONING_PROPOSAL_JSON" },
+    );
+    expect(reasoningPassthrough.reply.kind).toBe("COMPLETE");
+    if (reasoningPassthrough.reply.kind === "COMPLETE") {
+      expect(reasoningPassthrough.reply.text).toBe(nativeText);
+    }
+
+    const stringMode = translateNativeEditEnvelopeToApplication(
+      JSON.stringify({
+        schemaVersion: 1,
+        proposalId: "e2",
+        reasoningProposalJson: JSON.stringify(reasoning),
+        changes: [
+          {
+            changeId: "ch1",
+            kind: "REPLACE_TEXT",
+            targetId: "t1",
+            supportingClaimIds: ["c1"],
+            afterText: "after\n",
+          },
+        ],
+      }),
+    );
+    expect(stringMode.ok).toBe(false);
+    if (!stringMode.ok) {
+      expect(stringMode.safeReasonCode).toBe("EDIT_ENVELOPE_STRING_MODE_REJECTED");
+    }
+
+    const stringField = translateOpenAITransportResult(
+      httpJson(200, {
+        id: "resp_bad",
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify({
+                  schemaVersion: 1,
+                  proposalId: "e3",
+                  reasoningProposal: JSON.stringify(reasoning),
+                  changes: [
+                    {
+                      changeId: "ch1",
+                      kind: "REPLACE_TEXT",
+                      targetId: "t1",
+                      supportingClaimIds: ["c1"],
+                      afterText: "after\n",
+                    },
+                  ],
+                }),
+              },
+            ],
+          },
+        ],
+      }),
+      { ...CTX, profileKind: "ENGINEERING_EDIT_PROPOSAL_JSON" },
+    );
+    expect(viaTransport.diag.safeReasonCode).toBe("COMPLETE");
+    expect(stringField.reply.kind).toBe("FAILURE");
+    expect(stringField.diag.safeReasonCode).toBe(
+      "EDIT_ENVELOPE_STRING_MODE_REJECTED",
+    );
   });
 });

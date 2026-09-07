@@ -19,6 +19,14 @@ export type TranslateContext = {
   readonly credentialCanary?: string;
   /** Captured receive-time for optional Retry-After date interpretation (unused in V1 delta-only). */
   readonly receivedAtWallMs?: number;
+  /**
+   * When ENGINEERING_EDIT_PROPOSAL_JSON, COMPLETE provider text is translated from
+   * the OpenAI-native nested reasoningProposal object into the Path Code
+   * application envelope (reasoningProposalJson string). Reasoning profile is unchanged.
+   */
+  readonly profileKind?:
+    | "REASONING_PROPOSAL_JSON"
+    | "ENGINEERING_EDIT_PROPOSAL_JSON";
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -28,6 +36,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 }
+
+const OWN = Object.prototype.hasOwnProperty;
 
 function safeId(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -102,6 +112,109 @@ function containsCredential(
 ): boolean {
   if (canary === undefined || canary.length === 0) return false;
   return text.includes(canary);
+}
+
+const EDIT_NATIVE_ROOT_KEYS = new Set([
+  "schemaVersion",
+  "proposalId",
+  "reasoningProposal",
+  "changes",
+]);
+
+export type NativeEditEnvelopeTranslateResult =
+  | { readonly ok: true; readonly applicationText: string }
+  | { readonly ok: false; readonly safeReasonCode: string };
+
+/**
+ * Provider-native edit envelope (nested reasoningProposal object) → Path Code
+ * application edit envelope (reasoningProposalJson string). Fail closed; no repair.
+ */
+export function translateNativeEditEnvelopeToApplication(
+  providerText: string,
+): NativeEditEnvelopeTranslateResult {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(providerText) as unknown;
+  } catch {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_MALFORMED_JSON" };
+  }
+  if (!isPlainObject(decoded)) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_NOT_OBJECT" };
+  }
+
+  // String-mode / ambiguous dual fields: never repair into nested form.
+  if (OWN.call(decoded, "reasoningProposalJson")) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_STRING_MODE_REJECTED" };
+  }
+
+  for (const key of Object.keys(decoded)) {
+    if (!EDIT_NATIVE_ROOT_KEYS.has(key)) {
+      return { ok: false, safeReasonCode: "EDIT_ENVELOPE_UNKNOWN_FIELD" };
+    }
+  }
+  for (const required of EDIT_NATIVE_ROOT_KEYS) {
+    if (!OWN.call(decoded, required)) {
+      return { ok: false, safeReasonCode: "EDIT_ENVELOPE_MISSING_FIELD" };
+    }
+  }
+
+  if (decoded.schemaVersion !== 1) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_UNSUPPORTED_VERSION" };
+  }
+  if (typeof decoded.proposalId !== "string" || decoded.proposalId.length === 0) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_INVALID_PROPOSAL_ID" };
+  }
+
+  const reasoning = decoded.reasoningProposal;
+  if (typeof reasoning === "string") {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_STRING_MODE_REJECTED" };
+  }
+  if (Array.isArray(reasoning)) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_AMBIGUOUS_REASONING" };
+  }
+  if (!isPlainObject(reasoning)) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_MISSING_REASONING_OBJECT" };
+  }
+  if (reasoning.schemaVersion !== 1) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_REASONING_VERSION" };
+  }
+  if (!Array.isArray(reasoning.claims) || reasoning.claims.length < 1) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_REASONING_CLAIMS" };
+  }
+  if (!Array.isArray(reasoning.hypotheses)) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_REASONING_HYPOTHESES" };
+  }
+  if (typeof reasoning.proposalId !== "string" || reasoning.proposalId.length === 0) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_REASONING_PROPOSAL_ID" };
+  }
+  if (typeof reasoning.requestedOutcome !== "string") {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_REASONING_OUTCOME" };
+  }
+  if (!Array.isArray(decoded.changes)) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_CHANGES" };
+  }
+
+  let reasoningProposalJson: string;
+  try {
+    reasoningProposalJson = JSON.stringify(reasoning);
+  } catch {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_SERIALIZE_FAILED" };
+  }
+  if (reasoningProposalJson.length === 0) {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_SERIALIZE_FAILED" };
+  }
+
+  try {
+    const applicationText = JSON.stringify({
+      schemaVersion: 1,
+      proposalId: decoded.proposalId,
+      reasoningProposalJson,
+      changes: decoded.changes,
+    });
+    return { ok: true, applicationText };
+  } catch {
+    return { ok: false, safeReasonCode: "EDIT_ENVELOPE_SERIALIZE_FAILED" };
+  }
 }
 
 type FailureClass =
@@ -339,14 +452,32 @@ function translateCompletedOutput(
     };
   }
 
-  const text = textParts.join("");
-  if (text.length === 0) {
+  const textJoined = textParts.join("");
+  if (textJoined.length === 0) {
     return {
       reply: failure(ctx.invocationId, "OTHER", failureExtra({ providerRequestId, usage })),
       diag: { safeReasonCode: "EMPTY_TEXT", httpStatus: 200 },
       proposalTextUtf8Bytes: 0,
     };
   }
+
+  let text = textJoined;
+  if (ctx.profileKind === "ENGINEERING_EDIT_PROPOSAL_JSON") {
+    const translated = translateNativeEditEnvelopeToApplication(textJoined);
+    if (!translated.ok) {
+      return {
+        reply: failure(
+          ctx.invocationId,
+          "OTHER",
+          failureExtra({ providerRequestId, usage }),
+        ),
+        diag: { safeReasonCode: translated.safeReasonCode, httpStatus: 200 },
+        proposalTextUtf8Bytes: null,
+      };
+    }
+    text = translated.applicationText;
+  }
+
   const bytes = utf8ByteLength(text);
   if (bytes > ctx.maxProposalTextUtf8Bytes) {
     return {
