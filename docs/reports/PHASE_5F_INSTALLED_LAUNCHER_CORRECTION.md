@@ -16,7 +16,7 @@
 | Expected / starting HEAD | `2bb73109193af8e99f2ab62c30725e37b24ae131` |
 | Expected main | `525d74c4a92ae30a13fa0a2ae62bc305cc3115de` |
 | Main unchanged | `525d74c4a92ae30a13fa0a2ae62bc305cc3115de` |
-| Final SHA (this correction) | _(set after commit)_ |
+| Final SHA (this correction) | `5b512945f463a0c26515721ec905970b90a23697` |
 | Platform | macOS (`darwin`), Node local |
 
 Verified on entry: branch, HEAD, and main matched expectations. Installed symlink already pointed at this worktree:
