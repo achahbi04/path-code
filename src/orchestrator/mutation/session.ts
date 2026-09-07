@@ -13,12 +13,12 @@ import {
   createFile,
   createMultiFilePlan,
   executeMultiFilePlan,
-  inspectPreparedEditAuthorizationCompatibility,
   prepareCreateFile,
   prepareModifyExistingFile,
   replaceExistingFile,
   validatePreparedBatchBounds,
 } from "../../editing/index.js";
+import { inspectPreparedEditAuthorizationCompatibility } from "../../editing/binding.js";
 import type {
   KnowledgeInvalidation,
   PreparedChange,
