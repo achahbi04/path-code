@@ -15,7 +15,7 @@
 | Branch | `cursor/phase5f-live-trial-cli` |
 | Starting HEAD | `91fb710cd57d2ee99240c1e3e889a1b13a9916c2` |
 | Main (unchanged) | `525d74c4a92ae30a13fa0a2ae62bc305cc3115de` |
-| Final SHA | _(set after commit)_ |
+| Final SHA | `af1cf1d2297ee6c79f06ee7670b464e8d735a9d5` |
 | Live Trial 1 by implementer | **NOT RUN** |
 | Live provider calls | **zero** |
 | Credentials | **none read** |
