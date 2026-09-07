@@ -35,6 +35,7 @@ export {
 export {
   openEngineeringMutationSession,
   summarizeMutationSession,
+  buildMutationGroundingRequirementsDocument,
 } from "./session.js";
 
 export type {
@@ -44,6 +45,8 @@ export type {
   MutationArtifacts,
   MutationControlPhase,
   MutationDisposition,
+  MutationGroundingRequirement,
+  MutationGroundingRequirementsDocument,
   MutationReview,
   MutationReviewView,
   MutationSessionDescriptorView,

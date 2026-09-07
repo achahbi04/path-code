@@ -75,6 +75,8 @@ import type {
   MutationArtifacts,
   MutationControlPhase,
   MutationDisposition,
+  MutationGroundingRequirement,
+  MutationGroundingRequirementsDocument,
   MutationReview,
   MutationSessionDescriptorView,
   MutationSessionRecord,
@@ -91,7 +93,28 @@ type BoundTarget = {
   readonly targetId: string;
   readonly spec: MutationTargetSpec;
   readonly description: MutationTargetDescription;
+  readonly grounding: MutationGroundingRequirement;
 };
+
+const GROUNDING_RELATIONSHIP = Object.freeze({
+  reasoningClaimsMustIncludeRequiredKind: true as const,
+  claimProposedSubjectMustCiteRequiredEvidenceReference: true as const,
+  changeSupportingClaimIdsMustIncludeThatClaimId: true as const,
+});
+
+/**
+ * Build the immutable model-facing grounding score for permitted targets.
+ * Provider-neutral; adapters must transport the document unchanged.
+ */
+export function buildMutationGroundingRequirementsDocument(
+  requirements: readonly MutationGroundingRequirement[],
+): MutationGroundingRequirementsDocument {
+  return Object.freeze({
+    title: "GROUNDING REQUIREMENTS" as const,
+    schemaVersion: 1 as const,
+    targets: Object.freeze([...requirements]),
+  });
+}
 
 type SessionState = {
   phase: MutationControlPhase;
@@ -257,6 +280,17 @@ export function openEngineeringMutationSession(
     }
   }
 
+  const descriptorsResult = describeReferenceCatalog(spec.catalog);
+  if (!descriptorsResult.ok) {
+    return failure(
+      configurationFailure(
+        "CONTEXT_MISMATCH",
+        "reference catalog descriptors are unavailable for edit grounding",
+      ),
+    );
+  }
+  const catalogDescriptors = descriptorsResult.value;
+
   const boundTargets: BoundTarget[] = [];
   const pathKeys = new Set<string>();
   const physicalKeys = new Set<string>();
@@ -320,14 +354,34 @@ export function openEngineeringMutationSession(
         );
       }
       physicalKeys.add(phys);
+      const contentHandle = catalogDescriptors.find(
+        (d) => d.evidenceKind === "CONTENT" && d.relativePath === pathKey,
+      );
+      if (contentHandle === undefined) {
+        return failure(
+          configurationFailure(
+            "CONTEXT_MISMATCH",
+            "REPLACE_TEXT target lacks a CONTENT catalog handle for edit grounding",
+          ),
+        );
+      }
+      const replaceGrounding: MutationGroundingRequirement = Object.freeze({
+        targetId,
+        mutationKind: "REPLACE_TEXT" as const,
+        requiredSupportingClaimKind: "CONTENT" as const,
+        requiredEvidenceReference: contentHandle.handle,
+        requiredRelationship: GROUNDING_RELATIONSHIP,
+      });
       boundTargets.push({
         targetId,
         spec: target,
-        description: {
+        description: Object.freeze({
           targetId,
-          kind: "REPLACE_TEXT",
+          kind: "REPLACE_TEXT" as const,
           relativePath: pathKey,
-        },
+          evidenceHandle: contentHandle.handle,
+        }),
+        grounding: replaceGrounding,
       });
     } else if (target.kind === "CREATE_TEXT") {
       if (!snapshotEntries.has(target.parentDirectory)) {
@@ -380,14 +434,35 @@ export function openEngineeringMutationSession(
         );
       }
       pathKeys.add(rel);
+      const parentPath = target.parentDirectory.relativePath;
+      const parentHandle = catalogDescriptors.find(
+        (d) => d.evidenceKind === "ENTRY" && d.relativePath === parentPath,
+      );
+      if (parentHandle === undefined) {
+        return failure(
+          configurationFailure(
+            "CONTEXT_MISMATCH",
+            "CREATE_TEXT parent lacks an ENTRY catalog handle for edit grounding",
+          ),
+        );
+      }
+      const createGrounding: MutationGroundingRequirement = Object.freeze({
+        targetId,
+        mutationKind: "CREATE_TEXT" as const,
+        requiredSupportingClaimKind: "EXISTS" as const,
+        requiredEvidenceReference: parentHandle.handle,
+        requiredRelationship: GROUNDING_RELATIONSHIP,
+      });
       boundTargets.push({
         targetId,
         spec: target,
-        description: {
+        description: Object.freeze({
           targetId,
-          kind: "CREATE_TEXT",
+          kind: "CREATE_TEXT" as const,
           relativePath: rel,
-        },
+          evidenceHandle: parentHandle.handle,
+        }),
+        grounding: createGrounding,
       });
     } else {
       return failure(
@@ -474,41 +549,19 @@ export function openEngineeringMutationSession(
     lastAppliedReview: null,
   };
 
-  const descriptorsResult = describeReferenceCatalog(spec.catalog);
-  const descriptorHandles =
-    descriptorsResult.ok
-      ? descriptorsResult.value.map((d) => ({
-          handle: d.handle,
-          evidenceKind: d.evidenceKind,
-          ...(d.relativePath !== undefined
-            ? { relativePath: d.relativePath }
-            : {}),
-        }))
-      : [];
+  const descriptorHandles = catalogDescriptors.map((d) => ({
+    handle: d.handle,
+    evidenceKind: d.evidenceKind,
+    ...(d.relativePath !== undefined ? { relativePath: d.relativePath } : {}),
+  }));
 
-  if (descriptorsResult.ok) {
-    for (const bound of boundTargets) {
-      if (bound.spec.kind === "REPLACE_TEXT") {
-        const path = bound.spec.entry.relativePath;
-        const match = descriptorsResult.value.find(
-          (d) => d.evidenceKind === "CONTENT" && d.relativePath === path,
-        );
-        if (match) {
-          (bound.description as { evidenceHandle?: string }).evidenceHandle =
-            match.handle;
-        }
-      } else {
-        const path = bound.spec.parentDirectory.relativePath;
-        const match = descriptorsResult.value.find(
-          (d) => d.evidenceKind === "ENTRY" && d.relativePath === path,
-        );
-        if (match) {
-          (bound.description as { evidenceHandle?: string }).evidenceHandle =
-            match.handle;
-        }
-      }
-    }
-  }
+  const groundingDocument = buildMutationGroundingRequirementsDocument(
+    boundTargets.map((t) => t.grounding),
+  );
+  const groundingBlockText = JSON.stringify(groundingDocument, null, 2);
+  const groundingReferenceHandles = Object.freeze(
+    boundTargets.map((t) => t.grounding.requiredEvidenceReference),
+  );
 
   const session: EngineeringMutationSession = {
     describe(): MutationSessionDescriptorView {
@@ -628,6 +681,12 @@ export function openEngineeringMutationSession(
             context: {
               references: descriptorHandles,
               blocks: [
+                {
+                  blockId: "grounding-requirements",
+                  role: "REFERENCE_MATERIAL",
+                  text: groundingBlockText,
+                  referenceHandles: [...groundingReferenceHandles],
+                },
                 {
                   blockId: "permitted-targets",
                   role: "REFERENCE_MATERIAL",

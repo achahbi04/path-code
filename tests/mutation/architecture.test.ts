@@ -44,6 +44,7 @@ const ALLOWED_VALUE_EXPORTS = new Set([
   "sessionFailure",
   "openEngineeringMutationSession",
   "summarizeMutationSession",
+  "buildMutationGroundingRequirementsDocument",
 ]);
 
 function listTsFiles(dir: string): string[] {

@@ -50,7 +50,30 @@ export type MutationTargetDescription = {
   readonly targetId: string;
   readonly kind: MutationTargetKind;
   readonly relativePath: string;
+  /** Model-visible catalog handle for the required supporting evidence, when resolved. */
   readonly evidenceHandle?: string;
+};
+
+/**
+ * Provider-neutral edit grounding score for one permitted target.
+ * Owned by the mutation session — adapters transport it unchanged.
+ */
+export type MutationGroundingRequirement = {
+  readonly targetId: string;
+  readonly mutationKind: MutationTargetKind;
+  readonly requiredSupportingClaimKind: "CONTENT" | "EXISTS";
+  readonly requiredEvidenceReference: string;
+  readonly requiredRelationship: {
+    readonly reasoningClaimsMustIncludeRequiredKind: true;
+    readonly claimProposedSubjectMustCiteRequiredEvidenceReference: true;
+    readonly changeSupportingClaimIdsMustIncludeThatClaimId: true;
+  };
+};
+
+export type MutationGroundingRequirementsDocument = {
+  readonly title: "GROUNDING REQUIREMENTS";
+  readonly schemaVersion: 1;
+  readonly targets: readonly MutationGroundingRequirement[];
 };
 
 export type ValidationBlueprint = {
