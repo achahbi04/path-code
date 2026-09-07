@@ -103,10 +103,11 @@ describe("engineering brain architecture", () => {
       }
     }
 
-    // Earlier layers must not import brain.
+    // Earlier layers must not import brain. Orchestrator (5D2) is a later consumer.
     for (const file of listTsFiles(srcDir)) {
       const rel = relative(repoRoot, file).replaceAll("\\", "/");
       if (rel.startsWith("src/brain/")) continue;
+      if (rel.startsWith("src/orchestrator/")) continue;
       const src = readFileSync(file, "utf8");
       expect(src).not.toMatch(/from ["']\.\/brain|from ["']\.\.\/brain/);
     }

@@ -319,6 +319,10 @@ describe("reasoning architecture", () => {
       if (filePath.includes(`${join("src", "reasoning")}`)) {
         continue;
       }
+      // Orchestrator (5D2) is an authorized later consumer of reasoning/Gate APIs.
+      if (filePath.includes(`${join("src", "orchestrator")}`)) {
+        continue;
+      }
       const source = readFileSync(filePath, "utf8");
       if (
         /from\s+["'][^"']*reasoning(\/|\.js|\.ts)?["']/.test(source) ||
