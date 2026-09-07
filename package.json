@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "bin": {
-    "pathcode": "./dist/cli/entry.js"
+    "pathcode": "./scripts/pathcode.mjs"
   },
   "exports": {
     ".": {
