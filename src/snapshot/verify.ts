@@ -90,20 +90,7 @@ export function validateVerificationOptions(
 }
 
 /**
- * ADMITTED file/symlink members — used for content verification walks.
- */
-function admittedEntries(snapshot: RepositorySnapshot): RepositoryEntry[] {
-  const entries: RepositoryEntry[] = [];
-  for (const observation of snapshot.inventory.observations) {
-    if (observation.disposition === "ADMITTED") {
-      entries.push(observation.entry);
-    }
-  }
-  return entries;
-}
-
-/**
- * Entries eligible for identity verification requests.
+ * Entries eligible for identity verification requests and verification walks.
  * Includes ADMITTED members and DESCENDED directories (CREATE parent EXISTS).
  */
 function verificationEligibleEntries(
