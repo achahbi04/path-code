@@ -49,6 +49,7 @@ const ALLOWED_RUNTIME_VALUE_EXPORTS = new Set([
   "createReferenceCatalog",
   "describeReferenceCatalog",
   "disposeReferenceCatalog",
+  "inspectLiveReferenceCatalogAssociation",
   "bindReasoningProposalJson",
   "checkReferenceBoundReasoningApplicability",
 ]);

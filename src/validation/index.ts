@@ -18,6 +18,7 @@ export { authorizeValidationPlan } from "./authorization.js";
 export { executeValidationPlan } from "./execute.js";
 export { checkValidationResultApplicability } from "./applicability.js";
 export {
+  inspectValidationPlanAuthorizationCompatibility,
   resolveRegisteredPreparedValidationPlan,
   resolveRegisteredValidationBinding,
 } from "./binding.js";
@@ -33,6 +34,7 @@ export type {
   RegisteredValidationBinding,
   ValidationBindingFailure,
   ValidationBindingFailureCode,
+  ValidationPlanAuthorizationCompatibility,
 } from "./binding.js";
 export type {
   PreparedValidationCheck,

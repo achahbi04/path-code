@@ -152,7 +152,8 @@ export type ValidationExecutionFailureCode =
   | "SUBJECT_UNVERIFIABLE"
   | "CONFIG_UNREADABLE"
   | "POLICY_CHANGED"
-  | "PROCESS_EXECUTE_FAILED";
+  | "PROCESS_EXECUTE_FAILED"
+  | "STOP_REQUESTED";
 
 export type ValidationExecutionFailure = {
   readonly code: ValidationExecutionFailureCode;

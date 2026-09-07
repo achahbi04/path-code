@@ -52,6 +52,7 @@ function runFailure(
 export async function executeEngineeringRun(
   plan: PreparedValidationPlan,
   authorization: ValidationAuthorization,
+  options?: { readonly signal?: AbortSignal },
 ): Promise<Result<EngineeringRunRecord, EngineeringRunFailure>> {
   if (authorization.planRef !== plan) {
     return failure(
@@ -62,7 +63,7 @@ export async function executeEngineeringRun(
     );
   }
 
-  const executed = await executeValidationPlan(plan, authorization);
+  const executed = await executeValidationPlan(plan, authorization, options);
   if (!executed.ok) {
     return failure(
       runFailure(

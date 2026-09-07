@@ -13,11 +13,13 @@ import type { RepositorySnapshot } from "../snapshot/types.js";
 import type { ResolvedProjectConfig } from "../config/types.js";
 import {
   lookupPreparedValidationPlan,
+  lookupValidationAuthorization,
   lookupValidationResult,
 } from "./internal/registry.js";
 import type {
   PreparedValidationCheck,
   PreparedValidationPlan,
+  ValidationAuthorization,
   ValidationCheckKind,
   ValidationCriterionId,
   ValidationPlanResult,
@@ -27,7 +29,10 @@ import type {
 export type ValidationBindingFailureCode =
   | "RESULT_NOT_REGISTERED"
   | "PLAN_NOT_REGISTERED"
-  | "PLAN_MISMATCH";
+  | "PLAN_MISMATCH"
+  | "AUTHORIZATION_NOT_REGISTERED"
+  | "AUTHORIZATION_ALREADY_CONSUMED"
+  | "AUTHORIZATION_PLAN_MISMATCH";
 
 export type ValidationBindingFailure = {
   readonly code: ValidationBindingFailureCode;
@@ -123,6 +128,70 @@ export function resolveRegisteredPreparedValidationPlan(
       declaredEntries: entry.plan.declaredEntries,
       criterionId: entry.plan.criterionId,
       scopeId: entry.plan.scopeId,
+    }),
+  );
+}
+
+/**
+ * Read-only compatibility check for an existing plan + authorization.
+ * Reports unused status. Does not consume authorization, execute, or mint.
+ */
+export type ValidationPlanAuthorizationCompatibility = {
+  readonly plan: PreparedValidationPlan;
+  readonly authorization: ValidationAuthorization;
+  readonly unused: true;
+  readonly planId: string;
+  readonly authorizationId: string;
+  readonly checks: readonly PreparedCheckAssociation[];
+  readonly workspace: WorkspaceBoundary;
+  readonly snapshot: RepositorySnapshot;
+};
+
+export function inspectValidationPlanAuthorizationCompatibility(
+  plan: PreparedValidationPlan,
+  authorization: ValidationAuthorization,
+): Result<
+  ValidationPlanAuthorizationCompatibility,
+  ValidationBindingFailure
+> {
+  const prepared = resolveRegisteredPreparedValidationPlan(plan);
+  if (!prepared.ok) {
+    return prepared;
+  }
+  const authEntry = lookupValidationAuthorization(authorization);
+  if (authEntry === undefined) {
+    return failure({
+      code: "AUTHORIZATION_NOT_REGISTERED",
+      message:
+        "ValidationAuthorization is not registered or was reconstructed/copied",
+    });
+  }
+  if (authEntry.consumed) {
+    return failure({
+      code: "AUTHORIZATION_ALREADY_CONSUMED",
+      message: "ValidationAuthorization has already been consumed",
+    });
+  }
+  if (
+    authEntry.planRef !== plan ||
+    authorization.planRef !== plan ||
+    authEntry.planRef !== authorization.planRef
+  ) {
+    return failure({
+      code: "AUTHORIZATION_PLAN_MISMATCH",
+      message: "ValidationAuthorization is not bound to the supplied plan",
+    });
+  }
+  return success(
+    Object.freeze({
+      plan: prepared.value.plan,
+      authorization,
+      unused: true as const,
+      planId: prepared.value.planId,
+      authorizationId: authorization.authorizationId,
+      checks: prepared.value.checks,
+      workspace: prepared.value.workspace,
+      snapshot: prepared.value.snapshot,
     }),
   );
 }

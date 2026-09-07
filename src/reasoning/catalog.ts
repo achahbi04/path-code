@@ -343,3 +343,44 @@ export function requireLiveCatalog(
   }
   return success(internal);
 }
+
+/**
+ * Read-only live-catalog association projection for trusted conductors.
+ * Authenticates registration/liveness and reveals retained workspace/snapshot
+ * plus model-facing descriptors. Does not load file bytes, issue artifacts,
+ * or expose private Maps.
+ */
+export type LiveReferenceCatalogAssociation = {
+  readonly catalog: ReferenceCatalog;
+  readonly workspace: WorkspaceBoundary;
+  readonly snapshot: RepositorySnapshot;
+  readonly descriptors: readonly ReferenceDescriptor[];
+  readonly live: true;
+};
+
+export function inspectLiveReferenceCatalogAssociation(
+  catalog: ReferenceCatalog,
+): Result<LiveReferenceCatalogAssociation, ReasoningCatalogFailure> {
+  const internalResult = requireLiveCatalog(catalog);
+  if (!internalResult.ok) {
+    return internalResult;
+  }
+  const internal = internalResult.value;
+  const descriptors: ReferenceDescriptor[] = internal.records.map((record) => {
+    const descriptor: ReferenceDescriptor = {
+      handle: record.handle,
+      evidenceKind: record.evidenceKind,
+      relativePath: record.relativePath,
+    };
+    return Object.freeze(descriptor);
+  });
+  return success(
+    Object.freeze({
+      catalog,
+      workspace: internal.workspace,
+      snapshot: internal.snapshot,
+      descriptors: Object.freeze(descriptors),
+      live: true as const,
+    }),
+  );
+}

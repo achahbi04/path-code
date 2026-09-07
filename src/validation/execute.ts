@@ -56,7 +56,21 @@ function aggregateOutcome(
 export async function executeValidationPlan(
   plan: PreparedValidationPlan,
   authorization: ValidationAuthorization,
+  options?: { readonly signal?: AbortSignal },
 ): Promise<Result<ValidationPlanResult, ValidationExecutionFailure>> {
+  const signal = options?.signal;
+
+  if (signal !== undefined && signal.aborted) {
+    // Pre-aborted: do not consume authorization; report actual unused state.
+    return failure(
+      execFailure(
+        "STOP_REQUESTED",
+        "Validation execution refused before authorization consumption",
+        false,
+      ),
+    );
+  }
+
   const consumed = consumeValidationAuthorization(authorization, plan);
   if (consumed === "not_registered") {
     return failure(
@@ -89,6 +103,7 @@ export async function executeValidationPlan(
   const startedAtMs = Date.now();
   const checkResults: ValidationCheckResult[] = [];
   let stop = false;
+  let stopReason: string | null = null;
   let accumulatedProcessDurationMs = 0;
   let applicabilityValid = true;
 
@@ -104,6 +119,23 @@ export async function executeValidationPlan(
         subjectVerifiedBefore: false,
         subjectVerifiedAfter: null,
       });
+      continue;
+    }
+
+    if (signal !== undefined && signal.aborted) {
+      checkResults.push({
+        checkId: check.id,
+        kind: check.kind,
+        verdict: "NOT_ATTEMPTED",
+        processResult: null,
+        refusalCode: "STOP_REQUESTED",
+        refusalMessage: "Validation stop requested before check dispatch",
+        subjectVerifiedBefore: false,
+        subjectVerifiedAfter: null,
+      });
+      stop = true;
+      stopReason = "STOP_REQUESTED";
+      applicabilityValid = false;
       continue;
     }
 
@@ -157,6 +189,24 @@ export async function executeValidationPlan(
         subjectVerifiedAfter: null,
       });
       stop = true;
+      applicabilityValid = false;
+      continue;
+    }
+
+    // Recheck stop after awaited pre-dispatch work, before spawning.
+    if (signal !== undefined && signal.aborted) {
+      checkResults.push({
+        checkId: check.id,
+        kind: check.kind,
+        verdict: "NOT_ATTEMPTED",
+        processResult: null,
+        refusalCode: "STOP_REQUESTED",
+        refusalMessage: "Validation stop requested before process dispatch",
+        subjectVerifiedBefore: true,
+        subjectVerifiedAfter: null,
+      });
+      stop = true;
+      stopReason = "STOP_REQUESTED";
       applicabilityValid = false;
       continue;
     }
@@ -219,8 +269,16 @@ export async function executeValidationPlan(
 
     if (verdict !== "PASS" || !after.ok) {
       stop = true;
+    } else if (signal !== undefined && signal.aborted) {
+      // Active command completed; do not dispatch later checks.
+      stop = true;
+      stopReason = "STOP_REQUESTED";
+      applicabilityValid = false;
     }
   }
+
+  // Silence unused when stopReason only set on signal path (kept for clarity).
+  void stopReason;
 
   const planCriterionSatisfied =
     applicabilityValid &&

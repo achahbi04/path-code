@@ -82,6 +82,15 @@ export function consumeValidationAuthorization(
   return "ok";
 }
 
+/**
+ * Read-only authorization lookup — does not consume.
+ */
+export function lookupValidationAuthorization(
+  authorization: ValidationAuthorization,
+): AuthEntry | undefined {
+  return authRegistry.get(authorization);
+}
+
 export function registerValidationResult(
   result: ValidationPlanResult,
   planRef: PreparedValidationPlan,

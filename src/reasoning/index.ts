@@ -37,6 +37,7 @@ export type {
 
 export type {
   CreateReferenceCatalogInput,
+  LiveReferenceCatalogAssociation,
   ReferenceCatalog,
   ReferenceCatalogSelection,
   ReferenceDescriptor,
@@ -50,6 +51,7 @@ export {
   createReferenceCatalog,
   describeReferenceCatalog,
   disposeReferenceCatalog,
+  inspectLiveReferenceCatalogAssociation,
 } from "./catalog.js";
 
 export { bindReasoningProposalJson } from "./bind.js";
