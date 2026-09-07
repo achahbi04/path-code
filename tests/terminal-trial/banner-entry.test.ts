@@ -1,5 +1,13 @@
 import { spawnSync } from "node:child_process";
+import {
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -91,6 +99,74 @@ describe("T01 T03 packaging and offline entry", () => {
       expect(fetchCalls).toBe(0);
     } finally {
       globalThis.fetch = original;
+    }
+  });
+
+  it("installed symlink entry reaches welcome; naive argv compare would miss", async () => {
+    const scriptPath = join(CHECKOUT_ROOT, "scripts", "pathcode.mjs");
+    const binDir = mkdtempSync(join(tmpdir(), "pathcode-installed-bin-"));
+    const symlinkPath = join(binDir, "pathcode");
+    try {
+      symlinkSync(scriptPath, symlinkPath);
+
+      // Previous silent-exit shape: argv holds symlink, import.meta.url is real.
+      const naiveWouldMiss =
+        pathToFileURL(symlinkPath).href !== pathToFileURL(scriptPath).href;
+      expect(naiveWouldMiss).toBe(true);
+      expect(realpathSync(symlinkPath)).toBe(realpathSync(scriptPath));
+
+      const { isDirectEntry } = await importPathcodeMain();
+      expect(isDirectEntry(symlinkPath)).toBe(true);
+      expect(isDirectEntry(scriptPath)).toBe(true);
+
+      const env = { ...process.env, NO_COLOR: "1", TERM: "dumb" };
+      const bare = spawnSync(symlinkPath, [], { encoding: "utf8", env });
+      expect(bare.status).toBe(0);
+      expect(bare.stdout).toMatch(/PATH \* Code|PATH ● Code/);
+      expect(bare.stdout).toContain("Non-interactive stdout");
+      expect(bare.stdout).not.toContain("sk-");
+      expect(bare.stderr).toBe("");
+
+      const modeled = spawnSync(
+        symlinkPath,
+        ["--model", "gpt-5.6-terra"],
+        { encoding: "utf8", env },
+      );
+      expect(modeled.status).toBe(0);
+      expect(modeled.stdout).toMatch(/PATH \* Code|PATH ● Code/);
+      expect(modeled.stdout).toContain("Non-interactive stdout");
+      expect(modeled.stderr).toBe("");
+
+      const help = spawnSync(symlinkPath, ["--help"], { encoding: "utf8", env });
+      expect(help.status).toBe(0);
+      expect(help.stdout).toMatch(/Usage|\/trial|\/help/);
+
+      const version = spawnSync(symlinkPath, ["--version"], {
+        encoding: "utf8",
+        env,
+      });
+      expect(version.status).toBe(0);
+      expect(version.stdout).toMatch(/PATH \* Code|PATH ● Code/);
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
+    }
+  });
+
+  it("imported entry stays side-effect free (no welcome on import)", async () => {
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string | Uint8Array, ...rest: unknown[]) => {
+      writes.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
+      return originalWrite(chunk, ...(rest as []));
+    }) as typeof process.stdout.write;
+    try {
+      await import(
+        pathToFileURL(join(CHECKOUT_ROOT, "scripts", "pathcode.mjs")).href +
+          `?side-effect-probe=${Date.now()}`
+      );
+      expect(writes.join("")).not.toMatch(/PATH \* Code|PATH ● Code|First engineering trial/);
+    } finally {
+      process.stdout.write = originalWrite;
     }
   });
 

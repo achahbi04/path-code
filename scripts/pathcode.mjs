@@ -5,8 +5,8 @@
  * Legacy foundation CLI behavior is delegated for unrecognized flags.
  */
 
-import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { join } from "node:path";
 
 import {
@@ -217,11 +217,23 @@ export async function runPathcodeMain(argv, testIo = {}) {
   }
 }
 
-const isDirect =
-  process.argv[1] &&
-  pathToFileURL(process.argv[1]).href === import.meta.url;
+/**
+ * True when this module is the process entry, including symlink and package/bin
+ * launches. Naive argv[1] === import.meta.url fails when argv holds the symlink
+ * path while import.meta.url is the real scripts/pathcode.mjs path.
+ * @param {string | undefined} argv1
+ */
+export function isDirectEntry(argv1 = process.argv[1]) {
+  if (!argv1) return false;
+  const modulePath = fileURLToPath(import.meta.url);
+  try {
+    return realpathSync(argv1) === realpathSync(modulePath);
+  } catch {
+    return pathToFileURL(argv1).href === import.meta.url;
+  }
+}
 
-if (isDirect) {
+if (isDirectEntry()) {
   runPathcodeMain(process.argv.slice(2))
     .then((code) => {
       process.exitCode = code;
