@@ -17,16 +17,22 @@ import {
   TEST_CREDENTIAL,
   TEST_MODEL,
 } from "../adapters/openai/fixtures.js";
-import {
-  FIXED_CALCULATOR_SOURCE,
-  SEED_CALCULATOR_SOURCE,
-} from "../../scripts/pathcode-cli/fixture-store.mjs";
 
 const require = createRequire(import.meta.url);
 export const CHECKOUT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
 export { TEST_CREDENTIAL, TEST_MODEL, getRecordedFetchCalls };
-export { FIXED_CALCULATOR_SOURCE, SEED_CALCULATOR_SOURCE };
+
+/** Must match scripts/pathcode-cli/fixture-store.mjs seed/fixed sources. */
+export const SEED_CALCULATOR_SOURCE = `export function multiply(a: number, b: number): number {
+  return a + b;
+}
+`;
+
+export const FIXED_CALCULATOR_SOURCE = `export function multiply(a: number, b: number): number {
+  return a * b;
+}
+`;
 
 const trialRoots: string[] = [];
 

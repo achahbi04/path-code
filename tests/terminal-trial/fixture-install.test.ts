@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -21,6 +21,12 @@ afterEach(async () => {
 describe("T07 fixture provisioning", () => {
   it("provisions one unique synthetic workspace with defective seed; no overwrite", async () => {
     const store = await importHost("fixture-store.mjs");
+    expect(store.SEED_CALCULATOR_SOURCE).toBe(
+      (await import("./helpers.js")).SEED_CALCULATOR_SOURCE,
+    );
+    expect(store.FIXED_CALCULATOR_SOURCE).toBe(
+      (await import("./helpers.js")).FIXED_CALCULATOR_SOURCE,
+    );
     expect(store.seedSourceIsDefectiveProduct()).toBe(true);
     const a = await store.provisionMultiply01Workspace();
     expect(a.ok).toBe(true);
