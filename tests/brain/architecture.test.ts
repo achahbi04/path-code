@@ -42,6 +42,7 @@ const ALLOWED_VALUE_EXPORTS = new Set([
   "MAX_TASK_TEXT_UTF8_BYTES",
   "MIN_MAX_DISPATCHES",
   "REASONING_PROPOSAL_SCHEMA_VERSION",
+  "ENGINEERING_EDIT_PROPOSAL_SCHEMA_VERSION",
   "utf8ByteLength",
   "createEngineeringBrain",
   "readMonotonicMs",
@@ -108,6 +109,7 @@ describe("engineering brain architecture", () => {
       const rel = relative(repoRoot, file).replaceAll("\\", "/");
       if (rel.startsWith("src/brain/")) continue;
       if (rel.startsWith("src/orchestrator/")) continue;
+      if (rel.startsWith("src/orchestrator/mutation/")) continue;
       const src = readFileSync(file, "utf8");
       expect(src).not.toMatch(/from ["']\.\/brain|from ["']\.\.\/brain/);
     }

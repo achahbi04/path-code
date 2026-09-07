@@ -22,6 +22,13 @@ const ALLOWED_FILES = new Set([
   "src/orchestrator/seams.ts",
   "src/orchestrator/summary.ts",
   "src/orchestrator/types.ts",
+  "src/orchestrator/mutation/bounds.ts",
+  "src/orchestrator/mutation/envelope.ts",
+  "src/orchestrator/mutation/failures.ts",
+  "src/orchestrator/mutation/index.ts",
+  "src/orchestrator/mutation/registry.ts",
+  "src/orchestrator/mutation/session.ts",
+  "src/orchestrator/mutation/types.ts",
 ]);
 
 const ALLOWED_VALUE_EXPORTS = new Set([
@@ -76,6 +83,7 @@ describe("orchestrator architecture", () => {
 
     for (const rel of files) {
       const src = readFileSync(join(repoRoot, rel), "utf8");
+      const isMutation = rel.startsWith("src/orchestrator/mutation/");
       expect(src).not.toMatch(
         /from ["']node:(fs|path|child_process|worker_threads|http|https|net|dns|tls)["']/,
       );
@@ -83,7 +91,11 @@ describe("orchestrator architecture", () => {
       expect(src).not.toMatch(/process\.env/);
       expect(src).not.toMatch(/explicitLocalProcessApproval\s*\(/);
       expect(src).not.toMatch(/authorizeValidationPlan\s*\(/);
-      expect(src).not.toMatch(/from ["']\.\.\/editing\//);
+      expect(src).not.toMatch(/explicitEditApproval\s*\(/);
+      expect(src).not.toMatch(/authorizePreparedChange\s*\(/);
+      if (!isMutation) {
+        expect(src).not.toMatch(/from ["']\.\.\/editing\//);
+      }
 
       for (const line of src.split("\n")) {
         const m = line.match(/from ["']([^"']+)["']/);
@@ -94,7 +106,23 @@ describe("orchestrator architecture", () => {
           expect(spec).toBe("node:crypto");
           continue;
         }
-        const allowed = ALLOWED_IMPORT_PREFIXES.some((p) => spec.startsWith(p));
+        const allowedPrefixes = isMutation
+          ? [
+              "../../brain/",
+              "../../domain/",
+              "../../editing/",
+              "../../config/",
+              "../../inventory/",
+              "../../reader/",
+              "../../reasoning/",
+              "../../snapshot/",
+              "../../validation/",
+              "../",
+              "./",
+              "node:crypto",
+            ]
+          : ALLOWED_IMPORT_PREFIXES;
+        const allowed = allowedPrefixes.some((p) => spec.startsWith(p));
         expect(allowed, `${rel} imports ${spec}`).toBe(true);
       }
     }
@@ -117,5 +145,6 @@ describe("orchestrator architecture", () => {
     const root = await import("../../src/index.js");
     expect(root).not.toHaveProperty("openEngineeringCycle");
     expect(root).not.toHaveProperty("summarizeEngineeringCycle");
+    expect(root).not.toHaveProperty("openEngineeringMutationSession");
   });
 });

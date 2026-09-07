@@ -27,6 +27,7 @@ export const HARD_MAX_DISPATCHES = 8;
 export const MIN_MAX_DISPATCHES = 1;
 
 export const REASONING_PROPOSAL_SCHEMA_VERSION = 1 as const;
+export const ENGINEERING_EDIT_PROPOSAL_SCHEMA_VERSION = 1 as const;
 
 export function utf8ByteLength(value: string): number {
   return Buffer.byteLength(value, "utf8");

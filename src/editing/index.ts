@@ -13,6 +13,9 @@ export {
   explicitEditApproval,
 } from "./authorization.js";
 
+export { inspectPreparedEditAuthorizationCompatibility } from "./binding.js";
+export type { PreparedEditAuthorizationCompatibility } from "./binding.js";
+
 export {
   prepareCreateFile,
   prepareModifyExistingFile,

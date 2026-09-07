@@ -52,12 +52,22 @@ export type ReferenceDescriptor = {
   readonly relativePath?: string;
 };
 
-function admittedEntrySet(
+/**
+ * Entries eligible for Gate 1 ENTRY selection.
+ * Includes ADMITTED members and DESCENDED directories (parents used for CREATE_TEXT).
+ * Does not admit denied, partial, or non-directory DESCENDED shapes.
+ */
+function catalogEligibleEntrySet(
   snapshot: RepositorySnapshot,
 ): Set<RepositoryEntry> {
   const set = new Set<RepositoryEntry>();
   for (const observation of snapshot.inventory.observations) {
     if (observation.disposition === "ADMITTED") {
+      set.add(observation.entry);
+    } else if (
+      observation.disposition === "DESCENDED" &&
+      observation.entry.physicalKind === "DIRECTORY"
+    ) {
       set.add(observation.entry);
     }
   }
@@ -113,7 +123,7 @@ export function createReferenceCatalog(
     );
   }
 
-  const admitted = admittedEntrySet(snapshot);
+  const admitted = catalogEligibleEntrySet(snapshot);
   const observedManifests = collectObservedManifestEvidence(snapshot);
   const entries = selection.entries ?? [];
   const observations = selection.contentObservations ?? [];

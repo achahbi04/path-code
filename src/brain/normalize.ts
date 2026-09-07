@@ -18,6 +18,7 @@ import {
   MAX_RESPONSE_UTF8_BYTES,
   MAX_TASK_TEXT_UTF8_BYTES,
   REASONING_PROPOSAL_SCHEMA_VERSION,
+  ENGINEERING_EDIT_PROPOSAL_SCHEMA_VERSION,
   DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_TIMEOUT_MS,
   isNonemptyBoundedId,
@@ -38,7 +39,11 @@ import type {
 const OWN_DATA = Object.prototype.hasOwnProperty;
 
 const EVIDENCE_KINDS = new Set(["ENTRY", "CONTENT", "MANIFEST"]);
-const PURPOSES = new Set(["PROPOSE_REASONING", "REVISE_REASONING"]);
+const PURPOSES = new Set([
+  "PROPOSE_REASONING",
+  "REVISE_REASONING",
+  "PROPOSE_EDIT",
+]);
 const BLOCK_ROLES = new Set(["REFERENCE_MATERIAL", "DIAGNOSTIC"]);
 
 const REQUEST_KEYS = new Set([
@@ -445,12 +450,6 @@ function parseResponseProfile(
   if (!kindResult.ok) {
     return kindResult;
   }
-  if (kindResult.value !== "REASONING_PROPOSAL_JSON") {
-    return failure({
-      code: "UNSUPPORTED_CAPABILITY",
-      message: "responseProfile.kind is not supported by V1",
-    });
-  }
   if (!OWN_DATA.call(value, "schemaVersion")) {
     return failure({
       code: "INVALID_REQUEST",
@@ -458,18 +457,38 @@ function parseResponseProfile(
     });
   }
   const version = value.schemaVersion;
-  if (version !== REASONING_PROPOSAL_SCHEMA_VERSION) {
-    return failure({
-      code: "UNSUPPORTED_CAPABILITY",
-      message: "responseProfile.schemaVersion is not supported",
-    });
+  if (kindResult.value === "REASONING_PROPOSAL_JSON") {
+    if (version !== REASONING_PROPOSAL_SCHEMA_VERSION) {
+      return failure({
+        code: "UNSUPPORTED_CAPABILITY",
+        message: "responseProfile.schemaVersion is not supported",
+      });
+    }
+    return success(
+      Object.freeze({
+        kind: "REASONING_PROPOSAL_JSON" as const,
+        schemaVersion: REASONING_PROPOSAL_SCHEMA_VERSION,
+      }),
+    );
   }
-  return success(
-    Object.freeze({
-      kind: "REASONING_PROPOSAL_JSON" as const,
-      schemaVersion: REASONING_PROPOSAL_SCHEMA_VERSION,
-    }),
-  );
+  if (kindResult.value === "ENGINEERING_EDIT_PROPOSAL_JSON") {
+    if (version !== ENGINEERING_EDIT_PROPOSAL_SCHEMA_VERSION) {
+      return failure({
+        code: "UNSUPPORTED_CAPABILITY",
+        message: "responseProfile.schemaVersion is not supported",
+      });
+    }
+    return success(
+      Object.freeze({
+        kind: "ENGINEERING_EDIT_PROPOSAL_JSON" as const,
+        schemaVersion: ENGINEERING_EDIT_PROPOSAL_SCHEMA_VERSION,
+      }),
+    );
+  }
+  return failure({
+    code: "UNSUPPORTED_CAPABILITY",
+    message: "responseProfile.kind is not supported by V1",
+  });
 }
 
 export function resolveEffectiveCeilings(

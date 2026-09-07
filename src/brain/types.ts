@@ -6,6 +6,7 @@
 import type { ModelToolCallProposal } from "../domain/provider.js";
 import type {
   BRAIN_RECEIPT_SCHEMA_VERSION,
+  ENGINEERING_EDIT_PROPOSAL_SCHEMA_VERSION,
   REASONING_PROPOSAL_SCHEMA_VERSION,
 } from "./bounds.js";
 
@@ -39,12 +40,18 @@ export type BrainContextPacket = {
 
 export type BrainInvocationPurpose =
   | "PROPOSE_REASONING"
-  | "REVISE_REASONING";
+  | "REVISE_REASONING"
+  | "PROPOSE_EDIT";
 
-export type BrainResponseProfile = {
-  readonly kind: "REASONING_PROPOSAL_JSON";
-  readonly schemaVersion: typeof REASONING_PROPOSAL_SCHEMA_VERSION;
-};
+export type BrainResponseProfile =
+  | {
+      readonly kind: "REASONING_PROPOSAL_JSON";
+      readonly schemaVersion: typeof REASONING_PROPOSAL_SCHEMA_VERSION;
+    }
+  | {
+      readonly kind: "ENGINEERING_EDIT_PROPOSAL_JSON";
+      readonly schemaVersion: typeof ENGINEERING_EDIT_PROPOSAL_SCHEMA_VERSION;
+    };
 
 export type BrainInvocationRequest = {
   readonly correlationId: string;

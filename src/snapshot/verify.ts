@@ -89,6 +89,9 @@ export function validateVerificationOptions(
   });
 }
 
+/**
+ * ADMITTED file/symlink members — used for content verification walks.
+ */
 function admittedEntries(snapshot: RepositorySnapshot): RepositoryEntry[] {
   const entries: RepositoryEntry[] = [];
   for (const observation of snapshot.inventory.observations) {
@@ -99,11 +102,32 @@ function admittedEntries(snapshot: RepositorySnapshot): RepositoryEntry[] {
   return entries;
 }
 
+/**
+ * Entries eligible for identity verification requests.
+ * Includes ADMITTED members and DESCENDED directories (CREATE parent EXISTS).
+ */
+function verificationEligibleEntries(
+  snapshot: RepositorySnapshot,
+): RepositoryEntry[] {
+  const entries: RepositoryEntry[] = [];
+  for (const observation of snapshot.inventory.observations) {
+    if (observation.disposition === "ADMITTED") {
+      entries.push(observation.entry);
+    } else if (
+      observation.disposition === "DESCENDED" &&
+      observation.entry.physicalKind === "DIRECTORY"
+    ) {
+      entries.push(observation.entry);
+    }
+  }
+  return entries;
+}
+
 function resolveEntryScope(
   snapshot: RepositorySnapshot,
   request: VerificationRequest,
 ): Result<RepositoryEntry[], SnapshotFailure> {
-  const admitted = admittedEntries(snapshot);
+  const admitted = verificationEligibleEntries(snapshot);
   if (request.entries === "ALL") {
     return success(sortEntriesForVerification(admitted));
   }
@@ -234,7 +258,9 @@ export async function verifyRepositorySnapshot(
   let entryBudgetExhausted = false;
   let contentBudgetExhausted = false;
 
-  for (const entry of sortEntriesForVerification(admittedEntries(snapshot))) {
+  for (const entry of sortEntriesForVerification(
+    verificationEligibleEntries(snapshot),
+  )) {
     const inEntryScope = entryScopeSet.has(entry);
     const baseline = snapshot.contentObservationByEntry.get(entry);
 
