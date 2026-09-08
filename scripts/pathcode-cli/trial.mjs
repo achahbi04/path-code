@@ -36,6 +36,7 @@ export const TRIAL_CUMULATIVE_OUTPUT_TOKENS = 8_192;
 export const TRIAL_REQUEST_BODY_BYTES = 131_072;
 export const TRIAL_CUMULATIVE_REQUEST_BODY_BYTES = 262_144;
 export const MAX_CREDENTIAL_UTF8_BYTES = 8_192;
+export const DEFINES_CLAIM_ID = "defines-multiply-01";
 export const BEHAVES_CLAIM_ID = "behaves-multiply-01";
 export const TYPECHECK_CHECK_ID = "typecheck";
 export const TARGETED_CHECK_ID = "targeted";
@@ -513,18 +514,22 @@ export async function runMultiply01Trial(prompt, options = {}) {
       ],
       claimCheckAssignments: [
         {
+          claimId: DEFINES_CLAIM_ID,
+          selectedCheckIds: [TYPECHECK_CHECK_ID],
+        },
+        {
           claimId: BEHAVES_CLAIM_ID,
           selectedCheckIds: [TARGETED_CHECK_ID],
         },
       ],
       supportingObservations: phase2.supportingObservations,
       postEditInstructionText:
-        `After the edit, propose REASONING_PROPOSAL_JSON with BEHAVES claimId "${BEHAVES_CLAIM_ID}" for multiply product behavior on the CONTENT evidence for ${MUTATION_RELATIVE_PATH}. Both configured checks (${TYPECHECK_CHECK_ID}, ${TARGETED_CHECK_ID}) must still pass.`,
+        `After the edit, propose REASONING_PROPOSAL_JSON with exactly two EXECUTION claims on the CONTENT evidence for ${MUTATION_RELATIVE_PATH}: DEFINES claimId "${DEFINES_CLAIM_ID}" (symbolName "multiply") mapped to ${TYPECHECK_CHECK_ID}, and BEHAVES claimId "${BEHAVES_CLAIM_ID}" (product scenario) mapped to ${TARGETED_CHECK_ID}. Do not omit either claim. Do not add other EXECUTION claims.`,
       postEditContextBlocks: [
         {
           blockId: "post-trial-instruction",
           role: "REFERENCE_MATERIAL",
-          text: `Trial ${TRIAL_ID}: validate multiply returns the product. Claim ${BEHAVES_CLAIM_ID} maps to check ${TARGETED_CHECK_ID}. TYPECHECK emits .trial-build.`,
+          text: `Trial ${TRIAL_ID}: validate multiply returns the product. Claim ${DEFINES_CLAIM_ID} → ${TYPECHECK_CHECK_ID} (emits .trial-build). Claim ${BEHAVES_CLAIM_ID} → ${TARGETED_CHECK_ID} (runs after TYPECHECK).`,
           referenceHandles: [],
         },
       ],
@@ -796,6 +801,7 @@ export async function runMultiply01Trial(prompt, options = {}) {
       gate2: summary.gate2,
       modelCalls: "2 / 2",
       mutationDisposition: outcome.value.record?.mutationDisposition ?? null,
+      preExecution: summary.preExecution,
     }),
   );
 

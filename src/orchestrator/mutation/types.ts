@@ -76,6 +76,26 @@ export type MutationGroundingRequirementsDocument = {
   readonly targets: readonly MutationGroundingRequirement[];
 };
 
+/**
+ * Provider-neutral post-edit EXECUTION claim score derived from blueprint
+ * claim→check assignments. Adapters transport it unchanged.
+ */
+export type PostEditExecutionClaimRequirement = {
+  readonly claimId: string;
+  readonly requiredClaimKind: "DEFINES" | "BEHAVES";
+  readonly requiredCheckKinds: readonly ("TYPECHECK" | "TARGETED_TEST")[];
+  readonly requiredEvidenceReference: string;
+  readonly requiredRelationship: {
+    readonly claimProposedSubjectMustCiteRequiredEvidenceReference: true;
+  };
+};
+
+export type PostEditExecutionClaimRequirementsDocument = {
+  readonly title: "POST_EDIT_EXECUTION_CLAIM_REQUIREMENTS";
+  readonly schemaVersion: 1;
+  readonly requiredClaims: readonly PostEditExecutionClaimRequirement[];
+};
+
 export type ValidationBlueprint = {
   readonly checks: readonly ValidationCheckSpec[];
   readonly claimCheckAssignments: readonly ClaimCheckAssignmentInput[];

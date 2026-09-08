@@ -85,6 +85,8 @@ import type {
   MutationTargetSpec,
   MutationValidationOutcome,
   OpenMutationSessionResult,
+  PostEditExecutionClaimRequirement,
+  PostEditExecutionClaimRequirementsDocument,
   ReobservationDisposition,
   ValidationDisposition,
 } from "./types.js";
@@ -101,6 +103,116 @@ const GROUNDING_RELATIONSHIP = Object.freeze({
   claimProposedSubjectMustCiteRequiredEvidenceReference: true as const,
   changeSupportingClaimIdsMustIncludeThatClaimId: true as const,
 });
+
+const POST_EDIT_CLAIM_RELATIONSHIP = Object.freeze({
+  claimProposedSubjectMustCiteRequiredEvidenceReference: true as const,
+});
+
+function claimKindForSelectedCheckKinds(
+  kinds: readonly string[],
+): "DEFINES" | "BEHAVES" | null {
+  if (kinds.length === 1 && kinds[0] === "TYPECHECK") {
+    return "DEFINES";
+  }
+  if (kinds.length === 1 && kinds[0] === "TARGETED_TEST") {
+    return "BEHAVES";
+  }
+  return null;
+}
+
+function buildPostEditExecutionClaimRequirements(input: {
+  readonly assignments: EngineeringMutationSessionSpec["validationBlueprint"]["claimCheckAssignments"];
+  readonly checks: EngineeringMutationSessionSpec["validationBlueprint"]["checks"];
+  readonly catalog: import("../../reasoning/catalog.js").ReferenceCatalog;
+  readonly supportingObservations: readonly ContentObservation[];
+}):
+  | {
+      ok: true;
+      document: PostEditExecutionClaimRequirementsDocument;
+      referenceHandles: readonly string[];
+    }
+  | { ok: false; message: string } {
+  const described = describeReferenceCatalog(input.catalog);
+  if (!described.ok) {
+    return {
+      ok: false,
+      message: "post-edit catalog descriptors unavailable for claim requirements",
+    };
+  }
+  const contentByPath = new Map<string, string>();
+  for (const descriptor of described.value) {
+    if (
+      descriptor.evidenceKind === "CONTENT" &&
+      typeof descriptor.relativePath === "string" &&
+      typeof descriptor.handle === "string"
+    ) {
+      contentByPath.set(descriptor.relativePath, descriptor.handle);
+    }
+  }
+
+  let requiredEvidenceReference: string | null = null;
+  for (const observation of input.supportingObservations) {
+    const handle = contentByPath.get(observation.entry.relativePath);
+    if (handle !== undefined) {
+      requiredEvidenceReference = handle;
+      break;
+    }
+  }
+  if (requiredEvidenceReference === null) {
+    return {
+      ok: false,
+      message:
+        "post-edit CONTENT evidence handle missing for supporting observations",
+    };
+  }
+
+  const checkById = new Map(
+    input.checks.map((check) => [check.id, check] as const),
+  );
+  const requiredClaims: PostEditExecutionClaimRequirement[] = [];
+  for (const row of input.assignments) {
+    const kinds: string[] = [];
+    for (const checkId of row.selectedCheckIds) {
+      const check = checkById.get(checkId);
+      if (check === undefined) {
+        return {
+          ok: false,
+          message: `assignment references unknown check id ${checkId}`,
+        };
+      }
+      kinds.push(check.kind);
+    }
+    const requiredClaimKind = claimKindForSelectedCheckKinds(kinds);
+    if (requiredClaimKind === null) {
+      return {
+        ok: false,
+        message:
+          "assignment selected checks do not map to a single DEFINES/BEHAVES obligation",
+      };
+    }
+    requiredClaims.push(
+      Object.freeze({
+        claimId: row.claimId,
+        requiredClaimKind,
+        requiredCheckKinds: Object.freeze(
+          [...kinds],
+        ) as PostEditExecutionClaimRequirement["requiredCheckKinds"],
+        requiredEvidenceReference,
+        requiredRelationship: POST_EDIT_CLAIM_RELATIONSHIP,
+      }),
+    );
+  }
+
+  return {
+    ok: true,
+    document: Object.freeze({
+      title: "POST_EDIT_EXECUTION_CLAIM_REQUIREMENTS" as const,
+      schemaVersion: 1 as const,
+      requiredClaims: Object.freeze(requiredClaims),
+    }),
+    referenceHandles: Object.freeze([requiredEvidenceReference]),
+  };
+}
 
 /**
  * Build the immutable model-facing grounding score for permitted targets.
@@ -1447,6 +1559,27 @@ export function openEngineeringMutationSession(
           );
         }
 
+        const claimRequirements = buildPostEditExecutionClaimRequirements({
+          assignments: entry.assignments,
+          checks: spec.validationBlueprint.checks,
+          catalog: entry.catalog,
+          supportingObservations:
+            spec.validationBlueprint.supportingObservations,
+        });
+        if (!claimRequirements.ok) {
+          state.validationDisposition = "FAILED";
+          state.phase = "FINALIZED";
+          return failCall(
+            sessionId,
+            state,
+            sessionFailure(
+              "VALIDATION_FAILED",
+              claimRequirements.message,
+              { mutationOutcome: state.mutationArtifacts },
+            ),
+          );
+        }
+
         const cycleOpen = openEngineeringCycle(
           {
             mode: "BIND_AND_VALIDATE",
@@ -1483,7 +1616,15 @@ export function openEngineeringMutationSession(
           {
             correlationId,
             instructionText: spec.validationBlueprint.postEditInstructionText,
-            contextBlocks: [...spec.validationBlueprint.postEditContextBlocks],
+            contextBlocks: [
+              {
+                blockId: "post-edit-execution-claim-requirements",
+                role: "REFERENCE_MATERIAL",
+                text: JSON.stringify(claimRequirements.document, null, 2),
+                referenceHandles: [...claimRequirements.referenceHandles],
+              },
+              ...spec.validationBlueprint.postEditContextBlocks,
+            ],
           },
           options?.signal ? { signal: options.signal } : undefined,
         );

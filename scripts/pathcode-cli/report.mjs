@@ -6,6 +6,24 @@ import { COMPACT_NAME, ASCII_NAME } from "./banner.mjs";
 import { escapeForTerminalDisplay } from "./escape.mjs";
 
 /**
+ * @param {string | null | undefined} originCode
+ */
+function stageForPreExecutionOrigin(originCode) {
+  switch (originCode) {
+    case "GATE2_PREPARE_FAILED":
+      return "PREPARING_EXECUTION_EVIDENCE";
+    case "AUTHORIZATION_INCOMPATIBLE":
+    case "CATALOG_INVALID":
+    case "INSUFFICIENT_EXECUTION_BUDGET":
+      return "RECHECKING_EXECUTION_PRECONDITIONS";
+    case "NO_EXECUTION_OBLIGATIONS":
+      return "BINDING";
+    default:
+      return "PRE_EXECUTION";
+  }
+}
+
+/**
  * @param {{
  *   unicode?: boolean,
  *   label?: string,
@@ -17,6 +35,7 @@ import { escapeForTerminalDisplay } from "./escape.mjs";
  *   modelCalls?: string,
  *   note?: string,
  *   mutationDisposition?: string | null,
+ *   preExecution?: { stage: string, reason: string } | null,
  * }} input
  */
 export function renderTrialReport(input) {
@@ -26,6 +45,15 @@ export function renderTrialReport(input) {
     "",
     escapeForTerminalDisplay(input.label ?? "NOT_ESTABLISHED"),
   ];
+  if (input.preExecution) {
+    lines.push("  Validation stopped before execution");
+    lines.push(
+      `  Stage:        ${escapeForTerminalDisplay(input.preExecution.stage)}`,
+    );
+    lines.push(
+      `  Reason:       ${escapeForTerminalDisplay(input.preExecution.reason)}`,
+    );
+  }
   if (input.sourcePath) {
     lines.push(`  Source:       ${escapeForTerminalDisplay(input.sourcePath)}`);
   }
@@ -70,6 +98,12 @@ export function summarizeValidationOutcome(outcome) {
   const label = outcome?.label ?? "MUTATION_NOT_DISPATCHED";
   const cycle = outcome?.artifacts?.cycle?.record;
   const terminal = cycle?.terminalState ?? null;
+  const originCode =
+    typeof cycle?.originCode === "string" ? cycle.originCode : null;
+  const validationDisposition =
+    typeof cycle?.validationDisposition === "string"
+      ? cycle.validationDisposition
+      : null;
   const eng = outcome?.artifacts?.cycle?.artifacts?.engineeringRun;
   const checks =
     eng?.validationResult?.checkResults ??
@@ -90,11 +124,40 @@ export function summarizeValidationOutcome(outcome) {
       }
     }
   }
+  if (
+    (typecheck === "FAIL" || typecheck === "REFUSED") &&
+    regression === "NOT_ATTEMPTED"
+  ) {
+    regression = "not run (blocked by prior TYPECHECK)";
+  }
   const gate2 =
     label === "MUTATION_APPLIED_AND_CONFIGURED_VALIDATION_ACCEPTED"
       ? "configured evidence accepted"
       : terminal
         ? `not established (${terminal})`
         : "not established";
-  return { label, typecheck, regression, gate2, terminal };
+
+  let preExecution = null;
+  const notDispatched =
+    validationDisposition === "NOT_DISPATCHED_FAILED" ||
+    validationDisposition === "NOT_DISPATCHED_BUDGET" ||
+    validationDisposition === "NOT_DISPATCHED_STOP";
+  if (notDispatched && typecheck === "not run" && regression === "not run") {
+    const reason = originCode ?? validationDisposition ?? "UNKNOWN";
+    preExecution = {
+      stage: stageForPreExecutionOrigin(originCode),
+      reason,
+    };
+  }
+
+  return {
+    label,
+    typecheck,
+    regression,
+    gate2,
+    terminal,
+    originCode,
+    validationDisposition,
+    preExecution,
+  };
 }

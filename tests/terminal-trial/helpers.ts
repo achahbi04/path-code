@@ -22,6 +22,7 @@ const require = createRequire(import.meta.url);
 export const CHECKOUT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
 export { TEST_CREDENTIAL, TEST_MODEL, getRecordedFetchCalls };
+export { queueFetchResponse, completedResponsesBody };
 
 /** Must match scripts/pathcode-cli/fixture-store.mjs seed/fixed sources. */
 export const SEED_CALCULATOR_SOURCE = `export function multiply(a: number, b: number): number {
@@ -32,6 +33,13 @@ export const SEED_CALCULATOR_SOURCE = `export function multiply(a: number, b: nu
 export const FIXED_CALCULATOR_SOURCE = `export function multiply(a: number, b: number): number {
   return a * b;
 }
+`;
+
+/** Typechecks fail; used to prove TARGETED_TEST is blocked after TYPECHECK FAIL. */
+export const TYPECHECK_FAIL_CALCULATOR_SOURCE = `export function multiply(a: number, b: number): number {
+  return a * b;
+}
+const __pathcodeTypecheckFail: number = "not-a-number";
 `;
 
 const trialRoots: string[] = [];
@@ -262,6 +270,14 @@ export function queueSuccessfulTrialFetches(opts?: {
       proposalId: "post-edit",
       requestedOutcome: "evidence",
       claims: [
+        {
+          claimId: "defines-multiply-01",
+          kind: "DEFINES",
+          statement: "multiply is defined",
+          symbolName: "multiply",
+          proposedSubject: { kind: "EVIDENCE_ID", id: contentHandle },
+          proposedCitations: [],
+        },
         {
           claimId: "behaves-multiply-01",
           kind: "BEHAVES",
