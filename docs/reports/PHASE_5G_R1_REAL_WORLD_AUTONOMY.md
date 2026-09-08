@@ -212,7 +212,7 @@ Canonical: **ONE** `npm run check` — **PASS**
 |---|---|
 | Branch | `cursor/phase5g-r1-live-autonomy` |
 | IMPLEMENTATION SHA | `2954e3d335e81b43b7b69f5e35a310ed9f5d9cc3` |
-| BRANCH TIP SHA | `1d43cbbbc8f027c4ada5443442efe9dca409648b` |
+| BRANCH TIP SHA | `git rev-parse HEAD` on this branch (docs-only commits may sit above implementation) |
 | Main | **unchanged** `82f765a0622a9cd7426f9892f6b5072fb436fba6` |
 | Live providers | **zero** |
 | Credentials | **zero** |
