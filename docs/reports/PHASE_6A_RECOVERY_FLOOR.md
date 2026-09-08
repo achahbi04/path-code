@@ -18,10 +18,10 @@ PHASE 6A RECOVERY FLOOR IMPLEMENTED
 
 | Concept | Value | Meaning |
 |---|---|---|
-| **IMPLEMENTATION SHA** | `ded28f9724ae43d836877116bfd7ab7486c3362a` | Commit on which focused + canonical validation ran |
-| **BRANCH TIP SHA** | `ede13aff79d75678a19156e48cdb4b7d0532d638` | Tip after the Phase 6A report commit |
+| **IMPLEMENTATION SHA** | `ded28f9724ae43d836877116bfd7ab7486c3362a` | Commit on which focused + canonical validation ran (stable; never rewrite) |
+| **BRANCH TIP SHA** | `git rev-parse HEAD` on `cursor/phase6a-recovery-floor` | Live tip after any docs-only commits on top of the implementation |
 
-Do not call both “Final SHA”.
+Do not call both “Final SHA”. Do not treat a docs-only tip move as a new implementation SHA.
 
 ---
 
@@ -196,11 +196,13 @@ Zero live provider calls. Zero credentials.
 
 ---
 
-## Worktree status at report authorship
+## Worktree status (at freeze)
 
 | Worktree | Branch | HEAD | Status |
 |---|---|---|---|
-| Feature | `cursor/phase6a-recovery-floor` | IMPLEMENTATION SHA above | clean after implementation commit; this docs commit follows |
+| Feature | `cursor/phase6a-recovery-floor` | see **BRANCH TIP** via `git rev-parse HEAD` | must be clean |
 | Main | `main` | `8c3b5df5df7d8b7e6f947a1ccc5c3e67d0c30a63` | clean |
+
+**IMPLEMENTATION SHA** remains `ded28f9724ae43d836877116bfd7ab7486c3362a`.
 
 Phase 6A **not** merged to main. No push.
