@@ -95,9 +95,13 @@ At the prompt:
   /exit               Leave
 
 Flags:
-  --help, -h     Show help and exit
-  --version      Show package version and exit
-  --model <id>   Select the OpenAI model (else PATHCODE_OPENAI_MODEL, else prompt)
+  --help, -h              Show help and exit
+  --version               Show package version and exit
+  --model <id>            Select the OpenAI model (else PATHCODE_OPENAI_MODEL, else prompt)
+  --autonomy review|bounded
+                          Session consent mode (default: review). review keeps
+                          START/SCOPE/APPLY/CHECK; bounded requires one RUN
+                          disclosure then host-minted authority inside that envelope.
 
 Environment:
   PATHCODE_STATE_DIR   Where recovery checkpoints are stored. Must be outside the
@@ -106,9 +110,11 @@ Environment:
 A general engineering session:
   - requires a Git working tree, on a branch, with no merge/rebase in progress
   - asks the model which files the task touches, then asks you to approve that list
+    (or admits the list under a bounded RUN policy)
   - shows you the exact bytes of the edit before writing anything
   - writes a recovery checkpoint before the first byte changes
   - runs only checks discovered from your project metadata, after a separate approval
+    (or under the RUN-disclosed validation set in bounded mode)
   - never commits, stashes, resets, cleans or checks out anything in Git
   - uses at most 3 model calls and never retries automatically
 

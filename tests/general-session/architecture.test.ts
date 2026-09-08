@@ -26,6 +26,7 @@ const HOST_DIRECTORY = join(CHECKOUT_ROOT, "scripts/pathcode-cli");
 /** The Phase 5G host modules, as loaded by the CLI. */
 const GENERAL_SESSION_MODULES = [
   "general-session.mjs",
+  "autonomy-policy.mjs",
   "preflight.mjs",
   "currentness.mjs",
   "scope-request.mjs",
@@ -86,6 +87,9 @@ describe("5G-E: the scope profile is provider-neutral", () => {
     expect(pkg.scripts["general-session:smoke"]).toBe(
       "node scripts/general-session-smoke.mjs",
     );
+    expect(pkg.scripts["bounded-session:smoke"]).toBe(
+      "node scripts/bounded-session-smoke.mjs",
+    );
   });
 
   it("5G-E: no core module imports the host", () => {
@@ -119,18 +123,33 @@ describe("5G-L: the host never mutates Git", () => {
 describe("5G-S: authority is never minted from model text", () => {
   it("5G-S: every authorization constructor follows an accepted challenge", () => {
     const session = hostSource("general-session.mjs");
-    const applyGateAt = session.indexOf("acceptsApplyConfirmation");
+
+    // REVIEW path: APPLY / CHECK still precede host-minted authority.
+    const applyGateAt = session.indexOf(": acceptsApplyConfirmation(");
     const editAuthorizeAt = session.indexOf("authorizePreparedChange(");
     const editApprovalAt = session.indexOf("explicitEditApproval()");
     expect(applyGateAt).toBeGreaterThan(-1);
     expect(editAuthorizeAt).toBeGreaterThan(applyGateAt);
     expect(editApprovalAt).toBeGreaterThan(applyGateAt);
 
-    const checkGateAt = session.indexOf("acceptsCheckConfirmation");
+    const checkGateAt = session.indexOf(": acceptsCheckConfirmation(");
     const processApprovalAt = session.indexOf("explicitLocalProcessApproval()");
     const planAuthorizeAt = session.indexOf("authorizeValidationPlan(");
     expect(processApprovalAt).toBeGreaterThan(checkGateAt);
     expect(planAuthorizeAt).toBeGreaterThan(checkGateAt);
+
+    // BOUNDED path: one RUN challenge, then trusted-host policy before minting.
+    const runGateAt = session.indexOf(": acceptsRunConfirmation(");
+    const runConsentAt = session.indexOf('askLine("run-consent"');
+    const editPolicyAt = session.indexOf("evaluateEditAgainstPolicy(boundedPolicy");
+    const validationPolicyAt = session.indexOf(
+      "evaluateValidationAgainstPolicy(",
+    );
+    expect(runGateAt).toBeGreaterThan(-1);
+    expect(runConsentAt).toBeGreaterThan(-1);
+    expect(editPolicyAt).toBeGreaterThan(runGateAt);
+    expect(editAuthorizeAt).toBeGreaterThan(editPolicyAt);
+    expect(planAuthorizeAt).toBeGreaterThan(validationPolicyAt);
 
     const recover = hostSource("recover.mjs");
     expect(recover.indexOf("authorizeRecoveryReview(")).toBeGreaterThan(
@@ -145,16 +164,19 @@ describe("5G-S: authority is never minted from model text", () => {
       expect(source, file).not.toMatch(/--yes\b.*=>\s*true/);
     }
     // The consent predicates are injectable for tests, but each one defaults to
-    // the exact challenge grammar.
+    // the exact challenge grammar. BOUNDED adds RUN; it does not add AUTO_APPROVE.
     const session = hostSource("general-session.mjs");
     for (const predicate of [
       "acceptsStartConsent",
       "acceptsScopeConfirmation",
       "acceptsApplyConfirmation",
       "acceptsCheckConfirmation",
+      "acceptsRunConfirmation",
     ]) {
       expect(session, predicate).toContain(`: ${predicate}(`);
     }
+    expect(session).toContain('autonomyMode === "bounded"');
+    expect(session).not.toMatch(/AUTO_APPROVE/);
   });
 
   it("5G-S: the model's own text never reaches a command, path or id unchecked", () => {
@@ -165,6 +187,11 @@ describe("5G-S: authority is never minted from model text", () => {
     expect(session).not.toMatch(/readFileSync|writeFileSync|spawnSync|child_process/);
     // Untrusted text is always escaped before it is displayed.
     expect(session).toContain("prefixUntrustedLines");
+    // The model never mints Scope/Edit/Validation authority in either mode.
+    expect(session).toContain("authorizePreparedChange");
+    expect(session).toContain("explicitEditApproval()");
+    expect(session).toContain("authorizeValidationPlan");
+    expect(session).toContain("explicitLocalProcessApproval()");
   });
 });
 

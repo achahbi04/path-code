@@ -29,6 +29,7 @@ export async function loadTrialOwners(root = resolveCheckoutRoot()) {
     search,
     snapshot,
     catalogMod,
+    reasoningBounds,
     git,
     recovery,
     scope,
@@ -47,6 +48,7 @@ export async function loadTrialOwners(root = resolveCheckoutRoot()) {
     import(distHref("search/corpus.js", root)),
     import(distHref("snapshot/index.js", root)),
     import(distHref("reasoning/catalog.js", root)),
+    import(distHref("reasoning/bounds.js", root)),
     import(distHref("git/index.js", root)),
     import(distHref("recovery/index.js", root)),
     import(distHref("scope/index.js", root)),
@@ -73,6 +75,7 @@ export async function loadTrialOwners(root = resolveCheckoutRoot()) {
     createReferenceCatalog: catalogMod.createReferenceCatalog,
     describeReferenceCatalog: catalogMod.describeReferenceCatalog,
     disposeReferenceCatalog: catalogMod.disposeReferenceCatalog,
+    MAX_CATALOG_RECORDS: reasoningBounds.MAX_CATALOG_RECORDS,
 
     // Phase 5G — Git is read-only here. Discovery and the state baseline are
     // the only Git owners a General Session may reach, and neither writes.
@@ -94,5 +97,6 @@ export async function loadTrialOwners(root = resolveCheckoutRoot()) {
     classifyScopePathSensitivity: scope.classifyScopePathSensitivity,
     normalizeRepositoryRelativePath: scope.normalizeRepositoryRelativePath,
     MAX_SCOPE_EDITABLE_TARGETS: scope.MAX_SCOPE_EDITABLE_TARGETS,
+    MAX_SCOPE_CONTEXT_PATHS: scope.MAX_SCOPE_CONTEXT_PATHS,
   };
 }

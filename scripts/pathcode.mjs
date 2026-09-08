@@ -23,6 +23,7 @@ import {
   createPromptSession,
   isInteractiveTty,
 } from "./pathcode-cli/terminal.mjs";
+import { parseAutonomyMode } from "./pathcode-cli/autonomy-policy.mjs";
 
 const root = resolveCheckoutRoot();
 
@@ -30,8 +31,8 @@ const root = resolveCheckoutRoot();
  * @param {readonly string[]} argv
  */
 function parseArgs(argv) {
-  /** @type {{ help: boolean, version: boolean, model: string | null, rest: string[] }} */
-  const out = { help: false, version: false, model: null, rest: [] };
+  /** @type {{ help: boolean, version: boolean, model: string | null, autonomy: "review" | "bounded", rest: string[] }} */
+  const out = { help: false, version: false, model: null, autonomy: "review", rest: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--help" || a === "-h") {
@@ -48,6 +49,19 @@ function parseArgs(argv) {
         return { ok: false, message: "Usage: pathcode --model <id>" };
       }
       out.model = next.trim();
+      i += 1;
+      continue;
+    }
+    if (a === "--autonomy") {
+      const next = argv[i + 1];
+      if (typeof next !== "string" || next.trim() === "" || next.startsWith("-")) {
+        return { ok: false, message: "Usage: pathcode --autonomy review|bounded" };
+      }
+      const parsedAutonomy = parseAutonomyMode(next);
+      if (!parsedAutonomy.ok) {
+        return { ok: false, message: parsedAutonomy.message };
+      }
+      out.autonomy = parsedAutonomy.mode;
       i += 1;
       continue;
     }
@@ -257,6 +271,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
         taskText: cmd,
         projectRoot: process.cwd(),
         modelId: args.model ?? process.env.PATHCODE_OPENAI_MODEL ?? null,
+        autonomyMode: args.autonomy,
         unicode,
         checkoutRoot: root,
       });

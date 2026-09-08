@@ -77,6 +77,16 @@ export function acceptsScopeConfirmation(line, challenge) {
 }
 
 /**
+ * Phase 5G-R1 bounded-autonomy session-policy confirmation.
+ * Approves the disclosed finite envelope once; it is not an edit or command token.
+ * @param {string} line
+ * @param {string} challenge
+ */
+export function acceptsRunConfirmation(line, challenge) {
+  return matchesChallengePhrase("RUN", challenge, line);
+}
+
+/**
  * Phase 5G recovery confirmation. Approves restoring the reviewed checkpoint
  * entries over the current working tree.
  * @param {string} line

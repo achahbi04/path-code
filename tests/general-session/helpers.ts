@@ -187,6 +187,8 @@ export type AdapterState = {
     blocks: Array<{ blockId: string; text: string }>;
   }>;
   scopePlanText: string | null;
+  /** Repository-relative path the scripted edit mutates (must be permitted). */
+  editableRelativePath: string;
   afterText: string;
   beforeEditHook: null | (() => void | Promise<void>);
   /** Lets a test emit an edit envelope the host should refuse. */
@@ -199,6 +201,7 @@ export function newAdapterState(overrides?: Partial<AdapterState>): AdapterState
   return {
     invocations: [],
     scopePlanText: null,
+    editableRelativePath: "src/answer.ts",
     afterText: FIXED_SOURCE,
     beforeEditHook: null,
     editEnvelopeTransform: null,
@@ -251,7 +254,7 @@ export function scriptedAdapter(state: AdapterState) {
               taskSummary: "Change answer() to return 42.",
               editableTargets: [
                 {
-                  relativePath: "src/answer.ts",
+                  relativePath: state.editableRelativePath,
                   changeKind: "REPLACE_TEXT",
                   reason: "answer() is defined here",
                 },
@@ -269,13 +272,14 @@ export function scriptedAdapter(state: AdapterState) {
         if (state.beforeEditHook !== null) {
           await state.beforeEditHook();
         }
+        const editPath = state.editableRelativePath;
         const targets = JSON.parse(
           packet.context.blocks.find((b: any) => b.blockId === "permitted-targets")
             .text,
         ).permittedTargets;
-        const target = targets.find((t: any) => t.relativePath === "src/answer.ts");
+        const target = targets.find((t: any) => t.relativePath === editPath);
         const contentHandle = packet.context.references.find(
-          (r: any) => r.evidenceKind === "CONTENT" && r.relativePath === "src/answer.ts",
+          (r: any) => r.evidenceKind === "CONTENT" && r.relativePath === editPath,
         ).handle;
         const envelope: Record<string, any> = {
           schemaVersion: 1,
@@ -420,6 +424,7 @@ export const CHALLENGES = {
   applyChallenge: "t-apply",
   checkChallenge: "t-check",
   restoreChallenge: "t-restore",
+  runChallenge: "t-run",
 } as const;
 
 export function fullApprovalScript(): PromptScript {
@@ -429,6 +434,13 @@ export function fullApprovalScript(): PromptScript {
     apply: `APPLY ${CHALLENGES.applyChallenge}`,
     check: `CHECK ${CHALLENGES.checkChallenge}`,
     restore: `RESTORE ${CHALLENGES.restoreChallenge}`,
+  };
+}
+
+/** Exactly one RUN authority — no SCOPE / APPLY / CHECK prompts. */
+export function boundedApprovalScript(): PromptScript {
+  return {
+    "run-consent": `RUN ${CHALLENGES.runChallenge}`,
   };
 }
 

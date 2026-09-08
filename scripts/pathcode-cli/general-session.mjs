@@ -1,5 +1,5 @@
 /**
- * Phase 5G — General Engineering Session V1.
+ * Phase 5G — General Engineering Session V1 (+ Phase 5G-R1 bounded autonomy).
  *
  * A natural-language task against a real Git repository the operator chose.
  * This module is a *host*: it composes owners that already exist (workspace,
@@ -7,11 +7,15 @@
  * validation, recovery) and adds nothing but sequencing and disclosure. There
  * is no second mutation architecture here, and no second Gate 2.
  *
- * Everything the operator is asked to approve, they are shown first:
+ * REVIEW mode (default) asks the operator to approve, after disclosure:
  *   START   the budget and what a session may do at all
  *   SCOPE   the exact paths the model asked to edit and read
  *   APPLY   the exact bytes of the edit
  *   CHECK   the exact commands, including every npm hook and chain link
+ *
+ * BOUNDED mode asks once for RUN against a finite disclosed envelope; the host
+ * may then mint the same Scope/Edit/Validation authorities when every proposed
+ * action stays inside that policy. Escalation stops before undeclared work.
  *
  * Three invariants are worth stating plainly, because everything else follows:
  *
@@ -21,12 +25,22 @@
  *    before READY — not the older observation the model planned against.
  *  - The model never mints authority. It proposes paths and bytes; ids for
  *    commands come from the host; every authorization is constructed after a
- *    human typed a challenge phrase.
+ *    human typed a challenge phrase (START…CHECK in REVIEW, or RUN in BOUNDED)
+ *    and, under BOUNDED, after trusted-host policy evaluation.
  */
 
 import { lstat } from "node:fs/promises";
 
 import { COMPACT_NAME } from "./banner.mjs";
+import {
+  buildBoundedSessionPolicy,
+  evaluateEditAgainstPolicy,
+  evaluateScopeAgainstPolicy,
+  evaluateValidationAgainstPolicy,
+  parseAutonomyMode,
+  renderBoundedRunDisclosure,
+  renderEscalation,
+} from "./autonomy-policy.mjs";
 import {
   buildTrialChildEnvironment,
   trialChildEnvironmentExcludesSecrets,
@@ -49,6 +63,7 @@ import { summarizeValidationOutcome } from "./report.mjs";
 import {
   acceptsApplyConfirmation,
   acceptsCheckConfirmation,
+  acceptsRunConfirmation,
   acceptsScopeConfirmation,
   acceptsStartConsent,
   isInteractiveTty,
@@ -88,6 +103,31 @@ export const MAX_CREDENTIAL_UTF8_BYTES = 8_192;
 
 export const TYPECHECK_CLAIM_ID = "defines-1";
 export const TARGETED_CLAIM_ID = "behaves-1";
+
+/**
+ * Compact dirty-state line for the bounded RUN disclosure.
+ * @param {any} workingTree
+ */
+export function formatWorkingTreeSummary(workingTree) {
+  if (workingTree?.clean === true) {
+    return "clean";
+  }
+  const modified = workingTree?.modified?.length ?? 0;
+  const untracked = workingTree?.untracked?.length ?? 0;
+  const unmerged = workingTree?.unmerged?.length ?? 0;
+  return `${modified} modified, ${untracked} untracked, ${unmerged} unmerged`;
+}
+
+/**
+ * @param {any} candidate
+ */
+export function formatValidationCandidateSummary(candidate) {
+  const label =
+    typeof candidate.label === "string" && candidate.label.trim() !== ""
+      ? candidate.label
+      : candidate.id;
+  return `${candidate.kind} — ${label}`;
+}
 
 /**
  * @param {string} taskText
@@ -298,7 +338,16 @@ async function readPackageJsonText(owners, workspace, config, inventory) {
 }
 
 /**
- * Earn Phase 2 observations for the approved paths ONLY.
+ * Earn Phase 2 observations for the approved paths ONLY, then build a Gate 1
+ * catalog whose membership is exactly that approved set.
+ *
+ * Historical defect (live General Session, CLASS III): this function used to
+ * seed the *catalog selection* from every `map.manifestObservations` row. On a
+ * real project with `node_modules`, that admitted up to 128 unapproved
+ * manifests and a doubled ENTRY+CONTENT selection total of 258 — exceeding
+ * MAX_CATALOG_RECORDS (128) with `CATALOG_FAILED`. Fix: catalog sources ==
+ * exact approved source set. Snapshot contentObservations still include
+ * manifest observations so OBSERVED ManifestEvidence stays bound.
  *
  * @param {any} owners
  * @param {{ workspace: any, config: any, inventory: any, approved: any }} input
@@ -315,24 +364,24 @@ export async function earnApprovedScopeContext(owners, input) {
     return { ok: false, code: "SEARCH_FAILED", message: corpusResult.error.message };
   }
 
+  // Manifest ContentObservations are indexed so an approved path that was
+  // already read during map construction can reuse the *exact* object, and so
+  // the snapshot can bind OBSERVED ManifestEvidence. Nothing from this index
+  // is admitted to the catalog unless the path is approved below.
+  /** @type {Map<any, any>} */
+  const manifestObservationByEntry = new Map();
   /** @type {any[]} */
-  const contentObservations = [];
+  const snapshotContentObservations = [];
   for (const item of mapResult.value.manifestObservations ?? []) {
     if (item && typeof item === "object" && "observation" in item) {
-      contentObservations.push(item.observation);
-    }
-  }
-
-  const entryStatIdentities = new Map();
-  for (const item of inventory.observations) {
-    if (item.disposition === "ADMITTED" && "entry" in item) {
-      const stats = await lstat(item.entry.canonicalPath);
-      entryStatIdentities.set(item.entry, { dev: stats.dev, ino: stats.ino });
+      manifestObservationByEntry.set(item.entry, item.observation);
+      snapshotContentObservations.push(item.observation);
     }
   }
 
   /** @type {Map<string, any>} */
   const observationByPath = new Map();
+  /** @type {Array<{ relativePath: string, entry: any }>} */
   const readPaths = [];
   for (const target of approved.editableTargets) {
     if (target.changeKind === "REPLACE_TEXT") {
@@ -343,10 +392,26 @@ export async function earnApprovedScopeContext(owners, input) {
     readPaths.push({ relativePath: context.relativePath, entry: context.entry });
   }
 
+  const approvedPathSet = new Set(readPaths.map((item) => item.relativePath));
+
   for (const item of readPaths) {
     if (observationByPath.has(item.relativePath)) {
       continue;
     }
+
+    const reused = manifestObservationByEntry.get(item.entry);
+    if (reused !== undefined) {
+      if (reused.kind !== "TEXT") {
+        return {
+          ok: false,
+          code: "READ_NOT_TEXT",
+          message: `${item.relativePath} is not UTF-8 text; Path Code only edits text`,
+        };
+      }
+      observationByPath.set(item.relativePath, reused);
+      continue;
+    }
+
     const read = await owners.readRepositoryContent(item.entry, workspace, config);
     if (!read.ok) {
       return {
@@ -369,18 +434,26 @@ export async function earnApprovedScopeContext(owners, input) {
         message: `${item.relativePath} is not UTF-8 text; Path Code only edits text`,
       };
     }
-    // Manifest observations were already collected above. Reusing that exact
-    // object matters: the mutation session admits observations by identity
-    // against the snapshot, and a second read of the same bytes is a different
-    // object.
-    const existing = contentObservations.find(
-      (o) => o.entry === read.value.observation.entry,
-    );
-    const observation = existing ?? read.value.observation;
-    if (existing === undefined) {
-      contentObservations.push(observation);
+    snapshotContentObservations.push(read.value.observation);
+    observationByPath.set(item.relativePath, read.value.observation);
+  }
+
+  /** @type {any[]} */
+  const catalogContentObservations = [...observationByPath.values()];
+
+  // Snapshot identities cover ADMITTED inventory (as before) plus CREATE parents.
+  const entryStatIdentities = new Map();
+  for (const item of inventory.observations) {
+    if (item.disposition === "ADMITTED" && "entry" in item) {
+      const stats = await lstat(item.entry.canonicalPath);
+      entryStatIdentities.set(item.entry, { dev: stats.dev, ino: stats.ino });
     }
-    observationByPath.set(item.relativePath, observation);
+  }
+  for (const target of approved.editableTargets) {
+    if (target.changeKind === "CREATE_TEXT" && !entryStatIdentities.has(target.parentEntry)) {
+      const stats = await lstat(target.parentEntry.canonicalPath);
+      entryStatIdentities.set(target.parentEntry, { dev: stats.dev, ino: stats.ino });
+    }
   }
 
   const snapshotResult = owners.buildRepositorySnapshot({
@@ -389,7 +462,7 @@ export async function earnApprovedScopeContext(owners, input) {
     inventory,
     repositoryMap: mapResult.value,
     searchCorpus: corpusResult.value,
-    contentObservations,
+    contentObservations: snapshotContentObservations,
     entryStatIdentities,
   });
   if (!snapshotResult.ok) {
@@ -422,21 +495,54 @@ export async function earnApprovedScopeContext(owners, input) {
       catalogEntries.push(target.parentEntry);
     }
   }
-  for (const observation of contentObservations) {
+  for (const observation of catalogContentObservations) {
     if (!catalogEntries.includes(observation.entry)) {
       catalogEntries.push(observation.entry);
     }
   }
 
+  // Non-negotiable: every CONTENT record in the catalog must be an approved
+  // path; no ambient sibling, descendant, or dependency-tree file may enter.
+  for (const observation of catalogContentObservations) {
+    if (!approvedPathSet.has(observation.entry.relativePath)) {
+      return {
+        ok: false,
+        code: "CATALOG_SCOPE_LEAK",
+        message: `refusing catalog membership for unapproved path ${observation.entry.relativePath}`,
+      };
+    }
+  }
+
+  const selectionTotal = catalogEntries.length + catalogContentObservations.length;
+  const maxCatalogRecords =
+    typeof owners.MAX_CATALOG_RECORDS === "number" ? owners.MAX_CATALOG_RECORDS : 128;
+  if (selectionTotal < 1 || selectionTotal > maxCatalogRecords) {
+    return {
+      ok: false,
+      code: "APPROVED_SCOPE_EXCEEDS_REFERENCE_BUDGET",
+      message:
+        `approved scope selection count ${selectionTotal} is outside the finite ` +
+        `reference budget [1, ${maxCatalogRecords}] ` +
+        `(entries=${catalogEntries.length}, content=${catalogContentObservations.length})`,
+    };
+  }
+
   const catalogResult = owners.createReferenceCatalog({
     workspace,
     snapshot: snapshotResult.value,
-    selection: { entries: catalogEntries, contentObservations },
+    selection: {
+      entries: catalogEntries,
+      contentObservations: catalogContentObservations,
+    },
   });
   if (!catalogResult.ok) {
     return {
       ok: false,
-      code: "CATALOG_FAILED",
+      code:
+        catalogResult.error.code === "SELECTION_REJECTED" &&
+        /outside the allowed range/.test(catalogResult.error.message)
+          ? "APPROVED_SCOPE_EXCEEDS_REFERENCE_BUDGET"
+          : "CATALOG_FAILED",
       message: catalogResult.error.message,
     };
   }
@@ -544,10 +650,18 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     return { exitCode: 2, outcome: "NON_TTY_REFUSED" };
   }
 
+  const autonomyParsed = parseAutonomyMode(options.autonomyMode ?? "review");
+  if (!autonomyParsed.ok) {
+    prompt.write(`${autonomyParsed.message}\n`);
+    return { exitCode: 2, outcome: "AUTONOMY_MODE_REFUSED" };
+  }
+  const autonomyMode = autonomyParsed.mode;
+  const isBounded = autonomyMode === "bounded";
+
   const task = validateTaskText(options.taskText);
   if (!task.ok) {
     prompt.write(`${task.message}\n`);
-    return { exitCode: 2, outcome: task.code };
+    return { exitCode: 2, outcome: task.code, autonomyMode };
   }
 
   const modelId =
@@ -558,13 +672,13 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     prompt.write(
       "No model selected. Start with --model <id> or set PATHCODE_OPENAI_MODEL.\n",
     );
-    return { exitCode: 2, outcome: "MODEL_REQUIRED" };
+    return { exitCode: 2, outcome: "MODEL_REQUIRED", autonomyMode };
   }
 
   const owners = options.owners ?? (await loadTrialOwners(options.checkoutRoot));
   if (!owners.ok) {
     prompt.write(`${owners.message}\n`);
-    return { exitCode: 2, outcome: owners.code };
+    return { exitCode: 2, outcome: owners.code, autonomyMode };
   }
 
   // ── 1–3. Local preflight. No network, no credential, no provider. ────────
@@ -578,19 +692,20 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   });
   if (!preflight.ok) {
     prompt.write(`${preflight.message}\n`);
-    return { exitCode: 2, outcome: preflight.code };
+    return { exitCode: 2, outcome: preflight.code, autonomyMode };
   }
 
   const childEnv = buildTrialChildEnvironment();
   if (!trialChildEnvironmentExcludesSecrets(childEnv)) {
     prompt.write("Refusing: the host child environment carried a provider secret.\n");
-    return { exitCode: 1, outcome: "ENV_POLICY" };
+    return { exitCode: 1, outcome: "ENV_POLICY", autonomyMode };
   }
 
   // ── 11 (hoisted). Validation candidates. ─────────────────────────────────
-  // Discovery is ordered before START deliberately: the mutation session binds
-  // its validation blueprint at open, and a session that could never validate
-  // must refuse before it spends a provider call, not after it has edited.
+  // Discovery is ordered before START/RUN deliberately: the mutation session
+  // binds its validation blueprint at open, and a session that could never
+  // validate must refuse before it spends a provider call, not after it has
+  // edited.
   const packageJsonText = await readPackageJsonText(
     owners,
     preflight.workspace,
@@ -615,37 +730,76 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     for (const refusal of discovery.refused) {
       prompt.write(`  refused ${refusal.id}: ${refusal.reasonCode} — ${refusal.detail}\n`);
     }
-    return { exitCode: 2, outcome: "VALIDATION_PLAN_NOT_AVAILABLE" };
+    return { exitCode: 2, outcome: "VALIDATION_PLAN_NOT_AVAILABLE", autonomyMode };
   }
 
-  // ── 4. START. Nothing above touched the network; nothing below runs until
-  //      this exact phrase is typed. ────────────────────────────────────────
-  prompt.write(
-    renderStartDisclosure({
-      modelId: modelId ?? "(host-provided brain)",
+  /** @type {any | null} */
+  let boundedPolicy = null;
+
+  if (isBounded) {
+    // ── BOUNDED: one RUN session-policy gate before any provider call. ──────
+    boundedPolicy = buildBoundedSessionPolicy({
+      workspaceId: preflight.projectRoot,
+      taskText: task.taskText,
       projectRoot: preflight.projectRoot,
-      gitBranch: preflight.gitPosition.branch,
-      headOid: preflight.gitPosition.headOid,
-      storeRoot: preflight.recoveryStoreRoot,
-      stateSource: preflight.stateDirectorySource,
-      workingTree: preflight.workingTree,
-      candidates: discovery.candidates,
-      planned: selection.planned,
-    }),
-  );
-  prompt.write(`\nYour task:\n${prefixUntrustedLines(task.taskText)}\n`);
-  const startChallenge = options.startChallenge ?? newChallenge();
-  prompt.write(
-    `\nType exactly: START ${startChallenge}\n(empty / no / EOF cancels — no network)\n`,
-  );
-  const startLine = await prompt.askLine("start-consent", "> ");
-  const startOk =
-    typeof options.consentPredicate === "function"
-      ? options.consentPredicate(startLine, startChallenge)
-      : acceptsStartConsent(startLine, startChallenge);
-  if (!startOk || prompt.isStopped()) {
-    prompt.write("Cancelled before any model call. Nothing was read or written.\n");
-    return { exitCode: 130, outcome: "START_DECLINED" };
+      branch: preflight.gitPosition.branch ?? "(none)",
+      headOid: preflight.gitPosition.headOid ?? "(unborn)",
+      modelId: modelId ?? "(host-provided brain)",
+      maxEditableTargets: owners.MAX_SCOPE_EDITABLE_TARGETS,
+      maxContextPaths: owners.MAX_SCOPE_CONTEXT_PATHS,
+      validationCandidateIds: discovery.candidates.map((c) => c.id),
+      plannedSummaries: selection.planned.map(formatValidationCandidateSummary),
+    });
+    prompt.write(
+      renderBoundedRunDisclosure(boundedPolicy, {
+        workingTreeSummary: formatWorkingTreeSummary(preflight.workingTree),
+        storeRoot: preflight.recoveryStoreRoot,
+        stateSource: preflight.stateDirectorySource,
+      }),
+    );
+    const runChallenge = options.runChallenge ?? newChallenge();
+    prompt.write(
+      `\nType exactly: RUN ${runChallenge}\n(empty / no / EOF cancels — no network)\n`,
+    );
+    const runLine = await prompt.askLine("run-consent", "> ");
+    const runOk =
+      typeof options.runPredicate === "function"
+        ? options.runPredicate(runLine, runChallenge)
+        : acceptsRunConfirmation(runLine, runChallenge);
+    if (!runOk || prompt.isStopped()) {
+      prompt.write("Cancelled before any model call. Nothing was read or written.\n");
+      return { exitCode: 130, outcome: "RUN_DECLINED", autonomyMode };
+    }
+  } else {
+    // ── REVIEW: START. Nothing above touched the network; nothing below runs
+    //      until this exact phrase is typed. ────────────────────────────────
+    prompt.write(
+      renderStartDisclosure({
+        modelId: modelId ?? "(host-provided brain)",
+        projectRoot: preflight.projectRoot,
+        gitBranch: preflight.gitPosition.branch,
+        headOid: preflight.gitPosition.headOid,
+        storeRoot: preflight.recoveryStoreRoot,
+        stateSource: preflight.stateDirectorySource,
+        workingTree: preflight.workingTree,
+        candidates: discovery.candidates,
+        planned: selection.planned,
+      }),
+    );
+    prompt.write(`\nYour task:\n${prefixUntrustedLines(task.taskText)}\n`);
+    const startChallenge = options.startChallenge ?? newChallenge();
+    prompt.write(
+      `\nType exactly: START ${startChallenge}\n(empty / no / EOF cancels — no network)\n`,
+    );
+    const startLine = await prompt.askLine("start-consent", "> ");
+    const startOk =
+      typeof options.consentPredicate === "function"
+        ? options.consentPredicate(startLine, startChallenge)
+        : acceptsStartConsent(startLine, startChallenge);
+    if (!startOk || prompt.isStopped()) {
+      prompt.write("Cancelled before any model call. Nothing was read or written.\n");
+      return { exitCode: 130, outcome: "START_DECLINED", autonomyMode };
+    }
   }
 
   // ── Credential, then adapter, then brain. ────────────────────────────────
@@ -661,7 +815,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
         const hidden = await prompt.askHiddenCredential(MAX_CREDENTIAL_UTF8_BYTES);
         if (!hidden.ok) {
           prompt.write("No credential acquired. Nothing was dispatched.\n");
-          return { exitCode: 130, outcome: "CREDENTIAL_CANCELLED" };
+          return { exitCode: 130, outcome: "CREDENTIAL_CANCELLED", autonomyMode };
         }
         credential = hidden.credential;
       }
@@ -684,7 +838,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     credential = null;
     if (!adapterResult.ok) {
       prompt.write(`Adapter configuration failed: ${adapterResult.error.code}\n`);
-      return { exitCode: 1, outcome: "ADAPTER_CONFIG_FAILED" };
+      return { exitCode: 1, outcome: "ADAPTER_CONFIG_FAILED", autonomyMode };
     }
     const brainResult = owners.createEngineeringBrain(adapterResult.value, {
       maxDispatches: GENERAL_SESSION_MAX_PROVIDER_INVOCATIONS,
@@ -693,7 +847,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     });
     if (!brainResult.ok) {
       prompt.write(`Brain configuration failed: ${brainResult.error.code}\n`);
-      return { exitCode: 1, outcome: "BRAIN_CONFIG_FAILED" };
+      return { exitCode: 1, outcome: "BRAIN_CONFIG_FAILED", autonomyMode };
     }
     brain = brainResult.value;
     ownsBrain = true;
@@ -703,11 +857,15 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     if (ownsBrain) {
       brain.dispose();
     }
-    return result;
+    return { ...result, autonomyMode };
   };
 
   // ── 5. Call #1 — scope plan over inventory and metadata only. ────────────
-  prompt.write("\nAsking the model which files this task touches…\n");
+  prompt.write(
+    isBounded
+      ? "\nPlanning bounded scope…\n"
+      : "\nAsking the model which files this task touches…\n",
+  );
   const isSensitive = (relativePath) => {
     const verdict = owners.classifyScopePathSensitivity(relativePath, {
       forbiddenRelativePrefixes: preflight.forbiddenRelativePrefixes,
@@ -731,7 +889,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     return finish({ exitCode: 1, outcome: "SCOPE_CALL_FAILED" });
   }
 
-  // ── 6. Validate the untrusted plan, then ask a human. ────────────────────
+  // ── 6. Validate the untrusted plan, then gate (SCOPE or bounded policy). ─
   const parsed = owners.parseEngineeringScopePlan(scopeInvoke.value.response.text);
   if (!parsed.ok) {
     prompt.write(`Scope plan refused: ${parsed.error.code} — ${parsed.error.message}\n`);
@@ -748,22 +906,38 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
   const approved = admitted.value;
 
-  prompt.write(renderScopeReview(approved, parsed.value.taskSummary));
-  const scopeChallenge = options.scopeChallenge ?? newChallenge();
-  prompt.write(
-    `\nApprove THIS scope only by typing exactly: SCOPE ${scopeChallenge}\n`,
-  );
-  const scopeLine = await prompt.askLine("scope", "> ");
-  const scopeOk =
-    typeof options.scopePredicate === "function"
-      ? options.scopePredicate(scopeLine, scopeChallenge)
-      : acceptsScopeConfirmation(scopeLine, scopeChallenge);
-  if (!scopeOk || prompt.isStopped()) {
-    prompt.write("Scope declined. No file was read for the model; nothing was written.\n");
-    return finish({ exitCode: 130, outcome: "SCOPE_DECLINED" });
+  if (isBounded) {
+    const scopePolicy = evaluateScopeAgainstPolicy(boundedPolicy, approved);
+    if (!scopePolicy.ok) {
+      prompt.write(renderEscalation("scope", scopePolicy.reason));
+      return finish({
+        exitCode: 1,
+        outcome: "AUTONOMY_ESCALATION_REQUIRED",
+        escalationStage: "scope",
+        escalationReason: scopePolicy.reason,
+      });
+    }
+    prompt.write(
+      `Scope admitted by bounded policy: editable: ${approved.editableTargets.length} context: ${approved.contextPaths.length}\n`,
+    );
+  } else {
+    prompt.write(renderScopeReview(approved, parsed.value.taskSummary));
+    const scopeChallenge = options.scopeChallenge ?? newChallenge();
+    prompt.write(
+      `\nApprove THIS scope only by typing exactly: SCOPE ${scopeChallenge}\n`,
+    );
+    const scopeLine = await prompt.askLine("scope", "> ");
+    const scopeOk =
+      typeof options.scopePredicate === "function"
+        ? options.scopePredicate(scopeLine, scopeChallenge)
+        : acceptsScopeConfirmation(scopeLine, scopeChallenge);
+    if (!scopeOk || prompt.isStopped()) {
+      prompt.write("Scope declined. No file was read for the model; nothing was written.\n");
+      return finish({ exitCode: 130, outcome: "SCOPE_DECLINED" });
+    }
   }
 
-  // Baseline fingerprints at SCOPE approval (not yet disclosed to the provider).
+  // Baseline fingerprints at scope admission (not yet disclosed to the provider).
   const scopeFingerprints = await captureScopeFileFingerprints(owners, {
     workspace: preflight.workspace,
     config: preflight.config,
@@ -797,7 +971,9 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     return finish({ exitCode: 1, outcome: scopeRecheck.code });
   }
 
-  prompt.write("Reading the approved files…\n");
+  prompt.write(
+    isBounded ? "Reading approved files…\n" : "Reading the approved files…\n",
+  );
   const context = await earnApprovedScopeContext(owners, {
     workspace: preflight.workspace,
     config: preflight.config,
@@ -861,7 +1037,11 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   };
 
   // ── 8. Call #2 — the edit, with grounding, Gate 1 and an EditReview. ─────
-  prompt.write("Asking the model for the edit…\n");
+  if (isBounded) {
+    prompt.write("Reasoning about the change…\n");
+  } else {
+    prompt.write("Asking the model for the edit…\n");
+  }
   const proposed = await session.propose({
     correlationId: "general-session-edit",
     instructionText: [
@@ -884,7 +1064,13 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
   const review = proposed.value;
 
-  prompt.write("\n— Edit review (exact bytes) —\n");
+  if (isBounded) {
+    prompt.write("Gate 1: grounded.\n");
+  }
+
+  prompt.write(
+    isBounded ? "\n— Edit summary —\n" : "\n— Edit review (exact bytes) —\n",
+  );
   for (const item of review.view.order) {
     const before = context.observationByPath.get(item.relativePath);
     prompt.write(`\nTarget: ${item.relativePath} (${item.kind})\n`);
@@ -898,24 +1084,48 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     prompt.write(`${prefixUntrustedLines(item.afterText)}\n`);
   }
   prompt.write(`${ESCAPE_LEGEND}\n`);
-  prompt.write(
-    "No check has run yet. The edit is applied in place; there is no automatic rollback,\n" +
-      "but a recovery checkpoint is written first and /recover can restore these exact bytes.\n",
-  );
 
-  const applyChallenge = options.applyChallenge ?? newChallenge();
-  prompt.write(`\nApprove THIS review only by typing exactly: APPLY ${applyChallenge}\n`);
-  const applyLine = await prompt.askLine("apply", "> ");
-  const applyOk =
-    typeof options.applyPredicate === "function"
-      ? options.applyPredicate(applyLine, applyChallenge)
-      : acceptsApplyConfirmation(applyLine, applyChallenge);
-  if (!applyOk || prompt.isStopped()) {
-    prompt.write("Edit declined — zero authorizations constructed, nothing written.\n");
-    return closeSession({
-      exitCode: 130,
-      outcome: "EDIT_DECLINED",
-      modelCalls: 2,
+  if (isBounded) {
+    const editPolicy = evaluateEditAgainstPolicy(boundedPolicy, review, approved);
+    if (!editPolicy.ok) {
+      prompt.write(renderEscalation("edit", editPolicy.reason));
+      return closeSession({
+        exitCode: 1,
+        outcome: "AUTONOMY_ESCALATION_REQUIRED",
+        escalationStage: "edit",
+        escalationReason: editPolicy.reason,
+        modelCalls: 2,
+      });
+    }
+  } else {
+    prompt.write(
+      "No check has run yet. The edit is applied in place; there is no automatic rollback,\n" +
+        "but a recovery checkpoint is written first and /recover can restore these exact bytes.\n",
+    );
+
+    const applyChallenge = options.applyChallenge ?? newChallenge();
+    prompt.write(`\nApprove THIS review only by typing exactly: APPLY ${applyChallenge}\n`);
+    const applyLine = await prompt.askLine("apply", "> ");
+    const applyOk =
+      typeof options.applyPredicate === "function"
+        ? options.applyPredicate(applyLine, applyChallenge)
+        : acceptsApplyConfirmation(applyLine, applyChallenge);
+    if (!applyOk || prompt.isStopped()) {
+      prompt.write("Edit declined — zero authorizations constructed, nothing written.\n");
+      return closeSession({
+        exitCode: 130,
+        outcome: "EDIT_DECLINED",
+        modelCalls: 2,
+      });
+    }
+  }
+
+  // Test / harness hook: runs after edit policy or APPLY, before final currentness.
+  if (typeof options.afterEditReview === "function") {
+    await options.afterEditReview({
+      projectRoot: preflight.projectRoot,
+      review,
+      approved,
     });
   }
 
@@ -961,7 +1171,12 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     pairs.push({ prepared: item.prepared, authorization: auth.value });
   }
 
-  prompt.write("Writing the recovery checkpoint, then applying…\n");
+  if (isBounded) {
+    prompt.write("Preparing recovery…\n");
+    prompt.write(`Applying ${review.view.order.length} file(s)…\n`);
+  } else {
+    prompt.write("Writing the recovery checkpoint, then applying…\n");
+  }
   const applied = await session.apply(review, pairs);
   const checkpointId = session.describe().recoveryCheckpointId;
   if (!applied.ok) {
@@ -981,36 +1196,61 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
   const validationReview = applied.value;
 
-  // ── 10 + 12. Post-mutation re-observation happened inside apply; now the
-  //      command disclosure and the CHECK prompt. ──────────────────────────
-  prompt.write(`\nEdit applied. Recovery checkpoint: ${checkpointId}\n`);
-  prompt.write(
-    renderValidationPlanReview(plannedChecks, validationReview.view.preparedPlan),
-  );
-  prompt.write(
-    `One model call remains, for post-edit evidence (call 3 of ${GENERAL_SESSION_MAX_PROVIDER_INVOCATIONS}).\n`,
-  );
-  prompt.write("Disposition: files edited; validation NOT yet established.\n");
+  if (isBounded) {
+    prompt.write(`Recovery checkpoint READY: ${checkpointId}\n`);
+  }
 
-  const checkChallenge = options.checkChallenge ?? newChallenge();
-  prompt.write(`\nApprove THIS plan only by typing exactly: CHECK ${checkChallenge}\n`);
-  const checkLine = await prompt.askLine("check", "> ");
-  const checkOk =
-    typeof options.checkPredicate === "function"
-      ? options.checkPredicate(checkLine, checkChallenge)
-      : acceptsCheckConfirmation(checkLine, checkChallenge);
-  if (!checkOk || prompt.isStopped()) {
-    prompt.write("\nEDIT APPLIED — VALIDATION NOT RUN\n");
-    prompt.write("No process was started and no further model call was made.\n");
-    prompt.write(`Recovery checkpoint: ${checkpointId}\n`);
-    prompt.write(`Restore with: /recover ${checkpointId}\n`);
-    owners.disposeReferenceCatalog(validationReview.view.postEditCatalog);
-    return closeSession({
-      exitCode: 130,
-      outcome: "CHECK_DECLINED",
-      checkpointId,
-      modelCalls: 2,
-    });
+  // ── 10 + 12. Post-mutation re-observation happened inside apply; now the
+  //      validation gate (CHECK in REVIEW, policy in BOUNDED). ───────────────
+  if (!isBounded) {
+    prompt.write(`\nEdit applied. Recovery checkpoint: ${checkpointId}\n`);
+    prompt.write(
+      renderValidationPlanReview(plannedChecks, validationReview.view.preparedPlan),
+    );
+    prompt.write(
+      `One model call remains, for post-edit evidence (call 3 of ${GENERAL_SESSION_MAX_PROVIDER_INVOCATIONS}).\n`,
+    );
+    prompt.write("Disposition: files edited; validation NOT yet established.\n");
+
+    const checkChallenge = options.checkChallenge ?? newChallenge();
+    prompt.write(`\nApprove THIS plan only by typing exactly: CHECK ${checkChallenge}\n`);
+    const checkLine = await prompt.askLine("check", "> ");
+    const checkOk =
+      typeof options.checkPredicate === "function"
+        ? options.checkPredicate(checkLine, checkChallenge)
+        : acceptsCheckConfirmation(checkLine, checkChallenge);
+    if (!checkOk || prompt.isStopped()) {
+      prompt.write("\nEDIT APPLIED — VALIDATION NOT RUN\n");
+      prompt.write("No process was started and no further model call was made.\n");
+      prompt.write(`Recovery checkpoint: ${checkpointId}\n`);
+      prompt.write(`Restore with: /recover ${checkpointId}\n`);
+      owners.disposeReferenceCatalog(validationReview.view.postEditCatalog);
+      return closeSession({
+        exitCode: 130,
+        outcome: "CHECK_DECLINED",
+        checkpointId,
+        modelCalls: 2,
+      });
+    }
+  } else {
+    const validationPolicy = evaluateValidationAgainstPolicy(
+      boundedPolicy,
+      validationReview.view.preparedPlan,
+    );
+    if (!validationPolicy.ok) {
+      prompt.write(renderEscalation("validation", validationPolicy.reason));
+      prompt.write(`Recovery checkpoint: ${checkpointId}\n`);
+      prompt.write(`Restore with: /recover ${checkpointId}\n`);
+      owners.disposeReferenceCatalog(validationReview.view.postEditCatalog);
+      return closeSession({
+        exitCode: 1,
+        outcome: "AUTONOMY_ESCALATION_REQUIRED",
+        escalationStage: "validation",
+        escalationReason: validationPolicy.reason,
+        checkpointId,
+        modelCalls: 2,
+      });
+    }
   }
 
   const approvals = new Map();
@@ -1033,7 +1273,18 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
 
   // ── 13. Call #3 — post-edit reasoning, EngineeringRun, Gate 2. ───────────
-  prompt.write("Running the approved checks…\n");
+  if (isBounded) {
+    const byId = new Map(plannedChecks.map((candidate) => [candidate.id, candidate]));
+    for (const check of validationReview.view.preparedPlan.checks) {
+      const candidate = byId.get(check.id);
+      const detail = formatValidationCandidateSummary(
+        candidate ?? { id: check.id, kind: check.kind, label: check.id },
+      );
+      prompt.write(`Running admitted validation: ${detail}\n`);
+    }
+  } else {
+    prompt.write("Running the approved checks…\n");
+  }
   const outcome = await session.validate(validationReview, validationAuth.value);
   session.close();
   owners.disposeReferenceCatalog(validationReview.view.postEditCatalog);
@@ -1055,13 +1306,16 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   const summary = summarizeValidationOutcome(outcome.value);
   const accepted =
     summary.label === "MUTATION_APPLIED_AND_CONFIGURED_VALIDATION_ACCEPTED";
+  const headline = accepted
+    ? "EDIT APPLIED · CONFIGURED VALIDATION ACCEPTED"
+    : isBounded
+      ? "EDIT APPLIED · VALIDATION NOT ESTABLISHED"
+      : summary.label;
   const lines = [
     "",
-    `${COMPACT_NAME} — General Engineering Session`,
+    `${COMPACT_NAME} — ${isBounded ? "Bounded" : "General"} Engineering Session`,
     "",
-    accepted
-      ? "EDIT APPLIED · CONFIGURED VALIDATION ACCEPTED"
-      : summary.label,
+    headline,
     `  Project:      ${preflight.projectRoot}`,
     `  Files:        ${review.view.order.map((o) => o.relativePath).join(", ")}`,
     `  Typecheck:    ${summary.typecheck}`,
@@ -1081,7 +1335,11 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
 
   return finish({
     exitCode: accepted ? 0 : 1,
-    outcome: summary.label,
+    outcome: accepted
+      ? summary.label
+      : isBounded
+        ? "EDIT_APPLIED_VALIDATION_NOT_ESTABLISHED"
+        : summary.label,
     checkpointId,
     modelCalls: 3,
     validationOutcome: outcome.value,
