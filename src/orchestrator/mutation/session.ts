@@ -29,6 +29,16 @@ import type { RepositoryEntry } from "../../inventory/types.js";
 import { readRepositoryContent } from "../../reader/index.js";
 import type { ContentObservation } from "../../reader/types.js";
 import {
+  digestBytes,
+  persistCheckpoint,
+  prepareCheckpoint,
+} from "../../recovery/index.js";
+import type {
+  Checkpoint,
+  CheckpointTargetInput,
+  RecoveryStore,
+} from "../../recovery/types.js";
+import {
   bindReasoningProposalJson,
   checkReferenceBoundReasoningApplicability,
   createReferenceCatalog,
@@ -245,6 +255,8 @@ type SessionState = {
     ? T | null
     : never;
   lastAppliedReview: MutationReview | null;
+  recoveryProtection: "REQUIRED" | "NONE";
+  recoveryCheckpoint: Checkpoint | null;
 };
 
 function isPolicyPath(relativePath: string): boolean {
@@ -291,6 +303,15 @@ function buildRecord(
     label: state.label,
     inPlaceNoRollbackPolicy: true as const,
     noGitCommit: true as const,
+    ...(state.recoveryProtection === "REQUIRED"
+      ? {
+          recoveryProtection: "REQUIRED" as const,
+          recoveryCheckpointId:
+            state.recoveryCheckpoint === null
+              ? null
+              : state.recoveryCheckpoint.checkpointId,
+        }
+      : {}),
   });
 }
 
@@ -642,6 +663,33 @@ export function openEngineeringMutationSession(
   // Actual post-edit preparation still runs later.
   void attempts;
 
+  const recoveryProtection = spec.recoveryProtection ?? "NONE";
+  if (recoveryProtection !== "REQUIRED" && recoveryProtection !== "NONE") {
+    return failure(
+      configurationFailure(
+        "RECOVERY_CONFIGURATION_INVALID",
+        "recoveryProtection must be REQUIRED or NONE",
+      ),
+    );
+  }
+  let recoveryStore: RecoveryStore | null = null;
+  if (recoveryProtection === "REQUIRED") {
+    if (
+      spec.recoveryStore === undefined ||
+      typeof spec.recoveryStore.writeCheckpoint !== "function" ||
+      typeof spec.recoveryStore.readManifestJson !== "function" ||
+      typeof spec.recoveryStore.readBlob !== "function"
+    ) {
+      return failure(
+        configurationFailure(
+          "RECOVERY_CONFIGURATION_INVALID",
+          "recoveryProtection REQUIRED needs a recoveryStore; refusing to downgrade to NONE",
+        ),
+      );
+    }
+    recoveryStore = spec.recoveryStore;
+  }
+
   const sessionId = nextSessionId();
   const targetById = new Map(boundTargets.map((t) => [t.targetId, t]));
   const state: SessionState = {
@@ -659,6 +707,8 @@ export function openEngineeringMutationSession(
     appliedAfterBytes: new Map(),
     ownedPostCatalog: null,
     lastAppliedReview: null,
+    recoveryProtection,
+    recoveryCheckpoint: null,
   };
 
   const descriptorHandles = catalogDescriptors.map((d) => ({
@@ -685,6 +735,11 @@ export function openEngineeringMutationSession(
         proposeConsumed: state.proposeConsumed,
         applyConsumed: state.applyConsumed,
         validateConsumed: state.validateConsumed,
+        recoveryProtection: state.recoveryProtection,
+        recoveryCheckpointId:
+          state.recoveryCheckpoint === null
+            ? null
+            : state.recoveryCheckpoint.checkpointId,
       };
     },
     close(): void {
@@ -1171,6 +1226,44 @@ export function openEngineeringMutationSession(
               "Gate 1 applicability failed before mutation",
             ),
           );
+        }
+
+        // Phase 6A recovery floor. Nothing below this point may write to the
+        // repository until a durable checkpoint has been captured, persisted
+        // and read back. A failure here is terminal with ZERO writes.
+        if (recoveryProtection === "REQUIRED") {
+          if (recoveryStore === null) {
+            state.mutationDisposition = "NOT_DISPATCHED";
+            state.label = "MUTATION_NOT_DISPATCHED";
+            return failCall(
+              sessionId,
+              state,
+              sessionFailure(
+                "RECOVERY_CHECKPOINT_NOT_ESTABLISHED",
+                "recovery protection is REQUIRED but no recovery store is bound",
+              ),
+            );
+          }
+          const established = await establishRecoveryCheckpoint({
+            workspace: spec.workspace,
+            store: recoveryStore,
+            sessionId,
+            reviewId: review.reviewId,
+            preparedInOrder: entry.preparedInOrder,
+          });
+          if (!established.ok) {
+            state.mutationDisposition = "NOT_DISPATCHED";
+            state.label = "MUTATION_NOT_DISPATCHED";
+            return failCall(
+              sessionId,
+              state,
+              sessionFailure(
+                "RECOVERY_CHECKPOINT_NOT_ESTABLISHED",
+                established.message,
+              ),
+            );
+          }
+          state.recoveryCheckpoint = established.checkpoint;
         }
 
         const knowledgeInvalidations: KnowledgeInvalidation[] = [];
@@ -1677,6 +1770,147 @@ export function openEngineeringMutationSession(
   };
 
   return success(session);
+}
+
+/**
+ * Phase 6A: capture, persist and read-back-verify the durable checkpoint for a
+ * review that is about to be applied.
+ *
+ * For REPLACE the exact current bytes are captured and must still match the
+ * before-state the change was prepared against. For CREATE absence is proven
+ * again here, not merely inherited from preparation. Any failure is reported to
+ * the caller, which refuses the mutation outright — there is no downgrade path.
+ */
+async function establishRecoveryCheckpoint(input: {
+  workspace: EngineeringMutationSessionSpec["workspace"];
+  store: RecoveryStore;
+  sessionId: string;
+  reviewId: string;
+  preparedInOrder: readonly PreparedChange[];
+}): Promise<
+  { ok: true; checkpoint: Checkpoint } | { ok: false; message: string }
+> {
+  const configLoad = await loadProjectConfig(input.workspace);
+  if (!configLoad.ok) {
+    return {
+      ok: false,
+      message: "checkpoint capture could not load project configuration",
+    };
+  }
+  const root = await input.workspace.canonicalize(".");
+  if (!root.ok) {
+    return {
+      ok: false,
+      message: "checkpoint capture could not canonicalize the workspace root",
+    };
+  }
+
+  const targets: CheckpointTargetInput[] = [];
+  for (const prepared of input.preparedInOrder) {
+    if (prepared.action === "MODIFY_EXISTING_FILE") {
+      const relativePath = prepared.target.relativePath;
+      const canonical = await input.workspace.canonicalize(relativePath);
+      if (!canonical.ok || canonical.value !== prepared.target.canonicalPath) {
+        return {
+          ok: false,
+          message: `checkpoint capture: '${relativePath}' no longer resolves to its prepared canonical path`,
+        };
+      }
+      const read = await readRepositoryContent(
+        prepared.target,
+        input.workspace,
+        configLoad.value,
+      );
+      if (!read.ok || read.value.status !== "READ") {
+        return {
+          ok: false,
+          message: `checkpoint capture: pre-state of '${relativePath}' is unreadable`,
+        };
+      }
+      const observation = read.value.observation;
+      if (observation.kind !== "TEXT") {
+        return {
+          ok: false,
+          message: `checkpoint capture: '${relativePath}' is not TEXT`,
+        };
+      }
+      if (observation.fingerprint.hex !== prepared.beforeFingerprint.hex) {
+        return {
+          ok: false,
+          message: `checkpoint capture: '${relativePath}' changed since preparation`,
+        };
+      }
+      const preBytes = Buffer.from(observation.text, "utf8");
+      if (digestBytes(preBytes).hex !== observation.fingerprint.hex) {
+        return {
+          ok: false,
+          message: `checkpoint capture: byte fidelity of '${relativePath}' could not be proved`,
+        };
+      }
+      targets.push({
+        kind: "REPLACE_TEXT",
+        relativePath,
+        targetCanonicalPath: prepared.target.canonicalPath,
+        preBytes: new Uint8Array(
+          preBytes.buffer,
+          preBytes.byteOffset,
+          preBytes.byteLength,
+        ),
+        intendedPostBytes: prepared.proposedBytes,
+      });
+      continue;
+    }
+
+    const absence = await input.workspace.canonicalize(
+      prepared.targetRelativePath,
+    );
+    if (absence.ok || absence.error.code !== "PATH_NOT_FOUND") {
+      return {
+        ok: false,
+        message: `checkpoint capture: create target '${prepared.targetRelativePath}' is no longer absent`,
+      };
+    }
+    const parent = await input.workspace.canonicalize(
+      prepared.parent.relativePath,
+    );
+    if (!parent.ok || parent.value !== prepared.parent.canonicalPath) {
+      return {
+        ok: false,
+        message: `checkpoint capture: parent of '${prepared.targetRelativePath}' no longer resolves to its prepared canonical path`,
+      };
+    }
+    targets.push({
+      kind: "CREATE_TEXT",
+      relativePath: prepared.targetRelativePath,
+      parentCanonicalPath: prepared.parent.canonicalPath,
+      leafName: prepared.leafName,
+      intendedPostBytes: prepared.proposedBytes,
+    });
+  }
+
+  const preparedCheckpoint = prepareCheckpoint({
+    workspaceRoot: root.value,
+    sessionId: input.sessionId,
+    reviewId: input.reviewId,
+    targets,
+  });
+  if (!preparedCheckpoint.ok) {
+    return {
+      ok: false,
+      message: `checkpoint capture refused: ${preparedCheckpoint.error.message}`,
+    };
+  }
+  const persisted = await persistCheckpoint(
+    preparedCheckpoint.value,
+    input.store,
+  );
+  if (!persisted.ok) {
+    return {
+      ok: false,
+      message: `checkpoint persistence refused: ${persisted.error.message}`,
+    };
+  }
+  return { ok: true, checkpoint: persisted.value };
 }
 
 async function reobserveAfterApply(input: {

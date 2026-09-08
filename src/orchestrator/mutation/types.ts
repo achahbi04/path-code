@@ -14,6 +14,10 @@ import type {
 import type { MultiFilePlanResult } from "../../editing/multi-file-types.js";
 import type { RepositoryEntry } from "../../inventory/types.js";
 import type { ContentObservation } from "../../reader/types.js";
+import type {
+  RecoveryProtectionMode,
+  RecoveryStore,
+} from "../../recovery/types.js";
 import type { ReferenceBoundReasoning } from "../../reasoning/types.js";
 import type { ReferenceCatalog } from "../../reasoning/catalog.js";
 import type { ClaimCheckAssignmentInput } from "../../reasoning/gate2/types.js";
@@ -113,6 +117,16 @@ export type EngineeringMutationSessionSpec = {
   readonly permittedTargets: readonly MutationTargetSpec[];
   readonly disclosedObservations: readonly ContentObservation[];
   readonly validationBlueprint: ValidationBlueprint;
+  /**
+   * Phase 6A recovery floor. `REQUIRED` refuses to write anything until a
+   * durable checkpoint has been persisted and read back; `NONE` (the default,
+   * for Trial 1 compatibility) preserves pre-6A behavior. There is no silent
+   * downgrade from `REQUIRED` to `NONE`.
+   */
+  readonly recoveryProtection?: RecoveryProtectionMode;
+  /** Durable checkpoint store rooted outside this workspace. Required when
+   * `recoveryProtection` is `REQUIRED`. */
+  readonly recoveryStore?: RecoveryStore;
 };
 
 export type MutationControlPhase =
@@ -245,6 +259,14 @@ export type MutationSessionRecord = {
   readonly label: MutationStrongLabel;
   readonly inPlaceNoRollbackPolicy: true;
   readonly noGitCommit: true;
+  /** Phase 6A: protection mode in force for this session. */
+  readonly recoveryProtection?: RecoveryProtectionMode;
+  /**
+   * Checkpoint established before mutation, when protection was REQUIRED.
+   * `null` means protection was required but no checkpoint was established,
+   * which also means nothing was written.
+   */
+  readonly recoveryCheckpointId?: string | null;
 };
 
 export type MutationSessionDescriptorView = {
@@ -255,6 +277,13 @@ export type MutationSessionDescriptorView = {
   readonly proposeConsumed: boolean;
   readonly applyConsumed: boolean;
   readonly validateConsumed: boolean;
+  /** Phase 6A: protection mode in force for this session. */
+  readonly recoveryProtection: RecoveryProtectionMode;
+  /**
+   * Checkpoint established before mutation, or `null` while none exists.
+   * A host reads this to review and authorize recovery for this arc.
+   */
+  readonly recoveryCheckpointId: string | null;
 };
 
 export type MutationSessionSummary = {

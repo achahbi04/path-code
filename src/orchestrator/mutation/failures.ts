@@ -12,7 +12,9 @@ export type MutationSessionConfigurationFailureCode =
   | "UNSUPPORTED_CAPABILITY"
   | "POLICY_TARGET_FORBIDDEN"
   | "DUPLICATE_OR_ALIAS_TARGET"
-  | "LIMIT_EXCEEDED";
+  | "LIMIT_EXCEEDED"
+  /** Phase 6A: recoveryProtection REQUIRED without a usable recovery store. */
+  | "RECOVERY_CONFIGURATION_INVALID";
 
 export type MutationSessionConfigurationFailure = {
   readonly kind: "CONFIGURATION";
@@ -31,6 +33,11 @@ export type MutationSessionFailureCode =
   | "ENVELOPE_INVALID"
   | "GATE1_FAILED"
   | "PREPARATION_FAILED"
+  /**
+   * Phase 6A: recoveryProtection REQUIRED and the durable checkpoint could not
+   * be captured, persisted and read back. Zero mutation writes were dispatched.
+   */
+  | "RECOVERY_CHECKPOINT_NOT_ESTABLISHED"
   | "MUTATION_REFUSED"
   | "MUTATION_PARTIAL"
   | "MUTATION_COMMITTED_FAILURE"

@@ -105,6 +105,8 @@ export function directoryEntryAt(
 export async function mutationFixture(options?: {
   source?: string;
   extraFiles?: ReadonlyArray<{ path: string; content: string }>;
+  /** Runs after the files exist and before the snapshot is taken. */
+  beforeSnapshot?: (root: string) => Promise<void>;
 }): Promise<{
   root: string;
   fixture: SnapshotFixture;
@@ -139,6 +141,10 @@ export async function mutationFixture(options?: {
       2,
     ) + "\n",
   );
+
+  if (options?.beforeSnapshot !== undefined) {
+    await options.beforeSnapshot(root);
+  }
 
   const fixture = await snapshotAt(root, {
     extraContentPaths: [

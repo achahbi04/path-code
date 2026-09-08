@@ -29,6 +29,7 @@
     "cli:smoke": "node -e \"import { readFileSync } from 'node:fs'; const t=readFileSync('dist/cli/entry.js','utf8'); if(!t.startsWith('#!/usr/bin/env node\\n')) { console.error('missing shebang'); process.exit(1); }\" && node dist/cli/entry.js --help && node dist/cli/entry.js && node -e \"import { spawnSync } from 'node:child_process'; const r=spawnSync(process.execPath,['dist/cli/entry.js','build-something'],{encoding:'utf8'}); if(r.status===0){console.error('expected non-zero'); process.exit(1);} process.stdout.write(r.stderr);\"",
     "ledger:verify": "tsx scripts/ledger-verify.ts",
     "gap:render": "tsx scripts/gap-render.ts",
+    "recovery:smoke": "node scripts/recovery-smoke.mjs",
     "check": "npm run typecheck && npm run build && npm run test && npm run cli:smoke && npm run ledger:verify"
   },
   "devDependencies": {
