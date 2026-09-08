@@ -18,7 +18,7 @@ PHASE 5G GENERAL ENGINEERING SESSION V1 IMPLEMENTED
 
 | Concept | Value | Meaning |
 |---|---|---|
-| **IMPLEMENTATION SHA** | *(set at implementation commit)* | Commit on which focused + canonical validation ran |
+| **IMPLEMENTATION SHA** | `133209244a932c750139562ed0a8ba15f0342bf2` | Commit on which focused + canonical validation ran |
 | **BRANCH TIP SHA** | `git rev-parse HEAD` on `cursor/phase5g-general-engineering-session` | Tip after any docs-only commits |
 
 Do not call both “Final SHA”.
