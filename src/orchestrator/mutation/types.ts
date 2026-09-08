@@ -127,6 +127,14 @@ export type EngineeringMutationSessionSpec = {
   /** Durable checkpoint store rooted outside this workspace. Required when
    * `recoveryProtection` is `REQUIRED`. */
   readonly recoveryStore?: RecoveryStore;
+  /**
+   * Phase 5G: explicit output-token budget for the edit invocation. A general
+   * engineering edit rewrites whole files, which the brain's small default
+   * cannot carry. Omitted keeps the brain default; supplied values are still
+   * subject to the brain's and the adapter's own ceilings, so this can only
+   * ask for less than the composition already allows, never more.
+   */
+  readonly editOutputTokenBudget?: number;
 };
 
 export type MutationControlPhase =

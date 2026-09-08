@@ -47,20 +47,23 @@ export function renderWordmark(opts = {}) {
 export function renderWelcomeScreen(opts = {}) {
   const wordmark = renderWordmark(opts);
   const unicode = opts.unicode !== false && opts.plain !== true;
-  const title = unicode ? "First engineering trial" : "First engineering trial";
+  const title = "General engineering session";
   const prompt = unicode ? "PATH ● Code >" : "PATH * Code >";
   const body = [
     wordmark,
     "",
     centerLine(title, opts.columns ?? 80),
     "",
-    "  A small, disposable project. Your real OpenAI model.",
-    "  You review the exact edit and the exact checks.",
+    "  Describe an engineering task in your own words to start one here.",
+    "  You review the files, the exact edit and the exact checks before anything runs.",
+    "  A recovery checkpoint is written before any file changes.",
     "  No project scan or API call happens just by opening this screen.",
     "",
-    "  /trial   Start Trial 1",
-    "  /help    Show the commands and current scope",
-    "  /exit    Leave",
+    "  <task>              Describe what to change, in plain language",
+    "  /recover <id>       Restore a checkpoint from an earlier session",
+    "  /trial              Run Trial 1 in a disposable project",
+    "  /help               Show the commands and current scope",
+    "  /exit               Leave",
     "",
     `${prompt} `,
   ];
@@ -81,21 +84,34 @@ function centerLine(text, columns) {
  */
 export function renderHelpText(opts = {}) {
   const name = opts.unicode !== false && opts.plain !== true ? COMPACT_NAME : ASCII_NAME;
-  return `${name} — Trial CLI scope
+  return `${name} — CLI scope
 
-Commands (interactive):
-  /trial   Start Trial 1 (multiply-01) in a new synthetic workspace
-  /help    Show this help
-  /exit    Leave
+At the prompt:
+  <task>              Any line that does not start with '/' is an engineering task
+                      for the Git project in the current directory
+  /recover <id>       Restore the files captured by an earlier checkpoint
+  /trial              Run Trial 1 (multiply-01) in a new synthetic workspace
+  /help               Show this help
+  /exit               Leave
 
 Flags:
   --help, -h     Show help and exit
   --version      Show package version and exit
-  --model <id>   Select OpenAI model for /trial (else PATHCODE_OPENAI_MODEL, else prompt)
+  --model <id>   Select the OpenAI model (else PATHCODE_OPENAI_MODEL, else prompt)
 
-Trial 1 is one fixed task. No arbitrary repository paths, automatic Git commits,
-Gemini, persistence, Studio, --yes, or headless live approval.
+Environment:
+  PATHCODE_STATE_DIR   Where recovery checkpoints are stored. Must be outside the
+                       project. Defaults to the platform state directory.
 
-Opening this screen does not read a key or call a provider.
+A general engineering session:
+  - requires a Git working tree, on a branch, with no merge/rebase in progress
+  - asks the model which files the task touches, then asks you to approve that list
+  - shows you the exact bytes of the edit before writing anything
+  - writes a recovery checkpoint before the first byte changes
+  - runs only checks discovered from your project metadata, after a separate approval
+  - never commits, stashes, resets, cleans or checks out anything in Git
+  - uses at most 3 model calls and never retries automatically
+
+Opening this screen does not read a key, scan a project, or call a provider.
 `;
 }

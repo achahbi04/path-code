@@ -19,6 +19,7 @@ import {
   MAX_TASK_TEXT_UTF8_BYTES,
   REASONING_PROPOSAL_SCHEMA_VERSION,
   ENGINEERING_EDIT_PROPOSAL_SCHEMA_VERSION,
+  ENGINEERING_SCOPE_PLAN_SCHEMA_VERSION,
   DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_TIMEOUT_MS,
   isNonemptyBoundedId,
@@ -43,6 +44,7 @@ const PURPOSES = new Set([
   "PROPOSE_REASONING",
   "REVISE_REASONING",
   "PROPOSE_EDIT",
+  "PROPOSE_SCOPE",
 ]);
 const BLOCK_ROLES = new Set(["REFERENCE_MATERIAL", "DIAGNOSTIC"]);
 
@@ -482,6 +484,20 @@ function parseResponseProfile(
       Object.freeze({
         kind: "ENGINEERING_EDIT_PROPOSAL_JSON" as const,
         schemaVersion: ENGINEERING_EDIT_PROPOSAL_SCHEMA_VERSION,
+      }),
+    );
+  }
+  if (kindResult.value === "ENGINEERING_SCOPE_PLAN_JSON") {
+    if (version !== ENGINEERING_SCOPE_PLAN_SCHEMA_VERSION) {
+      return failure({
+        code: "UNSUPPORTED_CAPABILITY",
+        message: "responseProfile.schemaVersion is not supported",
+      });
+    }
+    return success(
+      Object.freeze({
+        kind: "ENGINEERING_SCOPE_PLAN_JSON" as const,
+        schemaVersion: ENGINEERING_SCOPE_PLAN_SCHEMA_VERSION,
       }),
     );
   }

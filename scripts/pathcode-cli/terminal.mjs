@@ -67,6 +67,26 @@ export function acceptsCheckConfirmation(line, challenge) {
 }
 
 /**
+ * Phase 5G scope-review confirmation. Approves the reviewed path list only —
+ * not the edit, and not any command.
+ * @param {string} line
+ * @param {string} challenge
+ */
+export function acceptsScopeConfirmation(line, challenge) {
+  return matchesChallengePhrase("SCOPE", challenge, line);
+}
+
+/**
+ * Phase 5G recovery confirmation. Approves restoring the reviewed checkpoint
+ * entries over the current working tree.
+ * @param {string} line
+ * @param {string} challenge
+ */
+export function acceptsRestoreConfirmation(line, challenge) {
+  return matchesChallengePhrase("RESTORE", challenge, line);
+}
+
+/**
  * @param {TerminalStreams} streams
  * @param {{ signal?: AbortSignal }} [options]
  */

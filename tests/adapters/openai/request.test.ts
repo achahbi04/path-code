@@ -113,7 +113,7 @@ describe("openai request construction", () => {
       if (!ok.ok) return;
       expect(ok.value.descriptor.modelId).toBe(TEST_MODEL);
       expect(ok.value.descriptor.capabilities.acceptedResponseProfiles).toHaveLength(
-        2,
+        3,
       );
     } finally {
       if (prev === undefined) delete process.env[envKey];

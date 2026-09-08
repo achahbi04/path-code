@@ -33,10 +33,13 @@ export type {
 export {
   REASONING_PROPOSAL_NATIVE_SCHEMA,
   ENGINEERING_EDIT_PROPOSAL_NATIVE_SCHEMA,
+  ENGINEERING_SCOPE_PLAN_NATIVE_SCHEMA,
   REASONING_SCHEMA_NAME,
   EDIT_SCHEMA_NAME,
+  SCOPE_SCHEMA_NAME,
   REASONING_PROFILE_INSTRUCTIONS,
   EDIT_PROFILE_INSTRUCTIONS,
+  SCOPE_PROFILE_INSTRUCTIONS,
 } from "./profiles.js";
 export { buildOpenAIResponsesRequest } from "./request.js";
 export { translateOpenAITransportResult } from "./response.js";

@@ -26,7 +26,9 @@ export type TranslateContext = {
    */
   readonly profileKind?:
     | "REASONING_PROPOSAL_JSON"
-    | "ENGINEERING_EDIT_PROPOSAL_JSON";
+    | "ENGINEERING_EDIT_PROPOSAL_JSON"
+    /** Scope plans need no wire translation: core owns parsing end to end. */
+    | "ENGINEERING_SCOPE_PLAN_JSON";
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

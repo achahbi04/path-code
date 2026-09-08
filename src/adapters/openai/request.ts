@@ -9,9 +9,12 @@ import {
   EDIT_PROFILE_INSTRUCTIONS,
   EDIT_SCHEMA_NAME,
   ENGINEERING_EDIT_PROPOSAL_NATIVE_SCHEMA,
+  ENGINEERING_SCOPE_PLAN_NATIVE_SCHEMA,
   REASONING_PROFILE_INSTRUCTIONS,
   REASONING_SCHEMA_NAME,
   REASONING_PROPOSAL_NATIVE_SCHEMA,
+  SCOPE_PROFILE_INSTRUCTIONS,
+  SCOPE_SCHEMA_NAME,
 } from "./profiles.js";
 import type { OpenAIReasoningEffort } from "./types.js";
 
@@ -30,7 +33,8 @@ export type OpenAIRequestBuildSuccess = {
   readonly bodyUtf8: string;
   readonly profileKind:
     | "REASONING_PROPOSAL_JSON"
-    | "ENGINEERING_EDIT_PROPOSAL_JSON";
+    | "ENGINEERING_EDIT_PROPOSAL_JSON"
+    | "ENGINEERING_SCOPE_PLAN_JSON";
 };
 
 export type OpenAIRequestBuildConfig = {
@@ -94,7 +98,8 @@ export function buildOpenAIResponsesRequest(
   const profile = packet.responseProfile;
   if (
     profile.kind !== "REASONING_PROPOSAL_JSON" &&
-    profile.kind !== "ENGINEERING_EDIT_PROPOSAL_JSON"
+    profile.kind !== "ENGINEERING_EDIT_PROPOSAL_JSON" &&
+    profile.kind !== "ENGINEERING_SCOPE_PLAN_JSON"
   ) {
     return {
       code: "UNSUPPORTED_PROFILE",
@@ -112,14 +117,26 @@ export function buildOpenAIResponsesRequest(
     };
   }
 
-  const isReasoning = profile.kind === "REASONING_PROPOSAL_JSON";
-  const instructions = isReasoning
-    ? REASONING_PROFILE_INSTRUCTIONS
-    : EDIT_PROFILE_INSTRUCTIONS;
-  const schemaName = isReasoning ? REASONING_SCHEMA_NAME : EDIT_SCHEMA_NAME;
-  const schema = isReasoning
-    ? REASONING_PROPOSAL_NATIVE_SCHEMA
-    : ENGINEERING_EDIT_PROPOSAL_NATIVE_SCHEMA;
+  // Transport only: each profile selects owned instructions plus the owned
+  // native schema. The adapter never adds semantics of its own.
+  const instructions =
+    profile.kind === "REASONING_PROPOSAL_JSON"
+      ? REASONING_PROFILE_INSTRUCTIONS
+      : profile.kind === "ENGINEERING_EDIT_PROPOSAL_JSON"
+        ? EDIT_PROFILE_INSTRUCTIONS
+        : SCOPE_PROFILE_INSTRUCTIONS;
+  const schemaName =
+    profile.kind === "REASONING_PROPOSAL_JSON"
+      ? REASONING_SCHEMA_NAME
+      : profile.kind === "ENGINEERING_EDIT_PROPOSAL_JSON"
+        ? EDIT_SCHEMA_NAME
+        : SCOPE_SCHEMA_NAME;
+  const schema =
+    profile.kind === "REASONING_PROPOSAL_JSON"
+      ? REASONING_PROPOSAL_NATIVE_SCHEMA
+      : profile.kind === "ENGINEERING_EDIT_PROPOSAL_JSON"
+        ? ENGINEERING_EDIT_PROPOSAL_NATIVE_SCHEMA
+        : ENGINEERING_SCOPE_PLAN_NATIVE_SCHEMA;
 
   const bodyObject: Record<string, unknown> = {
     model: config.modelId,

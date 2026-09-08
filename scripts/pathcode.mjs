@@ -110,6 +110,8 @@ async function delegateLegacy(args) {
  *   stdout?: any,
  *   stderr?: any,
  *   runTrial?: Function,
+ *   runRecover?: Function,
+ *   runGeneralSession?: Function,
  * }} [testIo]
  */
 export async function runPathcodeMain(argv, testIo = {}) {
@@ -207,9 +209,59 @@ export async function runPathcodeMain(argv, testIo = {}) {
         prompt.close();
         return result.exitCode ?? 1;
       }
-      prompt.write(`Unknown command: ${cmd}\n`);
-      prompt.write(renderHelpText({ unicode, plain }));
-      prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+      if (cmd.startsWith("/recover")) {
+        const { parseRecoverCommand, runRecoverCommand } = await import(
+          "./pathcode-cli/recover.mjs"
+        );
+        const parsedCommand = parseRecoverCommand(cmd);
+        if (!parsedCommand.ok) {
+          prompt.write(`${parsedCommand.message ?? "Usage: /recover <checkpoint-id>"}\n`);
+          prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+          continue;
+        }
+        const prereq = resolveRuntimePrerequisites(root);
+        if (!prereq.ok) {
+          prompt.write(`${prereq.message}\n`);
+          prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+          continue;
+        }
+        const runner = testIo.runRecover ?? runRecoverCommand;
+        const result = await runner(prompt, {
+          checkpointId: parsedCommand.checkpointId,
+          projectRoot: process.cwd(),
+          checkoutRoot: root,
+        });
+        prompt.close();
+        return result.exitCode ?? 1;
+      }
+      if (cmd.startsWith("/")) {
+        prompt.write(`Unknown command: ${cmd}\n`);
+        prompt.write(renderHelpText({ unicode, plain }));
+        prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+        continue;
+      }
+
+      // Any other line is an engineering task for the project in this directory.
+      const prereq = resolveRuntimePrerequisites(root);
+      if (!prereq.ok) {
+        prompt.write(`${prereq.message}\n`);
+        prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+        continue;
+      }
+      const { runGeneralEngineeringSession } = await import(
+        "./pathcode-cli/general-session.mjs"
+      );
+      const runner = testIo.runGeneralSession ?? runGeneralEngineeringSession;
+      const sessionResult = await runner(prompt, {
+        streams,
+        taskText: cmd,
+        projectRoot: process.cwd(),
+        modelId: args.model ?? process.env.PATHCODE_OPENAI_MODEL ?? null,
+        unicode,
+        checkoutRoot: root,
+      });
+      prompt.close();
+      return sessionResult.exitCode ?? 1;
     }
     return 130;
   } finally {

@@ -30,6 +30,7 @@
     "ledger:verify": "tsx scripts/ledger-verify.ts",
     "gap:render": "tsx scripts/gap-render.ts",
     "recovery:smoke": "node scripts/recovery-smoke.mjs",
+    "general-session:smoke": "node scripts/general-session-smoke.mjs",
     "check": "npm run typecheck && npm run build && npm run test && npm run cli:smoke && npm run ledger:verify"
   },
   "devDependencies": {

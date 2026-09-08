@@ -254,6 +254,7 @@ describe("openai adapter admission and composition", () => {
     expect(diag.profiles).toEqual([
       "REASONING_PROPOSAL_JSON",
       "ENGINEERING_EDIT_PROPOSAL_JSON",
+      "ENGINEERING_SCOPE_PLAN_JSON",
     ]);
     expect(JSON.stringify(diag)).not.toContain("sk-");
     expect(diag).not.toHaveProperty("credential");

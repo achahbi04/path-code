@@ -28,6 +28,8 @@ export const MIN_MAX_DISPATCHES = 1;
 
 export const REASONING_PROPOSAL_SCHEMA_VERSION = 1 as const;
 export const ENGINEERING_EDIT_PROPOSAL_SCHEMA_VERSION = 1 as const;
+/** Phase 5G scope plan. Provider-neutral; semantics owned outside the brain. */
+export const ENGINEERING_SCOPE_PLAN_SCHEMA_VERSION = 1 as const;
 
 export function utf8ByteLength(value: string): number {
   return Buffer.byteLength(value, "utf8");

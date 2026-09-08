@@ -663,6 +663,19 @@ export function openEngineeringMutationSession(
   // Actual post-edit preparation still runs later.
   void attempts;
 
+  if (
+    spec.editOutputTokenBudget !== undefined &&
+    (!Number.isSafeInteger(spec.editOutputTokenBudget) ||
+      spec.editOutputTokenBudget < 1)
+  ) {
+    return failure(
+      configurationFailure(
+        "INVALID_BLUEPRINT",
+        "editOutputTokenBudget must be a positive safe integer",
+      ),
+    );
+  }
+
   const recoveryProtection = spec.recoveryProtection ?? "NONE";
   if (recoveryProtection !== "REQUIRED" && recoveryProtection !== "NONE") {
     return failure(
@@ -867,6 +880,9 @@ export function openEngineeringMutationSession(
               kind: "ENGINEERING_EDIT_PROPOSAL_JSON",
               schemaVersion: 1,
             },
+            ...(spec.editOutputTokenBudget === undefined
+              ? {}
+              : { maxOutputTokens: spec.editOutputTokenBudget }),
           },
           options?.signal ? { signal: options.signal } : undefined,
         );

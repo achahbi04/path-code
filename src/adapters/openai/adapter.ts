@@ -158,6 +158,10 @@ export function createOpenAIAdapter(
           kind: "ENGINEERING_EDIT_PROPOSAL_JSON" as const,
           schemaVersion: 1 as const,
         }),
+        Object.freeze({
+          kind: "ENGINEERING_SCOPE_PLAN_JSON" as const,
+          schemaVersion: 1 as const,
+        }),
       ]),
       honorsOutputTokenLimit: true,
       cancellationDeclared: true,
@@ -174,6 +178,7 @@ export function createOpenAIAdapter(
       profiles: Object.freeze([
         "REASONING_PROPOSAL_JSON",
         "ENGINEERING_EDIT_PROPOSAL_JSON",
+        "ENGINEERING_SCOPE_PLAN_JSON",
       ] as const),
       endpoint: OPENAI_RESPONSES_URL,
       reasoningEffort: frozenReasoning,

@@ -80,6 +80,7 @@ export type OpenAIAdapterDiagnostics = {
   readonly profiles: readonly [
     "REASONING_PROPOSAL_JSON",
     "ENGINEERING_EDIT_PROPOSAL_JSON",
+    "ENGINEERING_SCOPE_PLAN_JSON",
   ];
   readonly endpoint: typeof OPENAI_RESPONSES_URL;
   readonly reasoningEffort: OpenAIReasoningEffort | null;
