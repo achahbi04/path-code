@@ -18,7 +18,7 @@ PHASE 5G-R1 REAL-WORLD STABILIZATION + BOUNDED AUTONOMY IMPLEMENTED
 
 | Concept | Value | Meaning |
 |---|---|---|
-| **IMPLEMENTATION SHA** | *(filled after commit)* | Commit on which focused + canonical validation ran |
+| **IMPLEMENTATION SHA** |  | Commit on which focused + canonical validation ran |
 | **BRANCH TIP SHA** | `git rev-parse HEAD` on `cursor/phase5g-r1-live-autonomy` | Tip after any docs-only commits |
 
 Do not call both “Final SHA”.
