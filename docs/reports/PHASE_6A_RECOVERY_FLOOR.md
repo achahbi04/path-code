@@ -19,7 +19,7 @@ PHASE 6A RECOVERY FLOOR IMPLEMENTED
 | Concept | Value | Meaning |
 |---|---|---|
 | **IMPLEMENTATION SHA** | `ded28f9724ae43d836877116bfd7ab7486c3362a` | Commit on which focused + canonical validation ran |
-| **BRANCH TIP SHA** | `ded28f9724ae43d836877116bfd7ab7486c3362a` *(updated after docs commit)* | Tip after report recording |
+| **BRANCH TIP SHA** | `ede13aff79d75678a19156e48cdb4b7d0532d638` | Tip after the Phase 6A report commit |
 
 Do not call both “Final SHA”.
 
