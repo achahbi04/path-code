@@ -33,6 +33,7 @@ const GENERAL_SESSION_MODULES = [
   "state-dir.mjs",
   "validation-candidates.mjs",
   "recover.mjs",
+  "session-events.mjs",
 ];
 
 function hostSource(file: string): string {

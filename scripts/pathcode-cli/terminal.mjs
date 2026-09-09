@@ -106,6 +106,10 @@ export function createPromptSession(streams, options = {}) {
   /** @type {string | null} */
   let activePromptId = null;
   let stopRequested = false;
+  /** True while a task/recover/trial cycle is running (not the idle REPL). */
+  let cycleActive = false;
+  /** First mid-cycle SIGINT cancels the cycle; a second force-exits. */
+  let cycleCancelInProgress = false;
   const stderr = streams.stderr ?? streams.stdout;
 
   const rl = createInterface({
@@ -128,8 +132,50 @@ export function createPromptSession(streams, options = {}) {
     stopRequested = true;
   }
 
+  function clearStop() {
+    stopRequested = false;
+  }
+
+  function beginCycle() {
+    cycleActive = true;
+    cycleCancelInProgress = false;
+  }
+
+  function endCycle() {
+    cycleActive = false;
+    cycleCancelInProgress = false;
+  }
+
+  function isCycleActive() {
+    return cycleActive;
+  }
+
   function isStopped() {
     return stopRequested || options.signal?.aborted === true;
+  }
+
+  /**
+   * Idle REPL SIGINT ends the living session. Mid-cycle SIGINT cancels the
+   * cycle only; a second SIGINT during that cleanup force-exits.
+   */
+  function handleSigintCancel(resolveWithNull) {
+    if (!cycleActive) {
+      requestStop();
+      resolveWithNull();
+      return;
+    }
+    if (cycleCancelInProgress) {
+      write("\nForced exit during cycle cleanup.\n");
+      try {
+        rl.close();
+      } catch {
+        // ignore
+      }
+      // Honest force-exit: second SIGINT during cleanup.
+      process.exit(130);
+    }
+    cycleCancelInProgress = true;
+    resolveWithNull();
   }
 
   /**
@@ -155,8 +201,7 @@ export function createPromptSession(streams, options = {}) {
       };
       const onSigint = () => {
         cleanup();
-        requestStop();
-        resolve(null);
+        handleSigintCancel(() => resolve(null));
       };
       function cleanup() {
         rl.off("line", onLine);
@@ -179,6 +224,13 @@ export function createPromptSession(streams, options = {}) {
     });
     mode = "idle";
     activePromptId = null;
+    // Mid-cycle cancel must not permanently stop the living session.
+    if (isStopped() && !cycleActive) {
+      return null;
+    }
+    if (cycleCancelInProgress) {
+      return null;
+    }
     if (isStopped()) {
       return null;
     }
@@ -246,8 +298,12 @@ export function createPromptSession(streams, options = {}) {
         for (let i = 0; i < data.length; i += 1) {
           const b = data[i];
           if (b === 0x03) {
-            // Ctrl+C
-            requestStop();
+            // Ctrl+C — cancel credential prompt; living session survives unless idle.
+            if (!cycleActive) {
+              requestStop();
+            } else {
+              cycleCancelInProgress = true;
+            }
             finish({ ok: false, code: "CANCELLED" });
             return;
           }
@@ -325,6 +381,10 @@ export function createPromptSession(streams, options = {}) {
     askLine,
     askHiddenCredential,
     requestStop,
+    clearStop,
+    beginCycle,
+    endCycle,
+    isCycleActive,
     isStopped,
     close,
     getActivePromptId: () => activePromptId,

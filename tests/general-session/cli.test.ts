@@ -83,10 +83,10 @@ describe("5G-M: a plain line at the prompt is an engineering task", () => {
   it("5G-M: routes the operator's words to the General Session", async () => {
     const seen: Array<Record<string, unknown>> = [];
     const task = "Fix the failing authentication test without changing the public API.";
-    const { exitCode } = await runRepl([task], {
+    const { exitCode } = await runRepl([task, "/exit"], {
       runGeneralSession: async (_prompt: unknown, options: Record<string, unknown>) => {
         seen.push(options);
-        return { exitCode: 0, outcome: "TEST" };
+        return { exitCode: 0, outcome: "TEST", modelCalls: 0 };
       },
     });
 
@@ -113,7 +113,7 @@ describe("5G-M: a plain line at the prompt is an engineering task", () => {
 describe("5G-AF: /recover routes to the recovery command", () => {
   it("5G-AF: passes the parsed checkpoint id and this directory", async () => {
     const seen: Array<Record<string, unknown>> = [];
-    const { exitCode } = await runRepl(["/recover mc-1a2b3c4d"], {
+    const { exitCode } = await runRepl(["/recover mc-1a2b3c4d", "/exit"], {
       runRecover: async (_prompt: unknown, options: Record<string, unknown>) => {
         seen.push(options);
         return { exitCode: 0, outcome: "RECOVERY_COMPLETE" };
@@ -145,11 +145,14 @@ describe("5G-M / 5G-AF: help and welcome describe what the prompt accepts", () =
     const help = renderHelpText({ unicode: true, plain: false });
     expect(help).toContain("engineering task");
     expect(help).toContain("/recover <id>");
+    expect(help).toContain("/model <id>");
+    expect(help).toContain("/autonomy <mode>");
     expect(help).toContain("/trial");
     expect(help).toContain("/help");
     expect(help).toContain("/exit");
     expect(help).toContain("PATHCODE_STATE_DIR");
     expect(help).toContain("recovery checkpoint before the first byte changes");
+    expect(help).toContain("--events ndjson");
   });
 
   it("5G-AF: the welcome screen says a checkpoint precedes any change", async () => {
@@ -157,6 +160,7 @@ describe("5G-M / 5G-AF: help and welcome describe what the prompt accepts", () =
     const welcome = renderWelcomeScreen({ columns: 100, unicode: true, plain: false });
     expect(welcome).toContain("Describe an engineering task in your own words");
     expect(welcome).toContain("/recover <id>");
+    expect(welcome).toContain("/model <id>");
     expect(welcome).toContain("A recovery checkpoint is written before any file changes.");
   });
 });

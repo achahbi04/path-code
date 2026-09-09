@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 /**
- * PATH ● Code — terminal application entry (Phase 5F).
+ * PATH ● Code — terminal application entry (Phase 5F / 5G / 5G-R2).
  * Resolves owners from this checkout via import.meta.url, not process.cwd.
  * Legacy foundation CLI behavior is delegated for unrecognized flags.
+ *
+ * Phase 5G-R2: the session is long-lived; authority is not. After any cycle
+ * disposition the prompt returns. Model id, autonomy mode, and provider key
+ * persist for the process; every task is a fresh authority cycle.
  */
 
 import { readFileSync, realpathSync } from "node:fs";
@@ -24,6 +28,7 @@ import {
   isInteractiveTty,
 } from "./pathcode-cli/terminal.mjs";
 import { parseAutonomyMode } from "./pathcode-cli/autonomy-policy.mjs";
+import { createSessionEventSink } from "./pathcode-cli/session-events.mjs";
 
 const root = resolveCheckoutRoot();
 
@@ -31,8 +36,22 @@ const root = resolveCheckoutRoot();
  * @param {readonly string[]} argv
  */
 function parseArgs(argv) {
-  /** @type {{ help: boolean, version: boolean, model: string | null, autonomy: "review" | "bounded", rest: string[] }} */
-  const out = { help: false, version: false, model: null, autonomy: "review", rest: [] };
+  /** @type {{
+   *   help: boolean,
+   *   version: boolean,
+   *   model: string | null,
+   *   autonomy: "review" | "bounded",
+   *   events: null | "ndjson",
+   *   rest: string[],
+   * }} */
+  const out = {
+    help: false,
+    version: false,
+    model: null,
+    autonomy: "review",
+    events: null,
+    rest: [],
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--help" || a === "-h") {
@@ -62,6 +81,19 @@ function parseArgs(argv) {
         return { ok: false, message: parsedAutonomy.message };
       }
       out.autonomy = parsedAutonomy.mode;
+      i += 1;
+      continue;
+    }
+    if (a === "--events") {
+      const next = argv[i + 1];
+      if (typeof next !== "string" || next.trim() === "" || next.startsWith("-")) {
+        return { ok: false, message: "Usage: pathcode --events ndjson" };
+      }
+      const mode = next.trim().toLowerCase();
+      if (mode !== "ndjson") {
+        return { ok: false, message: "Usage: pathcode --events ndjson" };
+      }
+      out.events = "ndjson";
       i += 1;
       continue;
     }
@@ -115,6 +147,29 @@ async function delegateLegacy(args) {
     writeOut: (t) => process.stdout.write(t),
     writeErr: (t) => process.stderr.write(t),
   });
+}
+
+/**
+ * @param {boolean} unicode
+ * @param {boolean} plain
+ */
+function promptPrefix(unicode, plain) {
+  return `${unicode && !plain ? COMPACT_NAME : ASCII_NAME} > `;
+}
+
+/**
+ * @param {any} prompt
+ * @param {boolean} unicode
+ * @param {boolean} plain
+ * @param {{ taskCount: number, modelCallCount: number }} sessionStats
+ */
+function redrawPrompt(prompt, unicode, plain, sessionStats) {
+  if (sessionStats.taskCount > 0 || sessionStats.modelCallCount > 0) {
+    prompt.write(
+      `Session so far: ${sessionStats.taskCount} tasks, ${sessionStats.modelCallCount} model calls.\n`,
+    );
+  }
+  prompt.write(promptPrefix(unicode, plain));
 }
 
 /**
@@ -182,6 +237,26 @@ export async function runPathcodeMain(argv, testIo = {}) {
     }),
   );
 
+  /** Session-scoped settings — persist; authority does not. */
+  let modelId = args.model ?? process.env.PATHCODE_OPENAI_MODEL ?? null;
+  let autonomyMode = args.autonomy;
+  /** @type {string | null} */
+  let sessionCredential = null;
+  const sessionStats = { taskCount: 0, modelCallCount: 0 };
+  /** @type {number} */
+  let lastExitCode = 0;
+
+  const eventsMode = args.events === "ndjson" ? "both" : "human";
+  const eventSink = createSessionEventSink({
+    mode: eventsMode,
+    writeNdjson:
+      args.events === "ndjson"
+        ? (line) => {
+            stdout.write(line);
+          }
+        : undefined,
+  });
+
   const prompt = createPromptSession(streams);
   try {
     while (!prompt.isStopped()) {
@@ -191,8 +266,8 @@ export async function runPathcodeMain(argv, testIo = {}) {
         return 130;
       }
       const cmd = line.trim();
-      if (cmd === "" ) {
-        prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+      if (cmd === "") {
+        prompt.write(promptPrefix(unicode, plain));
         continue;
       }
       if (cmd === "/exit" || cmd === "/quit") {
@@ -201,28 +276,76 @@ export async function runPathcodeMain(argv, testIo = {}) {
       }
       if (cmd === "/help") {
         prompt.write(renderHelpText({ unicode, plain }));
-        prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+        redrawPrompt(prompt, unicode, plain, sessionStats);
         continue;
       }
+
+      // Session settings — affect SUBSEQUENT tasks only.
+      if (cmd.startsWith("/model")) {
+        const parts = cmd.split(/\s+/);
+        const next = parts[1];
+        if (parts.length !== 2 || !next || next.startsWith("-")) {
+          prompt.write("Usage: /model <id>\n");
+          redrawPrompt(prompt, unicode, plain, sessionStats);
+          continue;
+        }
+        modelId = next.trim();
+        prompt.write(`Model set to ${modelId} for subsequent tasks.\n`);
+        redrawPrompt(prompt, unicode, plain, sessionStats);
+        continue;
+      }
+      if (cmd.startsWith("/autonomy")) {
+        const parts = cmd.split(/\s+/);
+        const next = parts[1];
+        if (parts.length !== 2 || !next) {
+          prompt.write("Usage: /autonomy <review|bounded>\n");
+          redrawPrompt(prompt, unicode, plain, sessionStats);
+          continue;
+        }
+        const parsedAutonomy = parseAutonomyMode(next);
+        if (!parsedAutonomy.ok) {
+          prompt.write(`${parsedAutonomy.message}\n`);
+          redrawPrompt(prompt, unicode, plain, sessionStats);
+          continue;
+        }
+        autonomyMode = parsedAutonomy.mode;
+        prompt.write(`Autonomy set to ${autonomyMode} for subsequent tasks.\n`);
+        redrawPrompt(prompt, unicode, plain, sessionStats);
+        continue;
+      }
+
       if (cmd === "/trial") {
         const prereq = resolveRuntimePrerequisites(root);
         if (!prereq.ok) {
           prompt.write(`${prereq.message}\n`);
-          prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+          redrawPrompt(prompt, unicode, plain, sessionStats);
           continue;
         }
-        const { runMultiply01Trial } = await import("./pathcode-cli/trial.mjs");
-        const runner = testIo.runTrial ?? runMultiply01Trial;
-        const result = await runner(prompt, {
-          streams,
-          modelFlag: args.model,
-          envModel: process.env.PATHCODE_OPENAI_MODEL ?? null,
-          unicode,
-          checkoutRoot: root,
-        });
-        prompt.close();
-        return result.exitCode ?? 1;
+        if (typeof prompt.beginCycle === "function") prompt.beginCycle();
+        try {
+          const { runMultiply01Trial } = await import("./pathcode-cli/trial.mjs");
+          const runner = testIo.runTrial ?? runMultiply01Trial;
+          const result = await runner(prompt, {
+            streams,
+            modelFlag: modelId,
+            envModel: process.env.PATHCODE_OPENAI_MODEL ?? null,
+            unicode,
+            checkoutRoot: root,
+          });
+          lastExitCode = result.exitCode ?? 1;
+        } catch (err) {
+          const message = err && err.message ? err.message : "unknown";
+          prompt.write(`Internal error (session continues): ${message}\n`);
+          eventSink.emit("session.internal_error", { message });
+          lastExitCode = 1;
+        } finally {
+          if (typeof prompt.endCycle === "function") prompt.endCycle();
+          if (typeof prompt.clearStop === "function") prompt.clearStop();
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats);
+        continue;
       }
+
       if (cmd.startsWith("/recover")) {
         const { parseRecoverCommand, runRecoverCommand } = await import(
           "./pathcode-cli/recover.mjs"
@@ -230,28 +353,41 @@ export async function runPathcodeMain(argv, testIo = {}) {
         const parsedCommand = parseRecoverCommand(cmd);
         if (!parsedCommand.ok) {
           prompt.write(`${parsedCommand.message ?? "Usage: /recover <checkpoint-id>"}\n`);
-          prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+          redrawPrompt(prompt, unicode, plain, sessionStats);
           continue;
         }
         const prereq = resolveRuntimePrerequisites(root);
         if (!prereq.ok) {
           prompt.write(`${prereq.message}\n`);
-          prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+          redrawPrompt(prompt, unicode, plain, sessionStats);
           continue;
         }
-        const runner = testIo.runRecover ?? runRecoverCommand;
-        const result = await runner(prompt, {
-          checkpointId: parsedCommand.checkpointId,
-          projectRoot: process.cwd(),
-          checkoutRoot: root,
-        });
-        prompt.close();
-        return result.exitCode ?? 1;
+        if (typeof prompt.beginCycle === "function") prompt.beginCycle();
+        try {
+          const runner = testIo.runRecover ?? runRecoverCommand;
+          const result = await runner(prompt, {
+            checkpointId: parsedCommand.checkpointId,
+            projectRoot: process.cwd(),
+            checkoutRoot: root,
+          });
+          lastExitCode = result.exitCode ?? 1;
+        } catch (err) {
+          const message = err && err.message ? err.message : "unknown";
+          prompt.write(`Internal error (session continues): ${message}\n`);
+          eventSink.emit("session.internal_error", { message });
+          lastExitCode = 1;
+        } finally {
+          if (typeof prompt.endCycle === "function") prompt.endCycle();
+          if (typeof prompt.clearStop === "function") prompt.clearStop();
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats);
+        continue;
       }
+
       if (cmd.startsWith("/")) {
         prompt.write(`Unknown command: ${cmd}\n`);
         prompt.write(renderHelpText({ unicode, plain }));
-        prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+        redrawPrompt(prompt, unicode, plain, sessionStats);
         continue;
       }
 
@@ -259,27 +395,53 @@ export async function runPathcodeMain(argv, testIo = {}) {
       const prereq = resolveRuntimePrerequisites(root);
       if (!prereq.ok) {
         prompt.write(`${prereq.message}\n`);
-        prompt.write(`${unicode ? COMPACT_NAME : ASCII_NAME} > `);
+        redrawPrompt(prompt, unicode, plain, sessionStats);
         continue;
       }
       const { runGeneralEngineeringSession } = await import(
         "./pathcode-cli/general-session.mjs"
       );
       const runner = testIo.runGeneralSession ?? runGeneralEngineeringSession;
-      const sessionResult = await runner(prompt, {
-        streams,
-        taskText: cmd,
-        projectRoot: process.cwd(),
-        modelId: args.model ?? process.env.PATHCODE_OPENAI_MODEL ?? null,
-        autonomyMode: args.autonomy,
-        unicode,
-        checkoutRoot: root,
-      });
-      prompt.close();
-      return sessionResult.exitCode ?? 1;
+      if (typeof prompt.beginCycle === "function") prompt.beginCycle();
+      try {
+        const sessionResult = await runner(prompt, {
+          streams,
+          taskText: cmd,
+          projectRoot: process.cwd(),
+          modelId,
+          autonomyMode,
+          unicode,
+          checkoutRoot: root,
+          credential: sessionCredential,
+          onCredentialAcquired: (credential) => {
+            if (typeof credential === "string" && credential.length > 0) {
+              sessionCredential = credential;
+            }
+          },
+          sessionEventEmit: eventSink.emit,
+        });
+        lastExitCode = sessionResult.exitCode ?? 1;
+        sessionStats.taskCount += 1;
+        const calls =
+          typeof sessionResult.modelCalls === "number" ? sessionResult.modelCalls : 0;
+        sessionStats.modelCallCount += calls;
+      } catch (err) {
+        const message = err && err.message ? err.message : "unknown";
+        prompt.write(`Internal error (session continues): ${message}\n`);
+        eventSink.emit("session.internal_error", { message });
+        lastExitCode = 1;
+        sessionStats.taskCount += 1;
+      } finally {
+        if (typeof prompt.endCycle === "function") prompt.endCycle();
+        if (typeof prompt.clearStop === "function") prompt.clearStop();
+      }
+      redrawPrompt(prompt, unicode, plain, sessionStats);
+      void lastExitCode;
     }
     return 130;
   } finally {
+    // Scrub session credential from the bag on leave.
+    sessionCredential = null;
     prompt.close();
   }
 }

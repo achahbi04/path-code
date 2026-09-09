@@ -61,6 +61,8 @@ export function renderWelcomeScreen(opts = {}) {
     "",
     "  <task>              Describe what to change, in plain language",
     "  /recover <id>       Restore a checkpoint from an earlier session",
+    "  /model <id>         Change the model for subsequent tasks",
+    "  /autonomy <mode>    review | bounded — for subsequent tasks",
     "  /trial              Run Trial 1 in a disposable project",
     "  /help               Show the commands and current scope",
     "  /exit               Leave",
@@ -90,6 +92,8 @@ At the prompt:
   <task>              Any line that does not start with '/' is an engineering task
                       for the Git project in the current directory
   /recover <id>       Restore the files captured by an earlier checkpoint
+  /model <id>         Change the model for subsequent tasks (not a cycle in flight)
+  /autonomy <mode>    review | bounded — for subsequent tasks only
   /trial              Run Trial 1 (multiply-01) in a new synthetic workspace
   /help               Show this help
   /exit               Leave
@@ -102,12 +106,16 @@ Flags:
                           Session consent mode (default: review). review keeps
                           START/SCOPE/APPLY/CHECK; bounded requires one RUN
                           disclosure then host-minted authority inside that envelope.
+  --events ndjson         Emit the structured session event stream as NDJSON
+                          (same events the live terminal is driven by)
 
 Environment:
   PATHCODE_STATE_DIR   Where recovery checkpoints are stored. Must be outside the
                        project. Defaults to the platform state directory.
 
-A general engineering session:
+A living general engineering session:
+  - the prompt stays open across tasks; each task is a fresh authority cycle
+  - the provider key is resolved once per process and never re-prompted
   - requires a Git working tree, on a branch, with no merge/rebase in progress
   - asks the model which files the task touches, then asks you to approve that list
     (or admits the list under a bounded RUN policy)
@@ -116,7 +124,9 @@ A general engineering session:
   - runs only checks discovered from your project metadata, after a separate approval
     (or under the RUN-disclosed validation set in bounded mode)
   - never commits, stashes, resets, cleans or checks out anything in Git
-  - uses at most 3 model calls and never retries automatically
+  - uses at most 3 model calls per task and never retries automatically
+  - nothing earned in one cycle (challenge, catalog, observations, checkpoint)
+    authorizes the next
 
 Opening this screen does not read a key, scan a project, or call a provider.
 `;
