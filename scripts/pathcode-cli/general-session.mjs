@@ -644,6 +644,15 @@ export function buildValidationBlueprint(planned, supportingObservations) {
 export async function runGeneralEngineeringSession(prompt, options = {}) {
   const unicode = options.unicode !== false;
   const streams = options.streams;
+  /** When true, mirrored one-line progress is omitted — inline cards own it. */
+  const cardsOwnProgress = options.cardsOwnProgress === true;
+  /**
+   * @param {string} text
+   */
+  function progress(text) {
+    if (cardsOwnProgress) return;
+    prompt.write(text);
+  }
   /** @type {(type: string, fields?: Record<string, unknown>) => void} */
   const emit =
     typeof options.sessionEventEmit === "function"
@@ -727,7 +736,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
 
   // ── 1–3. Local preflight. No network, no credential, no provider. ────────
-  prompt.write("Checking the working tree…\n");
+  progress("Checking the working tree…\n");
   const preflight = await runGeneralSessionPreflight(owners, {
     projectRoot: options.projectRoot ?? process.cwd(),
     checkoutRoot: options.checkoutRoot ?? owners.root,
@@ -1010,7 +1019,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   };
 
   // ── 5. Call #1 — scope plan over inventory and metadata only. ────────────
-  prompt.write(
+  progress(
     isBounded
       ? "\nPlanning bounded scope…\n"
       : "\nAsking the model which files this task touches…\n",
@@ -1146,7 +1155,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     return finish({ exitCode: 1, outcome: scopeRecheck.code });
   }
 
-  prompt.write(
+  progress(
     isBounded ? "Reading approved files…\n" : "Reading the approved files…\n",
   );
   emit("session.reading", {
@@ -1221,9 +1230,9 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
 
   // ── 8. Call #2 — the edit, with grounding, Gate 1 and an EditReview. ─────
   if (isBounded) {
-    prompt.write("Reasoning about the change…\n");
+    progress("Reasoning about the change…\n");
   } else {
-    prompt.write("Asking the model for the edit…\n");
+    progress("Asking the model for the edit…\n");
   }
   emit("session.reasoning", {
     call: 2,
@@ -1255,7 +1264,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   const review = proposed.value;
 
   if (isBounded) {
-    prompt.write("Gate 1: grounded.\n");
+    progress("Gate 1: grounded.\n");
   }
   emit("session.gate1", { status: "grounded" });
 
@@ -1341,7 +1350,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   //      §18 / 5G-AI / 5G-AJ. The observations proven here are the ones the
   //      mutation session checkpoints from, because it re-reads the same bytes
   //      and refuses if they no longer match this prepared pre-state.
-  prompt.write("Rechecking the working tree before writing…\n");
+  progress("Rechecking the working tree before writing…\n");
   const currentness = await verifyFinalCurrentness(owners, {
     projectRoot: preflight.projectRoot,
     expectedGitPosition: preflight.gitPosition,
@@ -1380,10 +1389,10 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
 
   if (isBounded) {
-    prompt.write("Preparing recovery…\n");
-    prompt.write(`Applying ${review.view.order.length} file(s)…\n`);
+    progress("Preparing recovery…\n");
+    progress(`Applying ${review.view.order.length} file(s)…\n`);
   } else {
-    prompt.write("Writing the recovery checkpoint, then applying…\n");
+    progress("Writing the recovery checkpoint, then applying…\n");
   }
   emit("session.applying", {
     files: review.view.order.map((item) => item.relativePath),
@@ -1413,7 +1422,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   emit("session.reobserved", {});
 
   if (isBounded) {
-    prompt.write(`Recovery checkpoint READY: ${checkpointId}\n`);
+    progress(`Recovery checkpoint READY: ${checkpointId}\n`);
   }
 
   // ── 10 + 12. Post-mutation re-observation happened inside apply; now the
@@ -1514,11 +1523,11 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
       const detail = formatValidationCandidateSummary(
         candidate ?? { id: check.id, kind: check.kind, label: check.id },
       );
-      prompt.write(`Running admitted validation: ${detail}\n`);
+      progress(`Running admitted validation: ${detail}\n`);
       emit("session.validation.running", { check: detail });
     }
   } else {
-    prompt.write("Running the approved checks…\n");
+    progress("Running the approved checks…\n");
     for (const check of validationReview.view.preparedPlan.checks) {
       emit("session.validation.running", {
         check: `${check.kind}:${check.id}`,

@@ -33,6 +33,10 @@ import {
   mintSessionId,
 } from "./pathcode-cli/session-events.mjs";
 import { openEventsOutSink } from "./pathcode-cli/events-out.mjs";
+import {
+  createInlineStudioRenderer,
+  installCollisionGuard,
+} from "./pathcode-cli/inline-studio.mjs";
 
 const root = resolveCheckoutRoot();
 
@@ -283,6 +287,8 @@ export async function runPathcodeMain(argv, testIo = {}) {
   let eventsOut = null;
   /** @type {((line: string) => void) | undefined} */
   let writeNdjson;
+  /** True when NDJSON would share the human TTY (breaks in-place cards). */
+  let ndjsonSharesStdout = false;
   if (args.events === "ndjson") {
     if (typeof args.eventsOut === "string" && args.eventsOut.trim() !== "") {
       // Named destination: truncate on launch, flush each line, keep human stdout clean.
@@ -291,24 +297,59 @@ export async function runPathcodeMain(argv, testIo = {}) {
         eventsOut.writeLine(line);
       };
     } else {
+      ndjsonSharesStdout = true;
       writeNdjson = (line) => {
         stdout.write(line);
       };
     }
   }
 
+  // Inline cards are the default TTY experience. Disable when NDJSON shares
+  // stdout (operator should use --events-out for a side-channel).
+  const ttyInline =
+    streams.stdout.isTTY === true && ndjsonSharesStdout === false;
+  const inlineStudio = createInlineStudioRenderer({
+    stdout: streams.stdout,
+    enabled: ttyInline,
+  });
+
   const eventsMode = args.events === "ndjson" ? "both" : "human";
   const eventSink = createSessionEventSink({
     sessionId,
     mode: eventsMode,
     writeNdjson,
+    ...(ttyInline
+      ? {
+          onEvent: (event) => {
+            inlineStudio.onEvent(event);
+          },
+        }
+      : {}),
   });
 
   const prompt = createPromptSession(streams);
+  const uninstallCollisionGuard = ttyInline
+    ? installCollisionGuard(prompt, inlineStudio)
+    : () => {};
+
+  /** @param {() => Promise<void> | void} cycle */
+  async function runCycle(cycle) {
+    if (typeof prompt.beginCycle === "function") prompt.beginCycle();
+    if (ttyInline) inlineStudio.begin();
+    try {
+      await cycle();
+    } finally {
+      if (ttyInline) inlineStudio.finish();
+      if (typeof prompt.endCycle === "function") prompt.endCycle();
+      if (typeof prompt.clearStop === "function") prompt.clearStop();
+    }
+  }
+
   try {
     while (!prompt.isStopped()) {
       const line = await prompt.askLine("repl", "");
       if (line == null) {
+        if (ttyInline) inlineStudio.finish();
         prompt.write("\n");
         return 130;
       }
@@ -318,6 +359,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
         continue;
       }
       if (cmd === "/exit" || cmd === "/quit") {
+        if (ttyInline) inlineStudio.finish();
         prompt.write("Goodbye.\n");
         return 0;
       }
@@ -368,27 +410,25 @@ export async function runPathcodeMain(argv, testIo = {}) {
           redrawPrompt(prompt, unicode, plain, sessionStats);
           continue;
         }
-        if (typeof prompt.beginCycle === "function") prompt.beginCycle();
-        try {
-          const { runMultiply01Trial } = await import("./pathcode-cli/trial.mjs");
-          const runner = testIo.runTrial ?? runMultiply01Trial;
-          const result = await runner(prompt, {
-            streams,
-            modelFlag: modelId,
-            envModel: process.env.PATHCODE_OPENAI_MODEL ?? null,
-            unicode,
-            checkoutRoot: root,
-          });
-          lastExitCode = result.exitCode ?? 1;
-        } catch (err) {
-          const message = err && err.message ? err.message : "unknown";
-          prompt.write(`Internal error (session continues): ${message}\n`);
-          eventSink.emit("session.internal_error", { message });
-          lastExitCode = 1;
-        } finally {
-          if (typeof prompt.endCycle === "function") prompt.endCycle();
-          if (typeof prompt.clearStop === "function") prompt.clearStop();
-        }
+        await runCycle(async () => {
+          try {
+            const { runMultiply01Trial } = await import("./pathcode-cli/trial.mjs");
+            const runner = testIo.runTrial ?? runMultiply01Trial;
+            const result = await runner(prompt, {
+              streams,
+              modelFlag: modelId,
+              envModel: process.env.PATHCODE_OPENAI_MODEL ?? null,
+              unicode,
+              checkoutRoot: root,
+            });
+            lastExitCode = result.exitCode ?? 1;
+          } catch (err) {
+            const message = err && err.message ? err.message : "unknown";
+            prompt.write(`Internal error (session continues): ${message}\n`);
+            eventSink.emit("session.internal_error", { message });
+            lastExitCode = 1;
+          }
+        });
         redrawPrompt(prompt, unicode, plain, sessionStats);
         continue;
       }
@@ -409,24 +449,22 @@ export async function runPathcodeMain(argv, testIo = {}) {
           redrawPrompt(prompt, unicode, plain, sessionStats);
           continue;
         }
-        if (typeof prompt.beginCycle === "function") prompt.beginCycle();
-        try {
-          const runner = testIo.runRecover ?? runRecoverCommand;
-          const result = await runner(prompt, {
-            checkpointId: parsedCommand.checkpointId,
-            projectRoot: process.cwd(),
-            checkoutRoot: root,
-          });
-          lastExitCode = result.exitCode ?? 1;
-        } catch (err) {
-          const message = err && err.message ? err.message : "unknown";
-          prompt.write(`Internal error (session continues): ${message}\n`);
-          eventSink.emit("session.internal_error", { message });
-          lastExitCode = 1;
-        } finally {
-          if (typeof prompt.endCycle === "function") prompt.endCycle();
-          if (typeof prompt.clearStop === "function") prompt.clearStop();
-        }
+        await runCycle(async () => {
+          try {
+            const runner = testIo.runRecover ?? runRecoverCommand;
+            const result = await runner(prompt, {
+              checkpointId: parsedCommand.checkpointId,
+              projectRoot: process.cwd(),
+              checkoutRoot: root,
+            });
+            lastExitCode = result.exitCode ?? 1;
+          } catch (err) {
+            const message = err && err.message ? err.message : "unknown";
+            prompt.write(`Internal error (session continues): ${message}\n`);
+            eventSink.emit("session.internal_error", { message });
+            lastExitCode = 1;
+          }
+        });
         redrawPrompt(prompt, unicode, plain, sessionStats);
         continue;
       }
@@ -449,46 +487,49 @@ export async function runPathcodeMain(argv, testIo = {}) {
         "./pathcode-cli/general-session.mjs"
       );
       const runner = testIo.runGeneralSession ?? runGeneralEngineeringSession;
-      if (typeof prompt.beginCycle === "function") prompt.beginCycle();
-      try {
-        const sessionResult = await runner(prompt, {
-          streams,
-          taskText: cmd,
-          projectRoot: process.cwd(),
-          modelId,
-          autonomyMode,
-          unicode,
-          checkoutRoot: root,
-          credential: sessionCredential,
-          onCredentialAcquired: (credential) => {
-            if (typeof credential === "string" && credential.length > 0) {
-              sessionCredential = credential;
-            }
-          },
-          sessionEventEmit: eventSink.emit,
-        });
-        lastExitCode = sessionResult.exitCode ?? 1;
-        sessionStats.taskCount += 1;
-        const calls =
-          typeof sessionResult.modelCalls === "number" ? sessionResult.modelCalls : 0;
-        sessionStats.modelCallCount += calls;
-      } catch (err) {
-        const message = err && err.message ? err.message : "unknown";
-        prompt.write(`Internal error (session continues): ${message}\n`);
-        eventSink.emit("session.internal_error", { message });
-        lastExitCode = 1;
-        sessionStats.taskCount += 1;
-      } finally {
-        if (typeof prompt.endCycle === "function") prompt.endCycle();
-        if (typeof prompt.clearStop === "function") prompt.clearStop();
-      }
+      await runCycle(async () => {
+        try {
+          const sessionResult = await runner(prompt, {
+            streams,
+            taskText: cmd,
+            projectRoot: process.cwd(),
+            modelId,
+            autonomyMode,
+            unicode,
+            checkoutRoot: root,
+            credential: sessionCredential,
+            onCredentialAcquired: (credential) => {
+              if (typeof credential === "string" && credential.length > 0) {
+                sessionCredential = credential;
+              }
+            },
+            sessionEventEmit: eventSink.emit,
+            // Cards own mirrored progress on TTY; disclosures/prompts still write.
+            cardsOwnProgress: ttyInline,
+          });
+          lastExitCode = sessionResult.exitCode ?? 1;
+          sessionStats.taskCount += 1;
+          const calls =
+            typeof sessionResult.modelCalls === "number" ? sessionResult.modelCalls : 0;
+          sessionStats.modelCallCount += calls;
+        } catch (err) {
+          const message = err && err.message ? err.message : "unknown";
+          prompt.write(`Internal error (session continues): ${message}\n`);
+          eventSink.emit("session.internal_error", { message });
+          lastExitCode = 1;
+          sessionStats.taskCount += 1;
+        }
+      });
       redrawPrompt(prompt, unicode, plain, sessionStats);
       void lastExitCode;
     }
+    if (ttyInline) inlineStudio.finish();
     return 130;
   } finally {
     // Scrub session credential from the bag on leave.
     sessionCredential = null;
+    uninstallCollisionGuard();
+    if (ttyInline) inlineStudio.finish();
     if (eventsOut !== null) {
       eventsOut.close();
       eventsOut = null;
