@@ -1,0 +1,5 @@
+{"type":"session.task.received","sessionId":"sess-missing-g2","ts":4000,"task":"partial fixture without gate2"}
+{"type":"session.preflight","sessionId":"sess-missing-g2","ts":4001,"branch":"main","head":"abcdef1234567890","dirtySummary":"clean"}
+{"type":"session.gate1","sessionId":"sess-missing-g2","ts":4002,"status":"grounded"}
+{"type":"session.validation.result","sessionId":"sess-missing-g2","ts":4003,"check":"typecheck","status":"PASS"}
+{"type":"session.terminal","sessionId":"sess-missing-g2","ts":4004,"disposition":"OK","summary":"truncated before gate2"}

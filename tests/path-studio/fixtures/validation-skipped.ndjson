@@ -1,0 +1,15 @@
+{"type":"session.task.received","sessionId":"sess-skipped","ts":3000,"task":"edit then decline check"}
+{"type":"session.preflight","sessionId":"sess-skipped","ts":3001,"branch":"main","head":"abcdef1234567890","dirtySummary":"clean"}
+{"type":"session.disclosure","sessionId":"sess-skipped","ts":3002,"kind":"start"}
+{"type":"session.authority","sessionId":"sess-skipped","ts":3003,"gate":"START","admission":"challenge-required"}
+{"type":"session.scope.admitted","sessionId":"sess-skipped","ts":3004,"editable":["src/answer.ts"],"context":[]}
+{"type":"session.reading","sessionId":"sess-skipped","ts":3005,"files":["src/answer.ts"]}
+{"type":"session.reasoning","sessionId":"sess-skipped","ts":3006,"call":2,"of":3,"purpose":"edit"}
+{"type":"session.gate1","sessionId":"sess-skipped","ts":3100,"status":"grounded"}
+{"type":"session.edit.summary","sessionId":"sess-skipped","ts":3101,"path":"src/answer.ts","kind":"REPLACE_TEXT","beforeBytes":40,"afterBytes":48}
+{"type":"session.applying","sessionId":"sess-skipped","ts":3102,"files":["src/answer.ts"]}
+{"type":"session.recovery.checkpoint","sessionId":"sess-skipped","ts":3200,"id":"cp-skip-1","status":"READY"}
+{"type":"session.reobserved","sessionId":"sess-skipped","ts":3201}
+{"type":"session.validation.plan","sessionId":"sess-skipped","ts":3202,"checks":["typecheck"]}
+{"type":"session.validation.skipped","sessionId":"sess-skipped","ts":3203,"reason":"CHECK_DECLINED"}
+{"type":"session.terminal","sessionId":"sess-skipped","ts":3204,"disposition":"CHECK_DECLINED","summary":"operator declined CHECK"}

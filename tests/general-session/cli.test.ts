@@ -153,6 +153,7 @@ describe("5G-M / 5G-AF: help and welcome describe what the prompt accepts", () =
     expect(help).toContain("PATHCODE_STATE_DIR");
     expect(help).toContain("recovery checkpoint before the first byte changes");
     expect(help).toContain("--events ndjson");
+    expect(help).toContain("--events-out");
   });
 
   it("5G-AF: the welcome screen says a checkpoint precedes any change", async () => {

@@ -28,7 +28,11 @@ import {
   isInteractiveTty,
 } from "./pathcode-cli/terminal.mjs";
 import { parseAutonomyMode } from "./pathcode-cli/autonomy-policy.mjs";
-import { createSessionEventSink } from "./pathcode-cli/session-events.mjs";
+import {
+  createSessionEventSink,
+  mintSessionId,
+} from "./pathcode-cli/session-events.mjs";
+import { openEventsOutSink } from "./pathcode-cli/events-out.mjs";
 
 const root = resolveCheckoutRoot();
 
@@ -42,6 +46,7 @@ function parseArgs(argv) {
    *   model: string | null,
    *   autonomy: "review" | "bounded",
    *   events: null | "ndjson",
+   *   eventsOut: string | null,
    *   rest: string[],
    * }} */
   const out = {
@@ -50,6 +55,7 @@ function parseArgs(argv) {
     model: null,
     autonomy: "review",
     events: null,
+    eventsOut: null,
     rest: [],
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -97,6 +103,18 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
+    if (a === "--events-out") {
+      const next = argv[i + 1];
+      if (typeof next !== "string" || next.trim() === "" || next.startsWith("-")) {
+        return {
+          ok: false,
+          message: "Usage: pathcode --events ndjson --events-out <path>",
+        };
+      }
+      out.eventsOut = next.trim();
+      i += 1;
+      continue;
+    }
     if (a === "--yes" || a === "--auto-approve" || a.startsWith("--workspace") || a === "--key") {
       return {
         ok: false,
@@ -105,8 +123,17 @@ function parseArgs(argv) {
     }
     out.rest.push(a);
   }
+  if (out.eventsOut !== null && out.events !== "ndjson") {
+    return {
+      ok: false,
+      message: "--events-out requires --events ndjson",
+    };
+  }
   return { ok: true, value: out };
 }
+
+/** Exported for focused CLI arg proofs (PS1). */
+export { parseArgs };
 
 function packageVersion() {
   try {
@@ -246,15 +273,35 @@ export async function runPathcodeMain(argv, testIo = {}) {
   /** @type {number} */
   let lastExitCode = 0;
 
+  // One living-session id for the process; stamped on every session.* event.
+  const sessionId =
+    typeof testIo.sessionId === "string" && testIo.sessionId.trim() !== ""
+      ? testIo.sessionId.trim()
+      : mintSessionId();
+
+  /** @type {ReturnType<typeof openEventsOutSink> | null} */
+  let eventsOut = null;
+  /** @type {((line: string) => void) | undefined} */
+  let writeNdjson;
+  if (args.events === "ndjson") {
+    if (typeof args.eventsOut === "string" && args.eventsOut.trim() !== "") {
+      // Named destination: truncate on launch, flush each line, keep human stdout clean.
+      eventsOut = openEventsOutSink(args.eventsOut);
+      writeNdjson = (line) => {
+        eventsOut.writeLine(line);
+      };
+    } else {
+      writeNdjson = (line) => {
+        stdout.write(line);
+      };
+    }
+  }
+
   const eventsMode = args.events === "ndjson" ? "both" : "human";
   const eventSink = createSessionEventSink({
+    sessionId,
     mode: eventsMode,
-    writeNdjson:
-      args.events === "ndjson"
-        ? (line) => {
-            stdout.write(line);
-          }
-        : undefined,
+    writeNdjson,
   });
 
   const prompt = createPromptSession(streams);
@@ -442,6 +489,10 @@ export async function runPathcodeMain(argv, testIo = {}) {
   } finally {
     // Scrub session credential from the bag on leave.
     sessionCredential = null;
+    if (eventsOut !== null) {
+      eventsOut.close();
+      eventsOut = null;
+    }
     prompt.close();
   }
 }

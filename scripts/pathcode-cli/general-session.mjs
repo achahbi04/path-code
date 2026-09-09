@@ -73,6 +73,7 @@ import {
   discoverValidationCandidates,
   selectPlannedChecks,
 } from "./validation-candidates.mjs";
+import { createHeartbeatController } from "./session-events.mjs";
 
 /**
  * Recovery protection for a General Engineering Session.
@@ -655,10 +656,20 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
         }
       : () => {};
 
+  const heartbeat = createHeartbeatController({
+    emit,
+    intervalMs:
+      typeof options.heartbeatIntervalMs === "number"
+        ? options.heartbeatIntervalMs
+        : undefined,
+    ...(typeof options.heartbeatNow === "function" ? { now: options.heartbeatNow } : {}),
+  });
+
   if (!options.allowNonTty && streams && !isInteractiveTty(streams)) {
     prompt.write(
       "A General Engineering Session requires a real interactive TTY for stdin and stdout.\n",
     );
+    heartbeat.stop();
     emit("session.terminal", {
       disposition: "NON_TTY_REFUSED",
       summary: "interactive TTY required",
@@ -669,6 +680,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   const autonomyParsed = parseAutonomyMode(options.autonomyMode ?? "review");
   if (!autonomyParsed.ok) {
     prompt.write(`${autonomyParsed.message}\n`);
+    heartbeat.stop();
     emit("session.terminal", {
       disposition: "AUTONOMY_MODE_REFUSED",
       summary: autonomyParsed.message,
@@ -681,6 +693,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   const task = validateTaskText(options.taskText);
   if (!task.ok) {
     prompt.write(`${task.message}\n`);
+    heartbeat.stop();
     emit("session.terminal", { disposition: task.code, summary: task.message });
     return { exitCode: 2, outcome: task.code, autonomyMode, modelCalls: 0 };
   }
@@ -697,6 +710,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     prompt.write(
       "No model selected. Start with --model <id> or set PATHCODE_OPENAI_MODEL.\n",
     );
+    heartbeat.stop();
     emit("session.terminal", {
       disposition: "MODEL_REQUIRED",
       summary: "no model selected",
@@ -707,6 +721,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   const owners = options.owners ?? (await loadTrialOwners(options.checkoutRoot));
   if (!owners.ok) {
     prompt.write(`${owners.message}\n`);
+    heartbeat.stop();
     emit("session.terminal", { disposition: owners.code, summary: owners.message });
     return { exitCode: 2, outcome: owners.code, autonomyMode, modelCalls: 0 };
   }
@@ -972,6 +987,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
 
   const finish = (result) => {
+    heartbeat.stop();
     if (ownsBrain) {
       brain.dispose();
     }
@@ -1004,6 +1020,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     of: GENERAL_SESSION_MAX_PROVIDER_INVOCATIONS,
     purpose: "scope",
   });
+  heartbeat.begin("reasoning");
   const isSensitive = (relativePath) => {
     const verdict = owners.classifyScopePathSensitivity(relativePath, {
       forbiddenRelativePrefixes: preflight.forbiddenRelativePrefixes,
@@ -1021,6 +1038,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     maxEditableTargets: owners.MAX_SCOPE_EDITABLE_TARGETS,
   });
   const scopeInvoke = await brain.invoke(scopeRequest);
+  heartbeat.stop();
   if (!scopeInvoke.ok) {
     prompt.write(`Scope call failed: ${scopeInvoke.error.code}\n`);
     prompt.write("No file was read for the model and nothing was written.\n");
@@ -1137,12 +1155,14 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
       ...approved.contextPaths.map((p) => p.relativePath),
     ],
   });
+  heartbeat.begin("reading");
   const context = await earnApprovedScopeContext(owners, {
     workspace: preflight.workspace,
     config: preflight.config,
     inventory: preflight.inventory,
     approved,
   });
+  heartbeat.stop();
   if (!context.ok) {
     prompt.write(`Refused before the edit call: ${context.code} — ${context.message}\n`);
     return finish({ exitCode: 1, outcome: context.code });
@@ -1210,6 +1230,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     of: GENERAL_SESSION_MAX_PROVIDER_INVOCATIONS,
     purpose: "edit",
   });
+  heartbeat.begin("reasoning");
   const proposed = await session.propose({
     correlationId: "general-session-edit",
     instructionText: [
@@ -1219,6 +1240,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
       "explicitly asks otherwise. Emit each file's complete new text.",
     ].join("\n"),
   });
+  heartbeat.stop();
   if (!proposed.ok) {
     prompt.write(
       `Edit proposal refused: ${proposed.error.code} — ${proposed.error.message}\n`,
@@ -1366,7 +1388,9 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   emit("session.applying", {
     files: review.view.order.map((item) => item.relativePath),
   });
+  heartbeat.begin("applying");
   const applied = await session.apply(review, pairs);
+  heartbeat.stop();
   const checkpointId = session.describe().recoveryCheckpointId;
   if (!applied.ok) {
     prompt.write(`Apply failed: ${applied.error.code} — ${applied.error.message}\n`);
@@ -1506,7 +1530,9 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     of: GENERAL_SESSION_MAX_PROVIDER_INVOCATIONS,
     purpose: "post-edit-evidence",
   });
+  heartbeat.begin("validation");
   const outcome = await session.validate(validationReview, validationAuth.value);
+  heartbeat.stop();
   session.close();
   owners.disposeReferenceCatalog(validationReview.view.postEditCatalog);
   owners.disposeReferenceCatalog(context.catalog);

@@ -108,6 +108,9 @@ Flags:
                           disclosure then host-minted authority inside that envelope.
   --events ndjson         Emit the structured session event stream as NDJSON
                           (same events the live terminal is driven by)
+  --events-out <path>     With --events ndjson: write NDJSON to a named file
+                          or pipe (fresh truncate on launch; flushed per event).
+                          Keeps machine events off the human terminal.
 
 Environment:
   PATHCODE_STATE_DIR   Where recovery checkpoints are stored. Must be outside the

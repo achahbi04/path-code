@@ -1,0 +1,6 @@
+{"type":"session.task.received","sessionId":"sess-old","ts":5000,"task":"prior run task"}
+{"type":"session.gate2","sessionId":"sess-old","ts":5001,"status":"accepted"}
+{"type":"session.terminal","sessionId":"sess-old","ts":5002,"disposition":"OK","summary":"old"}
+{"type":"session.task.received","sessionId":"sess-new","ts":6000,"task":"current run task"}
+{"type":"session.preflight","sessionId":"sess-new","ts":6001,"branch":"feature","head":"1111222233334444","dirtySummary":"1 modified"}
+{"type":"session.terminal","sessionId":"sess-new","ts":6002,"disposition":"START_DECLINED","summary":"declined"}

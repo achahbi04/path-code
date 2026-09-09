@@ -1,0 +1,20 @@
+{"type":"session.task.received","sessionId":"sess-accepted","ts":1000,"task":"fix the answer helper"}
+{"type":"session.preflight","sessionId":"sess-accepted","ts":1001,"branch":"main","head":"abcdef1234567890","dirtySummary":"clean"}
+{"type":"session.disclosure","sessionId":"sess-accepted","ts":1002,"kind":"start"}
+{"type":"session.authority","sessionId":"sess-accepted","ts":1003,"gate":"START","admission":"challenge-required"}
+{"type":"session.scope.admitted","sessionId":"sess-accepted","ts":1004,"editable":["src/answer.ts"],"context":[]}
+{"type":"session.reading","sessionId":"sess-accepted","ts":1005,"files":["src/answer.ts"]}
+{"type":"session.reasoning","sessionId":"sess-accepted","ts":1006,"call":2,"of":3,"purpose":"edit"}
+{"type":"session.heartbeat","sessionId":"sess-accepted","ts":1100,"stage":"reasoning","elapsedMs":94}
+{"type":"session.gate1","sessionId":"sess-accepted","ts":1200,"status":"grounded"}
+{"type":"session.edit.summary","sessionId":"sess-accepted","ts":1201,"path":"src/answer.ts","kind":"REPLACE_TEXT","beforeBytes":40,"afterBytes":48}
+{"type":"session.applying","sessionId":"sess-accepted","ts":1202,"files":["src/answer.ts"]}
+{"type":"session.recovery.checkpoint","sessionId":"sess-accepted","ts":1300,"id":"cp-accepted-1","status":"READY"}
+{"type":"session.reobserved","sessionId":"sess-accepted","ts":1301}
+{"type":"session.validation.plan","sessionId":"sess-accepted","ts":1302,"checks":["typecheck","targeted"]}
+{"type":"session.validation.running","sessionId":"sess-accepted","ts":1303,"check":"typecheck"}
+{"type":"session.validation.result","sessionId":"sess-accepted","ts":1400,"check":"typecheck","status":"PASS"}
+{"type":"session.validation.result","sessionId":"sess-accepted","ts":1401,"check":"targeted","status":"PASS"}
+{"type":"session.gate2","sessionId":"sess-accepted","ts":1402,"status":"accepted"}
+{"type":"session.terminal","sessionId":"sess-accepted","ts":1403,"disposition":"OK","summary":"CONFIGURED VALIDATION ACCEPTED"}
+{"type":"session.finding","sessionId":"sess-accepted","ts":1404,"severity":"info","stage":"session","message":"cycle complete"}

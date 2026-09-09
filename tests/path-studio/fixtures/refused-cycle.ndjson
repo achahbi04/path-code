@@ -1,0 +1,5 @@
+{"type":"session.task.received","sessionId":"sess-refused","ts":2000,"task":"do something"}
+{"type":"session.preflight","sessionId":"sess-refused","ts":2001,"branch":"main","head":"abcdef1234567890","dirtySummary":"clean"}
+{"type":"session.disclosure","sessionId":"sess-refused","ts":2002,"kind":"start"}
+{"type":"session.authority","sessionId":"sess-refused","ts":2003,"gate":"START","admission":"challenge-required"}
+{"type":"session.terminal","sessionId":"sess-refused","ts":2004,"disposition":"START_DECLINED","summary":"operator declined START"}

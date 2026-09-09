@@ -490,6 +490,7 @@ if (!/return 43;/.test(source)) {
 
     const ndjsonChunks: string[] = [];
     const sink = createSessionEventSink({
+      sessionId: "test-session-r2p",
       mode: "ndjson",
       writeNdjson: (line: string) => ndjsonChunks.push(line),
       onEvent: (event: Record<string, unknown>) => {

@@ -1,11 +1,16 @@
 /**
- * Phase 5G-R2 — structured session event stream.
+ * Phase 5G-R2 / PS1 — structured session event stream.
  *
  * Single source of truth for anything that displays a living session.
  * Every event corresponds to an actual host/owner transition. No decorative
  * progress, no fabricated stages, no secrets, no raw model text beyond the
  * existing sanitized disclosure envelopes.
+ *
+ * PS1: every event carries `sessionId`. Heartbeats prove liveness only
+ * (stage + elapsedMs) — never progress, percentage, or ETA.
  */
+
+import { randomUUID } from "node:crypto";
 
 /** @typedef {string} SessionEventType */
 
@@ -31,7 +36,20 @@ export const SESSION_EVENT_TYPES = Object.freeze([
   "session.finding",
   "session.cancelled",
   "session.internal_error",
+  // PS1 — liveness only (stage + elapsed). Never progress/ETA/percentage.
+  "session.heartbeat",
 ]);
+
+/** Default heartbeat cadence while a stage await is in flight. */
+export const DEFAULT_HEARTBEAT_INTERVAL_MS = 2_000;
+
+/**
+ * Mint a living-session id (one per pathcode process / Studio selection).
+ * @returns {string}
+ */
+export function mintSessionId() {
+  return randomUUID();
+}
 
 /**
  * @param {string} type
@@ -51,14 +69,21 @@ export function createSessionEvent(type, fields = {}) {
  * NDJSON serializes it. Live terminal copy remains the host's real progress
  * writes (same transitions) — renderSessionEventHuman is available for UIs.
  *
+ * Every emitted event is stamped with `sessionId` (integrity lock for Studio).
+ *
  * @param {{
+ *   sessionId: string,
  *   onEvent?: (event: Readonly<Record<string, unknown>>) => void,
  *   writeNdjson?: (line: string) => void,
  *   writeHumanFromEvents?: (text: string) => void,
  *   mode?: "human" | "ndjson" | "both",
- * }} [options]
+ * }} options
  */
-export function createSessionEventSink(options = {}) {
+export function createSessionEventSink(options) {
+  if (!options || typeof options.sessionId !== "string" || options.sessionId.trim() === "") {
+    throw new Error("createSessionEventSink requires a non-empty sessionId");
+  }
+  const sessionId = options.sessionId.trim();
   /** @type {Readonly<Record<string, unknown>>[]} */
   const events = [];
   const mode = options.mode ?? "human";
@@ -68,7 +93,8 @@ export function createSessionEventSink(options = {}) {
    * @param {Record<string, unknown>} [fields]
    */
   function emit(type, fields = {}) {
-    const event = createSessionEvent(type, fields);
+    const { sessionId: _ignoredSid, ...rest } = fields;
+    const event = createSessionEvent(type, { ...rest, sessionId });
     events.push(event);
     if (typeof options.onEvent === "function") {
       options.onEvent(event);
@@ -93,6 +119,83 @@ export function createSessionEventSink(options = {}) {
     emit,
     events: () => events.slice(),
     mode,
+    sessionId,
+  };
+}
+
+/**
+ * Emit `session.heartbeat` on a fixed interval while a named stage is open.
+ * Carries ONLY `{ stage, elapsedMs }` (+ type/ts/sessionId via emit).
+ * Must be stopped before cycle end (R2-K: no leaked timers between cycles).
+ *
+ * @param {{
+ *   emit: (type: string, fields?: Record<string, unknown>) => void,
+ *   intervalMs?: number,
+ *   now?: () => number,
+ *   setIntervalFn?: typeof setInterval,
+ *   clearIntervalFn?: typeof clearInterval,
+ * }} options
+ */
+export function createHeartbeatController(options) {
+  const intervalMs =
+    typeof options.intervalMs === "number" && options.intervalMs > 0
+      ? options.intervalMs
+      : DEFAULT_HEARTBEAT_INTERVAL_MS;
+  const now = typeof options.now === "function" ? options.now : () => Date.now();
+  const setIntervalFn =
+    typeof options.setIntervalFn === "function" ? options.setIntervalFn : setInterval;
+  const clearIntervalFn =
+    typeof options.clearIntervalFn === "function"
+      ? options.clearIntervalFn
+      : clearInterval;
+
+  /** @type {ReturnType<typeof setInterval> | null} */
+  let timer = null;
+  /** @type {string | null} */
+  let stage = null;
+  /** @type {number | null} */
+  let startedAt = null;
+
+  function stop() {
+    if (timer !== null) {
+      clearIntervalFn(timer);
+      timer = null;
+    }
+    stage = null;
+    startedAt = null;
+  }
+
+  /**
+   * Begin heartbeats for a stage the engine has actually entered.
+   * @param {string} stageName
+   */
+  function begin(stageName) {
+    stop();
+    if (typeof stageName !== "string" || stageName.trim() === "") return;
+    stage = stageName.trim();
+    startedAt = now();
+    timer = setIntervalFn(() => {
+      if (stage === null || startedAt === null) return;
+      options.emit("session.heartbeat", {
+        stage,
+        elapsedMs: Math.max(0, now() - startedAt),
+      });
+    }, intervalMs);
+    // Do not keep the process alive solely for heartbeats.
+    if (
+      timer &&
+      typeof timer === "object" &&
+      typeof /** @type {{ unref?: () => void }} */ (timer).unref === "function"
+    ) {
+      /** @type {{ unref: () => void }} */ (timer).unref();
+    }
+  }
+
+  return {
+    begin,
+    stop,
+    /** @returns {string | null} */
+    activeStage: () => stage,
   };
 }
 
@@ -202,6 +305,9 @@ export function renderSessionEventHuman(event) {
       const message = typeof event.message === "string" ? event.message : "internal error";
       return `Internal error (session continues): ${message}\n`;
     }
+    case "session.heartbeat":
+      // Liveness only — host keeps its own progress copy; Studio renders elapsed.
+      return "";
     default:
       return "";
   }
