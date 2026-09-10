@@ -267,11 +267,11 @@ Baseline comparison: 123→131 files, 1190→1210 tests (additive GC1-c + unchan
 |---|---|
 | GC1-AB baseline | `462a18dfb9e6395f6efdd4028d0f2707f4b1be2e` |
 | Implementation | `be457781d24fb5943dfbe3acaced8ce25e4274fa` |
-| Report | `bdef55d13467b1e730aa71150a5ed5e1b1884622` |
+| Report | `d4ae930c559f9de707c22591f90bcbe522555c20` |
 
 ```text
 GC1-c CONTINUOUS DRIVE: BLOCKED/PARTIAL
 IMPLEMENTATION: be457781d24fb5943dfbe3acaced8ce25e4274fa
-BRANCH TIP: bdef55d13467b1e730aa71150a5ed5e1b1884622
+BRANCH TIP: d4ae930c559f9de707c22591f90bcbe522555c20 (report checkpoint; verify with git rev-parse HEAD)
 STATUS: CLEAN after report checkpoint
 ```
