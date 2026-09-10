@@ -21,7 +21,8 @@ PHASE GC1-a GOOGLE CLOUD WORKSTATION LIFECYCLE IMPLEMENTED
 | **PS1-INLINE IMPLEMENTATION SHA (dispatch base)** | `e4e89e9ce9da3edc5e2e2d9db4b28941359019f0` | Banked PS1-INLINE tip used as branch point (`--no-track` fresh worktree) |
 | **Fresh worktree** | `/Users/achahbi/Projects/path-code-worktrees/cursor-phase-gc1a` | One agent per worktree; not a shared tree |
 | **Branch** | `cursor/phase-gc1a` | Created from the PS1-INLINE IMPLEMENTATION SHA above |
-| **IMPLEMENTATION SHA** | `0485bd71920bfd1939f4ea0c29399bec631ad519` | Lifecycle engine + mock/GCP transports + GC1A-A…H/P1 + report |
+| **IMPLEMENTATION SHA** | `0485bd71920bfd1939f4ea0c29399bec631ad519` | Initial GC1-a lifecycle engine + GC1A-A…H/P1 |
+| **AUTH-HEADER BUGFIX SHA** | _(filled after commit)_ | Bearer attachment fix + GC1A-I + report update |
 | **BRANCH TIP SHA** | `git rev-parse HEAD` on `cursor/phase-gc1a` | Tip after any docs-only commits |
 | **Main** | `d997ae13185013b4312755c38da4cd7099041621` | **Unchanged**. No push. No merge. |
 
@@ -60,6 +61,19 @@ PHASE GC1-a GOOGLE CLOUD WORKSTATION LIFECYCLE IMPLEMENTED
 - Static SA JSON keys are **refused** (`keyFilename` / `credentials` / `keyFile` → `GC1_AUTH_IMPERSONATION_UNAVAILABLE`); no fallback to a key; no billable work on auth failure.
 - Token refresh lives in the control-plane auth client only.
 - Identity separation: Control SA authenticates the control plane; workstation config `host.gceInstance.serviceAccount` is the **Runtime SA**. Control SA email/token never appears in workstation-facing payloads (GC1A-H).
+
+### Live-smoke bugfix — missing Authorization header
+
+**Symptom:** first real Workstations REST call returned `401 CREDENTIALS_MISSING` after successful impersonation / `reconcileStartup()`. A raw curl with the same impersonated bearer against the same endpoint succeeded — IAM and credential were fine.
+
+**Root cause:** `google-auth-library` `getRequestHeaders()` returns a Fetch `Headers` instance. The transport did `{ ...headers }` into the fetch init; `Headers` has no enumerable own properties, so the spread was `{}` and **no `Authorization` was attached**.
+
+**Fix:**
+- `headersToPlainRecord` / `buildBearerAuthHeaders` in `auth.mjs` — always force `Authorization: Bearer <token>` via `getAccessToken()`.
+- Every Workstations REST call goes through a single `authedFetch` helper that refuses to send without a Bearer (except the intentional GC1A-I falsification hook).
+- Auth headers win over `init.headers` so a caller cannot strip Bearer.
+
+**Proof:** GC1A-I (+ falsification) — $0 mock `fetch`; every REST method must attach Bearer; weaken omit on `getCluster` fails the proof; restore by hash.
 
 ---
 
@@ -140,13 +154,13 @@ Prerequisites: local ADC; `roles/iam.serviceAccountTokenCreator` on Control SA; 
 
 Without `GC1_LIVE_SMOKE=1` **and** `--confirm-cloud`, the entrypoint prints prerequisites and exits without touching GCP.
 
-This pass: **zero live GCP calls**. Operator runs the smoke to verify europe-west4 end-to-end.
+This bugfix pass: **zero live GCP calls**. Operator re-runs the smoke to verify europe-west4 end-to-end with Bearer attached.
 
 ---
 
-## Proofs — GC1A-A…H + P1
+## Proofs — GC1A-A…H + P1 + GC1A-I
 
-Focused file: `tests/gc1/lifecycle.test.ts` (**14/14 PASS**). All against `MockWorkstationTransport`.
+Focused file: `tests/gc1/lifecycle.test.ts` (**16/16 PASS**). Canonical path uses `MockWorkstationTransport`; GC1A-I exercises `GcpWorkstationTransport` against a **mock fetch** ($0, zero real GCP).
 
 | Proof | Result |
 |---|---|
@@ -159,21 +173,16 @@ Focused file: `tests/gc1/lifecycle.test.ts` (**14/14 PASS**). All against `MockW
 | **GC1A-G** | Without `GC1_LIVE_SMOKE=1`, `GcpWorkstationTransport` throws `GC1_LIVE_SMOKE_FORBIDDEN`; mock networkCalls=0 |
 | **GC1A-H** | Runtime SA in config; Control SA absent from workstation-facing payloads |
 | **P1** | `weakenReadinessGate: true` hands back lifecycle-only station (GC1A-E defect); honest path refuses; `lifecycle.mjs` SHA-256 unchanged |
+| **GC1A-I** | Every REST method attaches `Authorization: Bearer`; proves Headers-spread defect class; `$0` mock fetch |
+| **GC1A-I falsification** | `weakenAuthAttachment: true` omits Bearer on `getCluster` → proof fails; `gcp-transport.mjs` hash unchanged on restore |
 
-### Content hashes (pre-commit working tree)
+### Content hashes (auth-header bugfix working tree)
 
 | Path | SHA-256 |
 |---|---|
-| `scripts/pathcode-cli/gc1/constants.mjs` | `fcb7e560d4d8b84e81d223c85ccbf66acf92ddcd7114c1774aef2c26e4118072` |
-| `scripts/pathcode-cli/gc1/transport.mjs` | `71fcef8d71fd94744eea46a746a279a4450dead192af6c8be4cd78fc16f2f48b` |
-| `scripts/pathcode-cli/gc1/mock-transport.mjs` | `ebc5dc1fe77ff952b1c476bce2e9b0141ff034f2f1dccfd012489e41588812f0` |
-| `scripts/pathcode-cli/gc1/auth.mjs` | `52b29eff291663ad02f98880f244bd87d6ffc5a3ae5faad67cd19017fbf3f5d5` |
-| `scripts/pathcode-cli/gc1/gcp-transport.mjs` | `9454799dd78b46c94468e7ce32e8b43ba51c916ded9e89316019c6cf2a1d7b64` |
-| `scripts/pathcode-cli/gc1/lifecycle.mjs` | `c642b29a64cd9ac17631646cc58e4696c68f7c1e457a6b92355b5880a97ab915` |
-| `scripts/pathcode-cli/gc1/index.mjs` | `e9057392a162ca9d4a0081229b66b511079b73d6a5f991a08df78c39c7aca24b` |
-| `scripts/gc1-live-smoke.mjs` | `3f10582a3d5da614114d0f3857c401bc7f128bc602b37246d5e23e8918f4a95c` |
-| `tests/gc1/lifecycle.test.ts` | `53d7bbd410c7aa899c8313bc16f8e5cc1766bda0a75eb27b0f7ece8d900f29d6` |
-| `package.json` | `e3bd612f858c0a753302222b6dc12a3a85c30d366f851c4ae6ae436b1b33512c` |
+| `scripts/pathcode-cli/gc1/auth.mjs` | `3b3e254b451a4a02f4dd4db3d3416d078743c3365a654d80bcbe3a032c1f71ae` |
+| `scripts/pathcode-cli/gc1/gcp-transport.mjs` | `35e35cfe3f4afcff2f30266f4d98e4e1189d29f7240a0f17a5524bb6781b8d64` |
+| `tests/gc1/lifecycle.test.ts` | `bda8d759ce206bd11915e58497451059b7fe85b859ba028d67cddab7d472bf82` |
 
 ---
 
@@ -181,17 +190,18 @@ Focused file: `tests/gc1/lifecycle.test.ts` (**14/14 PASS**). All against `MockW
 
 | Gate | Result |
 |---|---|
-| Focused GC1A suite | **14/14 PASS** |
+| Focused GC1A suite | **16/16 PASS** (includes GC1A-I + falsification) |
 | `npm run typecheck` / `build` | **PASS** |
-| Vitest | **1165/1165 PASS** (121 files; includes +14 GC1A) |
+| Vitest | **1167/1167 PASS** (121 files) |
 | `cli:smoke` / `ledger:verify` | **PASS** |
-| Live GCP calls in this pass | **zero** |
+| Live GCP calls in this bugfix pass | **zero** (operator re-runs smoke) |
 | JSON key material | **none** |
+| IAM mutations | **none** |
 | Push | **none** |
 
 **Causal correction (first check):** root architecture tests require `dependencies: {}`. `google-auth-library@11.0.2` was placed in `optionalDependencies` so the live smoke can load it without violating those gates or pulling auth into the mock path.
 
-**One-off setup fault:** under host contention, default 5s Vitest budgets timed out mid-suite (`onTaskUpdate` worker RPC). Re-run with `--testTimeout=60000 --maxWorkers=2` in the quiet GC1-a worktree: full green. No product code change.
+**Auth-header bugfix:** `Headers` object-spread → missing Bearer; fixed via `buildBearerAuthHeaders` + single `authedFetch`; GC1A-I prevents regression in canonical ($0).
 
 ---
 
@@ -202,6 +212,7 @@ Focused file: `tests/gc1/lifecycle.test.ts` (**14/14 PASS**). All against `MockW
 3. **`roles/workstations.user` project-scope grant** remains forbidden; not attempted. If SSH IAM proves insufficient at live smoke time, that is operator STOP-AND-REPORT for a resource-scoped binding — out of GC1-a scope.
 4. **Cluster standing charge** persists after probe teardown by design; operator must run the documented cluster teardown when finished with GC1 work.
 5. **Vitest 5s default** is tight for general-session git fixtures on a busy host; recorded as one-off contention, not a GC1 defect.
+6. **Live smoke 401 CREDENTIALS_MISSING** was transport header attachment (`Headers` spread), not IAM — fixed under GC1A-I; operator re-run required.
 
 ---
 

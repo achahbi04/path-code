@@ -6,12 +6,17 @@
  *
  * google-auth-library is loaded only through auth.mjs (dynamic import).
  * Command channel: `gcloud workstations ssh --command=…` (no REST execute API).
+ *
+ * Auth attachment: EVERY Workstations REST call goes through `authedFetch`,
+ * which forces `Authorization: Bearer <impersonated-token>`. Never spread a
+ * Fetch `Headers` instance into a plain object (that yields `{}` → 401).
  */
 
 import { spawn } from "node:child_process";
 import {
   GC1_CLUSTER,
   GC1_CONFIG,
+  GC1_ERROR,
   GC1_PROJECT_ID,
   GC1_REGION,
   GC1_WORKSTATIONS_API_BASE,
@@ -21,7 +26,9 @@ import {
 } from "./constants.mjs";
 import {
   assertLiveSmokeAuthorized,
+  buildBearerAuthHeaders,
   createImpersonatedControlAuth,
+  hasBearerAuthorization,
 } from "./auth.mjs";
 
 /**
@@ -29,6 +36,7 @@ import {
  * @param {object} [opts.auth] pre-built impersonated auth
  * @param {typeof fetch} [opts.fetchImpl]
  * @param {boolean} [opts.skipEnvGate] test-only — NEVER set in production callers
+ * @param {boolean} [opts.weakenAuthAttachment] P-falsification only — omit Bearer on getCluster
  */
 export async function createGcpWorkstationTransport(opts = {}) {
   if (!opts.skipEnvGate) {
@@ -37,21 +45,64 @@ export async function createGcpWorkstationTransport(opts = {}) {
 
   const auth = opts.auth || (await createImpersonatedControlAuth());
   const fetchImpl = opts.fetchImpl || globalThis.fetch;
+  const weakenAuthAttachment = opts.weakenAuthAttachment === true;
   let networkCalls = 0;
+  /** @type {Array<{ op: string, url: string, hasBearer: boolean }>} */
+  const authAttachmentLog = [];
 
-  async function authedFetch(path, init = {}) {
+  /**
+   * Single authenticated request helper — the only path to the Workstations API.
+   * @param {string} path
+   * @param {RequestInit & { headers?: Record<string, string> }} [init]
+   * @param {{ op: string }} meta
+   */
+  async function authedFetch(path, init = {}, meta = { op: "unknown" }) {
     networkCalls += 1;
-    const headers = await auth.getRequestHeaders();
     const url = path.startsWith("http")
       ? path
       : `${GC1_WORKSTATIONS_API_BASE}/${path.replace(/^\//, "")}`;
+
+    // Falsification: omit bearer on getCluster only — proves GC1A-I is load-bearing.
+    const omitAuth =
+      weakenAuthAttachment && meta.op === "getCluster";
+
+    /** @type {Record<string, string>} */
+    let authHeaders = {};
+    if (!omitAuth) {
+      authHeaders = await buildBearerAuthHeaders(auth);
+      if (!hasBearerAuthorization(authHeaders)) {
+        const err = new Error(
+          `${GC1_ERROR.AUTH_IMPERSONATION_UNAVAILABLE}: refusing Workstations API call without Bearer token`,
+        );
+        err.code = GC1_ERROR.AUTH_IMPERSONATION_UNAVAILABLE;
+        throw err;
+      }
+    }
+
+    // Auth headers MUST win over init.headers — never allow a caller to strip Bearer.
+    const headers = {
+      "Content-Type": "application/json",
+      ...(init.headers || {}),
+      ...authHeaders,
+    };
+
+    authAttachmentLog.push({
+      op: meta.op,
+      url,
+      hasBearer: hasBearerAuthorization(headers),
+    });
+
+    if (!omitAuth && !hasBearerAuthorization(headers)) {
+      const err = new Error(
+        `${GC1_ERROR.AUTH_IMPERSONATION_UNAVAILABLE}: Authorization Bearer missing on ${meta.op}`,
+      );
+      err.code = GC1_ERROR.AUTH_IMPERSONATION_UNAVAILABLE;
+      throw err;
+    }
+
     const res = await fetchImpl(url, {
       ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...headers,
-        ...(init.headers || {}),
-      },
+      headers,
     });
     if (res.status === 404) return { notFound: true, status: 404 };
     const text = await res.text();
@@ -85,7 +136,7 @@ export async function createGcpWorkstationTransport(opts = {}) {
         throw new Error(`LRO deadline exceeded: ${op.name}`);
       }
       await new Promise((r) => setTimeout(r, 2000));
-      current = await authedFetch(op.name);
+      current = await authedFetch(op.name, {}, { op: "pollOperation" });
     }
     if (current.error) {
       throw new Error(`LRO failed: ${JSON.stringify(current.error)}`);
@@ -115,6 +166,7 @@ export async function createGcpWorkstationTransport(opts = {}) {
       const op = await authedFetch(
         `${parent}/workstationClusters?workstationClusterId=${encodeURIComponent(id)}`,
         { method: "POST", body: JSON.stringify(body) },
+        { op: "createCluster" },
       );
       const done = await pollOperation(op);
       return {
@@ -125,7 +177,7 @@ export async function createGcpWorkstationTransport(opts = {}) {
     },
 
     async getCluster(name) {
-      const res = await authedFetch(name);
+      const res = await authedFetch(name, {}, { op: "getCluster" });
       if (res?.notFound) return null;
       return {
         name: res.name,
@@ -135,7 +187,11 @@ export async function createGcpWorkstationTransport(opts = {}) {
     },
 
     async listClusters(parent = locationParent()) {
-      const res = await authedFetch(`${parent}/workstationClusters`);
+      const res = await authedFetch(
+        `${parent}/workstationClusters`,
+        {},
+        { op: "listClusters" },
+      );
       return (res.workstationClusters || []).map((c) => ({
         name: c.name,
         clusterId: c.name.split("/").pop(),
@@ -144,7 +200,7 @@ export async function createGcpWorkstationTransport(opts = {}) {
     },
 
     async deleteCluster(name) {
-      const op = await authedFetch(name, { method: "DELETE" });
+      const op = await authedFetch(name, { method: "DELETE" }, { op: "deleteCluster" });
       await pollOperation(op);
     },
 
@@ -152,6 +208,7 @@ export async function createGcpWorkstationTransport(opts = {}) {
       const op = await authedFetch(
         `${parent}/workstationConfigs?workstationConfigId=${encodeURIComponent(id)}`,
         { method: "POST", body: JSON.stringify(body) },
+        { op: "createConfig" },
       );
       const done = await pollOperation(op);
       return {
@@ -162,7 +219,7 @@ export async function createGcpWorkstationTransport(opts = {}) {
     },
 
     async getConfig(name) {
-      const res = await authedFetch(name);
+      const res = await authedFetch(name, {}, { op: "getConfig" });
       if (res?.notFound) return null;
       return {
         name: res.name,
@@ -172,7 +229,11 @@ export async function createGcpWorkstationTransport(opts = {}) {
     },
 
     async listConfigs(parent = clusterName()) {
-      const res = await authedFetch(`${parent}/workstationConfigs`);
+      const res = await authedFetch(
+        `${parent}/workstationConfigs`,
+        {},
+        { op: "listConfigs" },
+      );
       return (res.workstationConfigs || []).map((c) => ({
         name: c.name,
         configId: c.name.split("/").pop(),
@@ -181,7 +242,7 @@ export async function createGcpWorkstationTransport(opts = {}) {
     },
 
     async deleteConfig(name) {
-      const op = await authedFetch(name, { method: "DELETE" });
+      const op = await authedFetch(name, { method: "DELETE" }, { op: "deleteConfig" });
       await pollOperation(op);
     },
 
@@ -189,6 +250,7 @@ export async function createGcpWorkstationTransport(opts = {}) {
       const op = await authedFetch(
         `${parent}/workstations?workstationId=${encodeURIComponent(id)}`,
         { method: "POST", body: JSON.stringify(body) },
+        { op: "createWorkstation" },
       );
       const done = await pollOperation(op);
       return mapWorkstation(done) || {
@@ -200,18 +262,26 @@ export async function createGcpWorkstationTransport(opts = {}) {
     },
 
     async getWorkstation(name) {
-      const res = await authedFetch(name);
+      const res = await authedFetch(name, {}, { op: "getWorkstation" });
       if (res?.notFound) return null;
       return mapWorkstation(res);
     },
 
     async listWorkstations(parent = configName()) {
-      const res = await authedFetch(`${parent}/workstations`);
+      const res = await authedFetch(
+        `${parent}/workstations`,
+        {},
+        { op: "listWorkstations" },
+      );
       return (res.workstations || []).map(mapWorkstation).filter(Boolean);
     },
 
     async startWorkstation(name) {
-      const op = await authedFetch(`${name}:start`, { method: "POST", body: "{}" });
+      const op = await authedFetch(
+        `${name}:start`,
+        { method: "POST", body: "{}" },
+        { op: "startWorkstation" },
+      );
       await pollOperation(op);
       return (await this.getWorkstation(name)) || {
         name,
@@ -221,7 +291,11 @@ export async function createGcpWorkstationTransport(opts = {}) {
     },
 
     async stopWorkstation(name) {
-      const op = await authedFetch(`${name}:stop`, { method: "POST", body: "{}" });
+      const op = await authedFetch(
+        `${name}:stop`,
+        { method: "POST", body: "{}" },
+        { op: "stopWorkstation" },
+      );
       await pollOperation(op);
       return (await this.getWorkstation(name)) || {
         name,
@@ -231,7 +305,11 @@ export async function createGcpWorkstationTransport(opts = {}) {
     },
 
     async deleteWorkstation(name) {
-      const op = await authedFetch(name, { method: "DELETE" });
+      const op = await authedFetch(
+        name,
+        { method: "DELETE" },
+        { op: "deleteWorkstation" },
+      );
       await pollOperation(op);
     },
 
@@ -256,7 +334,14 @@ export async function createGcpWorkstationTransport(opts = {}) {
         kind: "gcp",
         networkCalls,
         controlSa: auth.targetPrincipal,
+        authAttachmentLog: [...authAttachmentLog],
+        weakenAuthAttachment,
       };
+    },
+
+    /** @internal test helper — recorded auth attachment per REST op */
+    getAuthAttachmentLog() {
+      return [...authAttachmentLog];
     },
   };
 }

@@ -11,6 +11,9 @@ export { createWorkstationLifecycleManager } from "./lifecycle.mjs";
 export {
   createImpersonatedControlAuth,
   assertLiveSmokeAuthorized,
+  buildBearerAuthHeaders,
+  headersToPlainRecord,
+  hasBearerAuthorization,
 } from "./auth.mjs";
 
 /**

@@ -494,6 +494,268 @@ describe("GC1 auth refuses JSON keys", () => {
   });
 });
 
+describe("GC1A-I AUTH ATTACHMENT ON EVERY REST CALL ($0 mock fetch)", () => {
+  const TOKEN = "gc1-test-impersonated-token";
+
+  function fakeAuth() {
+    return {
+      targetPrincipal: "pathcode-gc1-control@path-code-gc1-260910.iam.gserviceaccount.com",
+      kind: "impersonated-adc",
+      async getAccessToken() {
+        return TOKEN;
+      },
+      // Simulate the live bug surface: return a Fetch Headers instance.
+      async getRequestHeaders() {
+        return new Headers({ Authorization: `Bearer ${TOKEN}` });
+      },
+    };
+  }
+
+  function recordingFetch() {
+    /** @type {Array<{ url: string, method: string, headers: Record<string, string> }>} */
+    const calls: Array<{
+      url: string;
+      method: string;
+      headers: Record<string, string>;
+    }> = [];
+
+    const fetchImpl = async (url: string, init: RequestInit = {}) => {
+      const raw = init.headers || {};
+      const headers: Record<string, string> =
+        typeof (raw as Headers).forEach === "function"
+          ? (() => {
+              const out: Record<string, string> = {};
+              (raw as Headers).forEach((v, k) => {
+                out[k] = v;
+              });
+              return out;
+            })()
+          : { ...(raw as Record<string, string>) };
+      calls.push({
+        url: String(url),
+        method: String(init.method || "GET"),
+        headers,
+      });
+      // Minimal REST stubs — no network, $0.
+      // Match API path segments only (host `workstations.googleapis.com` contains
+      // the substring `/workstations` and must not trigger list stubs).
+      const path = String(url).replace(/^https?:\/\/[^/]+/, "");
+      if (
+        path.includes(":start") ||
+        path.includes(":stop") ||
+        init.method === "DELETE" ||
+        init.method === "POST"
+      ) {
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            return JSON.stringify({
+              done: true,
+              name: "projects/p/locations/l/operations/op",
+              response: {
+                name: path.replace(/:start|:stop.*/, "").replace(/^\//, "").split("?")[0],
+                state: "STATE_RUNNING",
+              },
+            });
+          },
+        };
+      }
+      if (/\/workstations(?:\?|$)/.test(path)) {
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            return JSON.stringify({ workstations: [] });
+          },
+        };
+      }
+      if (/\/workstationConfigs(?:\?|$)/.test(path)) {
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            return JSON.stringify({ workstationConfigs: [] });
+          },
+        };
+      }
+      if (/\/workstationClusters(?:\?|$)/.test(path)) {
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            return JSON.stringify({ workstationClusters: [] });
+          },
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        async text() {
+          return JSON.stringify({
+            name: path.replace(/^\//, ""),
+            state: "STATE_RUNNING",
+          });
+        },
+      };
+    };
+
+    return { fetchImpl, calls };
+  }
+
+  function assertEveryCallHasBearer(
+    calls: Array<{ headers: Record<string, string> }>,
+  ) {
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      const authz = call.headers.Authorization || call.headers.authorization;
+      expect(authz, `missing Bearer on ${JSON.stringify(call.headers)}`).toMatch(
+        new RegExp(`^Bearer\\s+${TOKEN}$`),
+      );
+    }
+  }
+
+  it("GC1A-I: every Workstations REST method attaches Authorization Bearer", async () => {
+    const { createGcpWorkstationTransport } = await import(
+      `${pathToFileURL(GCP).href}?i=${randomUUID()}`
+    );
+    const { headersToPlainRecord, hasBearerAuthorization } = await import(
+      `${pathToFileURL(AUTH).href}?i=${randomUUID()}`
+    );
+
+    // Prove Headers spread is empty (the defect class) while our helper is not.
+    const hdrs = new Headers({ Authorization: `Bearer ${TOKEN}` });
+    expect({ ...hdrs }).toEqual({});
+    expect(hasBearerAuthorization(headersToPlainRecord(hdrs))).toBe(true);
+
+    const { fetchImpl, calls } = recordingFetch();
+    const transport = await createGcpWorkstationTransport({
+      skipEnvGate: true,
+      auth: fakeAuth(),
+      fetchImpl,
+    });
+
+    const {
+      clusterName,
+      configName,
+      workstationName,
+      locationParent,
+      GC1_CLUSTER,
+      GC1_CONFIG,
+      GC1_PROBE_WORKSTATION,
+    } = await import(`${pathToFileURL(CONSTANTS).href}?i=${randomUUID()}`);
+
+    const parent = locationParent();
+    const cName = clusterName();
+    const cfgName = configName();
+    const wsName = workstationName(GC1_PROBE_WORKSTATION);
+
+    await transport.getCluster(cName);
+    await transport.listClusters(parent);
+    await transport.createCluster(GC1_CLUSTER, {});
+    await transport.getConfig(cfgName);
+    await transport.listConfigs(cName);
+    await transport.createConfig(cName, GC1_CONFIG, {
+      idleTimeout: "900s",
+      runningTimeout: "3600s",
+      host: { gceInstance: { poolSize: 0, machineType: "e2-standard-2", serviceAccount: "x" } },
+    });
+    await transport.listWorkstations(cfgName);
+    await transport.createWorkstation(cfgName, GC1_PROBE_WORKSTATION, {});
+    await transport.getWorkstation(wsName);
+    await transport.startWorkstation(wsName);
+    await transport.stopWorkstation(wsName);
+    await transport.deleteWorkstation(wsName);
+    await transport.deleteConfig(cfgName);
+    await transport.deleteCluster(cName);
+
+    assertEveryCallHasBearer(calls);
+
+    const log = transport.getAuthAttachmentLog();
+    const requiredOps = [
+      "getCluster",
+      "listClusters",
+      "createCluster",
+      "getConfig",
+      "listConfigs",
+      "createConfig",
+      "listWorkstations",
+      "createWorkstation",
+      "getWorkstation",
+      "startWorkstation",
+      "stopWorkstation",
+      "deleteWorkstation",
+      "deleteConfig",
+      "deleteCluster",
+    ];
+    for (const op of requiredOps) {
+      const entries = log.filter((e: { op: string }) => e.op === op);
+      expect(entries.length, `expected authedFetch for ${op}`).toBeGreaterThan(0);
+      for (const e of entries) {
+        expect(e.hasBearer).toBe(true);
+      }
+    }
+  });
+
+  it("GC1A-I falsification: omit auth on getCluster → proof fails; restore by hash", async () => {
+    const beforeHash = sha256(GCP);
+    const { createGcpWorkstationTransport } = await import(
+      `${pathToFileURL(GCP).href}?f=${randomUUID()}`
+    );
+    const { fetchImpl, calls } = recordingFetch();
+    const weak = await createGcpWorkstationTransport({
+      skipEnvGate: true,
+      auth: fakeAuth(),
+      fetchImpl,
+      weakenAuthAttachment: true,
+    });
+
+    const { clusterName } = await import(
+      `${pathToFileURL(CONSTANTS).href}?f=${randomUUID()}`
+    );
+    await weak.getCluster(clusterName());
+    await weak.getConfig(
+      (await import(`${pathToFileURL(CONSTANTS).href}?f2=${randomUUID()}`)).configName(),
+    );
+
+    const getClusterCalls = calls.filter((c) =>
+      c.url.includes("/workstationClusters/pathcode-gc1-cluster") &&
+      !c.url.includes("workstationConfigs"),
+    );
+    expect(getClusterCalls.length).toBeGreaterThan(0);
+    // Falsified call: no Bearer — this is the intentional defect.
+    for (const c of getClusterCalls) {
+      const authz = c.headers.Authorization || c.headers.authorization;
+      expect(authz).toBeUndefined();
+    }
+    // Honest sibling call still has Bearer — proves only the weakened op is broken.
+    const getConfigCalls = calls.filter((c) => c.url.includes("/workstationConfigs/"));
+    expect(getConfigCalls.length).toBeGreaterThan(0);
+    assertEveryCallHasBearer(getConfigCalls);
+
+    // GC1A-I property on the weakened log must fail for getCluster.
+    const log = weak.getAuthAttachmentLog();
+    const weakened = log.filter((e: { op: string }) => e.op === "getCluster");
+    expect(weakened.some((e: { hasBearer: boolean }) => !e.hasBearer)).toBe(true);
+
+    // Restore: honest transport (no weaken) — source hash unchanged.
+    const afterHash = sha256(GCP);
+    expect(afterHash).toBe(beforeHash);
+
+    const { fetchImpl: fetch2, calls: calls2 } = recordingFetch();
+    const honest = await createGcpWorkstationTransport({
+      skipEnvGate: true,
+      auth: fakeAuth(),
+      fetchImpl: fetch2,
+    });
+    await honest.getCluster(clusterName());
+    assertEveryCallHasBearer(calls2);
+    expect(honest.getAuthAttachmentLog().every((e: { hasBearer: boolean }) => e.hasBearer)).toBe(
+      true,
+    );
+  });
+});
+
 describe("GC1 live-smoke entrypoint gate", () => {
   it("without GC1_LIVE_SMOKE=1 and --confirm-cloud prints prerequisites and exits without GCP", async () => {
     const { spawnSync } = await import("node:child_process");
