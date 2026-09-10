@@ -23,7 +23,7 @@ PHASE GC1-a GOOGLE CLOUD WORKSTATION LIFECYCLE IMPLEMENTED
 | **Branch** | `cursor/phase-gc1a` | Created from the PS1-INLINE IMPLEMENTATION SHA above |
 | **IMPLEMENTATION SHA** | `0485bd71920bfd1939f4ea0c29399bec631ad519` | Initial GC1-a lifecycle engine + GC1A-A…H/P1 |
 | **AUTH-HEADER BUGFIX SHA** | `b4fbf3a95617d8d3599627a0e7d78584683e856d` | Bearer attachment fix + GC1A-I |
-| **EXEC-READY RETRY PATCH SHA** | _(filled after commit)_ | Command-channel poll 6×3s + stdout stream-end + GC1A-J |
+| **EXEC-READY RETRY PATCH SHA** | `fb1f3edd34013e86201a4f71e0b236133c5f6ccd` | Command-channel poll 6×3s + stdout stream-end + GC1A-J |
 | **BRANCH TIP SHA** | `git rev-parse HEAD` on `cursor/phase-gc1a` | Tip after any docs-only commits |
 | **Main** | `d997ae13185013b4312755c38da4cd7099041621` | **Unchanged**. No push. No merge. |
 
