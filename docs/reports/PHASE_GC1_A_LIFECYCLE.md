@@ -21,8 +21,8 @@ PHASE GC1-a GOOGLE CLOUD WORKSTATION LIFECYCLE IMPLEMENTED
 | **PS1-INLINE IMPLEMENTATION SHA (dispatch base)** | `e4e89e9ce9da3edc5e2e2d9db4b28941359019f0` | Banked PS1-INLINE tip used as branch point (`--no-track` fresh worktree) |
 | **Fresh worktree** | `/Users/achahbi/Projects/path-code-worktrees/cursor-phase-gc1a` | One agent per worktree; not a shared tree |
 | **Branch** | `cursor/phase-gc1a` | Created from the PS1-INLINE IMPLEMENTATION SHA above |
-| **IMPLEMENTATION SHA** | _(filled after implementation commit)_ | Lifecycle engine + mock/GCP transports + GC1A-A…H/P1 + this report draft |
-| **BRANCH TIP** | _(filled after tip commit)_ | Tip after SHA-recording docs commit |
+| **IMPLEMENTATION SHA** | `0485bd71920bfd1939f4ea0c29399bec631ad519` | Lifecycle engine + mock/GCP transports + GC1A-A…H/P1 + report |
+| **BRANCH TIP** | `0485bd71920bfd1939f4ea0c29399bec631ad519` | Same as IMPLEMENTATION until tip-recording commit |
 | **Main** | `d997ae13185013b4312755c38da4cd7099041621` | **Unchanged**. No push. No merge. |
 
 ---
