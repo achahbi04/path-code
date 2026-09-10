@@ -32,6 +32,10 @@ export function createMockWorkstationTransport(options = {}) {
     /** First N health-check attempts return exit=0 with empty stdout (agent warm-up). */
     emptyStdoutBeforeSuccess: options.emptyStdoutBeforeSuccess ?? 0,
     executeCommandCount: 0,
+    /** @type {Array<{ stdout?: string, stderr?: string, exitCode?: number }>|null} */
+    scriptedResults: Array.isArray(options.scriptedResults)
+      ? [...options.scriptedResults]
+      : null,
   };
 
   /** @type {Map<string, object>} */
@@ -46,6 +50,12 @@ export function createMockWorkstationTransport(options = {}) {
   let networkCalls = 0;
   let getPolls = new Map();
 
+  /** In-memory remote filesystem for GC1-b hydration tests ($0, no network). */
+  /** @type {Map<string, Buffer>} */
+  const remoteFs = new Map();
+  /** @type {string|null} */
+  let remoteGitSnapshotRoot = null;
+
   function log(op, detail) {
     callLog.push(detail ? `${op}:${detail}` : op);
   }
@@ -57,6 +67,21 @@ export function createMockWorkstationTransport(options = {}) {
   function idFromName(name) {
     const parts = String(name).split("/");
     return parts[parts.length - 1];
+  }
+
+
+  function writeRemoteFs(remotePath, content, encoding = "utf8") {
+    const p = String(remotePath);
+    let buf;
+    if (Buffer.isBuffer(content)) buf = content;
+    else if (encoding === "base64" || encoding === "binaryBase64") {
+      buf = Buffer.from(String(content), "base64");
+    } else {
+      buf = Buffer.from(String(content), encoding || "utf8");
+    }
+    remoteFs.set(p, buf);
+    log("writeRemoteFile", p);
+    return { ok: true, remotePath: p, bytes: buf.length };
   }
 
   return {
@@ -249,9 +274,61 @@ export function createMockWorkstationTransport(options = {}) {
       if (state.commandDelayMs > 0) {
         await new Promise((r) => setTimeout(r, state.commandDelayMs));
       }
+      if (state.scriptedResults) {
+        if (state.scriptedResults.length === 0) {
+          return {
+            stdout: "",
+            stderr: "mock: scripted results exhausted",
+            exitCode: 1,
+          };
+        }
+        const next = state.scriptedResults.shift();
+        return {
+          stdout: next.stdout ?? "",
+          stderr: next.stderr ?? "",
+          exitCode: next.exitCode ?? 0,
+        };
+      }
       if (state.commandFails) {
         return { stdout: "", stderr: "mock command failed", exitCode: 1 };
       }
+
+      // GC1-b: honor `cd '<cwd>' && ...` wrappers from workspace hydrator.
+      let effectiveCwd = null;
+      let effectiveCmd = command;
+      const cdMatch = String(command).match(
+        /^cd\s+(?:'([^']*)'|"([^"]*)")\s+&&\s+([\s\S]*)$/,
+      );
+      if (cdMatch) {
+        effectiveCwd = cdMatch[1] || cdMatch[2];
+        effectiveCmd = cdMatch[3];
+      }
+
+      const trimmed = String(effectiveCmd).trim();
+      if (trimmed === "pwd") {
+        return {
+          stdout: `${effectiveCwd || "/home/user"}\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+
+      // Read a hydrated remote file: `cat '<path>'` or `test -f ...`
+      const catMatch = trimmed.match(/^cat\s+(?:'([^']*)'|"([^"]*)")\s*$/);
+      if (catMatch) {
+        const p = catMatch[1] || catMatch[2];
+        const abs = p.startsWith("/")
+          ? p
+          : effectiveCwd
+            ? `${effectiveCwd.replace(/\/+$/, "")}/${p}`
+            : p;
+        const buf = remoteFs.get(abs);
+        if (!buf) {
+          return { stdout: "", stderr: `cat: ${p}: No such file`, exitCode: 1 };
+        }
+        return { stdout: buf.toString("utf8"), stderr: "", exitCode: 0 };
+      }
+
       const expectedEcho = command.includes("HEALTH_CHECK_OK");
       // Simulate container agent warm-up: connect succeeds (exit=0) but stdout
       // is empty until emptyStdoutBeforeSuccess attempts have elapsed.
@@ -266,6 +343,97 @@ export function createMockWorkstationTransport(options = {}) {
         stderr: "",
         exitCode: 0,
       };
+    },
+
+
+    /**
+     * Write a remote file into the in-memory FS (GC1-b hydrator).
+     * @param {{ remotePath: string, content: string|Buffer, encoding?: string, binaryBase64?: boolean }} opts
+     */
+    async writeRemoteFile(opts) {
+      assertNoNetwork();
+      const encoding = opts.binaryBase64
+        ? "base64"
+        : opts.encoding || "utf8";
+      return writeRemoteFs(opts.remotePath, opts.content, encoding);
+    },
+
+    /**
+     * Upload a text (or base64-as-text) file to the remote FS.
+     * @param {{ remotePath: string, text: string }} opts
+     */
+    async uploadTextFile(opts) {
+      assertNoNetwork();
+      return writeRemoteFs(opts.remotePath, opts.text, "utf8");
+    },
+
+    /**
+     * Expand hydration file payloads under remoteRoot (mock stands in for tar -xzf).
+     * @param {{ remoteRoot: string, files: Array<{ relativePath: string, content: Buffer|string }>, archiveRemotePath?: string }} opts
+     */
+    async materializeHydrationFiles(opts) {
+      assertNoNetwork();
+      const root = String(opts.remoteRoot).replace(/\/+$/, "");
+      log("materializeHydrationFiles", root);
+      for (const f of opts.files || []) {
+        const rel = String(f.relativePath).replace(/^\/+/, "");
+        // Confinement: refuse .. escape
+        if (rel.split("/").includes("..") || rel === ".git" || rel.startsWith(".git/")) {
+          continue;
+        }
+        const remotePath = `${root}/${rel}`;
+        const content = Buffer.isBuffer(f.content)
+          ? f.content
+          : Buffer.from(String(f.content), "utf8");
+        remoteFs.set(remotePath, content);
+      }
+      // Drop any leaked .git pointer file if present in archive staging.
+      remoteFs.delete(`${root}/.git`);
+      return { ok: true, count: (opts.files || []).length };
+    },
+
+    /**
+     * Record that a proper remote git snapshot was initialized (no Mac gitdir).
+     * @param {{ remoteRoot: string, message?: string }} opts
+     */
+    async initRemoteGitSnapshot(opts) {
+      assertNoNetwork();
+      const root = String(opts.remoteRoot).replace(/\/+$/, "");
+      log("initRemoteGitSnapshot", root);
+      remoteGitSnapshotRoot = root;
+      // Represent a real git directory — never a `gitdir:` pointer file.
+      remoteFs.set(
+        `${root}/.git/HEAD`,
+        Buffer.from("ref: refs/heads/main\n", "utf8"),
+      );
+      remoteFs.set(
+        `${root}/.git/gc1-snapshot`,
+        Buffer.from(opts.message || "gc1 hydrate snapshot", "utf8"),
+      );
+      return { ok: true, remoteRoot: root, gitStrategy: "archive-init-snapshot" };
+    },
+
+    readRemoteFile(remotePath) {
+      const buf = remoteFs.get(String(remotePath));
+      return buf ? buf.toString("utf8") : null;
+    },
+
+    listRemoteFiles(prefix = "") {
+      const p = String(prefix);
+      return [...remoteFs.keys()]
+        .filter((k) => !p || k.startsWith(p))
+        .sort();
+    },
+
+    getRemoteGitSnapshotRoot() {
+      return remoteGitSnapshotRoot;
+    },
+
+    hasRemoteGitPointerLeak(remoteRoot) {
+      const root = String(remoteRoot).replace(/\/+$/, "");
+      const pointer = remoteFs.get(`${root}/.git`);
+      if (!pointer) return false;
+      return /gitdir:\s*\/Users\//.test(pointer.toString("utf8"));
     },
 
     // --- test helpers (not part of transport contract) ---

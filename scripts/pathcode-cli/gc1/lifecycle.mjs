@@ -27,6 +27,7 @@ import {
   configName,
   workstationName,
 } from "./constants.mjs";
+import { normalizeRemoteText } from "./remote-exec.mjs";
 
 /**
  * @param {object} options
@@ -138,11 +139,17 @@ export function createWorkstationLifecycleManager(options) {
   }
 
   function stdoutMatchesHealthCheck(stdout) {
-    const text = String(stdout || "").trim();
-    return (
-      text === GC1_HEALTH_CHECK_EXPECTED ||
-      text.split(/\r?\n/).includes(GC1_HEALTH_CHECK_EXPECTED)
-    );
+    return normalizeRemoteText(stdout) === GC1_HEALTH_CHECK_EXPECTED;
+  }
+
+  function stderrIsCleanForSuccess(stderr) {
+    const text = String(stderr ?? "");
+    // Token must never appear on stderr (no stderr-as-stdout shortcut).
+    if (text.includes(GC1_HEALTH_CHECK_EXPECTED)) return false;
+    if (/PERMISSION_DENIED|Permission ['"]workstations\.|CREDENTIALS_MISSING|ERROR:\s/i.test(text)) {
+      return false;
+    }
+    return true;
   }
 
   async function waitUntilRunning(name) {
@@ -326,12 +333,16 @@ export function createWorkstationLifecycleManager(options) {
         command: GC1_HEALTH_CHECK_COMMAND,
       });
       lastExit = result.exitCode;
-      lastStdout = String(result.stdout || "").trim();
+      lastStdout = String(result.stdout || "");
+      const lastStderr = String(result.stderr || "");
+      const normalized = normalizeRemoteText(lastStdout);
 
       const tokenOk = stdoutMatchesHealthCheck(lastStdout);
       const ok = weakenExitOnlyExecutionReady
         ? result.exitCode === 0 // falsification: ignore stdout
-        : result.exitCode === 0 && tokenOk;
+        : result.exitCode === 0 &&
+          tokenOk &&
+          stderrIsCleanForSuccess(lastStderr);
 
       if (ok) {
         return {
@@ -340,11 +351,10 @@ export function createWorkstationLifecycleManager(options) {
           lifecycleReady: true,
           executionReady: true,
           healthCheck: weakenExitOnlyExecutionReady
-            ? lastStdout || GC1_HEALTH_CHECK_EXPECTED
-            : lastStdout.includes(GC1_HEALTH_CHECK_EXPECTED)
-              ? GC1_HEALTH_CHECK_EXPECTED
-              : lastStdout,
+            ? normalized || GC1_HEALTH_CHECK_EXPECTED
+            : GC1_HEALTH_CHECK_EXPECTED,
           executionReadyAttempts: attempts,
+          stderr: lastStderr,
         };
       }
 

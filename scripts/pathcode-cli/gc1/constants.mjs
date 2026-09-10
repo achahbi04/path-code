@@ -25,6 +25,11 @@ export const GC1_COST_FENCES = Object.freeze({
 export const GC1_HEALTH_CHECK_COMMAND = "echo HEALTH_CHECK_OK";
 export const GC1_HEALTH_CHECK_EXPECTED = "HEALTH_CHECK_OK";
 
+export const GC1_SSH_USER = "user";
+/** Local OpenSSH noise lines that may appear on stderr without being remote stderr. */
+export const GC1_LOCAL_SSH_NOISE_RE =
+  /^(Warning: Permanently added |WARNING: This command is using service account impersonation|Picking local unused port |Listening on port )/u;
+
 /**
  * Command-channel readiness poll: VM may be STATE_RUNNING before the
  * container agent has wired stdout. Default window = 6 × 3s = 18s.

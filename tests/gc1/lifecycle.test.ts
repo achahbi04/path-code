@@ -873,6 +873,148 @@ describe("GC1A-I AUTH ATTACHMENT ON EVERY REST CALL ($0 mock fetch)", () => {
   });
 });
 
+describe("GC1A-K I/O CHANNEL PRESERVATION ($0 mock)", () => {
+  const SENTINEL = {
+    stdout: "GC1_STDOUT_SENTINEL\n",
+    stderr: "GC1_STDERR_SENTINEL\n",
+    exitCode: 17,
+  };
+
+  it("preserves stdout/stderr/exit independently for a remote sentinel", async () => {
+    const { createMockWorkstationTransport } = await loadGc1();
+    const transport = createMockWorkstationTransport({
+      scriptedResults: [{ ...SENTINEL }],
+    });
+    const result = await transport.executeCommand({
+      workstationName: "pathcode-gc1-probe",
+      command: "sentinel",
+    });
+    expect(result.stdout).toBe(SENTINEL.stdout);
+    expect(result.stderr).toBe(SENTINEL.stderr);
+    expect(result.exitCode).toBe(17);
+    // Channels remain independent — no merge.
+    expect(result.stdout).not.toContain("GC1_STDERR_SENTINEL");
+    expect(result.stderr).not.toContain("GC1_STDOUT_SENTINEL");
+  });
+
+  it("falsifications: drop/merge/wrong-exit/stderr-token must fail the proof; restore by hash", async () => {
+    const REMOTE_EXEC = join(GC1_DIR, "remote-exec.mjs");
+    const beforeHash = sha256(REMOTE_EXEC);
+    const { createMockWorkstationTransport, createWorkstationLifecycleManager } =
+      await loadGc1();
+
+    const assertPreserved = (r: {
+      stdout: string;
+      stderr: string;
+      exitCode: number;
+    }) => {
+      expect(r.stdout).toBe(SENTINEL.stdout);
+      expect(r.stderr).toBe(SENTINEL.stderr);
+      expect(r.exitCode).toBe(17);
+    };
+
+    // Positive
+    assertPreserved(
+      await createMockWorkstationTransport({
+        scriptedResults: [{ ...SENTINEL }],
+      }).executeCommand({ workstationName: "x", command: "s" }),
+    );
+
+    // Drop stdout
+    await expect(async () => {
+      assertPreserved(
+        await createMockWorkstationTransport({
+          scriptedResults: [{ stdout: "", stderr: SENTINEL.stderr, exitCode: 17 }],
+        }).executeCommand({ workstationName: "x", command: "s" }),
+      );
+    }).rejects.toThrow();
+
+    // Drop stderr
+    await expect(async () => {
+      assertPreserved(
+        await createMockWorkstationTransport({
+          scriptedResults: [{ stdout: SENTINEL.stdout, stderr: "", exitCode: 17 }],
+        }).executeCommand({ workstationName: "x", command: "s" }),
+      );
+    }).rejects.toThrow();
+
+    // Wrong exit
+    await expect(async () => {
+      assertPreserved(
+        await createMockWorkstationTransport({
+          scriptedResults: [
+            { stdout: SENTINEL.stdout, stderr: SENTINEL.stderr, exitCode: 0 },
+          ],
+        }).executeCommand({ workstationName: "x", command: "s" }),
+      );
+    }).rejects.toThrow();
+
+    // Merged channels
+    await expect(async () => {
+      assertPreserved(
+        await createMockWorkstationTransport({
+          scriptedResults: [
+            {
+              stdout: SENTINEL.stdout + SENTINEL.stderr,
+              stderr: "",
+              exitCode: 17,
+            },
+          ],
+        }).executeCommand({ workstationName: "x", command: "s" }),
+      );
+    }).rejects.toThrow();
+
+    // Accept exit=0 ignoring token (readiness falsification already covered);
+    // HEALTH_CHECK_OK sourced from stderr must refuse readiness.
+    const bad = createMockWorkstationTransport({
+      scriptedResults: [
+        { stdout: "", stderr: "HEALTH_CHECK_OK\n", exitCode: 0 },
+      ],
+    });
+    bad.seedCluster();
+    bad.seedConfig();
+    const manager = createWorkstationLifecycleManager({
+      transport: bad,
+      deadlineMs: 5_000,
+      pollIntervalMs: 5,
+      executionReadyAttempts: 2,
+      executionReadyIntervalMs: 1,
+    });
+    await expect(manager.acquireProbeWorkstation()).rejects.toMatchObject({
+      code: "GC1_EXECUTION_NOT_READY",
+    });
+    expect(bad.getWorkstationState("pathcode-gc1-probe")).toBeNull();
+
+    expect(sha256(REMOTE_EXEC)).toBe(beforeHash);
+    expect(sha256(LIFECYCLE)).toBe(sha256(LIFECYCLE)); // touch
+  });
+
+  it("exact stdout HEALTH_CHECK_OK required — not substring / not stderr", async () => {
+    const { createMockWorkstationTransport, createWorkstationLifecycleManager } =
+      await loadGc1();
+    for (const scripted of [
+      [{ stdout: "something HEALTH_CHECK_OK\n", stderr: "", exitCode: 0 }],
+      [{ stdout: "HEALTH_CHECK_OK something\n", stderr: "", exitCode: 0 }],
+      [{ stdout: "", stderr: "HEALTH_CHECK_OK\n", exitCode: 0 }],
+      [{ stdout: "HEALTH_CHECK_OK\n", stderr: "HEALTH_CHECK_OK\n", exitCode: 0 }],
+    ]) {
+      const transport = createMockWorkstationTransport({ scriptedResults: scripted });
+      transport.seedCluster();
+      transport.seedConfig();
+      const manager = createWorkstationLifecycleManager({
+        transport,
+        deadlineMs: 5_000,
+        pollIntervalMs: 5,
+        executionReadyAttempts: 2,
+        executionReadyIntervalMs: 1,
+      });
+      await expect(manager.acquireProbeWorkstation()).rejects.toMatchObject({
+        code: "GC1_EXECUTION_NOT_READY",
+      });
+    }
+  });
+});
+
 describe("GC1 live-smoke entrypoint gate", () => {
   it("without GC1_LIVE_SMOKE=1 and --confirm-cloud prints prerequisites and exits without GCP", async () => {
     const { spawnSync } = await import("node:child_process");

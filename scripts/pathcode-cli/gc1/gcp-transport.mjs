@@ -12,7 +12,6 @@
  * Fetch `Headers` instance into a plain object (that yields `{}` → 401).
  */
 
-import { spawn } from "node:child_process";
 import {
   GC1_CLUSTER,
   GC1_CONFIG,
@@ -30,6 +29,7 @@ import {
   createImpersonatedControlAuth,
   hasBearerAuthorization,
 } from "./auth.mjs";
+import { createTunnelSession } from "./remote-exec.mjs";
 
 /**
  * @param {object} [opts]
@@ -46,6 +46,7 @@ export async function createGcpWorkstationTransport(opts = {}) {
   const auth = opts.auth || (await createImpersonatedControlAuth());
   const fetchImpl = opts.fetchImpl || globalThis.fetch;
   const weakenAuthAttachment = opts.weakenAuthAttachment === true;
+  const tunnelSession = createTunnelSession();
   let networkCalls = 0;
   /** @type {Array<{ op: string, url: string, hasBearer: boolean }>} */
   const authAttachmentLog = [];
@@ -313,20 +314,19 @@ export async function createGcpWorkstationTransport(opts = {}) {
       await pollOperation(op);
     },
 
-    async executeCommand({ workstationName: wsName, command }) {
-      const workstationId = wsName.split("/").pop();
-      const args = [
-        "workstations",
-        "ssh",
-        workstationId,
-        `--project=${GC1_PROJECT_ID}`,
-        `--region=${GC1_REGION}`,
-        `--cluster=${GC1_CLUSTER}`,
-        `--config=${GC1_CONFIG}`,
-        `--command=${command}`,
-      ];
-      const result = await runGcloud(args);
-      return result;
+    async executeCommand({ workstationName: wsName, command, stdin }) {
+      // Control-SA TCP tunnel + OpenSSH — NOT bare `gcloud workstations ssh`
+      // (operator ADC lacks workstations.use; gcloud --command drops exit codes).
+      // Session reuses one tunnel; config/cluster parsed from full resource name.
+      return tunnelSession.execute({
+        workstationName: wsName,
+        command,
+        stdin,
+      });
+    },
+
+    async closeTunnelSession() {
+      await tunnelSession.closeAll();
     },
 
     getDebugStats() {
@@ -344,84 +344,4 @@ export async function createGcpWorkstationTransport(opts = {}) {
       return [...authAttachmentLog];
     },
   };
-}
-
-function runGcloud(args) {
-  return new Promise((resolve) => {
-    const child = spawn("gcloud", args, {
-      env: { ...process.env },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    let stdoutEnded = false;
-    let stderrEnded = false;
-    let closed = false;
-    let exitCode = 1;
-    let settled = false;
-
-    function settle() {
-      if (settled) return;
-      // Await stream end (not a single immediate read) so slow-but-nonempty
-      // stdout is not truncated before pipes finish.
-      if (!(closed && stdoutEnded && stderrEnded)) return;
-      settled = true;
-      resolve({
-        stdout: stdout.replace(/\s+$/u, ""),
-        stderr: stderr.replace(/\s+$/u, ""),
-        exitCode,
-      });
-    }
-
-    child.stdout.on("data", (d) => {
-      stdout += d.toString("utf8");
-    });
-    child.stdout.on("end", () => {
-      stdoutEnded = true;
-      settle();
-    });
-    child.stdout.on("error", () => {
-      stdoutEnded = true;
-      settle();
-    });
-
-    child.stderr.on("data", (d) => {
-      stderr += d.toString("utf8");
-    });
-    child.stderr.on("end", () => {
-      stderrEnded = true;
-      settle();
-    });
-    child.stderr.on("error", () => {
-      stderrEnded = true;
-      settle();
-    });
-
-    child.on("close", (code) => {
-      closed = true;
-      exitCode = code ?? 1;
-      // If a stream never opened, treat it as ended so we do not hang.
-      if (!child.stdout.readableEnded && child.stdout.destroyed) stdoutEnded = true;
-      if (!child.stderr.readableEnded && child.stderr.destroyed) stderrEnded = true;
-      // Node may emit close before end on some platforms — mark ended if
-      // the readable has already finished.
-      if (child.stdout.readableEnded) stdoutEnded = true;
-      if (child.stderr.readableEnded) stderrEnded = true;
-      settle();
-      // Safety: if end events are delayed past close, wait briefly then force.
-      setTimeout(() => {
-        stdoutEnded = true;
-        stderrEnded = true;
-        settle();
-      }, 50).unref?.();
-    });
-    child.on("error", (err) => {
-      settled = true;
-      resolve({
-        stdout: "",
-        stderr: String(err.message || err),
-        exitCode: 1,
-      });
-    });
-  });
 }
