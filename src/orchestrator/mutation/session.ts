@@ -1284,12 +1284,18 @@ export function openEngineeringMutationSession(
 
         const knowledgeInvalidations: KnowledgeInvalidation[] = [];
         let appliedCount = 0;
+        const replaceExistingFileFn =
+          spec.projectWriteEffects?.replaceExistingFile ?? replaceExistingFile;
+        const createFileFn =
+          spec.projectWriteEffects?.createFile ?? createFile;
+        const executeMultiFilePlanFn =
+          spec.projectWriteEffects?.executeMultiFilePlan ?? executeMultiFilePlan;
 
         try {
           if (pairs.length === 1) {
             const pair = pairs[0]!;
             if (pair.prepared.action === "MODIFY_EXISTING_FILE") {
-              const result = await replaceExistingFile(
+              const result = await replaceExistingFileFn(
                 pair.authorization,
                 pair.prepared,
               );
@@ -1362,7 +1368,7 @@ export function openEngineeringMutationSession(
                 );
               }
             } else {
-              const result = await createFile(pair.authorization, pair.prepared);
+              const result = await createFileFn(pair.authorization, pair.prepared);
               if (result.outcome === "SUCCESS") {
                 appliedCount = 1;
                 knowledgeInvalidations.push(result.knowledgeInvalidation);
@@ -1447,7 +1453,7 @@ export function openEngineeringMutationSession(
                 sessionFailure("MUTATION_REFUSED", plan.error.message),
               );
             }
-            const multi = await executeMultiFilePlan(plan.value);
+            const multi = await executeMultiFilePlanFn(plan.value);
             knowledgeInvalidations.push(...multi.knowledgeInvalidations);
             appliedCount = multi.targetOutcomes.filter(
               (t) => t.kind === "APPLIED",
@@ -1555,6 +1561,7 @@ export function openEngineeringMutationSession(
           originalSupport: spec.validationBlueprint.supportingObservations,
           disclosed: spec.disclosedObservations,
           bypassAfterByteCheck: false,
+          authoritativeContentReader: spec.authoritativeContentReader,
         });
         if (!reobs.ok) {
           state.reobservationDisposition = "FAILED";
@@ -1937,6 +1944,7 @@ async function reobserveAfterApply(input: {
   originalSupport: readonly ContentObservation[];
   disclosed: readonly ContentObservation[];
   bypassAfterByteCheck: boolean;
+  authoritativeContentReader?: EngineeringMutationSessionSpec["authoritativeContentReader"];
 }): Promise<
   | {
       ok: true;
@@ -2000,6 +2008,40 @@ async function reobserveAfterApply(input: {
     relativePath: string;
   }[] = [];
 
+  const readAuthoritativeContent = async (
+    entry: RepositoryEntry,
+  ): Promise<
+    | { ok: true; observation: ContentObservation }
+    | { ok: false; message: string }
+  > => {
+    if (input.authoritativeContentReader !== undefined) {
+      const read = await input.authoritativeContentReader(
+        input.workspace,
+        configLoad.value,
+        entry.relativePath,
+      );
+      if (!read.ok) {
+        return {
+          ok: false,
+          message: `failed to re-read '${entry.relativePath}'`,
+        };
+      }
+      return { ok: true, observation: read.value };
+    }
+    const read = await readRepositoryContent(
+      entry,
+      input.workspace,
+      configLoad.value,
+    );
+    if (!read.ok || read.value.status !== "READ") {
+      return {
+        ok: false,
+        message: `failed to re-read '${entry.relativePath}'`,
+      };
+    }
+    return { ok: true, observation: read.value.observation };
+  };
+
   for (let i = 0; i < input.reviewEntry.relativePaths.length; i += 1) {
     const relativePath = input.reviewEntry.relativePaths[i]!;
     const targetId = input.reviewEntry.targetIds[i]!;
@@ -2010,18 +2052,14 @@ async function reobserveAfterApply(input: {
         message: `applied target '${relativePath}' not admitted after write`,
       };
     }
-    const read = await readRepositoryContent(
-      entry,
-      input.workspace,
-      configLoad.value,
-    );
-    if (!read.ok || read.value.status !== "READ") {
+    const read = await readAuthoritativeContent(entry);
+    if (!read.ok) {
       return {
         ok: false,
         message: `failed to re-read applied target '${relativePath}'`,
       };
     }
-    const observation = read.value.observation;
+    const observation = read.observation;
     if (observation.kind !== "TEXT") {
       return {
         ok: false,
@@ -2071,18 +2109,14 @@ async function reobserveAfterApply(input: {
         message: `support input '${original.entry.relativePath}' missing after edit`,
       };
     }
-    const read = await readRepositoryContent(
-      entry,
-      input.workspace,
-      configLoad.value,
-    );
-    if (!read.ok || read.value.status !== "READ") {
+    const read = await readAuthoritativeContent(entry);
+    if (!read.ok) {
       return {
         ok: false,
         message: `support input '${original.entry.relativePath}' unreadable after edit`,
       };
     }
-    const observation = read.value.observation;
+    const observation = read.observation;
     if (
       original.kind === "TEXT" &&
       (observation.kind !== "TEXT" ||

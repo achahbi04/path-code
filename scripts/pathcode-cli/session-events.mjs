@@ -11,6 +11,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { escapeForTerminalDisplay } from "./escape.mjs";
 
 /** @typedef {string} SessionEventType */
 
@@ -38,6 +39,14 @@ export const SESSION_EVENT_TYPES = Object.freeze([
   "session.internal_error",
   // PS1 — liveness only (stage + elapsed). Never progress/ETA/percentage.
   "session.heartbeat",
+  // GC1-c — truthful cloud lifecycle only (emitted from real host transitions).
+  "session.cloud.selected",
+  "session.environment.preparing",
+  "session.hydration",
+  "session.checkpoint.ready",
+  "session.artifacts.saving",
+  "session.cleanup",
+  "session.cleanup.pending",
 ]);
 
 /** Default heartbeat cadence while a stage await is in flight. */
@@ -207,21 +216,24 @@ export function createHeartbeatController(options) {
  */
 export function renderSessionEventHuman(event) {
   const type = event.type;
+  /** Escape every interpolated string so hostile ANSI never reaches the TTY raw. */
+  const s = (value, fallback = "") =>
+    escapeForTerminalDisplay(typeof value === "string" ? value : fallback);
   switch (type) {
     case "session.task.received":
       return "";
     case "session.preflight": {
-      const dirty = typeof event.dirtySummary === "string" ? event.dirtySummary : "unknown";
-      const branch = typeof event.branch === "string" ? event.branch : "(none)";
-      const head = typeof event.head === "string" ? event.head : "(unknown)";
-      return `Checking the working tree… (${branch} @ ${shortOid(head)}; ${dirty})\n`;
+      const dirty = s(event.dirtySummary, "unknown");
+      const branch = s(event.branch, "(none)");
+      const headRaw = typeof event.head === "string" ? event.head : "(unknown)";
+      const head = s(shortOid(headRaw), "(unknown)");
+      return `Checking the working tree… (${branch} @ ${head}; ${dirty})\n`;
     }
     case "session.disclosure":
       return "";
     case "session.authority": {
-      const gate = typeof event.gate === "string" ? event.gate : "authority";
-      const how =
-        typeof event.admission === "string" ? event.admission : "challenge-required";
+      const gate = s(event.gate, "authority");
+      const how = s(event.admission, "challenge-required");
       return `Authority: ${gate} — ${how}\n`;
     }
     case "session.scope.admitted": {
@@ -230,7 +242,9 @@ export function renderSessionEventHuman(event) {
       return `Scope admitted: editable: ${editable} context: ${context}\n`;
     }
     case "session.reading": {
-      const files = Array.isArray(event.files) ? event.files : [];
+      const files = Array.isArray(event.files)
+        ? event.files.map((f) => s(typeof f === "string" ? f : String(f)))
+        : [];
       return files.length > 0
         ? `Reading approved files… (${files.join(", ")})\n`
         : "Reading approved files…\n";
@@ -242,18 +256,47 @@ export function renderSessionEventHuman(event) {
     }
     case "session.gate1": {
       if (event.status === "grounded") return "Gate 1: grounded.\n";
-      return `Gate 1: refused: ${event.code ?? "unknown"}\n`;
+      return `Gate 1: refused: ${s(event.code, "unknown")}\n`;
     }
     case "session.edit.summary": {
-      const path = typeof event.path === "string" ? event.path : "(file)";
-      const kind = typeof event.kind === "string" ? event.kind : "edit";
+      const path = s(event.path, "(file)");
+      const kind = s(event.kind, "edit");
       const before = typeof event.beforeBytes === "number" ? event.beforeBytes : 0;
       const after = typeof event.afterBytes === "number" ? event.afterBytes : 0;
       return `Edit summary: ${path} (${kind}) ${before} → ${after} bytes\n`;
     }
     case "session.recovery.checkpoint": {
-      const id = typeof event.id === "string" ? event.id : "(none)";
+      const id = s(event.id, "(none)");
       return `Recovery checkpoint READY: ${id}\n`;
+    }
+    case "session.checkpoint.ready": {
+      const id = s(event.id, "(none)");
+      return `Recovery checkpoint READY: ${id}\n`;
+    }
+    case "session.cloud.selected": {
+      const config = s(event.config, "cloud");
+      return `Execution: cloud (${config})\n`;
+    }
+    case "session.environment.preparing": {
+      const config = s(event.config, "workstation");
+      return `Preparing cloud environment… (${config})\n`;
+    }
+    case "session.hydration": {
+      const files = typeof event.files === "number" ? event.files : "?";
+      return `Hydrating admitted snapshot… (${files} file(s))\n`;
+    }
+    case "session.artifacts.saving":
+      return "Saving task artifacts…\n";
+    case "session.cleanup":
+      return "Cleaning up workstation…\n";
+    case "session.cleanup.pending": {
+      const id =
+        typeof event.workstationId === "string"
+          ? s(event.workstationId)
+          : typeof event.count === "number"
+            ? `${event.count} resource(s)`
+            : "resource";
+      return `Cleanup pending — reconcile before next cloud task (${id})\n`;
     }
     case "session.applying": {
       const files = Array.isArray(event.files) ? event.files : [];
@@ -268,17 +311,16 @@ export function renderSessionEventHuman(event) {
       return `Validation plan: ${checks.length} check(s)\n`;
     }
     case "session.validation.running": {
-      const check = typeof event.check === "string" ? event.check : "check";
+      const check = s(event.check, "check");
       return `Running admitted validation: ${check}\n`;
     }
     case "session.validation.result": {
-      const check = typeof event.check === "string" ? event.check : "check";
-      const status = typeof event.status === "string" ? event.status : "NOT_ATTEMPTED";
+      const check = s(event.check, "check");
+      const status = s(event.status, "NOT_ATTEMPTED");
       return `Validation result: ${check} — ${status}\n`;
     }
     case "session.validation.skipped": {
-      const reason =
-        typeof event.reason === "string" ? event.reason : "validation not reached";
+      const reason = s(event.reason, "validation not reached");
       return `Validation skipped: ${reason}\n`;
     }
     case "session.gate2": {
@@ -286,23 +328,22 @@ export function renderSessionEventHuman(event) {
       return "Gate 2: not-established.\n";
     }
     case "session.terminal": {
-      const disposition =
-        typeof event.disposition === "string" ? event.disposition : "unknown";
-      const summary = typeof event.summary === "string" ? event.summary : "";
+      const disposition = s(event.disposition, "unknown");
+      const summary = s(event.summary, "");
       return summary
         ? `Session terminal: ${disposition} — ${summary}\n`
         : `Session terminal: ${disposition}\n`;
     }
     case "session.finding": {
-      const severity = typeof event.severity === "string" ? event.severity : "info";
-      const stage = typeof event.stage === "string" ? event.stage : "session";
-      const message = typeof event.message === "string" ? event.message : "";
+      const severity = s(event.severity, "info");
+      const stage = s(event.stage, "session");
+      const message = s(event.message, "");
       return `Finding [${severity}/${stage}]: ${message}\n`;
     }
     case "session.cancelled":
       return "Cycle cancelled.\n";
     case "session.internal_error": {
-      const message = typeof event.message === "string" ? event.message : "internal error";
+      const message = s(event.message, "internal error");
       return `Internal error (session continues): ${message}\n`;
     }
     case "session.heartbeat":

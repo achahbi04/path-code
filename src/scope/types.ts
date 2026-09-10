@@ -29,7 +29,9 @@ export type ScopeFailureCode =
   | "SCOPE_CREATE_PARENT_NOT_ADMITTED"
   | "SCOPE_CREATE_TARGET_EXISTS"
   | "SCOPE_VALIDATION_CANDIDATE_UNKNOWN"
-  | "SCOPE_NO_EDITABLE_TARGET";
+  | "SCOPE_NO_EDITABLE_TARGET"
+  | "SCOPE_HYDRATION_DOES_NOT_COVER_EDITABLE"
+  | "SCOPE_HYDRATION_DOES_NOT_COVER_CONTEXT";
 
 export type ScopeFailure = {
   readonly code: ScopeFailureCode;
@@ -46,6 +48,9 @@ export type ProposedEditableTarget = {
 /**
  * Structurally valid, bounded scope plan reconstructed from untrusted text.
  * Field presence and shape are guaranteed; path meaning is not.
+ *
+ * `hydrationPaths` (H) is optional and additive. When omitted, consumers treat
+ * effective H as E ∪ P ∪ validation-needed for backward compatibility.
  */
 export type EngineeringScopePlan = {
   readonly schemaVersion: typeof ENGINEERING_SCOPE_PLAN_SCHEMA_VERSION;
@@ -55,6 +60,8 @@ export type EngineeringScopePlan = {
   readonly validationCandidateIds: readonly string[];
   readonly assumptions: readonly string[];
   readonly limitations: readonly string[];
+  /** Exact hydration path set (H). Optional; see ApprovedScope.hydrationPaths. */
+  readonly hydrationPaths?: readonly string[];
 };
 
 export type SensitivePathReasonCode =
@@ -112,6 +119,10 @@ export type AdmittedContextPath = {
 /**
  * The approved scope: exactly the paths a human may be asked about, bound to
  * inventory entries that were admitted by the workspace boundary.
+ *
+ * When `hydrationPaths` (H) is omitted, treat effective H as
+ * E ∪ P ∪ validation-needed for backward compatibility with plans that only
+ * declare editable (E) and context (P) sets.
  */
 export type ApprovedScope = {
   readonly taskSummary: string;
@@ -120,4 +131,6 @@ export type ApprovedScope = {
   readonly validationCandidateIds: readonly string[];
   readonly assumptions: readonly string[];
   readonly limitations: readonly string[];
+  /** Admitted hydration paths (H). Present only when the plan supplied H. */
+  readonly hydrationPaths?: readonly AdmittedContextPath[];
 };

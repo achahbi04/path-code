@@ -16,6 +16,9 @@ export const MAX_SCOPE_NOTE_UTF8_BYTES = 512;
 /** Mirrors MAX_MUTATION_TARGETS: the mutation session refuses more than four. */
 export const MAX_SCOPE_EDITABLE_TARGETS = 4;
 export const MAX_SCOPE_CONTEXT_PATHS = 16;
+/** H may cover E ∪ P (and optional extras); bound ≥ E + P ceilings. */
+export const MAX_SCOPE_HYDRATION_PATHS =
+  MAX_SCOPE_EDITABLE_TARGETS + MAX_SCOPE_CONTEXT_PATHS;
 export const MAX_SCOPE_VALIDATION_CANDIDATE_IDS = 8;
 export const MAX_SCOPE_NOTES = 8;
 

@@ -7,6 +7,7 @@ import type { Result } from "../domain/result.js";
 import { failure, success } from "../domain/result.js";
 import { issueLocalProcessResult } from "./evidence.js";
 import { consumeLocalProcessAuthorization } from "./internal/consume-authorization.js";
+import { getBoundProcessObservationRunner } from "./internal/observation-runner.js";
 import { runDetachedProcess } from "./internal/process-host.js";
 import {
   identitiesMatch,
@@ -118,7 +119,7 @@ export async function executeAuthorizedLocalProcess(
     );
   }
 
-  const observation = await runDetachedProcess({
+  const processRequest = {
     executable: prepared.executable,
     argv: prepared.argv,
     cwd: prepared.cwd,
@@ -126,7 +127,11 @@ export async function executeAuthorizedLocalProcess(
     timeoutMs: prepared.timeoutMs,
     maxStdoutBytes: prepared.maxStdoutBytes,
     maxStderrBytes: prepared.maxStderrBytes,
-  });
+  };
+  const boundRunner = getBoundProcessObservationRunner();
+  const observation = await (boundRunner !== null
+    ? boundRunner(processRequest)
+    : runDetachedProcess(processRequest));
 
   return success(
     issueLocalProcessResult({

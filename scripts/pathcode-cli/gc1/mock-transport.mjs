@@ -36,6 +36,11 @@ export function createMockWorkstationTransport(options = {}) {
     scriptedResults: Array.isArray(options.scriptedResults)
       ? [...options.scriptedResults]
       : null,
+    /** @type {object|null} */
+    workerProcessScript: null,
+    workerInstalled: false,
+    /** @type {object[]} */
+    workerRequestLog: [],
   };
 
   /** @type {Map<string, object>} */
@@ -532,6 +537,52 @@ export function createMockWorkstationTransport(options = {}) {
     getWorkstationState(id) {
       const rec = workstations.get(workstationName(id));
       return rec ? rec.state : null;
+    },
+
+    /**
+     * GC1-c: in-process remote worker simulation against remoteFs.
+     * @param {{ workstationName: string, request: object }} opts
+     */
+    async invokeWorkerRequest(opts) {
+      assertNoNetwork();
+      const req = opts.request;
+      state.workerRequestLog.push(structuredClone(req));
+      log("invokeWorkerRequest", req?.op);
+      const { dispatchWorkerRequest } = await import("./remote-worker.mjs");
+      const scripted =
+        state.workerProcessScript != null
+          ? state.workerProcessScript
+          : undefined;
+      if (state.workerProcessScript != null) {
+        state.workerProcessScript = null;
+      }
+      return dispatchWorkerRequest(req, {
+        remoteFs,
+        scriptedProcess: scripted,
+        allowSpawn: options.allowWorkerSpawn === true,
+      });
+    },
+
+    markWorkerInstalled(remotePath) {
+      state.workerInstalled = true;
+      writeRemoteFs(remotePath, "// mock worker installed\n", "utf8");
+    },
+
+    setWorkerProcessScript(script) {
+      state.workerProcessScript = script ? { ...script } : null;
+    },
+
+    getWorkerRequestLog() {
+      return state.workerRequestLog.map((r) => structuredClone(r));
+    },
+
+    clearWorkerRequestLog() {
+      state.workerRequestLog = [];
+    },
+
+    /** Expose remote FS map for GC1-c tests. */
+    getRemoteFs() {
+      return remoteFs;
     },
 
     /** Defaults used by manager when probe does not yet exist. */

@@ -91,6 +91,9 @@ export async function loadTrialOwners(root = resolveCheckoutRoot()) {
     explicitRecoveryApproval: recovery.explicitRecoveryApproval,
     executeRecovery: recovery.executeRecovery,
 
+    // Phase GC1-c — ALS process observation binder for remote validation.
+    runWithProcessObservationRunner: execution.runWithProcessObservationRunner,
+
     // Phase 5G scope contracts. Semantics live in core; the CLI only sequences.
     parseEngineeringScopePlan: scope.parseEngineeringScopePlan,
     admitScopePlan: scope.admitScopePlan,

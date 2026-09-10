@@ -220,6 +220,97 @@ export function admitScopePlan(
     selectedCandidateIds.push(id);
   }
 
+  // When H is omitted, treat effective H as E ∪ P ∪ validation-needed
+  // (backward compatible). When H is provided, admit like context and require
+  // E ⊆ H and P ⊆ H (CREATE_TEXT targets must still appear in H as strings so
+  // the host can hydrate related context; non-file CREATE paths are covered by
+  // the plan string set check before file admission).
+  let hydrationPaths: readonly AdmittedContextPath[] | undefined;
+  if (plan.hydrationPaths !== undefined) {
+    const hydrationPathsAdmitted: AdmittedContextPath[] = [];
+    const hydrationSet = new Set<string>();
+    const seenHydration = new Set<string>();
+
+    for (const raw of plan.hydrationPaths) {
+      const verdict = classifyScopePathSensitivity(raw, policy);
+      if (verdict.sensitive) {
+        return failure(
+          fail(
+            verdict.reasonCode === "PATH_NOT_REPOSITORY_RELATIVE"
+              ? "SCOPE_PATH_NOT_ADMITTED"
+              : "SCOPE_PATH_SENSITIVE",
+            `hydration path '${raw}' refused (${verdict.reasonCode}): ${verdict.detail}`,
+          ),
+        );
+      }
+      const relativePath = verdict.normalizedPath;
+      hydrationSet.add(relativePath);
+      if (seenHydration.has(relativePath)) {
+        continue;
+      }
+      seenHydration.add(relativePath);
+
+      // CREATE targets in H need not exist as files yet; keep them in the
+      // coverage set but only admit existing files onto ApprovedScope.H.
+      if (index.known.has(relativePath) === false) {
+        const isCreateEditable = editableTargets.some(
+          (t) =>
+            t.changeKind === "CREATE_TEXT" && t.relativePath === relativePath,
+        );
+        if (isCreateEditable) {
+          continue;
+        }
+        return failure(
+          fail(
+            "SCOPE_PATH_NOT_ADMITTED",
+            `hydration path '${relativePath}' is not an admitted repository file`,
+          ),
+        );
+      }
+
+      const entry = index.files.get(relativePath);
+      if (entry === undefined) {
+        return failure(
+          fail(
+            index.directories.has(relativePath)
+              ? "SCOPE_PATH_KIND_MISMATCH"
+              : "SCOPE_PATH_NOT_ADMITTED",
+            `hydration path '${relativePath}' is not an admitted repository file`,
+          ),
+        );
+      }
+      hydrationPathsAdmitted.push(Object.freeze({ relativePath, entry }));
+    }
+
+    for (const target of editableTargets) {
+      if (!hydrationSet.has(target.relativePath)) {
+        return failure(
+          fail(
+            "SCOPE_HYDRATION_DOES_NOT_COVER_EDITABLE",
+            `hydration paths do not cover editable target '${target.relativePath}'`,
+          ),
+        );
+      }
+    }
+    for (const raw of plan.contextPaths) {
+      const verdict = classifyScopePathSensitivity(raw, policy);
+      if (verdict.sensitive) {
+        // Already refused above when admitting context; defensive only.
+        continue;
+      }
+      if (!hydrationSet.has(verdict.normalizedPath)) {
+        return failure(
+          fail(
+            "SCOPE_HYDRATION_DOES_NOT_COVER_CONTEXT",
+            `hydration paths do not cover context path '${verdict.normalizedPath}'`,
+          ),
+        );
+      }
+    }
+
+    hydrationPaths = Object.freeze(hydrationPathsAdmitted);
+  }
+
   return success(
     Object.freeze({
       taskSummary: plan.taskSummary,
@@ -228,6 +319,7 @@ export function admitScopePlan(
       validationCandidateIds: Object.freeze(selectedCandidateIds),
       assumptions: plan.assumptions,
       limitations: plan.limitations,
+      ...(hydrationPaths !== undefined ? { hydrationPaths } : {}),
     }),
   );
 }

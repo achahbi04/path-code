@@ -1,5 +1,5 @@
 /**
- * Phase GC1-a — public surface for the Cloud Workstation lifecycle engine.
+ * Phase GC1-a/b/c — public surface for the Cloud Workstation lifecycle engine.
  *
  * Canonical/test code should import mock + lifecycle only.
  * GcpWorkstationTransport is exported for the live-smoke entrypoint exclusively.
@@ -63,3 +63,60 @@ export {
   assertDurableToolchainPathEnv,
   DURABLE_TOOLCHAIN_PATH_PREFIXES,
 } from "./image-contract.mjs";
+
+/** Phase GC1-c — host/application layer. */
+export {
+  GC1C_CONFIG,
+  GC1C_SESSION_BUDGET,
+  GC1C_IMAGE_DIGEST,
+  GC1C_COST_FENCES,
+  GC1C_ERROR,
+} from "./cloud-constants.mjs";
+export {
+  captureTaskSnapshot,
+  materializeTaskWorkspace,
+  verifySnapshotCurrentness,
+  manifestDigest,
+  assertPrimaryUnchanged,
+  writeSnapshotDiffArtifact,
+  normalizeHydrationRelativePath,
+  isCredentialCanaryPath,
+  CREDENTIAL_CANARY_PATH_PATTERNS,
+} from "./task-snapshot.mjs";
+export {
+  REMOTE_WORKER_VERSION,
+  WORKER_REMOTE_DIR,
+  WORKER_REMOTE_PATH,
+  REMOTE_WORKER_SCRIPT_SOURCE,
+  installRemoteWorker,
+  invokeRemoteWorker,
+  dispatchWorkerRequest,
+  toProcessObservation,
+  assertNoCredentialCanaries,
+} from "./remote-worker.mjs";
+export {
+  createCloudEffectsBackend,
+  loadEditingHostDependencies,
+  refuseModelInjection,
+  remapCwd,
+  remapExecutable,
+  remapArgv,
+  remapPathArgument,
+  REMOTE_NODE_EXECUTABLE,
+  REMOTE_NPM_CLI_JS,
+} from "./cloud-effects.mjs";
+export {
+  createTaskJournal,
+  DEFAULT_JOURNAL_ROOT,
+  CLEANUP_PENDING,
+  CLEANUP_VERIFIED,
+} from "./task-journal.mjs";
+export {
+  resolveHydrationPaths,
+  collectValidationSupportPaths,
+  prepareCloudTaskEnvironment,
+  finalizeCloudTask,
+  remapApprovedScopeEntries,
+  remapValidationCandidatesForTaskWorkspace,
+  inventoryEntriesByPath,
+} from "./cloud-session.mjs";

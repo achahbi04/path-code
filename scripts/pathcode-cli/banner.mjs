@@ -106,6 +106,12 @@ Flags:
                           Session consent mode (default: review). review keeps
                           START/SCOPE/APPLY/CHECK; bounded requires one RUN
                           disclosure then host-minted authority inside that envelope.
+  --execution local|cloud
+                          Where admitted project effects run (default: local).
+                          cloud uses pinned GC1 constants (pathcode-gc1b-config-v4
+                          Engineering Image) via a disposable workstation; primary
+                          project bytes are never written. Trusted host config only —
+                          the model cannot select the backend.
   --events ndjson         Emit the structured session event stream as NDJSON
                           (same events the live terminal is driven by)
   --events-out <path>     With --events ndjson: write NDJSON to a named file
@@ -115,6 +121,8 @@ Flags:
 Environment:
   PATHCODE_STATE_DIR   Where recovery checkpoints are stored. Must be outside the
                        project. Defaults to the platform state directory.
+  GC1_LIVE_SMOKE=1     Required (with live transport) for real GCP workstations;
+                       canonical/cloud tests use the mock transport ($0).
 
 A living general engineering session:
   - the prompt stays open across tasks; each task is a fresh authority cycle

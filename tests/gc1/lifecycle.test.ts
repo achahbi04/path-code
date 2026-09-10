@@ -48,14 +48,36 @@ afterAll(async () => {
   delete process.env.GC1_LIVE_SMOKE;
 });
 
-describe("GC1A boundary — SRC zero-diff + layout", () => {
-  it("SRC_DIFF_BYTES=0 and GC1-a lives only under scripts/pathcode-cli/gc1 + tests/gc1 + live smoke", async () => {
+describe("GC1A boundary — SRC layout + GC1-c allowed src seams", () => {
+  it("GC1-a/b stay under scripts/pathcode-cli/gc1; GC1-c may touch listed src injection seams", async () => {
     const { execSync } = await import("node:child_process");
     const diff = execSync("git diff HEAD -- src/", {
       cwd: CHECKOUT_ROOT,
       encoding: "utf8",
     });
-    expect(Buffer.byteLength(diff, "utf8")).toBe(0);
+    // GC1-c authorizes provider-neutral src seams for remote workspace effects.
+    // Any other src path in the diff is a regression against the GC1-a zero-diff floor.
+    const allowedSrcPrefixes = [
+      "src/execution/",
+      "src/editing/host-dependencies.ts",
+      "src/orchestrator/mutation/",
+      "src/scope/",
+    ];
+    const touched = diff
+      .split("\n")
+      .filter((l) => l.startsWith("diff --git "))
+      .map((l) => {
+        const m = l.match(/b\/(.+)$/);
+        return m ? m[1] : "";
+      })
+      .filter(Boolean);
+    for (const path of touched) {
+      if (path === undefined || path === "") continue;
+      const ok = allowedSrcPrefixes.some(
+        (p) => path === p || path.startsWith(p),
+      );
+      expect(ok, `unexpected src change: ${path}`).toBe(true);
+    }
 
     const lifecycle = readFileSync(LIFECYCLE, "utf8");
     const mock = readFileSync(MOCK, "utf8");

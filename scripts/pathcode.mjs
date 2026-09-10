@@ -51,6 +51,7 @@ function parseArgs(argv) {
    *   autonomy: "review" | "bounded",
    *   events: null | "ndjson",
    *   eventsOut: string | null,
+   *   execution: "local" | "cloud",
    *   rest: string[],
    * }} */
   const out = {
@@ -60,6 +61,7 @@ function parseArgs(argv) {
     autonomy: "review",
     events: null,
     eventsOut: null,
+    execution: "local",
     rest: [],
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -116,6 +118,19 @@ function parseArgs(argv) {
         };
       }
       out.eventsOut = next.trim();
+      i += 1;
+      continue;
+    }
+    if (a === "--execution") {
+      const next = argv[i + 1];
+      if (typeof next !== "string" || next.trim() === "" || next.startsWith("-")) {
+        return { ok: false, message: "Usage: pathcode --execution local|cloud" };
+      }
+      const mode = next.trim().toLowerCase();
+      if (mode !== "local" && mode !== "cloud") {
+        return { ok: false, message: "Usage: pathcode --execution local|cloud" };
+      }
+      out.execution = mode;
       i += 1;
       continue;
     }
@@ -497,6 +512,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
             autonomyMode,
             unicode,
             checkoutRoot: root,
+            executionMode: args.execution,
             credential: sessionCredential,
             onCredentialAcquired: (credential) => {
               if (typeof credential === "string" && credential.length > 0) {

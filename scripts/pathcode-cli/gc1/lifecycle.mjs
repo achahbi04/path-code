@@ -39,12 +39,20 @@ import { normalizeRemoteText } from "./remote-exec.mjs";
  * @param {boolean} [options.weakenReadinessGate] P1 falsification only — MUST be false in production
  * @param {boolean} [options.weakenExitOnlyExecutionReady] falsification: accept exit=0 ignoring stdout
  * @param {NodeJS.Process} [options.proc] process for signal handlers (tests inject)
+ * @param {{ hasCleanupPending?: () => boolean, listCleanupPending?: () => object[] }} [options.journal]
+ *   GC1-c: CLEANUP_PENDING blocks another billable acquire.
+ * @param {number} [options.sessionBudget] GC1-c live session budget (default unlimited for GC1-a tests)
  */
 export function createWorkstationLifecycleManager(options) {
   const transport = options.transport;
   if (!transport) {
     throw new Error("WorkstationLifecycleManager requires a transport");
   }
+
+  const journal = options.journal ?? null;
+  const sessionBudget =
+    typeof options.sessionBudget === "number" ? options.sessionBudget : null;
+  let acquireCount = 0;
 
   const deadlineMs = options.deadlineMs ?? GC1_DEFAULT_DEADLINE_MS;
   const pollIntervalMs = options.pollIntervalMs ?? 25;
@@ -375,9 +383,32 @@ export function createWorkstationLifecycleManager(options) {
   /**
    * Dual-stage acquire: lifecycle-ready AND execution-ready.
    * With weakenReadinessGate (P1 only), returns after lifecycle-ready alone.
+   * GC1-c: refuses when journal reports CLEANUP_PENDING or session budget exhausted.
    */
   async function acquireProbeWorkstation() {
+    if (journal && typeof journal.hasCleanupPending === "function") {
+      if (journal.hasCleanupPending()) {
+        const pending =
+          typeof journal.listCleanupPending === "function"
+            ? journal.listCleanupPending()
+            : [];
+        const err = new Error(
+          `GC1C_CLEANUP_PENDING: refusing billable acquire while ${pending.length} cleanup(s) pending`,
+        );
+        err.code = "GC1C_CLEANUP_PENDING";
+        err.pending = pending;
+        throw err;
+      }
+    }
+    if (sessionBudget != null && acquireCount >= sessionBudget) {
+      const err = new Error(
+        `GC1C_SESSION_BUDGET_EXHAUSTED: acquire budget ${sessionBudget} exhausted`,
+      );
+      err.code = "GC1C_SESSION_BUDGET_EXHAUSTED";
+      throw err;
+    }
     const lifecycle = await startProbeWorkstation();
+    acquireCount += 1;
     if (weakenReadinessGate) {
       // P1 falsification: skip execution-ready — caller receives a not-actually-executable station.
       return { ...lifecycle, executionReady: false, weakened: true };

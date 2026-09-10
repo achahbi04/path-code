@@ -39,6 +39,7 @@ export {
 } from "./session.js";
 
 export type {
+  AuthoritativeContentReader,
   CreateTextTargetSpec,
   EngineeringMutationSession,
   EngineeringMutationSessionSpec,
@@ -61,6 +62,7 @@ export type {
   MutationValidationReviewView,
   OpenMutationSessionResult,
   PreparedAuthorizationPair,
+  ProjectWriteEffects,
   ReobservationDisposition,
   ReplaceTextTargetSpec,
   ValidationBlueprint,

@@ -13,6 +13,7 @@ import {
   ENGINEERING_SCOPE_PLAN_SCHEMA_VERSION,
   MAX_SCOPE_CONTEXT_PATHS,
   MAX_SCOPE_EDITABLE_TARGETS,
+  MAX_SCOPE_HYDRATION_PATHS,
   MAX_SCOPE_NOTE_UTF8_BYTES,
   MAX_SCOPE_NOTES,
   MAX_SCOPE_PLAN_UTF8_BYTES,
@@ -32,7 +33,8 @@ import type {
 
 const OWN = Object.prototype.hasOwnProperty;
 
-const ROOT_KEYS = new Set([
+/** Required root fields — every plan must carry these. */
+const REQUIRED_ROOT_KEYS = [
   "schemaVersion",
   "taskSummary",
   "editableTargets",
@@ -40,7 +42,10 @@ const ROOT_KEYS = new Set([
   "validationCandidateIds",
   "assumptions",
   "limitations",
-]);
+] as const;
+
+/** Allowed root fields = required + optional additive fields (e.g. H). */
+const ROOT_KEYS = new Set<string>([...REQUIRED_ROOT_KEYS, "hydrationPaths"]);
 
 const TARGET_KEYS = new Set(["relativePath", "changeKind", "reason"]);
 
@@ -244,7 +249,7 @@ export function parseEngineeringScopePlan(
       );
     }
   }
-  for (const required of ROOT_KEYS) {
+  for (const required of REQUIRED_ROOT_KEYS) {
     if (!OWN.call(decoded, required)) {
       return failure(
         fail("SCOPE_PLAN_MISSING_FIELD", `scope plan is missing '${required}'`),
@@ -385,6 +390,29 @@ export function parseEngineeringScopePlan(
     return limitations;
   }
 
+  let hydrationPaths: readonly string[] | undefined;
+  if (OWN.call(decoded, "hydrationPaths")) {
+    const parsedHydration = parseBoundedStringArray(
+      decoded.hydrationPaths,
+      "hydrationPaths",
+      MAX_SCOPE_HYDRATION_PATHS,
+      MAX_SCOPE_RELATIVE_PATH_UTF8_BYTES,
+    );
+    if (!parsedHydration.ok) {
+      return parsedHydration;
+    }
+    const seenHydration = new Set<string>();
+    for (const path of parsedHydration.value) {
+      if (seenHydration.has(path)) {
+        return failure(
+          fail("SCOPE_PLAN_DUPLICATE_PATH", `hydrationPaths repeats '${path}'`),
+        );
+      }
+      seenHydration.add(path);
+    }
+    hydrationPaths = parsedHydration.value;
+  }
+
   return success(
     Object.freeze({
       schemaVersion: ENGINEERING_SCOPE_PLAN_SCHEMA_VERSION,
@@ -394,6 +422,7 @@ export function parseEngineeringScopePlan(
       validationCandidateIds: candidateIds.value,
       assumptions: assumptions.value,
       limitations: limitations.value,
+      ...(hydrationPaths !== undefined ? { hydrationPaths } : {}),
     }),
   );
 }

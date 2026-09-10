@@ -3,6 +3,8 @@
  */
 
 import type { EngineeringBrain, BrainContextBlock, BrainInvocationReceipt } from "../../brain/types.js";
+import type { ResolvedProjectConfig } from "../../config/types.js";
+import type { Result } from "../../domain/result.js";
 import type { WorkspaceBoundary } from "../../domain/workspace.js";
 import type {
   EditAuthorization,
@@ -13,7 +15,11 @@ import type {
 } from "../../editing/types.js";
 import type { MultiFilePlanResult } from "../../editing/multi-file-types.js";
 import type { RepositoryEntry } from "../../inventory/types.js";
-import type { ContentObservation } from "../../reader/types.js";
+import type { ReaderFailure } from "../../reader/failure.js";
+import type {
+  ContentObservation,
+  ReaderOptions,
+} from "../../reader/types.js";
 import type {
   RecoveryProtectionMode,
   RecoveryStore,
@@ -33,6 +39,28 @@ import type {
   MutationSessionConfigurationFailure,
   MutationSessionFailure,
 } from "./failures.js";
+
+/**
+ * Optional host-supplied project-write effects for remote workspaces.
+ * Signatures match the public editing barrel functions; omitted fields fall
+ * back to production local FS implementations.
+ */
+export type ProjectWriteEffects = {
+  readonly replaceExistingFile: typeof import("../../editing/replace-existing-file.js").replaceExistingFile;
+  readonly createFile: typeof import("../../editing/create-file.js").createFile;
+  readonly executeMultiFilePlan?: typeof import("../../editing/multi-file-execute.js").executeMultiFilePlan;
+};
+
+/**
+ * Optional host-supplied authoritative content reader for post-apply
+ * re-observation against a remote workspace.
+ */
+export type AuthoritativeContentReader = (
+  workspace: WorkspaceBoundary,
+  config: ResolvedProjectConfig,
+  relativePath: string,
+  options?: ReaderOptions,
+) => Promise<Result<ContentObservation, ReaderFailure>>;
 
 export type MutationTargetKind = "REPLACE_TEXT" | "CREATE_TEXT";
 
@@ -135,6 +163,17 @@ export type EngineeringMutationSessionSpec = {
    * ask for less than the composition already allows, never more.
    */
   readonly editOutputTokenBudget?: number;
+  /**
+   * When set, `apply` uses these callbacks instead of the production
+   * `replaceExistingFile` / `createFile` / `executeMultiFilePlan`. Local
+   * default behavior is unchanged when omitted.
+   */
+  readonly projectWriteEffects?: ProjectWriteEffects;
+  /**
+   * When set, post-apply re-observation uses this reader instead of
+   * `readRepositoryContent`. Local default behavior is unchanged when omitted.
+   */
+  readonly authoritativeContentReader?: AuthoritativeContentReader;
 };
 
 export type MutationControlPhase =

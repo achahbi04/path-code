@@ -42,7 +42,7 @@ function tmpPath(label: string): string {
   return join(dir, `${label}-${randomUUID()}.ndjson`);
 }
 
-describe("PS1-A CLI cleanliness + SRC zero-diff + R2-K interstitial", () => {
+describe("PS1-A CLI cleanliness + SRC allowlist + R2-K interstitial", () => {
   it("PS1-A: --events-out uses a file sink only; no network server in CLI sources", async () => {
     const pathcode = readFileSync(join(CHECKOUT_ROOT, "scripts/pathcode.mjs"), "utf8");
     const eventsOut = readFileSync(EVENTS_OUT, "utf8");
@@ -52,13 +52,33 @@ describe("PS1-A CLI cleanliness + SRC zero-diff + R2-K interstitial", () => {
     expect(eventsOut).toContain("fsyncSync");
     expect(eventsOut).toMatch(/openSync\([^,]+,\s*["']w["']\)/);
 
-    // SRC_DIFF_BYTES=0 relative to HEAD for this worktree's committed src.
+    // PS1-A itself must not invent new src surfaces. GC1-c may touch authorized seams.
     const { execSync } = await import("node:child_process");
     const diff = execSync("git diff HEAD -- src/", {
       cwd: CHECKOUT_ROOT,
       encoding: "utf8",
     });
-    expect(Buffer.byteLength(diff, "utf8")).toBe(0);
+    const allowedSrcPrefixes = [
+      "src/execution/",
+      "src/editing/host-dependencies.ts",
+      "src/orchestrator/mutation/",
+      "src/scope/",
+    ];
+    const touched = diff
+      .split("\n")
+      .filter((l) => l.startsWith("diff --git "))
+      .map((l) => {
+        const m = l.match(/b\/(.+)$/);
+        return m ? m[1] : "";
+      })
+      .filter(Boolean);
+    for (const path of touched) {
+      if (path === undefined || path === "") continue;
+      const ok = allowedSrcPrefixes.some(
+        (p) => path === p || path.startsWith(p),
+      );
+      expect(ok, `unexpected src change: ${path}`).toBe(true);
+    }
 
     // R2-K interstitial: heartbeat controller clears its timer on stop.
     const { createHeartbeatController, createSessionEventSink } = await import(

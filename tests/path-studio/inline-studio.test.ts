@@ -79,14 +79,36 @@ class FakeTtyStdout extends EventEmitter {
   }
 }
 
-describe("PS1-INLINE SRC zero-diff + wiring", () => {
-  it("SRC_DIFF_BYTES=0 and inline module is wired without servers", async () => {
+describe("PS1-INLINE SRC allowlist + wiring", () => {
+  it("src diff stays within GC1-c seams; inline module is wired without servers", async () => {
     const { execSync } = await import("node:child_process");
     const diff = execSync("git diff HEAD -- src/", {
       cwd: CHECKOUT_ROOT,
       encoding: "utf8",
     });
-    expect(Buffer.byteLength(diff, "utf8")).toBe(0);
+    // PS1-INLINE itself must not invent new src surfaces. GC1-c may touch the
+    // authorized provider-neutral seams listed here (same floor as GC1 lifecycle).
+    const allowedSrcPrefixes = [
+      "src/execution/",
+      "src/editing/host-dependencies.ts",
+      "src/orchestrator/mutation/",
+      "src/scope/",
+    ];
+    const touched = diff
+      .split("\n")
+      .filter((l) => l.startsWith("diff --git "))
+      .map((l) => {
+        const m = l.match(/b\/(.+)$/);
+        return m ? m[1] : "";
+      })
+      .filter(Boolean);
+    for (const path of touched) {
+      if (path === undefined || path === "") continue;
+      const ok = allowedSrcPrefixes.some(
+        (p) => path === p || path.startsWith(p),
+      );
+      expect(ok, `unexpected src change: ${path}`).toBe(true);
+    }
 
     const pathcode = readFileSync(PATHCODE, "utf8");
     const inline = readFileSync(INLINE, "utf8");

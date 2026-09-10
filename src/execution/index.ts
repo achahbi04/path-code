@@ -29,6 +29,8 @@ export {
 
 export { executeAuthorizedLocalProcess } from "./execute.js";
 
+export { runWithProcessObservationRunner } from "./internal/observation-runner.js";
+
 export {
   DISABLE_ACTION_FOR_EXECUTE_PROCESS,
   isExecuteProcessDisabled,

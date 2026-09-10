@@ -74,6 +74,14 @@ import {
   selectPlannedChecks,
 } from "./validation-candidates.mjs";
 import { createHeartbeatController } from "./session-events.mjs";
+import {
+  prepareCloudTaskEnvironment,
+  finalizeCloudTask,
+  loadEditingHostDependencies,
+  remapApprovedScopeEntries,
+  remapValidationCandidatesForTaskWorkspace,
+  GC1C_CONFIG,
+} from "./gc1/cloud-session.mjs";
 
 /**
  * Recovery protection for a General Engineering Session.
@@ -173,12 +181,18 @@ export function validateTaskText(taskText) {
  *   storeRoot: string, stateSource: string, workingTree: any, candidates: Array<any>, planned: Array<any> }} input
  */
 export function renderStartDisclosure(input) {
+  const executionMode = input.executionMode === "cloud" ? "cloud" : "local";
   const lines = [
     "",
     `${COMPACT_NAME} — General Engineering Session`,
     "",
     `  Project:      ${input.projectRoot}`,
     `  Branch:       ${input.gitBranch ?? "(none)"} @ ${input.headOid ?? "(unborn)"}`,
+    `  Execution:    ${executionMode}${
+      executionMode === "cloud"
+        ? ` (pinned ${input.cloudConfig ?? GC1C_CONFIG}; primary tree is never written)`
+        : ""
+    }`,
     `  Provider:     openai`,
     `  Model:        ${input.modelId}`,
     `  Model calls:  at most ${GENERAL_SESSION_MAX_PROVIDER_INVOCATIONS} (scope, edit, post-edit evidence); no automatic retries`,
@@ -190,6 +204,14 @@ export function renderStartDisclosure(input) {
     `  Checks:       only the commands listed below, after a separate approval`,
     `  Permissions:  approved checks run with your ordinary OS permissions`,
   ];
+  if (executionMode === "cloud") {
+    lines.push(
+      "  Cloud note:   admitted project effects run on a disposable Engineering Workstation;",
+    );
+    lines.push(
+      "                local primary bytes for H stay unchanged; delivery is an inspectable artifact.",
+    );
+  }
   if (input.workingTree.clean) {
     lines.push("  Working tree: clean");
   } else {
@@ -698,6 +720,15 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
   const autonomyMode = autonomyParsed.mode;
   const isBounded = autonomyMode === "bounded";
+  const executionMode =
+    options.executionMode === "cloud" ? "cloud" : "local";
+
+  /** @type {null | object} */
+  let cloudCtx = null;
+
+  if (executionMode === "cloud") {
+    emit("session.cloud.selected", { config: GC1C_CONFIG });
+  }
 
   const task = validateTaskText(options.taskText);
   if (!task.ok) {
@@ -877,6 +908,8 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
         workingTree: preflight.workingTree,
         candidates: discovery.candidates,
         planned: selection.planned,
+        executionMode,
+        cloudConfig: GC1C_CONFIG,
       }),
     );
     prompt.write(`\nYour task:\n${prefixUntrustedLines(task.taskText)}\n`);
@@ -995,7 +1028,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     ownsBrain = true;
   }
 
-  const finish = (result) => {
+  const finish = async (result) => {
     heartbeat.stop();
     if (ownsBrain) {
       brain.dispose();
@@ -1004,16 +1037,37 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
       modelCalls: 0,
       ...result,
       autonomyMode,
+      executionMode,
     };
+    // Always await cloud finalize when a cloud context exists — primary check +
+    // cleanup must complete before the cycle returns (no fire-and-forget).
+    if (cloudCtx) {
+      const finalized = await finalizeCloudTask(
+        {
+          ...cloudCtx,
+          primaryRoot: preflight.projectRoot,
+          emit,
+          options,
+        },
+        { disposition: result.outcome },
+      );
+      withCalls.cloudFinalize = finalized;
+      if (!finalized.ok) {
+        withCalls.primaryCheckFailed = true;
+        withCalls.outcome = finalized.code ?? "PRIMARY_MUTATED";
+        withCalls.exitCode = 1;
+        withCalls.staleDetail = finalized.message ?? withCalls.staleDetail;
+      }
+    }
     emit("session.terminal", {
-      disposition: result.outcome ?? "UNKNOWN",
+      disposition: withCalls.outcome ?? "UNKNOWN",
       summary:
-        typeof result.staleDetail === "string"
-          ? result.staleDetail
-          : typeof result.escalationReason === "string"
-            ? result.escalationReason
-            : String(result.outcome ?? "unknown"),
-      ...(result.checkpointId ? { checkpointId: result.checkpointId } : {}),
+        typeof withCalls.staleDetail === "string"
+          ? withCalls.staleDetail
+          : typeof withCalls.escalationReason === "string"
+            ? withCalls.escalationReason
+            : String(withCalls.outcome ?? "unknown"),
+      ...(withCalls.checkpointId ? { checkpointId: withCalls.checkpointId } : {}),
     });
     return withCalls;
   };
@@ -1069,7 +1123,8 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     prompt.write(`Scope plan refused: ${admitted.error.code} — ${admitted.error.message}\n`);
     return finish({ exitCode: 1, outcome: admitted.error.code });
   }
-  const approved = admitted.value;
+  /** @type {any} */
+  let approved = admitted.value;
 
   if (isBounded) {
     const scopePolicy = evaluateScopeAgainstPolicy(boundedPolicy, approved);
@@ -1142,17 +1197,108 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     });
   }
 
+  // ── GC1-c cloud drive: after scope admission, snapshot H and switch to
+  //      PATH-owned task workspace + remote effects. Local path unchanged. ──
+  /** @type {any} */
+  let activeWorkspace = preflight.workspace;
+  /** @type {any} */
+  let activeInventory = preflight.inventory;
+  /** @type {any} */
+  let activeConfig = preflight.config;
+  /** @type {null | ((req: any) => Promise<any>)} */
+  let cloudProcessRunner = null;
+  /** @type {null | object} */
+  let cloudWriteEffects = null;
+  /** @type {null | Function} */
+  let cloudAuthoritativeReader = null;
+
+  if (executionMode === "cloud") {
+    progress("Preparing cloud environment…\n");
+    const prepared = await prepareCloudTaskEnvironment({
+      owners,
+      primaryRoot: preflight.projectRoot,
+      approved,
+      inventory: preflight.inventory,
+      emit,
+      prompt,
+      options: {
+        cloudTransport: options.cloudTransport,
+        cloudLifecycle: options.cloudLifecycle,
+        skipLiveGcp: options.skipLiveGcp !== false,
+        taskWorkspaceRoot: options.taskWorkspaceRoot,
+        journalRoot: options.journalRoot,
+        scriptedProcessResults: options.scriptedProcessResults,
+        remoteRoot: options.remoteRoot,
+        deadlineMs: options.cloudDeadlineMs,
+      },
+    });
+    if (!prepared.ok) {
+      prompt.write(`Cloud preparation refused: ${prepared.code} — ${prepared.message}\n`);
+      return finish({ exitCode: 1, outcome: prepared.code, modelCalls: 1 });
+    }
+    cloudCtx = prepared;
+    activeWorkspace = prepared.workspace;
+    activeInventory = prepared.inventory;
+    if (prepared.config) activeConfig = prepared.config;
+    try {
+      approved = remapApprovedScopeEntries(approved, activeInventory);
+    } catch (e) {
+      prompt.write(`Cloud inventory remap refused: ${e.code} — ${e.message}\n`);
+      return finish({ exitCode: 1, outcome: e.code || "TASK_INVENTORY_GAP", modelCalls: 1 });
+    }
+    cloudProcessRunner = prepared.cloudBackend.createProcessObservationRunner();
+    try {
+      const hostDeps = await loadEditingHostDependencies(
+        options.checkoutRoot ?? owners.root,
+      );
+      // Prefer public editing entrypoints when present on dist editing barrel.
+      const editingHref = await import(
+        new URL("../../dist/editing/index.js", import.meta.url).href
+      ).catch(() => null);
+      cloudWriteEffects = prepared.cloudBackend.createProjectWriteEffects({
+        ...(editingHref ?? {}),
+        ...hostDeps,
+      });
+    } catch (e) {
+      // Fallback: publish-only wrappers unavailable — still bind process runner.
+      prompt.write(
+        `Cloud write-effects host deps unavailable (${e.message}); continuing with process runner only.\n`,
+      );
+    }
+    // Re-observation must use inventory entries from the post-write task
+    // workspace (session default reader). A custom authoritative reader that
+    // reuses pre-write entry object identity fails snapshot membership checks.
+    // Remote publish is confirmed by projectWriteEffects; local task bytes are
+    // the re-observation surface.
+    cloudAuthoritativeReader = null;
+    // Re-bind config against task workspace.
+    const cfg = await owners.loadProjectConfig(activeWorkspace);
+    if (cfg.ok) activeConfig = cfg.value;
+  }
+
   // ── 7. Recheck currentness, then read ONLY the approved paths. ───────────
-  const scopeRecheck = await recheckScopeCurrentness(owners, {
-    workspace: preflight.workspace,
-    config: preflight.config,
-    inventory: preflight.inventory,
-    expectedGitPosition: preflight.gitPosition,
-    expectedFingerprints: scopeFingerprints.fingerprints,
-  });
-  if (!scopeRecheck.ok) {
-    prompt.write(`Refusing after scope approval: ${scopeRecheck.code} — ${scopeRecheck.detail}\n`);
-    return finish({ exitCode: 1, outcome: scopeRecheck.code });
+  if (executionMode !== "cloud") {
+    const scopeRecheck = await recheckScopeCurrentness(owners, {
+      workspace: activeWorkspace,
+      config: activeConfig,
+      inventory: activeInventory,
+      expectedGitPosition: preflight.gitPosition,
+      expectedFingerprints: scopeFingerprints.fingerprints,
+    });
+    if (!scopeRecheck.ok) {
+      prompt.write(`Refusing after scope approval: ${scopeRecheck.code} — ${scopeRecheck.detail}\n`);
+      return finish({ exitCode: 1, outcome: scopeRecheck.code });
+    }
+  } else if (cloudCtx?.snapshot) {
+    const { verifySnapshotCurrentness } = await import("./gc1/task-snapshot.mjs");
+    const cur = verifySnapshotCurrentness(
+      cloudCtx.taskWorkspaceRoot,
+      cloudCtx.snapshot,
+    );
+    if (!cur.ok) {
+      prompt.write(`Refusing after cloud hydration: drift — ${cur.detail}\n`);
+      return finish({ exitCode: 1, outcome: "SNAPSHOT_DRIFT" });
+    }
   }
 
   progress(
@@ -1166,9 +1312,9 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   });
   heartbeat.begin("reading");
   const context = await earnApprovedScopeContext(owners, {
-    workspace: preflight.workspace,
-    config: preflight.config,
-    inventory: preflight.inventory,
+    workspace: activeWorkspace,
+    config: activeConfig,
+    inventory: activeInventory,
     approved,
   });
   heartbeat.stop();
@@ -1181,8 +1327,14 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     discovery.candidates,
     approved.validationCandidateIds,
   );
-  const plannedChecks =
+  let plannedChecks =
     scopedSelection.planned.length > 0 ? scopedSelection.planned : selection.planned;
+  if (executionMode === "cloud" && cloudCtx?.taskWorkspaceRoot) {
+    plannedChecks = remapValidationCandidatesForTaskWorkspace(plannedChecks, {
+      primaryRoot: preflight.projectRoot,
+      taskWorkspaceRoot: cloudCtx.taskWorkspaceRoot,
+    });
+  }
 
   // ── §C. The recovery store. A General Session that cannot checkpoint does
   //      not open at all. ────────────────────────────────────────────────────
@@ -1198,7 +1350,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
 
   const sessionOpen = owners.openEngineeringMutationSession({
-    workspace: preflight.workspace,
+    workspace: activeWorkspace,
     snapshot: context.snapshot,
     catalog: context.catalog,
     brain,
@@ -1212,6 +1364,10 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     // §C: a literal. There is no option, no variable and no downgrade path.
     recoveryProtection: GENERAL_SESSION_RECOVERY_PROTECTION,
     recoveryStore: storeResult.value,
+    ...(cloudWriteEffects ? { projectWriteEffects: cloudWriteEffects } : {}),
+    ...(cloudAuthoritativeReader
+      ? { authoritativeContentReader: cloudAuthoritativeReader }
+      : {}),
   });
   if (!sessionOpen.ok) {
     owners.disposeReferenceCatalog(context.catalog);
@@ -1222,7 +1378,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
   const session = sessionOpen.value;
 
-  const closeSession = (result) => {
+  const closeSession = async (result) => {
     session.close();
     owners.disposeReferenceCatalog(context.catalog);
     return finish(result);
@@ -1352,21 +1508,39 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   //      and refuses if they no longer match this prepared pre-state.
   progress("Rechecking the working tree before writing…\n");
   const currentness = await verifyFinalCurrentness(owners, {
-    projectRoot: preflight.projectRoot,
-    expectedGitPosition: preflight.gitPosition,
+    projectRoot:
+      executionMode === "cloud" && cloudCtx
+        ? cloudCtx.taskWorkspaceRoot
+        : preflight.projectRoot,
+    expectedGitPosition:
+      executionMode === "cloud" && cloudCtx
+        ? {
+            ...preflight.gitPosition,
+            root: cloudCtx.taskWorkspaceRoot,
+          }
+        : preflight.gitPosition,
     order: review.view.order,
   });
   if (!currentness.ok) {
-    prompt.write(`\nMUTATION_STALE — ${currentness.detail}\n`);
-    prompt.write(
-      "Zero files were written. Re-run the task so the review matches what is on disk.\n",
-    );
-    return closeSession({
-      exitCode: 1,
-      outcome: "MUTATION_STALE",
-      modelCalls: 2,
-      staleDetail: currentness.detail,
-    });
+    // Cloud: git root differs by design — if only GIT_POSITION root mismatch, allow
+    // when snapshot hashes still match (task workspace is the write surface).
+    const cloudTolerated =
+      executionMode === "cloud" &&
+      cloudCtx &&
+      currentness.code === "GIT_POSITION_CHANGED" &&
+      /Git root changed/.test(String(currentness.detail ?? ""));
+    if (!cloudTolerated) {
+      prompt.write(`\nMUTATION_STALE — ${currentness.detail}\n`);
+      prompt.write(
+        "Zero files were written. Re-run the task so the review matches what is on disk.\n",
+      );
+      return closeSession({
+        exitCode: 1,
+        outcome: "MUTATION_STALE",
+        modelCalls: 2,
+        staleDetail: currentness.detail,
+      });
+    }
   }
 
   /** @type {any[]} */
@@ -1419,6 +1593,7 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   }
   const validationReview = applied.value;
   emit("session.recovery.checkpoint", { id: checkpointId, status: "READY" });
+  emit("session.checkpoint.ready", { id: checkpointId, status: "READY" });
   emit("session.reobserved", {});
 
   if (isBounded) {
@@ -1540,7 +1715,12 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     purpose: "post-edit-evidence",
   });
   heartbeat.begin("validation");
-  const outcome = await session.validate(validationReview, validationAuth.value);
+  const outcome =
+    cloudProcessRunner && typeof owners.runWithProcessObservationRunner === "function"
+      ? await owners.runWithProcessObservationRunner(cloudProcessRunner, () =>
+          session.validate(validationReview, validationAuth.value),
+        )
+      : await session.validate(validationReview, validationAuth.value);
   heartbeat.stop();
   session.close();
   owners.disposeReferenceCatalog(validationReview.view.postEditCatalog);
