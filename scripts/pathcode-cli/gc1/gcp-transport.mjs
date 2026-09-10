@@ -354,16 +354,69 @@ function runGcloud(args) {
     });
     let stdout = "";
     let stderr = "";
+    let stdoutEnded = false;
+    let stderrEnded = false;
+    let closed = false;
+    let exitCode = 1;
+    let settled = false;
+
+    function settle() {
+      if (settled) return;
+      // Await stream end (not a single immediate read) so slow-but-nonempty
+      // stdout is not truncated before pipes finish.
+      if (!(closed && stdoutEnded && stderrEnded)) return;
+      settled = true;
+      resolve({
+        stdout: stdout.replace(/\s+$/u, ""),
+        stderr: stderr.replace(/\s+$/u, ""),
+        exitCode,
+      });
+    }
+
     child.stdout.on("data", (d) => {
       stdout += d.toString("utf8");
     });
+    child.stdout.on("end", () => {
+      stdoutEnded = true;
+      settle();
+    });
+    child.stdout.on("error", () => {
+      stdoutEnded = true;
+      settle();
+    });
+
     child.stderr.on("data", (d) => {
       stderr += d.toString("utf8");
     });
+    child.stderr.on("end", () => {
+      stderrEnded = true;
+      settle();
+    });
+    child.stderr.on("error", () => {
+      stderrEnded = true;
+      settle();
+    });
+
     child.on("close", (code) => {
-      resolve({ stdout: stdout.trim(), stderr: stderr.trim(), exitCode: code ?? 1 });
+      closed = true;
+      exitCode = code ?? 1;
+      // If a stream never opened, treat it as ended so we do not hang.
+      if (!child.stdout.readableEnded && child.stdout.destroyed) stdoutEnded = true;
+      if (!child.stderr.readableEnded && child.stderr.destroyed) stderrEnded = true;
+      // Node may emit close before end on some platforms — mark ended if
+      // the readable has already finished.
+      if (child.stdout.readableEnded) stdoutEnded = true;
+      if (child.stderr.readableEnded) stderrEnded = true;
+      settle();
+      // Safety: if end events are delayed past close, wait briefly then force.
+      setTimeout(() => {
+        stdoutEnded = true;
+        stderrEnded = true;
+        settle();
+      }, 50).unref?.();
     });
     child.on("error", (err) => {
+      settled = true;
       resolve({
         stdout: "",
         stderr: String(err.message || err),

@@ -25,6 +25,13 @@ export const GC1_COST_FENCES = Object.freeze({
 export const GC1_HEALTH_CHECK_COMMAND = "echo HEALTH_CHECK_OK";
 export const GC1_HEALTH_CHECK_EXPECTED = "HEALTH_CHECK_OK";
 
+/**
+ * Command-channel readiness poll: VM may be STATE_RUNNING before the
+ * container agent has wired stdout. Default window = 6 × 3s = 18s.
+ */
+export const GC1_EXECUTION_READY_ATTEMPTS = 6;
+export const GC1_EXECUTION_READY_INTERVAL_MS = 3_000;
+
 export const GC1_AUTH_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 export const GC1_WORKSTATIONS_API_BASE = "https://workstations.googleapis.com/v1";
 

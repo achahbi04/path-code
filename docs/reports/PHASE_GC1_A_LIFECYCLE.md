@@ -22,7 +22,8 @@ PHASE GC1-a GOOGLE CLOUD WORKSTATION LIFECYCLE IMPLEMENTED
 | **Fresh worktree** | `/Users/achahbi/Projects/path-code-worktrees/cursor-phase-gc1a` | One agent per worktree; not a shared tree |
 | **Branch** | `cursor/phase-gc1a` | Created from the PS1-INLINE IMPLEMENTATION SHA above |
 | **IMPLEMENTATION SHA** | `0485bd71920bfd1939f4ea0c29399bec631ad519` | Initial GC1-a lifecycle engine + GC1A-A…H/P1 |
-| **AUTH-HEADER BUGFIX SHA** |  | Bearer attachment fix + GC1A-I + report update |
+| **AUTH-HEADER BUGFIX SHA** | `b4fbf3a95617d8d3599627a0e7d78584683e856d` | Bearer attachment fix + GC1A-I |
+| **EXEC-READY RETRY PATCH SHA** | _(filled after commit)_ | Command-channel poll 6×3s + stdout stream-end + GC1A-J |
 | **BRANCH TIP SHA** | `git rev-parse HEAD` on `cursor/phase-gc1a` | Tip after any docs-only commits |
 | **Main** | `d997ae13185013b4312755c38da4cd7099041621` | **Unchanged**. No push. No merge. |
 
@@ -134,13 +135,19 @@ Module: `scripts/pathcode-cli/gc1/lifecycle.mjs`
 | `reconcileStartup()` | Lists GC1-owned (`pathcode-gc1-*`) workstations; stop/delete orphans; **never** deletes cluster/config; reports reclaimed IDs |
 | `ensureClusterAndConfig()` | Verifies cluster/config; creates only if missing (disclosed); bakes cost fences + Runtime SA |
 | `startProbeWorkstation()` | Starts probe → waits for `STATE_RUNNING` = **LIFECYCLE READY**; does **not** create the cluster |
-| `verifyExecutionReadiness()` | One authenticated `echo HEALTH_CHECK_OK` round-trip = **EXECUTION READY** |
+| `verifyExecutionReadiness()` | One authenticated `echo HEALTH_CHECK_OK` round-trip = **EXECUTION READY**, with bounded retry (default **6 attempts × 3s**) while the container agent warms stdout; force-dispose on miss |
 | `acquireProbeWorkstation()` | Returns workstation only when **both** stages pass (unless P1 weaken hook) |
 | `teardown()` | Idempotent dispose of **probe only**; SIGINT/SIGTERM/uncaughtException → async cleanup; handlers detached; timers cleared (R2-K) |
 
 **Deadline / stuck-state:** bounded poll deadline; never-ready → force stop/delete → `GC1_WORKSTATION_NOT_READY` (never left running to bill).
 
-**Dual-stage readiness:** `STATE_RUNNING` alone is insufficient. Execution-ready requires the command channel to return exact `HEALTH_CHECK_OK`.
+**Dual-stage readiness:** `STATE_RUNNING` alone is insufficient. Execution-ready requires the command channel to return exact `HEALTH_CHECK_OK`. When the VM is powered on but the agent’s stdout pipes are still initializing (exit=0, empty stdout), the manager polls up to `GC1_EXECUTION_READY_ATTEMPTS` (6) × `GC1_EXECUTION_READY_INTERVAL_MS` (3000) before force-disposing and throwing `GC1_EXECUTION_NOT_READY`. Live `gcloud workstations ssh` stdout is captured by awaiting stream **end**, not a single immediate read.
+
+### Live-smoke patch — execution readiness retry
+
+**Symptom:** LIFECYCLE READY succeeded; `verifyExecutionReadiness()` failed with `exit=0 stdout=""`.
+
+**Fix:** bounded command-channel retry + stream-end capture + force-dispose on deadline (GC1A-J). Cluster left intact; no IAM changes.
 
 ---
 
@@ -158,9 +165,9 @@ This bugfix pass: **zero live GCP calls**. Operator re-runs the smoke to verify 
 
 ---
 
-## Proofs — GC1A-A…H + P1 + GC1A-I
+## Proofs — GC1A-A…H + P1 + GC1A-I + GC1A-J
 
-Focused file: `tests/gc1/lifecycle.test.ts` (**16/16 PASS**). Canonical path uses `MockWorkstationTransport`; GC1A-I exercises `GcpWorkstationTransport` against a **mock fetch** ($0, zero real GCP).
+Focused file: `tests/gc1/lifecycle.test.ts` (**19/19 PASS**). Canonical path uses `MockWorkstationTransport`; GC1A-I exercises `GcpWorkstationTransport` against a **mock fetch** ($0, zero real GCP).
 
 | Proof | Result |
 |---|---|
@@ -168,21 +175,25 @@ Focused file: `tests/gc1/lifecycle.test.ts` (**16/16 PASS**). Canonical path use
 | **GC1A-B** | Config create payload exact fences: poolSize 0, idle 900s, run 3600s |
 | **GC1A-C** | Probe path does not `createCluster`; teardown/reconcile preserve cluster/config |
 | **GC1A-D** | Orphan `pathcode-gc1-*` reclaimed; non-GC1 workstation untouched |
-| **GC1A-E** | Lifecycle-ready + failed command channel → `GC1_EXECUTION_NOT_READY`; acquire refuses |
+| **GC1A-E** | Lifecycle-ready + failed command channel → `GC1_EXECUTION_NOT_READY`; acquire refuses; force-dispose |
 | **GC1A-F** | Double teardown / partial startup / SIGINT clean; zero dangling timers/handlers (R2-K) |
 | **GC1A-G** | Without `GC1_LIVE_SMOKE=1`, `GcpWorkstationTransport` throws `GC1_LIVE_SMOKE_FORBIDDEN`; mock networkCalls=0 |
 | **GC1A-H** | Runtime SA in config; Control SA absent from workstation-facing payloads |
 | **P1** | `weakenReadinessGate: true` hands back lifecycle-only station (GC1A-E defect); honest path refuses; `lifecycle.mjs` SHA-256 unchanged |
 | **GC1A-I** | Every REST method attaches `Authorization: Bearer`; proves Headers-spread defect class; `$0` mock fetch |
 | **GC1A-I falsification** | `weakenAuthAttachment: true` omits Bearer on `getCluster` → proof fails; `gcp-transport.mjs` hash unchanged on restore |
+| **GC1A-J** | Empty stdout on early attempts is not ready until a later retry returns `HEALTH_CHECK_OK`; never-matching token force-disposes (no leaked probe) |
+| **GC1A-J falsification** | `weakenExitOnlyExecutionReady: true` accepts exit=0 ignoring stdout → proof fails; `lifecycle.mjs` hash unchanged |
 
-### Content hashes (auth-header bugfix working tree)
+### Content hashes (exec-ready retry patch working tree)
 
 | Path | SHA-256 |
 |---|---|
-| `scripts/pathcode-cli/gc1/auth.mjs` | `3b3e254b451a4a02f4dd4db3d3416d078743c3365a654d80bcbe3a032c1f71ae` |
-| `scripts/pathcode-cli/gc1/gcp-transport.mjs` | `35e35cfe3f4afcff2f30266f4d98e4e1189d29f7240a0f17a5524bb6781b8d64` |
-| `tests/gc1/lifecycle.test.ts` | `bda8d759ce206bd11915e58497451059b7fe85b859ba028d67cddab7d472bf82` |
+| `scripts/pathcode-cli/gc1/constants.mjs` | `4b39fe387559178b817db7e5e9fe5b33972887da52ae097306922f0625495d73` |
+| `scripts/pathcode-cli/gc1/lifecycle.mjs` | `e1a2839b65bbe034afd69600a746157d461e04fc99b13b408c7a94dd1da29edb` |
+| `scripts/pathcode-cli/gc1/mock-transport.mjs` | `397a70e0576ae1968fbc03af10a241415b9bcf214385b471e94ba0390f1ddc6b` |
+| `scripts/pathcode-cli/gc1/gcp-transport.mjs` | `7f555adc261fff2cae68601a6a8e4990375f0082684cba301603da29092c883b` |
+| `tests/gc1/lifecycle.test.ts` | `126e21c831814e3ceb2d65e9b04e1fdc7c1bf71bd103447ce4ada23c5ad9792b` |
 
 ---
 
@@ -190,9 +201,9 @@ Focused file: `tests/gc1/lifecycle.test.ts` (**16/16 PASS**). Canonical path use
 
 | Gate | Result |
 |---|---|
-| Focused GC1A suite | **16/16 PASS** (includes GC1A-I + falsification) |
+| Focused GC1A suite | **19/19 PASS** (includes GC1A-I/J + falsifications) |
 | `npm run typecheck` / `build` | **PASS** |
-| Vitest | **1167/1167 PASS** (121 files) |
+| Vitest | **1170/1170 PASS** (121 files) |
 | `cli:smoke` / `ledger:verify` | **PASS** |
 | Live GCP calls in this bugfix pass | **zero** (operator re-runs smoke) |
 | JSON key material | **none** |
@@ -202,6 +213,8 @@ Focused file: `tests/gc1/lifecycle.test.ts` (**16/16 PASS**). Canonical path use
 **Causal correction (first check):** root architecture tests require `dependencies: {}`. `google-auth-library@11.0.2` was placed in `optionalDependencies` so the live smoke can load it without violating those gates or pulling auth into the mock path.
 
 **Auth-header bugfix:** `Headers` object-spread → missing Bearer; fixed via `buildBearerAuthHeaders` + single `authedFetch`; GC1A-I prevents regression in canonical ($0).
+
+**Exec-ready retry patch:** exit=0 / empty stdout after `STATE_RUNNING` → bounded 6×3s poll + stream-end capture + force-dispose; GC1A-J.
 
 ---
 
@@ -213,6 +226,7 @@ Focused file: `tests/gc1/lifecycle.test.ts` (**16/16 PASS**). Canonical path use
 4. **Cluster standing charge** persists after probe teardown by design; operator must run the documented cluster teardown when finished with GC1 work.
 5. **Vitest 5s default** is tight for general-session git fixtures on a busy host; recorded as one-off contention, not a GC1 defect.
 6. **Live smoke 401 CREDENTIALS_MISSING** was transport header attachment (`Headers` spread), not IAM — fixed under GC1A-I; operator re-run required.
+7. **Live smoke GC1_EXECUTION_NOT_READY (exit=0, empty stdout)** was command-agent warm-up after STATE_RUNNING — fixed under GC1A-J with 6×3s retry + force-dispose; cluster not deleted.
 
 ---
 

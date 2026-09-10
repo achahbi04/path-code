@@ -227,11 +227,15 @@ describe("GC1A-E DUAL READINESS", () => {
       transport,
       deadlineMs: 5_000,
       pollIntervalMs: 5,
+      executionReadyAttempts: 3,
+      executionReadyIntervalMs: 1,
     });
 
     await expect(manager.acquireProbeWorkstation()).rejects.toMatchObject({
       code: "GC1_EXECUTION_NOT_READY",
     });
+    // Failed readiness force-disposes — no leaked billing workstation.
+    expect(transport.getWorkstationState("pathcode-gc1-probe")).toBeNull();
 
     // Lifecycle alone still reachable, but must not be the acquire return.
     const life = await manager.startProbeWorkstation();
@@ -241,8 +245,10 @@ describe("GC1A-E DUAL READINESS", () => {
       code: "GC1_EXECUTION_NOT_READY",
     });
 
+    // Recreate after force-dispose, then succeed once the channel works.
     transport.setCommandFails(false);
-    const ready = await manager.verifyExecutionReadiness(life);
+    const life2 = await manager.startProbeWorkstation();
+    const ready = await manager.verifyExecutionReadiness(life2);
     expect(ready.executionReady).toBe(true);
     expect(ready.healthCheck).toBe("HEALTH_CHECK_OK");
     await manager.teardown();
@@ -411,6 +417,8 @@ describe("GC1A-P1 readiness falsification", () => {
       transport: failing,
       deadlineMs: 5_000,
       pollIntervalMs: 5,
+      executionReadyAttempts: 3,
+      executionReadyIntervalMs: 1,
     });
     await expect(honest.acquireProbeWorkstation()).rejects.toMatchObject({
       code: "GC1_EXECUTION_NOT_READY",
@@ -426,6 +434,8 @@ describe("GC1A-P1 readiness falsification", () => {
       deadlineMs: 5_000,
       pollIntervalMs: 5,
       weakenReadinessGate: true,
+      executionReadyAttempts: 3,
+      executionReadyIntervalMs: 1,
     });
     const handed = await weak.acquireProbeWorkstation();
     expect(handed.lifecycleReady).toBe(true);
@@ -449,11 +459,118 @@ describe("GC1A-P1 readiness falsification", () => {
       transport: okTransport,
       deadlineMs: 5_000,
       pollIntervalMs: 5,
+      executionReadyAttempts: 3,
+      executionReadyIntervalMs: 1,
     });
     const ready = await restored.acquireProbeWorkstation();
     expect(ready.executionReady).toBe(true);
     expect(ready.healthCheck).toBe("HEALTH_CHECK_OK");
     await restored.teardown();
+  });
+});
+
+describe("GC1A-J EXECUTION READINESS RETRY + FORCE-DISPOSE", () => {
+  it("empty stdout on first attempts is not ready until a later retry returns HEALTH_CHECK_OK", async () => {
+    const { createMockWorkstationTransport, createWorkstationLifecycleManager, constants } =
+      await loadGc1();
+    expect(constants.GC1_EXECUTION_READY_ATTEMPTS).toBe(6);
+    expect(constants.GC1_EXECUTION_READY_INTERVAL_MS).toBe(3_000);
+
+    const transport = createMockWorkstationTransport({
+      pollsUntilRunning: 1,
+      emptyStdoutBeforeSuccess: 2, // attempts 1–2: exit=0 stdout=""; attempt 3: token
+    });
+    transport.seedCluster();
+    transport.seedConfig();
+    const manager = createWorkstationLifecycleManager({
+      transport,
+      deadlineMs: 5_000,
+      pollIntervalMs: 5,
+      executionReadyAttempts: 6,
+      executionReadyIntervalMs: 1,
+    });
+
+    const ready = await manager.acquireProbeWorkstation();
+    expect(ready.executionReady).toBe(true);
+    expect(ready.healthCheck).toBe("HEALTH_CHECK_OK");
+    expect(ready.executionReadyAttempts).toBe(3);
+    expect(transport.getExecuteCommandCount()).toBe(3);
+    expect(transport.getWorkstationState("pathcode-gc1-probe")).toBe("STATE_RUNNING");
+    await manager.teardown();
+  });
+
+  it("never-matching token force-disposes within the deadline (no leaked billing workstation)", async () => {
+    const { createMockWorkstationTransport, createWorkstationLifecycleManager } =
+      await loadGc1();
+    // Permanently empty stdout (agent never ready) with exit=0 — the live-smoke defect class.
+    const transport = createMockWorkstationTransport({
+      pollsUntilRunning: 1,
+      emptyStdoutBeforeSuccess: 100,
+    });
+    transport.seedCluster();
+    transport.seedConfig();
+    const manager = createWorkstationLifecycleManager({
+      transport,
+      deadlineMs: 5_000,
+      pollIntervalMs: 5,
+      executionReadyAttempts: 4,
+      executionReadyIntervalMs: 1,
+    });
+
+    await expect(manager.acquireProbeWorkstation()).rejects.toMatchObject({
+      code: "GC1_EXECUTION_NOT_READY",
+    });
+    expect(transport.getExecuteCommandCount()).toBe(4);
+    expect(transport.getWorkstationState("pathcode-gc1-probe")).toBeNull();
+    expect(transport.hasWorkstation("pathcode-gc1-probe")).toBe(false);
+  });
+
+  it("falsification: accept exit=0 ignoring stdout → GC1A-J fails; restore by hash", async () => {
+    const beforeHash = sha256(LIFECYCLE);
+    const { createMockWorkstationTransport, createWorkstationLifecycleManager } =
+      await loadGc1();
+
+    // Honest: empty forever → refuses + force-dispose.
+    const honestTransport = createMockWorkstationTransport({
+      emptyStdoutBeforeSuccess: 100,
+    });
+    honestTransport.seedCluster();
+    honestTransport.seedConfig();
+    const honest = createWorkstationLifecycleManager({
+      transport: honestTransport,
+      deadlineMs: 5_000,
+      pollIntervalMs: 5,
+      executionReadyAttempts: 3,
+      executionReadyIntervalMs: 1,
+    });
+    await expect(honest.acquireProbeWorkstation()).rejects.toMatchObject({
+      code: "GC1_EXECUTION_NOT_READY",
+    });
+    expect(honestTransport.getWorkstationState("pathcode-gc1-probe")).toBeNull();
+
+    // Falsification: exit=0 alone is treated as ready — hands back not-actually-ready station.
+    const weakTransport = createMockWorkstationTransport({
+      emptyStdoutBeforeSuccess: 100,
+    });
+    weakTransport.seedCluster();
+    weakTransport.seedConfig();
+    const weak = createWorkstationLifecycleManager({
+      transport: weakTransport,
+      deadlineMs: 5_000,
+      pollIntervalMs: 5,
+      executionReadyAttempts: 3,
+      executionReadyIntervalMs: 1,
+      weakenExitOnlyExecutionReady: true,
+    });
+    const handed = await weak.acquireProbeWorkstation();
+    expect(handed.executionReady).toBe(true);
+    // The defect: empty-stdout workstation was accepted on the first try (no token required).
+    expect(weakTransport.getExecuteCommandCount()).toBe(1);
+    expect(weakTransport.getWorkstationState("pathcode-gc1-probe")).toBe("STATE_RUNNING");
+    await weak.teardown();
+
+    const afterHash = sha256(LIFECYCLE);
+    expect(afterHash).toBe(beforeHash);
   });
 });
 

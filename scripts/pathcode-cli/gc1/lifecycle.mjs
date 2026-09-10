@@ -15,6 +15,8 @@ import {
   GC1_COST_FENCES,
   GC1_DEFAULT_DEADLINE_MS,
   GC1_ERROR,
+  GC1_EXECUTION_READY_ATTEMPTS,
+  GC1_EXECUTION_READY_INTERVAL_MS,
   GC1_HEALTH_CHECK_COMMAND,
   GC1_HEALTH_CHECK_EXPECTED,
   GC1_PROBE_WORKSTATION,
@@ -31,7 +33,10 @@ import {
  * @param {import("./transport.mjs").WorkstationTransport} options.transport
  * @param {number} [options.deadlineMs]
  * @param {number} [options.pollIntervalMs]
+ * @param {number} [options.executionReadyAttempts] default GC1_EXECUTION_READY_ATTEMPTS
+ * @param {number} [options.executionReadyIntervalMs] default GC1_EXECUTION_READY_INTERVAL_MS
  * @param {boolean} [options.weakenReadinessGate] P1 falsification only — MUST be false in production
+ * @param {boolean} [options.weakenExitOnlyExecutionReady] falsification: accept exit=0 ignoring stdout
  * @param {NodeJS.Process} [options.proc] process for signal handlers (tests inject)
  */
 export function createWorkstationLifecycleManager(options) {
@@ -42,7 +47,13 @@ export function createWorkstationLifecycleManager(options) {
 
   const deadlineMs = options.deadlineMs ?? GC1_DEFAULT_DEADLINE_MS;
   const pollIntervalMs = options.pollIntervalMs ?? 25;
+  const executionReadyAttempts =
+    options.executionReadyAttempts ?? GC1_EXECUTION_READY_ATTEMPTS;
+  const executionReadyIntervalMs =
+    options.executionReadyIntervalMs ?? GC1_EXECUTION_READY_INTERVAL_MS;
   const weakenReadinessGate = options.weakenReadinessGate === true;
+  const weakenExitOnlyExecutionReady =
+    options.weakenExitOnlyExecutionReady === true;
   const proc = options.proc || process;
 
   /** @type {string[]} */
@@ -110,6 +121,30 @@ export function createWorkstationLifecycleManager(options) {
     }
   }
 
+  async function forceDisposeProbe(name) {
+    try {
+      await transport.stopWorkstation(name);
+      recordState("STATE_STOPPING");
+    } catch {
+      /* best-effort */
+    }
+    try {
+      await transport.deleteWorkstation(name);
+      recordState("DELETED");
+    } catch {
+      /* best-effort */
+    }
+    if (activeWorkstationName === name) activeWorkstationName = null;
+  }
+
+  function stdoutMatchesHealthCheck(stdout) {
+    const text = String(stdout || "").trim();
+    return (
+      text === GC1_HEALTH_CHECK_EXPECTED ||
+      text.split(/\r?\n/).includes(GC1_HEALTH_CHECK_EXPECTED)
+    );
+  }
+
   async function waitUntilRunning(name) {
     const started = Date.now();
     while (Date.now() - started < deadlineMs) {
@@ -128,19 +163,7 @@ export function createWorkstationLifecycleManager(options) {
       await delay(pollIntervalMs);
     }
     // Stuck — force dispose, never leave billing.
-    try {
-      await transport.stopWorkstation(name);
-      recordState("STATE_STOPPING");
-    } catch {
-      /* best-effort */
-    }
-    try {
-      await transport.deleteWorkstation(name);
-      recordState("DELETED");
-    } catch {
-      /* best-effort */
-    }
-    activeWorkstationName = null;
+    await forceDisposeProbe(name);
     const err = new Error(
       `${GC1_ERROR.WORKSTATION_NOT_READY}: workstation did not reach STATE_RUNNING within ${deadlineMs}ms; force-disposed`,
     );
@@ -284,36 +307,59 @@ export function createWorkstationLifecycleManager(options) {
   }
 
   /**
-   * EXECUTION READY: authenticated remote command round-trip.
-   * STATE_RUNNING alone is insufficient.
+   * EXECUTION READY: authenticated remote command round-trip with bounded retry.
+   * STATE_RUNNING alone is insufficient — the container agent may still be
+   * wiring stdout (exit=0, empty stdout). Poll up to executionReadyAttempts
+   * with executionReadyIntervalMs between tries (default 6 × 3s = 18s).
+   * On deadline miss: force-dispose the probe (never leave it billing).
    */
   async function verifyExecutionReadiness(workstation) {
     const name = workstation?.name || activeWorkstationName || workstationName();
-    const result = await transport.executeCommand({
-      workstationName: name,
-      command: GC1_HEALTH_CHECK_COMMAND,
-    });
-    const stdout = String(result.stdout || "").trim();
-    const ok =
-      result.exitCode === 0 &&
-      (stdout === GC1_HEALTH_CHECK_EXPECTED ||
-        stdout.split(/\r?\n/).includes(GC1_HEALTH_CHECK_EXPECTED));
+    let lastStdout = "";
+    let lastExit = null;
+    let attempts = 0;
 
-    if (!ok) {
-      const err = new Error(
-        `${GC1_ERROR.EXECUTION_NOT_READY}: expected ${GC1_HEALTH_CHECK_EXPECTED}, got exit=${result.exitCode} stdout=${JSON.stringify(stdout)}`,
-      );
-      err.code = GC1_ERROR.EXECUTION_NOT_READY;
-      throw err;
+    for (let i = 0; i < executionReadyAttempts; i += 1) {
+      attempts = i + 1;
+      const result = await transport.executeCommand({
+        workstationName: name,
+        command: GC1_HEALTH_CHECK_COMMAND,
+      });
+      lastExit = result.exitCode;
+      lastStdout = String(result.stdout || "").trim();
+
+      const tokenOk = stdoutMatchesHealthCheck(lastStdout);
+      const ok = weakenExitOnlyExecutionReady
+        ? result.exitCode === 0 // falsification: ignore stdout
+        : result.exitCode === 0 && tokenOk;
+
+      if (ok) {
+        return {
+          ...workstation,
+          name,
+          lifecycleReady: true,
+          executionReady: true,
+          healthCheck: weakenExitOnlyExecutionReady
+            ? lastStdout || GC1_HEALTH_CHECK_EXPECTED
+            : lastStdout.includes(GC1_HEALTH_CHECK_EXPECTED)
+              ? GC1_HEALTH_CHECK_EXPECTED
+              : lastStdout,
+          executionReadyAttempts: attempts,
+        };
+      }
+
+      if (i + 1 < executionReadyAttempts) {
+        await delay(executionReadyIntervalMs);
+      }
     }
 
-    return {
-      ...workstation,
-      name,
-      lifecycleReady: true,
-      executionReady: true,
-      healthCheck: stdout,
-    };
+    await forceDisposeProbe(name);
+    const err = new Error(
+      `${GC1_ERROR.EXECUTION_NOT_READY}: expected ${GC1_HEALTH_CHECK_EXPECTED} within ${executionReadyAttempts} attempts × ${executionReadyIntervalMs}ms; got exit=${lastExit} stdout=${JSON.stringify(lastStdout)}; force-disposed`,
+    );
+    err.code = GC1_ERROR.EXECUTION_NOT_READY;
+    err.attempts = attempts;
+    throw err;
   }
 
   /**
@@ -421,6 +467,9 @@ export function createWorkstationLifecycleManager(options) {
       reclaimed: [...reclaimed],
       clusterCreatedThisSession,
       weakenReadinessGate,
+      weakenExitOnlyExecutionReady,
+      executionReadyAttempts,
+      executionReadyIntervalMs,
       lastConfigCreateBody: lastConfigCreateBody
         ? structuredClone(lastConfigCreateBody)
         : null,

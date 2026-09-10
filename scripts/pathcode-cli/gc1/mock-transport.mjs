@@ -29,6 +29,9 @@ export function createMockWorkstationTransport(options = {}) {
     commandDelayMs: options.commandDelayMs ?? 0,
     neverReachRunning: options.neverReachRunning === true,
     commandStdout: options.commandStdout ?? GC1_HEALTH_CHECK_EXPECTED,
+    /** First N health-check attempts return exit=0 with empty stdout (agent warm-up). */
+    emptyStdoutBeforeSuccess: options.emptyStdoutBeforeSuccess ?? 0,
+    executeCommandCount: 0,
   };
 
   /** @type {Map<string, object>} */
@@ -242,6 +245,7 @@ export function createMockWorkstationTransport(options = {}) {
     async executeCommand({ workstationName: wsName, command }) {
       assertNoNetwork();
       log("executeCommand", command);
+      state.executeCommandCount += 1;
       if (state.commandDelayMs > 0) {
         await new Promise((r) => setTimeout(r, state.commandDelayMs));
       }
@@ -249,6 +253,14 @@ export function createMockWorkstationTransport(options = {}) {
         return { stdout: "", stderr: "mock command failed", exitCode: 1 };
       }
       const expectedEcho = command.includes("HEALTH_CHECK_OK");
+      // Simulate container agent warm-up: connect succeeds (exit=0) but stdout
+      // is empty until emptyStdoutBeforeSuccess attempts have elapsed.
+      if (
+        expectedEcho &&
+        state.executeCommandCount <= state.emptyStdoutBeforeSuccess
+      ) {
+        return { stdout: "", stderr: "", exitCode: 0 };
+      }
       return {
         stdout: expectedEcho ? state.commandStdout : `ran:${command}`,
         stderr: "",
@@ -334,6 +346,15 @@ export function createMockWorkstationTransport(options = {}) {
 
     setCommandFails(value) {
       state.commandFails = value === true;
+    },
+
+    setEmptyStdoutBeforeSuccess(n) {
+      state.emptyStdoutBeforeSuccess = Number(n) || 0;
+      state.executeCommandCount = 0;
+    },
+
+    getExecuteCommandCount() {
+      return state.executeCommandCount;
     },
 
     hasWorkstation(id) {
