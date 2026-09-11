@@ -47,7 +47,7 @@ export function renderWordmark(opts = {}) {
 export function renderWelcomeScreen(opts = {}) {
   const wordmark = renderWordmark(opts);
   const unicode = opts.unicode !== false && opts.plain !== true;
-  const title = "General engineering session";
+  const title = "PATH engineering session";
   const prompt = unicode ? "PATH ● Code >" : "PATH * Code >";
   const body = [
     wordmark,
@@ -55,14 +55,12 @@ export function renderWelcomeScreen(opts = {}) {
     centerLine(title, opts.columns ?? 80),
     "",
     "  Describe an engineering task in your own words to start one here.",
-    "  You review the files, the exact edit and the exact checks before anything runs.",
-    "  A recovery checkpoint is written before any file changes.",
-    "  No project scan or API call happens just by opening this screen.",
+    "  PATH creates an isolated task workspace and runs bounded engineering.",
+    "  PATH independently validates the final result. The primary checkout stays untouched.",
+    "  No project scan happens just by opening this screen.",
     "",
     "  <task>              Describe what to change, in plain language",
     "  /recover <id>       Restore a checkpoint from an earlier session",
-    "  /model <id>         Change the model for subsequent tasks",
-    "  /autonomy <mode>    review | bounded — for subsequent tasks",
     "  /trial              Run Trial 1 in a disposable project",
     "  /help               Show the commands and current scope",
     "  /exit               Leave",

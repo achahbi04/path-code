@@ -137,6 +137,61 @@ export function buildEvidenceLines(state) {
     lines.push("Environment     ✕");
   }
 
+  // AG1: show engineering lifecycle evidence — never legacy Gate 1 / Gate 2.
+  if (product.ag1 === true) {
+    lines.push(
+      state.cards.recovery?.arrived ? "Workspace       ✓" : "Workspace       —",
+    );
+    lines.push(
+      state.cards.recovery?.arrived ? "Recovery        ✓" : "Recovery        —",
+    );
+    const activities = Array.isArray(product.ag1Activities)
+      ? product.ag1Activities
+      : [];
+    if (activities.length === 0) {
+      lines.push("Activity        —");
+    } else {
+      for (const label of activities.slice(-6)) {
+        lines.push(`◆ ${label}`);
+      }
+    }
+    if (product.ag1Mutation) {
+      lines.push("Mutation        ✓");
+    } else if (state.cards.applying?.status === "active") {
+      lines.push("Mutation        ●");
+    } else {
+      lines.push("Mutation        —");
+    }
+    const vRes = state.cards.validationResult;
+    const detail = vRes?.detail || "";
+    if (state.cards.validationRunning?.status === "active") {
+      lines.push("Verifying       ●");
+    } else if (vRes?.arrived) {
+      if (/fail|FAILED/i.test(detail)) {
+        lines.push("Validation      ✕");
+      } else if (/PASSED|pass/i.test(detail)) {
+        lines.push("Validation      ✓");
+      } else {
+        lines.push("Validation      —");
+      }
+    } else if (state.cards.validationSkipped?.arrived) {
+      lines.push("Validation      —");
+    } else {
+      lines.push("Validation      —");
+    }
+    const term = state.cards.terminal;
+    if (term?.arrived) {
+      const d = String(term.detail || "");
+      if (/^VERIFIED\b/i.test(d)) lines.push("Result          ✓");
+      else if (/PARTIALLY_VERIFIED/i.test(d)) lines.push("Result          ◐");
+      else if (/FAILED|NOT_VERIFIED|AG1_/i.test(d)) lines.push("Result          ✕");
+      else lines.push("Result          —");
+    } else {
+      lines.push("Result          —");
+    }
+    return lines;
+  }
+
   const g1 = state.cards.gate1;
   if (g1?.arrived) {
     lines.push(
@@ -234,8 +289,9 @@ export function buildEvidenceLines(state) {
  * @param {string} phase
  */
 function pathGlyph(phase) {
-  if (phase === "Complete") return "✓";
-  if (phase === "Failed" || phase === "Infrastructure failure") return "✕";
+  if (phase === "Complete" || phase === "Verified") return "✓";
+  if (phase === "Partially verified") return "◐";
+  if (phase === "Failed" || phase === "Infrastructure failure" || phase === "Not verified") return "✕";
   if (phase === "Blocked") return "■";
   if (phase === "Cancelled" || phase === "Cancelling") return "○";
   if (phase === "Unknown" || phase === "Unconfirmed") return "○";
@@ -286,7 +342,7 @@ export function buildLivingProductLines(state, viewport) {
   } else {
     const files = Array.isArray(product.projectFiles) ? product.projectFiles : [];
     if (files.length === 0) {
-      projectCol.push("(awaiting scope)");
+      projectCol.push(product.ag1 ? "(engineering…)" : "(awaiting scope)");
     } else {
       for (const f of files.slice(0, 6)) {
         projectCol.push(String(f));

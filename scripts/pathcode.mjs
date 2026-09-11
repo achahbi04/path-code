@@ -210,9 +210,15 @@ function promptPrefix(unicode, plain) {
  * @param {{ taskCount: number, modelCallCount: number }} sessionStats
  */
 function redrawPrompt(prompt, unicode, plain, sessionStats) {
-  if (sessionStats.taskCount > 0 || sessionStats.modelCallCount > 0) {
+  if (sessionStats.taskCount > 0) {
+    const engine =
+      typeof sessionStats.engineActivityCount === "number" &&
+      sessionStats.engineActivityCount > 0
+        ? `, ${sessionStats.engineActivityCount} engineering activities`
+        : "";
+    // Do not report legacy OpenAI "model calls" for AG1 — that counter is not AG1 proof.
     prompt.write(
-      `Session so far: ${sessionStats.taskCount} tasks, ${sessionStats.modelCallCount} model calls.\n`,
+      `Session so far: ${sessionStats.taskCount} task${sessionStats.taskCount === 1 ? "" : "s"}${engine}.\n`,
     );
   }
   prompt.write(promptPrefix(unicode, plain));
@@ -288,7 +294,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
   let autonomyMode = args.autonomy;
   /** @type {string | null} */
   let sessionCredential = null;
-  const sessionStats = { taskCount: 0, modelCallCount: 0 };
+  const sessionStats = { taskCount: 0, modelCallCount: 0, engineActivityCount: 0 };
   /** @type {number} */
   let lastExitCode = 0;
 
@@ -492,48 +498,69 @@ export async function runPathcodeMain(argv, testIo = {}) {
       }
 
       // Any other line is an engineering task for the project in this directory.
+      // AG1: local default path is Antigravity via PATH gateway (not Gate-1 OpenAI).
+      // Cloud execution remains the historical GC1 general-session path.
       const prereq = resolveRuntimePrerequisites(root);
       if (!prereq.ok) {
         prompt.write(`${prereq.message}\n`);
         redrawPrompt(prompt, unicode, plain, sessionStats);
         continue;
       }
-      const { runGeneralEngineeringSession } = await import(
-        "./pathcode-cli/general-session.mjs"
-      );
-      const runner = testIo.runGeneralSession ?? runGeneralEngineeringSession;
       const cycleNote = await runCycle(async () => {
         try {
-          const sessionResult = await runner(prompt, {
-            streams,
-            taskText: cmd,
-            projectRoot: process.cwd(),
-            modelId,
-            autonomyMode,
-            unicode,
-            checkoutRoot: root,
-            executionMode: args.execution,
-            // Live GCP only when operator authorizes via GC1_LIVE_SMOKE=1.
-            // Default cloud mode stays mock ($0) for local/canonical safety.
-            skipLiveGcp: !(
-              args.execution === "cloud" &&
-              process.env.GC1_LIVE_SMOKE === "1"
-            ),
-            credential: sessionCredential,
-            onCredentialAcquired: (credential) => {
-              if (typeof credential === "string" && credential.length > 0) {
-                sessionCredential = credential;
-              }
-            },
-            sessionEventEmit: eventSink.emit,
-            // Cards own mirrored progress on TTY; disclosures/prompts still write.
-            cardsOwnProgress: ttyInline,
-          });
+          let sessionResult;
+          if (args.execution === "cloud") {
+            const { runGeneralEngineeringSession } = await import(
+              "./pathcode-cli/general-session.mjs"
+            );
+            const runner = testIo.runGeneralSession ?? runGeneralEngineeringSession;
+            sessionResult = await runner(prompt, {
+              streams,
+              taskText: cmd,
+              projectRoot: process.cwd(),
+              modelId,
+              autonomyMode,
+              unicode,
+              checkoutRoot: root,
+              executionMode: "cloud",
+              skipLiveGcp: !(process.env.GC1_LIVE_SMOKE === "1"),
+              credential: sessionCredential,
+              onCredentialAcquired: (credential) => {
+                if (typeof credential === "string" && credential.length > 0) {
+                  sessionCredential = credential;
+                }
+              },
+              sessionEventEmit: eventSink.emit,
+              cardsOwnProgress: ttyInline,
+            });
+          } else {
+            const { runAntigravityEngineeringSession } = await import(
+              "./pathcode-cli/ag1/session.mjs"
+            );
+            const runner =
+              testIo.runAg1Session ?? runAntigravityEngineeringSession;
+            sessionResult = await runner(prompt, {
+              streams,
+              taskText: cmd,
+              projectRoot: process.cwd(),
+              unicode,
+              checkoutRoot: root,
+              sessionEventEmit: eventSink.emit,
+              cardsOwnProgress: ttyInline,
+            });
+          }
           lastExitCode = sessionResult.exitCode ?? 1;
           sessionStats.taskCount += 1;
-          const calls =
-            typeof sessionResult.modelCalls === "number" ? sessionResult.modelCalls : 0;
-          sessionStats.modelCallCount += calls;
+          if (typeof sessionResult.engineActivityCount === "number") {
+            sessionStats.engineActivityCount += sessionResult.engineActivityCount;
+          }
+          // Legacy OpenAI counter only when general-session reports modelCalls.
+          if (
+            args.execution === "cloud" &&
+            typeof sessionResult.modelCalls === "number"
+          ) {
+            sessionStats.modelCallCount += sessionResult.modelCalls;
+          }
           return null;
         } catch (err) {
           const message = err && err.message ? err.message : "unknown";

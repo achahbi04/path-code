@@ -107,6 +107,11 @@ export function createEmptyStudioState() {
       /** @type {string[] | null} */
       machineLines: null,
       pathDetail: null,
+      /** AG1 living product — when true, evidence uses engineering lifecycle. */
+      ag1: false,
+      ag1Mutation: false,
+      /** @type {string[]} */
+      ag1Activities: [],
     },
   };
 }
@@ -132,14 +137,21 @@ export function classifyTerminalPathPhase(disposition, summary = "") {
   const blob = `${disposition} ${summary}`;
   if (/cancel|declined|CREDENTIAL_CANCELLED/i.test(blob)) return "Cancelled";
   if (
-    /ESCALATION|AUTONOMY_ESCALATION|PRIMARY_MUTATED|cleanup\.pending|CLEANUP_PENDING/i.test(
+    /ESCALATION|AUTONOMY_ESCALATION|PRIMARY_MUTATED|cleanup\.pending|CLEANUP_PENDING|AG1_AUTH_REQUIRED/i.test(
       blob,
     )
   ) {
     return "Blocked";
   }
+  // AG1 independent final result classifications — never map failure to Complete.
+  const disp = String(disposition || "").trim();
+  if (/^VERIFIED$/i.test(disp)) return "Verified";
+  if (/^PARTIALLY_VERIFIED$/i.test(disp)) return "Partially verified";
+  if (/^FAILED$/i.test(disp)) return "Failed";
+  if (/^NOT_VERIFIED$/i.test(disp)) return "Not verified";
+  if (/^AG1_/i.test(disp)) return "Failed";
   if (isSuccessfulTerminalDisposition(disposition, summary)) return "Complete";
-  if (/UNKNOWN|^unknown$/i.test(String(disposition || "").trim())) return "Unknown";
+  if (/UNKNOWN|^unknown$/i.test(disp)) return "Unknown";
   // Fail closed: non-success outcomes never render as Complete.
   if (
     /fail|error|refuse|not.?established|NOT_READY|ACQUIRE|CREDENTIAL|unavailable|GC1|ENV_POLICY|STALE|GAP|DRIFT|CALL_FAILED|AUTH_FAILED|SNAPSHOT|REQUIRED|UNAVAILABLE|INVENTORY|MUTATION_STALE|VALIDATION_|SCOPE_|ADAPTER_|BRAIN_|H_REFUSED|EDIT_|CHECK_/i.test(
@@ -194,7 +206,7 @@ export function projectAuthoritativePathPhase(state) {
     const disposition = parts[0] || terminal.detail || "";
     const summary = parts.slice(1).join(" — ");
     const classified = classifyTerminalPathPhase(disposition, summary);
-    if (classified === "Complete") {
+    if (classified === "Complete" || classified === "Verified") {
       if (product.cloudSelected && !product.disposed) {
         return /Cleaning up/i.test(product.cloudFooter || "")
           ? "Cleaning up"
@@ -203,7 +215,8 @@ export function projectAuthoritativePathPhase(state) {
       if (state.cards.gate2?.arrived && state.cards.gate2.status !== "done") {
         return "Failed";
       }
-      return "Complete";
+      // AG1: Verified is the success terminal; legacy Complete remains for Gate2 success.
+      return classified === "Verified" ? "Verified" : "Complete";
     }
     if (
       classified === "Failed" &&
@@ -320,8 +333,15 @@ export function applyStudioEvent(state, event, opts = {}) {
         state,
         "task",
         "done",
-        typeof event.task === "string" ? event.task : "(task)",
+        typeof event.task === "string"
+          ? event.task
+          : typeof event.preview === "string"
+            ? event.preview
+            : "(task)",
       );
+      if (event.mode === "ag1") {
+        state.product.ag1 = true;
+      }
       if (typeof event.modelId === "string") state.product.modelId = event.modelId;
       if (typeof event.provider === "string") {
         state.product.providerLabel = event.provider;
@@ -638,6 +658,117 @@ export function applyStudioEvent(state, event, opts = {}) {
         }
       }
       break;
+    case "session.engineering.workspace": {
+      state.product.ag1 = true;
+      setCard(
+        state,
+        "recovery",
+        "done",
+        typeof event.baselineHead === "string"
+          ? `baseline ${event.baselineHead.slice(0, 12)}`
+          : "task workspace",
+      );
+      setPathPhase(state, "Understanding");
+      break;
+    }
+    case "session.engineering.bridge": {
+      state.product.ag1 = true;
+      if (typeof event.detail === "string") {
+        state.product.pathDetail = event.detail.slice(0, 80);
+      }
+      break;
+    }
+    case "session.engineering.activity": {
+      state.product.ag1 = true;
+      const activity =
+        typeof event.activity === "string" ? event.activity : "";
+      const label =
+        typeof event.label === "string"
+          ? event.label
+          : activity || "Working";
+      // Agent "complete" is NOT a product terminal — only PATH validation is.
+      if (/^complete$/i.test(activity) || /^complete$/i.test(label)) {
+        setPathPhase(state, "Finishing");
+        break;
+      }
+      if (/^failed$/i.test(activity) || /^failed$/i.test(label)) {
+        setPathPhase(state, "Failed");
+        break;
+      }
+      setPathPhase(state, label);
+      if (/edit|implement/i.test(label)) {
+        setCard(state, "applying", "active", label);
+        state.product.ag1Mutation = true;
+      } else if (/test|verif/i.test(label)) {
+        setCard(state, "validationRunning", "active", label);
+      } else if (/inspect|read|understand/i.test(label)) {
+        setCard(state, "reading", "active", label);
+      }
+      if (!Array.isArray(state.product.ag1Activities)) {
+        state.product.ag1Activities = [];
+      }
+      if (state.product.ag1Activities[state.product.ag1Activities.length - 1] !== label) {
+        state.product.ag1Activities.push(label);
+      }
+      break;
+    }
+    case "session.engineering.tool": {
+      state.product.ag1 = true;
+      const summary =
+        typeof event.summary === "string"
+          ? event.summary
+          : typeof event.tool === "string"
+            ? event.tool
+            : "tool";
+      if (event.kind === "file_edit") {
+        setCard(state, "edit", "done", summary.slice(0, 120));
+        state.product.ag1Mutation = true;
+        if (state.cards.applying) {
+          state.cards.applying.arrived = true;
+          state.cards.applying.status = "done";
+          state.cards.applying.detail = summary.slice(0, 80);
+        }
+      }
+      break;
+    }
+    case "session.engineering.result": {
+      state.product.ag1 = true;
+      const classification =
+        typeof event.classification === "string"
+          ? event.classification
+          : "NOT_VERIFIED";
+      const files = Array.isArray(event.changedFiles)
+        ? event.changedFiles.length
+        : 0;
+      const phase =
+        classification === "VERIFIED"
+          ? "Verified"
+          : classification === "PARTIALLY_VERIFIED"
+            ? "Partially verified"
+            : classification === "FAILED"
+              ? "Failed"
+              : "Not verified";
+      setCard(
+        state,
+        "terminal",
+        classification === "VERIFIED" ? "done" : "refused",
+        `${classification} — ${files} file(s)`,
+      );
+      if (Array.isArray(event.changedFiles)) {
+        for (const p of event.changedFiles.slice(0, 40)) {
+          if (typeof p !== "string") continue;
+          if (!state.product.projectFiles.includes(p)) {
+            state.product.projectFiles.push(p);
+          }
+          state.product.projectEntries.push({
+            path: p,
+            role: fileRole(p, { modified: true }),
+          });
+        }
+      }
+      setPathPhase(state, phase);
+      break;
+    }
     case "session.environment.unavailable":
     case "session.infrastructure.failure": {
       const reason =

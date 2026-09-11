@@ -52,6 +52,12 @@ export const SESSION_EVENT_TYPES = Object.freeze([
   "session.machine.capabilities",
   "session.environment.unavailable",
   "session.infrastructure.failure",
+  // AG1 — Antigravity engineering session (product-facing; no engine branding).
+  "session.engineering.workspace",
+  "session.engineering.activity",
+  "session.engineering.tool",
+  "session.engineering.result",
+  "session.engineering.bridge",
 ]);
 
 /** Default heartbeat cadence while a stage await is in flight. */
@@ -363,6 +369,34 @@ export function renderSessionEventHuman(event) {
     }
     case "session.cancelled":
       return "Cycle cancelled.\n";
+    case "session.engineering.workspace": {
+      const ws = s(event.workspace, "task workspace");
+      return `Task workspace ready.\n`;
+    }
+    case "session.engineering.activity": {
+      const label = s(event.label, s(event.activity, "Working"));
+      const detail =
+        typeof event.detail === "string" && event.detail.trim() !== ""
+          ? ` — ${s(event.detail)}`
+          : "";
+      return `${label}${detail}\n`;
+    }
+    case "session.engineering.tool": {
+      const summary = s(event.summary, s(event.tool, "tool"));
+      return `Tool: ${summary}\n`;
+    }
+    case "session.engineering.result": {
+      const classification = s(event.classification, "NOT_VERIFIED");
+      const files = Array.isArray(event.changedFiles)
+        ? event.changedFiles.length
+        : 0;
+      const untouched = event.primaryUntouched === true ? "yes" : "no";
+      return `Engineering result: ${classification} · ${files} file(s) · primary untouched: ${untouched}\n`;
+    }
+    case "session.engineering.bridge": {
+      // Development evidence only — never print engine branding to the living UI.
+      return "";
+    }
     case "session.internal_error": {
       const message = s(event.message, "internal error");
       return `Internal error (session continues): ${message}\n`;
