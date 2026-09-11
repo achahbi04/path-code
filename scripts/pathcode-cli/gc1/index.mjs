@@ -67,6 +67,7 @@ export {
 /** Phase GC1-c — host/application layer. */
 export {
   GC1C_CONFIG,
+  GC1C_PROBE_WORKSTATION,
   GC1C_SESSION_BUDGET,
   GC1C_IMAGE_DIGEST,
   GC1C_COST_FENCES,
@@ -95,7 +96,40 @@ export {
   dispatchWorkerRequest,
   toProcessObservation,
   assertNoCredentialCanaries,
+  getLastRemoteWorkerInstallReceipt,
+  parseWorkerProtocolResponse,
 } from "./remote-worker.mjs";
+export {
+  DEFAULT_RUNTIME_ROOT_PREFIX,
+  buildRuntimeRoot,
+  assertRuntimeRelativePath,
+  assertPathUnderRuntimeRoot,
+  assertTransportRuntimeDeliveryCapability,
+  sha256Hex,
+  assertNoSecretsInDeliverySurfaces,
+  deliverVerifiedHostRuntimeFile,
+  shQuote,
+  GC1_RUNTIME_DELIVERY_ERROR,
+  parseWcBytes,
+  parseSha256Sum,
+} from "./runtime-delivery.mjs";
+export { assertGc1cTransportConformance } from "./transport-conformance.mjs";
+export {
+  encodeShellArg,
+  encodeShellArgv,
+  assertRemoteCommandString,
+  looksLikeArrayCommaCoercion,
+  GC1_SHELL_ENCODE_ERROR,
+} from "./shell-encode.mjs";
+export {
+  TRUSTED_REMOTE_NODE,
+  encodeWorkerBootstrapCommand,
+  parseWorkerBootstrapCommand,
+  assertVerifiedWorkerPath,
+  assertWorkerInstallReceipt,
+  encodeTrustedRemoteDescriptor,
+  GC1_BOOTSTRAP_ERROR,
+} from "./worker-bootstrap.mjs";
 export {
   createCloudEffectsBackend,
   loadEditingHostDependencies,
@@ -134,3 +168,13 @@ export {
   remapValidationCandidatesForTaskWorkspace,
   inventoryEntriesByPath,
 } from "./cloud-session.mjs";
+export {
+  ENGINEERING_TOOL_SPECS,
+  queryMachineCapabilities,
+  parseToolVersion,
+  interpretToolResult,
+  formatMachineCapabilityLines,
+} from "./machine-capabilities.mjs";
+export {
+  isTransientExecutionChannelFailure,
+} from "./lifecycle.mjs";

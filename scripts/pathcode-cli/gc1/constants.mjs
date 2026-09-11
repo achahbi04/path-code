@@ -32,10 +32,14 @@ export const GC1_LOCAL_SSH_NOISE_RE =
 
 /**
  * Command-channel readiness poll: VM may be STATE_RUNNING before the
- * container agent has wired stdout. Default window = 6 × 3s = 18s.
+ * container agent has wired stdout. Production GC1-c window = 180s @ 2s.
  */
-export const GC1_EXECUTION_READY_ATTEMPTS = 6;
-export const GC1_EXECUTION_READY_INTERVAL_MS = 3_000;
+export const GC1_EXECUTION_READY_INTERVAL_MS = 2_000;
+export const GC1_EXECUTION_READY_DEADLINE_MS = 180_000;
+/** @deprecated prefer deadline/interval — kept for GC1-a test compatibility */
+export const GC1_EXECUTION_READY_ATTEMPTS = Math.ceil(
+  GC1_EXECUTION_READY_DEADLINE_MS / GC1_EXECUTION_READY_INTERVAL_MS,
+);
 
 export const GC1_AUTH_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 export const GC1_WORKSTATIONS_API_BASE = "https://workstations.googleapis.com/v1";
@@ -57,16 +61,18 @@ export function clusterName(projectId = GC1_PROJECT_ID, region = GC1_REGION) {
 export function configName(
   projectId = GC1_PROJECT_ID,
   region = GC1_REGION,
+  configId = GC1_CONFIG,
 ) {
-  return `${clusterName(projectId, region)}/workstationConfigs/${GC1_CONFIG}`;
+  return `${clusterName(projectId, region)}/workstationConfigs/${configId}`;
 }
 
 export function workstationName(
   workstationId = GC1_PROBE_WORKSTATION,
   projectId = GC1_PROJECT_ID,
   region = GC1_REGION,
+  configId = GC1_CONFIG,
 ) {
-  return `${configName(projectId, region)}/workstations/${workstationId}`;
+  return `${configName(projectId, region, configId)}/workstations/${workstationId}`;
 }
 
 export function locationParent(

@@ -30,6 +30,8 @@ import { normalizeHydrationRelativePath } from "./task-snapshot.mjs";
  *   localPrimaryRoot: string,
  *   journal?: object,
  *   taskId?: string,
+ *   sessionId?: string,
+ *   workerInstallReceipt?: object,
  *   ownersDistEditingHostDeps?: object,
  *   scriptedProcessResults?: object[],
  * }} opts
@@ -42,6 +44,7 @@ export function createCloudEffectsBackend(opts) {
   const localPrimaryRoot = resolve(String(opts.localPrimaryRoot));
   const journal = opts.journal ?? null;
   const taskId = opts.taskId ?? null;
+  const sessionId = opts.sessionId || taskId || "default";
 
   if (!transport) throw new Error("createCloudEffectsBackend requires transport");
   if (!workstationName) throw new Error("createCloudEffectsBackend requires workstationName");
@@ -61,7 +64,10 @@ export function createCloudEffectsBackend(opts) {
   const processLog = [];
   /** @type {object[]} */
   const writeOrder = [];
-  let workerInstalled = false;
+  /** @type {object|null} */
+  let workerReceipt = opts.workerInstallReceipt
+    ? { ...opts.workerInstallReceipt }
+    : null;
   /** @type {object[]} */
   const scriptedProcessResults = Array.isArray(opts.scriptedProcessResults)
     ? [...opts.scriptedProcessResults]
@@ -89,9 +95,32 @@ export function createCloudEffectsBackend(opts) {
   }
 
   async function ensureWorker() {
-    if (workerInstalled) return;
-    await installRemoteWorker(transport, { workstationName });
-    workerInstalled = true;
+    if (workerReceipt?.remotePath && workerReceipt?.sha256) {
+      return workerReceipt;
+    }
+    workerReceipt = await installRemoteWorker(transport, {
+      workstationName,
+      sessionId,
+      taskId,
+    });
+    return workerReceipt;
+  }
+
+  function workerInvokeOpts(extra = {}) {
+    if (!workerReceipt?.remotePath) {
+      const err = new Error("worker install receipt missing remotePath");
+      err.code = "GC1_REMOTE_RUNTIME_PATH_REFUSED";
+      throw err;
+    }
+    return {
+      workstationName,
+      installReceipt: workerReceipt,
+      workerRemotePath: workerReceipt.remotePath,
+      expectedSha256: workerReceipt.sha256,
+      sessionId,
+      taskId,
+      ...extra,
+    };
   }
 
   /**
@@ -128,7 +157,7 @@ export function createCloudEffectsBackend(opts) {
       });
     }
     const response = await invokeRemoteWorker(transport, {
-      workstationName,
+      ...workerInvokeOpts(),
       request,
     });
     if (!response?.ok) {
@@ -156,7 +185,7 @@ export function createCloudEffectsBackend(opts) {
     };
     assertNoCredentialCanaries(request);
     const response = await invokeRemoteWorker(transport, {
-      workstationName,
+      ...workerInvokeOpts(),
       request,
     });
     if (!response?.ok) {
@@ -258,7 +287,7 @@ export function createCloudEffectsBackend(opts) {
 
     processLog.push({ request, atMs: Date.now() });
     const response = await invokeRemoteWorker(transport, {
-      workstationName,
+      ...workerInvokeOpts(),
       request,
     });
     if (!response?.ok) {
@@ -404,6 +433,8 @@ export function createCloudEffectsBackend(opts) {
     createProcessObservationRunner,
     createAuthoritativeContentReader,
     ensureWorker,
+    getWorkerInstallReceipt: () =>
+      workerReceipt ? { ...workerReceipt } : null,
     getPublishLog: () => [...publishLog],
     getProcessLog: () => [...processLog],
     getWriteOrder: () => [...writeOrder],

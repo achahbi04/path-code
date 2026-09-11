@@ -13,6 +13,7 @@ import {
   applyStudioEvent,
   assertNoFabricatedProgress,
   createEmptyStudioState,
+  projectAuthoritativePathPhase,
   STUDIO_CARD_ORDER,
 } from "../path-studio/state.mjs";
 import { escapeForTerminalDisplay } from "./escape.mjs";
@@ -123,22 +124,284 @@ function formatCardLine(card, compact, columns) {
 }
 
 /**
+ * Evidence marks for the living product column — only from arrived cards.
+ * @param {ReturnType<typeof createEmptyStudioState>} state
+ * @returns {string[]}
+ */
+export function buildEvidenceLines(state) {
+  /** @type {string[]} */
+  const lines = [];
+  const product = state.product || {};
+
+  if (product.infraFailure) {
+    lines.push("Environment     ✕");
+  }
+
+  const g1 = state.cards.gate1;
+  if (g1?.arrived) {
+    lines.push(
+      g1.status === "done" ? "Gate 1          ✓" : "Gate 1          refused",
+    );
+  } else {
+    lines.push("Gate 1          waiting");
+  }
+
+  // Snapshot is established once hydration (or non-cloud recovery path) begins.
+  if (product.hydrationFiles != null || state.cards.recovery?.arrived) {
+    lines.push("Snapshot        ✓");
+  } else if (product.cloudSelected && !product.workstationReady) {
+    lines.push("Snapshot        —");
+  } else if (state.cards.scope?.arrived) {
+    lines.push("Snapshot        —");
+  }
+
+  const rec = state.cards.recovery;
+  if (rec?.arrived) {
+    lines.push("Recovery        ✓");
+  } else {
+    lines.push("Recovery        —");
+  }
+
+  const apply = state.cards.applying;
+  if (apply?.status === "active") {
+    lines.push("Mutation        ●");
+  } else if (apply?.arrived) {
+    lines.push("Mutation        ✓");
+  } else {
+    lines.push("Mutation        —");
+  }
+
+  const vPlan = state.cards.validationPlan;
+  const vRun = state.cards.validationRunning;
+  const vRes = state.cards.validationResult;
+  const detail = vRes?.detail || "";
+  const typecheckPass = /TYPECHECK[^\n]*?(?:pass|ok|✓|done)/i.test(detail);
+  const typecheckFail = /TYPECHECK[^\n]*?(?:fail|error|NOT_PASS)/i.test(detail);
+  const testPassMatch = detail.match(/(\d+)\s*\/\s*(\d+)/);
+  const testFail = /fail|error|NOT_PASS|not.?pass/i.test(detail) && /test|TARGETED|regression/i.test(detail);
+
+  if (vRun?.status === "active") {
+    const check = String(vRun.detail || "");
+    if (/TYPECHECK/i.test(check)) {
+      lines.push("Typecheck       ●");
+      lines.push("Tests           —");
+    } else {
+      lines.push(typecheckPass ? "Typecheck       ✓" : "Typecheck       —");
+      lines.push(`Tests           ●`);
+    }
+  } else if (vRes?.arrived) {
+    if (typecheckFail) {
+      lines.push("Typecheck       ✕");
+    } else if (typecheckPass || /TYPECHECK/i.test(detail)) {
+      lines.push("Typecheck       ✓");
+    } else if (vPlan?.arrived) {
+      lines.push("Typecheck       —");
+    } else {
+      lines.push("Typecheck       —");
+    }
+    if (testPassMatch) {
+      const mark = testFail || /✕|fail/i.test(detail) ? " ✕" : " ✓";
+      lines.push(`Tests          ${testPassMatch[1]}/${testPassMatch[2]}${mark}`);
+    } else if (testFail || /fail|error|NOT_PASS/i.test(detail)) {
+      lines.push("Tests           ✕");
+    } else if (/TARGETED|test|regression|pass|ok/i.test(detail)) {
+      lines.push("Tests           ✓");
+    } else {
+      lines.push("Tests           —");
+    }
+  } else {
+    lines.push("Typecheck       —");
+    lines.push("Tests           —");
+  }
+
+  const g2 = state.cards.gate2;
+  if (g2?.arrived) {
+    if (g2.status === "done" && g2.detail === "accepted") {
+      lines.push("Gate 2          ✓");
+    } else {
+      lines.push("Gate 2          NOT ESTABLISHED");
+    }
+  } else if (vRun?.status === "active") {
+    lines.push("Gate 2          waiting");
+  } else {
+    lines.push("Gate 2          —");
+  }
+  return lines;
+}
+
+/**
+ * Glyph for PATH phase — activity vs terminal.
+ * @param {string} phase
+ */
+function pathGlyph(phase) {
+  if (phase === "Complete") return "✓";
+  if (phase === "Failed" || phase === "Infrastructure failure") return "✕";
+  if (phase === "Blocked") return "■";
+  if (phase === "Cancelled" || phase === "Cancelling") return "○";
+  if (phase === "Unknown" || phase === "Unconfirmed") return "○";
+  return "◆";
+}
+
+/**
+ * Wide living product surface: PROJECT | PATH | EVIDENCE + MACHINE + footer.
+ *
+ * @param {ReturnType<typeof createEmptyStudioState>} state
+ * @param {{ rows: number, columns: number }} viewport
+ * @returns {string[]}
+ */
+export function buildLivingProductLines(state, viewport) {
+  const columns =
+    typeof viewport.columns === "number" && viewport.columns > 0
+      ? Math.floor(viewport.columns)
+      : 80;
+  const rows =
+    typeof viewport.rows === "number" && viewport.rows > 0
+      ? Math.floor(viewport.rows)
+      : 24;
+  const maxHeight = Math.max(10, rows - 2);
+  const gap = 2;
+  const colW = Math.max(12, Math.floor((columns - gap * 2) / 3));
+
+  const product = state.product || {
+    pathPhase: "Idle",
+    cloudFooter: null,
+    projectFiles: [],
+    projectEntries: [],
+    branch: null,
+    dirtySummary: null,
+  };
+
+  const pathPhase = projectAuthoritativePathPhase(state);
+
+  /** @type {string[]} */
+  const projectCol = ["PROJECT", ""];
+  const entries = Array.isArray(product.projectEntries)
+    ? product.projectEntries
+    : [];
+  if (entries.length > 0) {
+    for (const e of entries.slice(0, 6)) {
+      projectCol.push(String(e.path));
+      projectCol.push(`  ${e.role}`);
+    }
+  } else {
+    const files = Array.isArray(product.projectFiles) ? product.projectFiles : [];
+    if (files.length === 0) {
+      projectCol.push("(awaiting scope)");
+    } else {
+      for (const f of files.slice(0, 6)) {
+        projectCol.push(String(f));
+      }
+    }
+  }
+  projectCol.push("");
+  const branch = product.branch ? String(product.branch).replace(/\s+@\s+\S+/, "") : null;
+  const dirty = product.dirtySummary ? String(product.dirtySummary) : null;
+  if (branch || dirty) {
+    projectCol.push([branch, dirty].filter(Boolean).join(" · "));
+  }
+
+  /** @type {string[]} */
+  const pathCol = ["PATH", "", `${pathGlyph(pathPhase)} ${pathPhase}`];
+  if (pathPhase === "Starting workstation") {
+    const region = product.region || "europe-west4";
+    const sec = state.heartbeat
+      ? Math.floor(state.heartbeat.elapsedMs / 1000)
+      : null;
+    pathCol.push(`  ${region}${sec != null ? ` · ${sec}s` : ""}`);
+  } else if (pathPhase === "Hydrating" && product.pathDetail) {
+    pathCol.push(`  ${product.pathDetail}`);
+  } else if (pathPhase === "Applying" && product.pathDetail) {
+    pathCol.push(`  ${product.pathDetail}`);
+  } else if (pathPhase === "Testing" && state.cards.validationRunning?.detail) {
+    pathCol.push(`  ${state.cards.validationRunning.detail}`);
+  } else if (pathPhase === "Infrastructure failure" && product.infraFailure) {
+    pathCol.push(`  ${String(product.infraFailure).slice(0, colW - 2)}`);
+  }
+
+  const modelId = product.modelId || null;
+  const provider = product.providerLabel || (modelId ? "OpenAI" : null);
+  if (provider || modelId) {
+    pathCol.push("");
+    pathCol.push("Provider");
+    pathCol.push(`  ${[provider, modelId].filter(Boolean).join(" · ")}`);
+    if (product.providerTurn) {
+      const t = product.providerTurn;
+      pathCol.push(`  bounded · turn ${t.call}/${t.of}`);
+    }
+  }
+
+  /** @type {string[]} */
+  const evidenceCol = ["EVIDENCE", "", ...buildEvidenceLines(state)];
+
+  const height = Math.max(projectCol.length, pathCol.length, evidenceCol.length);
+  /** @type {string[]} */
+  const lines = [];
+  for (let i = 0; i < height; i += 1) {
+    const a = fitLine(projectCol[i] ?? "", colW).padEnd(colW, " ");
+    const b = fitLine(pathCol[i] ?? "", colW).padEnd(colW, " ");
+    const c = fitLine(evidenceCol[i] ?? "", colW);
+    lines.push(fitLine(`${a}${" ".repeat(gap)}${b}${" ".repeat(gap)}${c}`, columns));
+  }
+
+  const machineLines = Array.isArray(product.machineLines)
+    ? product.machineLines
+    : null;
+  if (machineLines && machineLines.length > 0 && product.workstationReady) {
+    lines.push(fitLine("─".repeat(Math.min(columns, 80)), columns));
+    lines.push(fitLine("MACHINE", columns));
+    for (const ml of machineLines) {
+      lines.push(fitLine(ml, columns));
+    }
+  }
+
+  lines.push(fitLine("─".repeat(Math.min(columns, 80)), columns));
+  let footer =
+    product.cloudFooter ||
+    (state.heartbeat
+      ? `☁ working · ${state.heartbeat.stage} · ${Math.floor(state.heartbeat.elapsedMs / 1000)}s`
+      : "");
+  // Keep footer coherent with authoritative PATH (no Complete + Starting).
+  if (
+    pathPhase === "Starting workstation" &&
+    footer &&
+    !/Starting/i.test(footer)
+  ) {
+    footer = `☁ ${product.region || "europe-west4"} · Engineering Image · Starting`;
+  }
+  if (pathPhase === "Infrastructure failure") {
+    footer = product.disposed ? "☁ Disposed ✓" : "☁ Cleaning up…";
+  }
+  if (footer) {
+    lines.push(fitLine(footer, columns));
+  }
+  return lines.slice(0, maxHeight);
+}
+
+/** Wide-TTY threshold for three-column living product surface. */
+export const LIVING_PRODUCT_MIN_COLUMNS = 120;
+
+/**
  * Build the visible card block, clamped to rows-2 (1a).
  * Non-active stages collapse to single-line summaries when needed.
+ * Wide TTY (≥120 cols): three-column living product surface.
  *
  * @param {ReturnType<typeof createEmptyStudioState>} state
  * @param {{ rows: number, columns: number }} viewport
  * @returns {string[]}
  */
 export function buildInlineCardLines(state, viewport) {
-  const rows =
-    typeof viewport.rows === "number" && viewport.rows > 0
-      ? Math.floor(viewport.rows)
-      : 24;
   const columns =
     typeof viewport.columns === "number" && viewport.columns > 0
       ? Math.floor(viewport.columns)
       : 80;
+  if (columns >= LIVING_PRODUCT_MIN_COLUMNS) {
+    return buildLivingProductLines(state, viewport);
+  }
+
+  const rows =
+    typeof viewport.rows === "number" && viewport.rows > 0
+      ? Math.floor(viewport.rows)
+      : 24;
   const maxHeight = Math.max(3, rows - 2);
   const activeId = activeCardId(state);
 
@@ -314,6 +577,7 @@ export function createInlineStudioRenderer(options = {}) {
   let resizeListener = null;
   let writeCount = 0;
   /** @type {string[]} */
+  const diagnostics = [];
   const frames = [];
   const decorateGate2Accepted = options.decorateGate2Accepted === true;
 
@@ -448,6 +712,10 @@ export function createInlineStudioRenderer(options = {}) {
     }
   }
 
+  function noteDiagnostic(text) {
+    diagnostics.push(String(text ?? ""));
+  }
+
   function isActive() {
     return active;
   }
@@ -466,6 +734,7 @@ export function createInlineStudioRenderer(options = {}) {
       cursorHidden,
       writeCount,
       frames: frames.slice(),
+      diagnostics: diagnostics.slice(),
       hasResizeListener: resizeListener !== null,
     };
   }
@@ -475,6 +744,7 @@ export function createInlineStudioRenderer(options = {}) {
     begin,
     onEvent,
     noteExternalWrite,
+    noteDiagnostic,
     finish,
     dispose: () => finish(),
     isActive,
@@ -487,19 +757,37 @@ export function createInlineStudioRenderer(options = {}) {
 }
 
 /**
- * Wrap a prompt.write so external session output re-anchors the card block (1d).
+ * Wrap a prompt.write so external session output does not tear the living frame.
+ * Interactive challenge prompts still surface; diagnostic dumps are suppressed
+ * while the renderer owns the TTY and routed into a diagnostic buffer.
+ *
  * @param {{ write: (text: string) => void }} prompt
  * @param {ReturnType<typeof createInlineStudioRenderer>} renderer
  */
 export function installCollisionGuard(prompt, renderer) {
   const original = prompt.write.bind(prompt);
+  /** @type {string[]} */
+  const diagnostics = [];
   prompt.write = (text) => {
+    const raw = String(text ?? "");
     if (renderer.isActive() && renderer.enabled) {
+      const interactive =
+        /Approve THIS|typing exactly:|Your task:|ESCAPE_LEGEND|APPLY |CHECK |SCOPE |RESTORE |\/recover|Goodbye|Usage:|Model set|PATH ●|Path Code >/i.test(
+          raw,
+        );
+      if (!interactive) {
+        diagnostics.push(raw);
+        if (typeof renderer.noteDiagnostic === "function") {
+          renderer.noteDiagnostic(raw);
+        }
+        return;
+      }
       renderer.noteExternalWrite();
     }
     return original(text);
   };
   return () => {
     prompt.write = original;
+    return diagnostics;
   };
 }

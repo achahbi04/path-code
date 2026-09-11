@@ -27,12 +27,15 @@ import { DEFAULT_REMOTE_ROOT } from "./workspace-hydrator.mjs";
 import { detectDependencyStrategy } from "./dependency-strategy.mjs";
 import {
   GC1C_CONFIG,
+  GC1C_PROBE_WORKSTATION,
   GC1C_IMAGE_DIGEST,
   GC1C_SESSION_BUDGET,
 } from "./cloud-constants.mjs";
 import { IMAGE_DIGEST_HISTORY } from "./engineering-image.mjs";
 import { installRemoteWorker, invokeRemoteWorker } from "./remote-worker.mjs";
 import { runRemoteCredentialBoundaryProof } from "./credential-boundary.mjs";
+import { assertGc1cTransportConformance } from "./transport-conformance.mjs";
+import { queryMachineCapabilities } from "./machine-capabilities.mjs";
 
 /**
  * Index ADMITTED inventory paths → RepositoryEntry.
@@ -459,16 +462,30 @@ export async function prepareCloudTaskEnvironment(input) {
     });
   }
 
+  // Fail closed locally before billable GCP acquire when possible.
+  try {
+    assertGc1cTransportConformance(transport);
+  } catch (e) {
+    return {
+      ok: false,
+      code: e.code || "GC1_REMOTE_TRANSPORT_CAPABILITY_MISSING",
+      message: e.message || "transport missing GC1-c runtime delivery capability",
+    };
+  }
+
   const lifecycle =
     options.cloudLifecycle ??
     createWorkstationLifecycleManager({
       transport,
       journal,
       sessionBudget: GC1C_SESSION_BUDGET,
-      deadlineMs: options.deadlineMs ?? 5_000,
-      pollIntervalMs: options.pollIntervalMs ?? 5,
-      executionReadyAttempts: options.executionReadyAttempts ?? 2,
-      executionReadyIntervalMs: options.executionReadyIntervalMs ?? 1,
+      configId: GC1C_CONFIG,
+      probeWorkstationId: GC1C_PROBE_WORKSTATION,
+      deadlineMs: options.deadlineMs,
+      pollIntervalMs: options.pollIntervalMs,
+      executionReadyDeadlineMs: options.executionReadyDeadlineMs,
+      executionReadyIntervalMs: options.executionReadyIntervalMs,
+      executionReadyAttempts: options.executionReadyAttempts,
     });
 
   let workstation;
@@ -486,6 +503,37 @@ export async function prepareCloudTaskEnvironment(input) {
   journal.appendEvent(taskId, "workstation.acquired", {
     workstationId: workstation.workstationId || workstation.name,
   });
+  emit?.("session.workstation.ready", {
+    workstationId: workstation.workstationId || workstation.name,
+    region: "europe-west4",
+  });
+
+  // One-shot Engineering Computer probe after execution readiness.
+  // Live / explicit inject only — mock unit paths skip unless capabilities provided.
+  if (
+    options.skipMachineCapabilities !== true &&
+    (options.machineCapabilities || options.skipLiveGcp === false)
+  ) {
+    try {
+      const caps =
+        options.machineCapabilities ||
+        (await queryMachineCapabilities(transport, {
+          workstationName: workstation.name,
+        }));
+      emit?.("session.machine.capabilities", {
+        workstationId: workstation.workstationId || workstation.name,
+        lines: caps.lines,
+        tools: Object.fromEntries(
+          Object.entries(caps.tools || {}).map(([id, row]) => [
+            id,
+            { present: row.present, version: row.version },
+          ]),
+        ),
+      });
+    } catch {
+      /* capability probe failure is non-fatal for the task path; MACHINE stays empty */
+    }
+  }
 
   const taskWorkspaceRoot =
     options.taskWorkspaceRoot ||
@@ -518,7 +566,28 @@ export async function prepareCloudTaskEnvironment(input) {
 
   // Prefer exact H file list via worker publish (not full-repo hydrator).
   // Worker install runs after lifecycle execution-ready (acquireProbeWorkstation).
-  await installRemoteWorker(transport, { workstationName });
+  let workerInstallReceipt;
+  try {
+    workerInstallReceipt = await installRemoteWorker(transport, {
+      workstationName,
+      sessionId: taskId,
+      taskId,
+    });
+    journal.appendEvent(taskId, "worker.installed", {
+      sha256: workerInstallReceipt.sha256,
+      remotePath: workerInstallReceipt.remotePath,
+      length: workerInstallReceipt.length,
+      version: workerInstallReceipt.version,
+      runtimeRoot: workerInstallReceipt.runtimeRoot,
+    });
+  } catch (e) {
+    await safeTeardown(lifecycle, journal, taskId, workstation);
+    return {
+      ok: false,
+      code: e.code || "GC1_REMOTE_RUNTIME_WRITE_FAILED",
+      message: e.message || "remote worker install failed",
+    };
+  }
 
   // Credential boundary proof: after execution ready + worker install,
   // BEFORE dependency install / mutation readiness. Never prints values.
@@ -539,6 +608,11 @@ export async function prepareCloudTaskEnvironment(input) {
     const bytes = snapshot.payload.get(meta.relativePath);
     const response = await invokeRemoteWorker(transport, {
       workstationName,
+      installReceipt: workerInstallReceipt,
+      workerRemotePath: workerInstallReceipt.remotePath,
+      expectedSha256: workerInstallReceipt.sha256,
+      sessionId: taskId,
+      taskId,
       request: {
         op: "writeFile",
         root: remoteRoot,
@@ -561,6 +635,11 @@ export async function prepareCloudTaskEnvironment(input) {
   for (const meta of snapshot.manifest.files) {
     const st = await invokeRemoteWorker(transport, {
       workstationName,
+      installReceipt: workerInstallReceipt,
+      workerRemotePath: workerInstallReceipt.remotePath,
+      expectedSha256: workerInstallReceipt.sha256,
+      sessionId: taskId,
+      taskId,
       request: { op: "stat", root: remoteRoot, path: meta.relativePath },
     });
     if (!st?.ok || !st.result?.isFile) {
@@ -588,6 +667,8 @@ export async function prepareCloudTaskEnvironment(input) {
     localPrimaryRoot: primaryRoot,
     journal,
     taskId,
+    sessionId: taskId,
+    workerInstallReceipt,
     scriptedProcessResults: options.scriptedProcessResults,
   });
 
@@ -691,6 +772,10 @@ export async function finalizeCloudTask(ctx, outcome = {}) {
         : null;
     if (still && still.state && still.state !== "DELETED") {
       cleanupOk = false;
+    } else {
+      emit?.("session.workstation.disposed", {
+        workstationId: workstation?.workstationId || workstation?.name,
+      });
     }
   } catch (e) {
     cleanupOk = false;

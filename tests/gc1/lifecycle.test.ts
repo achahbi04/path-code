@@ -495,8 +495,9 @@ describe("GC1A-J EXECUTION READINESS RETRY + FORCE-DISPOSE", () => {
   it("empty stdout on first attempts is not ready until a later retry returns HEALTH_CHECK_OK", async () => {
     const { createMockWorkstationTransport, createWorkstationLifecycleManager, constants } =
       await loadGc1();
-    expect(constants.GC1_EXECUTION_READY_ATTEMPTS).toBe(6);
-    expect(constants.GC1_EXECUTION_READY_INTERVAL_MS).toBe(3_000);
+    expect(constants.GC1_EXECUTION_READY_ATTEMPTS).toBe(90);
+    expect(constants.GC1_EXECUTION_READY_INTERVAL_MS).toBe(2_000);
+    expect(constants.GC1_EXECUTION_READY_DEADLINE_MS).toBe(180_000);
 
     const transport = createMockWorkstationTransport({
       pollsUntilRunning: 1,

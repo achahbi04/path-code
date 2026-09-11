@@ -464,7 +464,7 @@ describe("PI-J atomic write", () => {
 });
 
 describe("PI-K collision guard", () => {
-  it("PI-K: interleaved write re-anchors; next frame intact without cursor-up into history", async () => {
+  it("PI-K: stray diagnostic writes are suppressed; living frame stays coherent", async () => {
     const { createInlineStudioRenderer, installCollisionGuard } = await import(
       `${INLINE}?pik=${Date.now()}`
     );
@@ -484,9 +484,11 @@ describe("PI-K collision guard", () => {
       ts: 1,
     });
     const mid = stdout.writeCount;
-    // Stray library / console write mid-cycle.
+    // Stray library / console write mid-cycle — must not tear the product frame.
     prompt.write("STRAY_LOG_LINE\n");
-    expect(renderer.stats().needsReanchor).toBe(true);
+    expect(renderer.stats().diagnostics.join("")).toContain("STRAY_LOG_LINE");
+    const midChunks = stdout.chunks.slice(mid).join("");
+    expect(midChunks).not.toContain("STRAY_LOG_LINE");
     renderer.onEvent({
       type: "session.preflight",
       sessionId: "pik",
@@ -495,14 +497,8 @@ describe("PI-K collision guard", () => {
       ts: 2,
     });
     const after = stdout.chunks.slice(mid).join("");
-    expect(after).toContain("STRAY_LOG_LINE");
-    // Re-anchored frame starts with a newline, not a blind cursor-up into history.
-    const frame = stdout.chunks[stdout.chunks.length - 1]!;
-    expect(frame.startsWith("\u001b[?25l\n") || frame.includes("\nPATH STUDIO")).toBe(
-      true,
-    );
-    expect(frame).not.toMatch(/^\u001b\[\?25l\u001b\[\d+A/);
-    expect(frame).toContain("Preflight");
+    expect(after).not.toContain("STRAY_LOG_LINE");
+    expect(after).toContain("Preflight");
     uninstall();
     renderer.finish();
   });

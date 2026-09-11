@@ -37,6 +37,7 @@ import { createTunnelSession } from "./remote-exec.mjs";
  * @param {typeof fetch} [opts.fetchImpl]
  * @param {boolean} [opts.skipEnvGate] test-only — NEVER set in production callers
  * @param {boolean} [opts.weakenAuthAttachment] P-falsification only — omit Bearer on getCluster
+ * @param {object} [opts.tunnelSession] test-only — inject fake tunnel (no GCP)
  */
 export async function createGcpWorkstationTransport(opts = {}) {
   if (!opts.skipEnvGate) {
@@ -46,7 +47,7 @@ export async function createGcpWorkstationTransport(opts = {}) {
   const auth = opts.auth || (await createImpersonatedControlAuth());
   const fetchImpl = opts.fetchImpl || globalThis.fetch;
   const weakenAuthAttachment = opts.weakenAuthAttachment === true;
-  const tunnelSession = createTunnelSession();
+  const tunnelSession = opts.tunnelSession || createTunnelSession();
   let networkCalls = 0;
   /** @type {Array<{ op: string, url: string, hasBearer: boolean }>} */
   const authAttachmentLog = [];
@@ -318,10 +319,30 @@ export async function createGcpWorkstationTransport(opts = {}) {
       // Control-SA TCP tunnel + OpenSSH — NOT bare `gcloud workstations ssh`
       // (operator ADC lacks workstations.use; gcloud --command drops exit codes).
       // Session reuses one tunnel; config/cluster parsed from full resource name.
+      const { assertRemoteCommandString } = await import("./shell-encode.mjs");
       return tunnelSession.execute({
         workstationName: wsName,
-        command,
+        command: assertRemoteCommandString(command),
         stdin,
+      });
+    },
+
+    /**
+     * Conformance alias — verified PATH-owned runtime delivery via executeCommand+stdin.
+     * Not a project-source mutation path.
+     */
+    async writeHostRuntimeFile(opts) {
+      const { deliverVerifiedHostRuntimeFile } = await import(
+        "./runtime-delivery.mjs"
+      );
+      return deliverVerifiedHostRuntimeFile({
+        transport: this,
+        workstationName: opts.workstationName,
+        runtimeRoot: opts.runtimeRoot,
+        bytes: opts.bytes,
+        finalBaseName: opts.finalBaseName,
+        mode: opts.mode,
+        _testHooks: opts._testHooks,
       });
     },
 

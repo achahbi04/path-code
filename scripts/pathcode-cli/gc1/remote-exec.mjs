@@ -23,6 +23,7 @@ import {
   GC1_REGION,
   GC1_SSH_USER,
 } from "./constants.mjs";
+import { assertRemoteCommandString } from "./shell-encode.mjs";
 
 /**
  * @param {import("node:child_process").ChildProcessWithoutNullStreams} child
@@ -213,6 +214,10 @@ export function createTunnelSession() {
   async function execute(opts) {
     const target = resolveWorkstationTunnelTarget(opts);
     const { port } = await ensureTunnel(target);
+    // CRITICAL: command MUST be a string. Arrays coerce via Array.toString()
+    // to "node,/tmp/..." when passed as a single ssh argv element — the live
+    // GC1-c WORKER_PROTOCOL / exit=127 failure mode.
+    const remoteCommand = assertRemoteCommandString(opts.command);
     const sshArgs = [
       "-T",
       "-p",
@@ -234,7 +239,7 @@ export function createTunnelSession() {
       "-o",
       "ServerAliveCountMax=4",
       `${GC1_SSH_USER}@127.0.0.1`,
-      opts.command,
+      remoteCommand,
     ];
 
     const hasStdin = opts.stdin != null;
@@ -244,12 +249,34 @@ export function createTunnelSession() {
       shell: false,
     });
 
+    /** @type {{ stdinEnded: boolean, stdinError: Error|null }} */
+    const stdinMeta = { stdinEnded: !hasStdin, stdinError: null };
+
     if (hasStdin) {
       const buf = Buffer.isBuffer(opts.stdin)
         ? opts.stdin
         : Buffer.from(String(opts.stdin), "utf8");
-      ssh.stdin.write(buf);
-      ssh.stdin.end();
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        const fail = (err) => {
+          if (settled) return;
+          settled = true;
+          stdinMeta.stdinError = err instanceof Error ? err : new Error(String(err));
+          reject(stdinMeta.stdinError);
+        };
+        const ok = () => {
+          if (settled) return;
+          settled = true;
+          stdinMeta.stdinEnded = true;
+          resolve();
+        };
+        ssh.stdin.on("error", fail);
+        // Explicit EOF is part of the worker protocol contract.
+        ssh.stdin.end(buf, (err) => {
+          if (err) fail(err);
+          else ok();
+        });
+      });
     }
 
     const result = await captureChildStreams(ssh);
@@ -270,6 +297,8 @@ export function createTunnelSession() {
         shell: false,
         awaitsStreamEnd: true,
         sessionReuse: true,
+        stdinEnded: stdinMeta.stdinEnded,
+        remoteCommandIsString: true,
       },
     };
   }

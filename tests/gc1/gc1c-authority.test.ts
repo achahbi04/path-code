@@ -141,12 +141,19 @@ describe("GC1C-B execution authority", () => {
   it("never falls back to local spawn when remote worker fails", async () => {
     const { createCloudEffectsBackend, createMockWorkstationTransport } = await load();
     const transport = createMockWorkstationTransport();
-    // Break worker by making invokeWorkerRequest fail.
-    transport.invokeWorkerRequest = async () => ({
-      v: "gc1c-worker-v1",
-      ok: false,
-      error: { code: "TRANSPORT", message: "simulated transport failure" },
-    });
+    // Break the executeCommand bootstrap/protocol path (not the retired in-process shortcut).
+    const originalExec = transport.executeCommand.bind(transport);
+    transport.executeCommand = async (opts: any) => {
+      const cmd = String(opts.command || "");
+      if (cmd.includes("/usr/bin/node") && cmd.includes("remote-worker-")) {
+        return {
+          stdout: "",
+          stderr: "simulated transport failure",
+          exitCode: 1,
+        };
+      }
+      return originalExec(opts);
+    };
     const primary = mkdtempSync(join(tmpdir(), "gc1c-prim-"));
     const task = mkdtempSync(join(tmpdir(), "gc1c-task-"));
     temps.push(primary, task);
@@ -166,6 +173,8 @@ describe("GC1C-B execution authority", () => {
         maxStdoutBytes: 10,
         maxStderrBytes: 10,
       }),
-    ).rejects.toMatchObject({ code: "REMOTE_PROCESS_FAILED" });
+    ).rejects.toMatchObject({
+      code: expect.stringMatching(/REMOTE_PROCESS_FAILED|WORKER_PROTOCOL/),
+    });
   });
 });

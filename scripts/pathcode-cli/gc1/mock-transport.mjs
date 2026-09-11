@@ -3,6 +3,7 @@
  * NO network. NO GCP resources. Canonical suite runs exclusively against this.
  */
 
+import { createHash } from "node:crypto";
 import {
   GC1_CLUSTER,
   GC1_CONFIG,
@@ -13,6 +14,40 @@ import {
   configName,
   workstationName,
 } from "./constants.mjs";
+
+/**
+ * Unquote a posix single-quoted / double-quoted shell argument (mock only).
+ * @param {string} raw
+ */
+function unquoteShellArg(raw) {
+  const s = String(raw ?? "").trim();
+  if (s.startsWith("'")) {
+    // Reconstruct posix $'...'? No — plain single-quoted with '\'' splits.
+    let out = "";
+    let i = 0;
+    while (i < s.length) {
+      if (s[i] === "'") {
+        i += 1;
+        while (i < s.length && s[i] !== "'") {
+          out += s[i];
+          i += 1;
+        }
+        if (s[i] === "'") i += 1;
+        continue;
+      }
+      out += s[i];
+      i += 1;
+    }
+    return out;
+  }
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("`") && s.endsWith("`"))
+  ) {
+    return s.slice(1, -1);
+  }
+  return s;
+}
 
 /**
  * @param {object} [options]
@@ -31,6 +66,7 @@ export function createMockWorkstationTransport(options = {}) {
     commandStdout: options.commandStdout ?? GC1_HEALTH_CHECK_EXPECTED,
     /** First N health-check attempts return exit=0 with empty stdout (agent warm-up). */
     emptyStdoutBeforeSuccess: options.emptyStdoutBeforeSuccess ?? 0,
+    connectionRefusedBeforeSuccess: options.connectionRefusedBeforeSuccess ?? 0,
     executeCommandCount: 0,
     /** @type {Array<{ stdout?: string, stderr?: string, exitCode?: number }>|null} */
     scriptedResults: Array.isArray(options.scriptedResults)
@@ -41,6 +77,10 @@ export function createMockWorkstationTransport(options = {}) {
     workerInstalled: false,
     /** @type {object[]} */
     workerRequestLog: [],
+    /** @type {string|null} */
+    lastBootstrapCommand: null,
+    /** @type {Buffer|null} */
+    lastBootstrapStdin: null,
     /** @type {Record<string, string>} */
     remoteEnv: { ...(options.remoteEnv ?? {}) },
   };
@@ -274,9 +314,12 @@ export function createMockWorkstationTransport(options = {}) {
       }
     },
 
-    async executeCommand({ workstationName: wsName, command }) {
+    async executeCommand({ workstationName: wsName, command, stdin }) {
       assertNoNetwork();
-      log("executeCommand", command);
+      const { assertRemoteCommandString } = await import("./shell-encode.mjs");
+      const { parseWorkerBootstrapCommand } = await import("./worker-bootstrap.mjs");
+      const commandStr = assertRemoteCommandString(command);
+      log("executeCommand", commandStr);
       state.executeCommandCount += 1;
       if (state.commandDelayMs > 0) {
         await new Promise((r) => setTimeout(r, state.commandDelayMs));
@@ -300,10 +343,71 @@ export function createMockWorkstationTransport(options = {}) {
         return { stdout: "", stderr: "mock command failed", exitCode: 1 };
       }
 
+      // GC1-c: worker bootstrap — same encoded SSH command + stdin protocol as GCP.
+      const bootstrap = parseWorkerBootstrapCommand(commandStr);
+      if (bootstrap) {
+        state.workerInstalled = true;
+        state.lastBootstrapCommand = commandStr;
+        state.lastBootstrapStdin = Buffer.isBuffer(stdin)
+          ? Buffer.from(stdin)
+          : Buffer.from(String(stdin ?? ""), "utf8");
+        log("workerBootstrap", bootstrap.workerRemotePath);
+        let req;
+        try {
+          const text = state.lastBootstrapStdin.toString("utf8");
+          const line = text.split(/\r?\n/).filter((l) => l.trim())[0];
+          req = JSON.parse(line || "{}");
+        } catch (e) {
+          return {
+            stdout: "",
+            stderr: `bootstrap request JSON: ${e.message}`,
+            exitCode: 1,
+          };
+        }
+        state.workerRequestLog.push(structuredClone(req));
+        const { dispatchWorkerRequest } = await import("./remote-worker.mjs");
+        const scripted =
+          state.workerProcessScript != null
+            ? state.workerProcessScript
+            : undefined;
+        if (state.workerProcessScript != null) {
+          state.workerProcessScript = null;
+        }
+        try {
+          const response = await dispatchWorkerRequest(req, {
+            remoteFs,
+            scriptedProcess: scripted,
+            allowSpawn: options.allowWorkerSpawn === true,
+          });
+          return {
+            stdout: `${JSON.stringify(response)}\n`,
+            stderr: "",
+            exitCode: 0,
+            meta: { stdinEnded: true, bootstrap: true },
+          };
+        } catch (e) {
+          const failBody = {
+            v: req?.v || "gc1c-worker-v1",
+            id: req?.id || null,
+            ok: false,
+            error: {
+              code: e.code || "WORKER_ERROR",
+              message: String(e.message || e),
+            },
+          };
+          return {
+            stdout: `${JSON.stringify(failBody)}\n`,
+            stderr: String(e.message || e),
+            exitCode: 1,
+            meta: { stdinEnded: true, bootstrap: true },
+          };
+        }
+      }
+
       // GC1-b: honor `cd '<cwd>' && ...` wrappers from workspace hydrator.
       let effectiveCwd = null;
-      let effectiveCmd = command;
-      const cdMatch = String(command).match(
+      let effectiveCmd = commandStr;
+      const cdMatch = String(commandStr).match(
         /^cd\s+(?:'([^']*)'|"([^"]*)")\s+&&\s+([\s\S]*)$/,
       );
       if (cdMatch) {
@@ -351,15 +455,154 @@ export function createMockWorkstationTransport(options = {}) {
         };
       }
 
-      // Read a hydrated remote file: `cat '<path>'` or `test -f ...`
-      const catMatch = trimmed.match(/^cat\s+(?:'([^']*)'|"([^"]*)")\s*$/);
+      function resolveRemotePath(raw) {
+        const p = unquoteShellArg(raw);
+        if (p.startsWith("/")) return p;
+        if (effectiveCwd) {
+          return `${effectiveCwd.replace(/\/+$/, "")}/${p}`;
+        }
+        return p;
+      }
+
+      // --- GC1-c host-runtime delivery shell surface (remoteFs) ---
+
+      const mkdirMatch = trimmed.match(/^mkdir\s+-p\s+(.+)$/);
+      if (mkdirMatch) {
+        const dir = resolveRemotePath(mkdirMatch[1]);
+        // Directory presence is implicit in path keys; record a marker.
+        if (![...remoteFs.keys()].some((k) => k === dir || k.startsWith(`${dir}/`))) {
+          remoteFs.set(`${dir}/.pathcode-dir`, Buffer.alloc(0));
+        }
+        return { stdout: "", stderr: "", exitCode: 0 };
+      }
+
+      const catWriteMatch = trimmed.match(/^cat\s+>\s+(.+)$/);
+      if (catWriteMatch) {
+        const p = resolveRemotePath(catWriteMatch[1]);
+        const buf = Buffer.isBuffer(stdin)
+          ? stdin
+          : stdin == null
+            ? Buffer.alloc(0)
+            : Buffer.from(String(stdin), "utf8");
+        remoteFs.set(p, Buffer.from(buf));
+        log("catWrite", p);
+        return { stdout: "", stderr: "", exitCode: 0 };
+      }
+
+      const wcMatch = trimmed.match(/^wc\s+-c\s+(.+)$/);
+      if (wcMatch) {
+        const p = resolveRemotePath(wcMatch[1]);
+        const buf = remoteFs.get(p);
+        if (!buf) {
+          return { stdout: "", stderr: `wc: ${p}: No such file`, exitCode: 1 };
+        }
+        return {
+          stdout: `${buf.length} ${p}\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+
+      const shaMatch =
+        trimmed.match(/^sha256sum\s+(.+)$/) ||
+        trimmed.match(/^shasum\s+-a\s+256\s+(.+)$/);
+      if (shaMatch) {
+        const p = resolveRemotePath(shaMatch[1]);
+        const buf = remoteFs.get(p);
+        if (!buf) {
+          return {
+            stdout: "",
+            stderr: `sha256sum: ${p}: No such file`,
+            exitCode: 1,
+          };
+        }
+        const hex = createHash("sha256").update(buf).digest("hex");
+        return { stdout: `${hex}  ${p}\n`, stderr: "", exitCode: 0 };
+      }
+
+      const chmodMatch = trimmed.match(/^chmod\s+(\S+)\s+(.+)$/);
+      if (chmodMatch) {
+        const p = resolveRemotePath(chmodMatch[2]);
+        if (!remoteFs.has(p) && !p.includes("/.pathcode-dir")) {
+          // chmod on directory root (runtime root) is ok even without file body.
+          if (![...remoteFs.keys()].some((k) => k.startsWith(`${p}/`) || k === p)) {
+            // Still allow chmod on freshly mkdir'd roots.
+          }
+        }
+        log("chmod", `${chmodMatch[1]} ${p}`);
+        return { stdout: "", stderr: "", exitCode: 0 };
+      }
+
+      const mvMatch = trimmed.match(/^mv\s+-f\s+(\S+)\s+(.+)$/);
+      if (mvMatch) {
+        const from = resolveRemotePath(mvMatch[1]);
+        const to = resolveRemotePath(mvMatch[2]);
+        const buf = remoteFs.get(from);
+        if (!buf) {
+          return { stdout: "", stderr: `mv: ${from}: No such file`, exitCode: 1 };
+        }
+        remoteFs.set(to, Buffer.from(buf));
+        remoteFs.delete(from);
+        log("mv", `${from}->${to}`);
+        return { stdout: "", stderr: "", exitCode: 0 };
+      }
+
+      const rmMatch = trimmed.match(/^rm\s+-f\s+(.+)$/);
+      if (rmMatch) {
+        const args = rmMatch[1].trim().split(/\s+/);
+        for (const a of args) {
+          const p = resolveRemotePath(a);
+          remoteFs.delete(p);
+        }
+        return { stdout: "", stderr: "", exitCode: 0 };
+      }
+
+      // `test ! -e 'a' && test -f 'b'` and similar.
+      if (/^test\b/.test(trimmed)) {
+        const parts = trimmed.split(/\s+&&\s+/);
+        for (const part of parts) {
+          const t = part.trim();
+          const notExist = t.match(/^test\s+!\s+-e\s+(.+)$/);
+          if (notExist) {
+            const p = resolveRemotePath(notExist[1]);
+            if (remoteFs.has(p)) {
+              return { stdout: "", stderr: "", exitCode: 1 };
+            }
+            continue;
+          }
+          const isFile = t.match(/^test\s+-f\s+(.+)$/);
+          if (isFile) {
+            const p = resolveRemotePath(isFile[1]);
+            if (!remoteFs.has(p)) {
+              return { stdout: "", stderr: "", exitCode: 1 };
+            }
+            continue;
+          }
+          const isNonempty = t.match(/^test\s+-s\s+(.+)$/);
+          if (isNonempty) {
+            const p = resolveRemotePath(isNonempty[1]);
+            const buf = remoteFs.get(p);
+            if (!buf || buf.length === 0) {
+              return { stdout: "", stderr: "", exitCode: 1 };
+            }
+            continue;
+          }
+          // Unknown test form — treat as success for hydrator `test -s ... && echo OK`.
+          if (/echo\s+OK/.test(t)) {
+            return { stdout: "OK\n", stderr: "", exitCode: 0 };
+          }
+        }
+        if (/echo\s+OK/.test(trimmed)) {
+          return { stdout: "OK\n", stderr: "", exitCode: 0 };
+        }
+        return { stdout: "", stderr: "", exitCode: 0 };
+      }
+
+      // Read a hydrated remote file: `cat '<path>'`
+      const catMatch = trimmed.match(/^cat\s+(?:'([^']*)'|"([^"]*)"|(\S+))\s*$/);
       if (catMatch) {
-        const p = catMatch[1] || catMatch[2];
-        const abs = p.startsWith("/")
-          ? p
-          : effectiveCwd
-            ? `${effectiveCwd.replace(/\/+$/, "")}/${p}`
-            : p;
+        const p = catMatch[1] || catMatch[2] || catMatch[3];
+        const abs = resolveRemotePath(p);
         const buf = remoteFs.get(abs);
         if (!buf) {
           return { stdout: "", stderr: `cat: ${p}: No such file`, exitCode: 1 };
@@ -367,7 +610,32 @@ export function createMockWorkstationTransport(options = {}) {
         return { stdout: buf.toString("utf8"), stderr: "", exitCode: 0 };
       }
 
-      const expectedEcho = command.includes("HEALTH_CHECK_OK");
+      // Hydrator `test -s path && echo OK`
+      const testEcho = trimmed.match(
+        /^test\s+-s\s+(.+?)\s+&&\s+echo\s+OK$/,
+      );
+      if (testEcho) {
+        const p = resolveRemotePath(testEcho[1]);
+        const buf = remoteFs.get(p);
+        if (buf && buf.length > 0) {
+          return { stdout: "OK\n", stderr: "", exitCode: 0 };
+        }
+        return { stdout: "", stderr: "", exitCode: 1 };
+      }
+
+      const expectedEcho = commandStr.includes("HEALTH_CHECK_OK");
+      // Transient SSH channel warm-up (exit=255 Connection refused).
+      if (
+        expectedEcho &&
+        state.connectionRefusedBeforeSuccess > 0 &&
+        state.executeCommandCount <= state.connectionRefusedBeforeSuccess
+      ) {
+        return {
+          stdout: "",
+          stderr: "ssh: connect to host 127.0.0.1 port 22: Connection refused",
+          exitCode: 255,
+        };
+      }
       // Simulate container agent warm-up: connect succeeds (exit=0) but stdout
       // is empty until emptyStdoutBeforeSuccess attempts have elapsed.
       if (
@@ -377,7 +645,7 @@ export function createMockWorkstationTransport(options = {}) {
         return { stdout: "", stderr: "", exitCode: 0 };
       }
       return {
-        stdout: expectedEcho ? state.commandStdout : `ran:${command}`,
+        stdout: expectedEcho ? state.commandStdout : `ran:${commandStr}`,
         stderr: "",
         exitCode: 0,
       };
@@ -598,7 +866,10 @@ export function createMockWorkstationTransport(options = {}) {
 
     markWorkerInstalled(remotePath) {
       state.workerInstalled = true;
-      writeRemoteFs(remotePath, "// mock worker installed\n", "utf8");
+      // Do not overwrite bytes already verified by deliverVerifiedHostRuntimeFile.
+      if (!remoteFs.has(remotePath)) {
+        writeRemoteFs(remotePath, "// mock worker installed\n", "utf8");
+      }
     },
 
     setWorkerProcessScript(script) {
@@ -607,6 +878,16 @@ export function createMockWorkstationTransport(options = {}) {
 
     getWorkerRequestLog() {
       return state.workerRequestLog.map((r) => structuredClone(r));
+    },
+
+    getLastBootstrapCommand() {
+      return state.lastBootstrapCommand || null;
+    },
+
+    getLastBootstrapStdin() {
+      return state.lastBootstrapStdin
+        ? Buffer.from(state.lastBootstrapStdin)
+        : null;
     },
 
     clearWorkerRequestLog() {

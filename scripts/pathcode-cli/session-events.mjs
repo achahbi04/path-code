@@ -47,6 +47,11 @@ export const SESSION_EVENT_TYPES = Object.freeze([
   "session.artifacts.saving",
   "session.cleanup",
   "session.cleanup.pending",
+  "session.workstation.ready",
+  "session.workstation.disposed",
+  "session.machine.capabilities",
+  "session.environment.unavailable",
+  "session.infrastructure.failure",
 ]);
 
 /** Default heartbeat cadence while a stage await is in flight. */
@@ -297,6 +302,22 @@ export function renderSessionEventHuman(event) {
             ? `${event.count} resource(s)`
             : "resource";
       return `Cleanup pending — reconcile before next cloud task (${id})\n`;
+    }
+    case "session.workstation.ready":
+      return "Workstation execution-ready.\n";
+    case "session.workstation.disposed":
+      return "Workstation disposed.\n";
+    case "session.machine.capabilities":
+      return "Engineering computer capabilities queried.\n";
+    case "session.environment.unavailable":
+    case "session.infrastructure.failure": {
+      const msg =
+        typeof event.message === "string"
+          ? event.message
+          : typeof event.code === "string"
+            ? event.code
+            : "infrastructure failure";
+      return `Infrastructure failure: ${msg}\n`;
     }
     case "session.applying": {
       const files = Array.isArray(event.files) ? event.files : [];

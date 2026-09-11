@@ -11,10 +11,31 @@ import {
   CREDENTIAL_CANARY_PATH_PATTERNS,
   isCredentialCanaryPath,
 } from "./task-snapshot.mjs";
+import {
+  assertTransportRuntimeDeliveryCapability,
+  buildRuntimeRoot,
+  DEFAULT_RUNTIME_ROOT_PREFIX,
+  deliverVerifiedHostRuntimeFile,
+  sha256Hex,
+} from "./runtime-delivery.mjs";
+import {
+  assertRemoteCommandString,
+  looksLikeArrayCommaCoercion,
+} from "./shell-encode.mjs";
+import {
+  TRUSTED_REMOTE_NODE,
+  encodeWorkerBootstrapCommand,
+  assertWorkerInstallReceipt,
+  assertVerifiedWorkerPath,
+} from "./worker-bootstrap.mjs";
 
 export const REMOTE_WORKER_VERSION = "gc1c-worker-v1";
 
-/** Outside project-writable /home/user/workspace. */
+/**
+ * Legacy host worker dir (pre GC1-c verified runtime delivery).
+ * Install now uses /tmp/pathcode-runtime/<sessionId>/ via runtime-delivery.
+ * Kept for compatibility / docs only.
+ */
 export const WORKER_REMOTE_DIR = "/home/user/.pathcode-worker";
 
 export const WORKER_SCRIPT_NAME = "worker.js";
@@ -26,6 +47,23 @@ export const WORKER_DEFAULT_MAX_STDOUT = 2 * 1024 * 1024;
 export const WORKER_DEFAULT_MAX_STDERR = 2 * 1024 * 1024;
 
 export { CREDENTIAL_CANARY_PATH_PATTERNS, isCredentialCanaryPath };
+
+/** @type {object|null} */
+let lastInstallReceipt = null;
+
+/**
+ * @returns {object|null}
+ */
+export function getLastRemoteWorkerInstallReceipt() {
+  return lastInstallReceipt ? { ...lastInstallReceipt } : null;
+}
+
+/**
+ * @internal test helper
+ */
+export function _resetLastRemoteWorkerInstallReceiptForTests() {
+  lastInstallReceipt = null;
+}
 
 /**
  * Reviewed host-owned worker source. No template interpolation of model text.
@@ -93,6 +131,11 @@ async function runProcess(req) {
     let stdoutTrunc = false;
     let stderrTrunc = false;
     let settled = false;
+    let exitCode = null;
+    let signal = null;
+    let closed = false;
+    let stdoutEnded = false;
+    let stderrEnded = false;
     const child = spawn(executable, argv, {
       cwd,
       env,
@@ -105,6 +148,24 @@ async function runProcess(req) {
       clearTimeout(timer);
       resolve(payload);
     };
+    const settleOk = () => {
+      if (!(closed && stdoutEnded && stderrEnded)) return;
+      finish({
+        exitCode: typeof exitCode === "number" ? exitCode : null,
+        signal: signal || null,
+        stdout: stdout.toString("utf8"),
+        stderr: stderr.toString("utf8"),
+        stdoutTruncated: stdoutTrunc,
+        stderrTruncated: stderrTrunc,
+        stdoutComplete: true,
+        stderrComplete: true,
+        timedOut: false,
+        startedAtMs,
+        finishedAtMs: Date.now(),
+        pid: child.pid ?? null,
+        shell: false,
+      });
+    };
     const timer = setTimeout(() => {
       try { child.kill("SIGKILL"); } catch (_) {}
       finish({
@@ -114,10 +175,13 @@ async function runProcess(req) {
         stderr: stderr.toString("utf8"),
         stdoutTruncated: stdoutTrunc,
         stderrTruncated: stderrTrunc,
+        stdoutComplete: stdoutEnded,
+        stderrComplete: stderrEnded,
         timedOut: true,
         startedAtMs,
         finishedAtMs: Date.now(),
         pid: child.pid ?? null,
+        shell: false,
       });
     }, timeoutMs);
     child.stdout.on("data", (chunk) => {
@@ -140,7 +204,12 @@ async function runProcess(req) {
       stderr = Buffer.concat([stderr, take]);
       if (chunk.length > room) stderrTrunc = true;
     });
+    child.stdout.on("end", () => { stdoutEnded = true; settleOk(); });
+    child.stderr.on("end", () => { stderrEnded = true; settleOk(); });
     child.on("error", (err) => {
+      stdoutEnded = true;
+      stderrEnded = true;
+      closed = true;
       finish({
         exitCode: null,
         signal: null,
@@ -148,26 +217,29 @@ async function runProcess(req) {
         stderr: stderr.toString("utf8"),
         stdoutTruncated: stdoutTrunc,
         stderrTruncated: stderrTrunc,
+        stdoutComplete: true,
+        stderrComplete: true,
         timedOut: false,
         spawnError: String(err && err.message ? err.message : err),
         startedAtMs,
         finishedAtMs: Date.now(),
         pid: null,
+        shell: false,
       });
     });
-    child.on("close", (code, signal) => {
-      finish({
-        exitCode: typeof code === "number" ? code : null,
-        signal: signal || null,
-        stdout: stdout.toString("utf8"),
-        stderr: stderr.toString("utf8"),
-        stdoutTruncated: stdoutTrunc,
-        stderrTruncated: stderrTrunc,
-        timedOut: false,
-        startedAtMs,
-        finishedAtMs: Date.now(),
-        pid: child.pid ?? null,
-      });
+    child.on("close", (code, sig) => {
+      closed = true;
+      exitCode = typeof code === "number" ? code : null;
+      signal = sig || null;
+      if (child.stdout && child.stdout.readableEnded) stdoutEnded = true;
+      if (child.stderr && child.stderr.readableEnded) stderrEnded = true;
+      settleOk();
+      const t = setTimeout(() => {
+        stdoutEnded = true;
+        stderrEnded = true;
+        settleOk();
+      }, 100);
+      if (t && typeof t.unref === "function") t.unref();
     });
   });
 }
@@ -242,14 +314,27 @@ async function dispatch(req) {
   try {
     raw = await readAllStdin();
   } catch (e) {
-    fail(null, "REQUEST_READ", String(e && e.message ? e.message : e));
+    const msg = String(e && e.message ? e.message : e);
+    const code = /too large/i.test(msg) ? "REQUEST_TOO_LARGE" : "REQUEST_INCOMPLETE";
+    fail(null, code, msg);
     process.exitCode = 1;
     return;
   }
-  const text = raw.toString("utf8").trim();
+  const text = raw.toString("utf8");
+  if (!text.trim()) {
+    fail(null, "REQUEST_INCOMPLETE", "empty stdin request");
+    process.exitCode = 1;
+    return;
+  }
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length !== 1) {
+    fail(null, "REQUEST_MULTIPLEX", "GC1-c V1 accepts exactly one JSON request document");
+    process.exitCode = 1;
+    return;
+  }
   let req;
   try {
-    req = JSON.parse(text.split(/\r?\n/)[0] || "{}");
+    req = JSON.parse(lines[0]);
   } catch (e) {
     fail(null, "REQUEST_JSON", String(e && e.message ? e.message : e));
     process.exitCode = 1;
@@ -587,67 +672,83 @@ export function assertNoCredentialCanaries(value, pathHint = "$") {
 }
 
 /**
- * Upload host-owned worker script to WORKER_REMOTE_DIR.
+ * Upload host-owned worker script via verified host-runtime delivery.
+ * Uses executeCommand+stdin exclusively (same path for mock and GCP).
+ * Runtime root: /tmp/pathcode-runtime/<sessionId>/ — NOT project workspace.
+ *
+ * Legacy WORKER_REMOTE_DIR / WORKER_REMOTE_PATH remain exported for
+ * compatibility docs; install no longer writes there.
+ *
  * @param {object} transport
- * @param {{ workstationName: string }} opts
+ * @param {{ workstationName: string, sessionId?: string, taskId?: string }} opts
  */
 export async function installRemoteWorker(transport, opts) {
-  const workstationName = opts.workstationName;
+  const workstationName = opts?.workstationName;
   if (!transport) throw new Error("installRemoteWorker requires transport");
   if (!workstationName) throw new Error("installRemoteWorker requires workstationName");
 
-  if (typeof transport.writeRemoteFile === "function") {
-    await transport.executeCommand?.({
-      workstationName,
-      command: ["mkdir", "-p", WORKER_REMOTE_DIR],
-      argv: ["mkdir", "-p", WORKER_REMOTE_DIR],
-    }).catch?.(() => undefined);
-    // Prefer mkdir via argv form when supported.
-    if (typeof transport.executeCommand === "function") {
-      await transport.executeCommand({
-        workstationName,
-        command: `mkdir -p '${WORKER_REMOTE_DIR}'`,
-        argv: ["mkdir", "-p", WORKER_REMOTE_DIR],
-      });
-    }
-    await transport.writeRemoteFile({
-      remotePath: WORKER_REMOTE_PATH,
-      content: REMOTE_WORKER_SCRIPT_SOURCE,
-      encoding: "utf8",
-    });
-  } else if (typeof transport.uploadTextFile === "function") {
-    await transport.executeCommand({
-      workstationName,
-      command: `mkdir -p '${WORKER_REMOTE_DIR}'`,
-      argv: ["mkdir", "-p", WORKER_REMOTE_DIR],
-    });
-    await transport.uploadTextFile({
-      remotePath: WORKER_REMOTE_PATH,
-      text: REMOTE_WORKER_SCRIPT_SOURCE,
-    });
-  } else {
-    throw new Error("transport cannot install remote worker (no writeRemoteFile)");
-  }
+  assertTransportRuntimeDeliveryCapability(transport);
 
-  // Mark worker installed for mock simulation.
+  const sessionId = opts.sessionId || opts.taskId || "default";
+  const runtimeRoot = buildRuntimeRoot(sessionId);
+  const bytes = Buffer.from(REMOTE_WORKER_SCRIPT_SOURCE, "utf8");
+  const sha256 = sha256Hex(bytes);
+  const finalBaseName = `remote-worker-${sha256}.cjs`;
+
+  const receipt = await deliverVerifiedHostRuntimeFile({
+    transport,
+    workstationName,
+    runtimeRoot,
+    bytes,
+    finalBaseName,
+    mode: "0500",
+  });
+
+  // Mark worker installed for mock simulation (must not overwrite verified bytes).
   if (typeof transport.markWorkerInstalled === "function") {
-    transport.markWorkerInstalled(WORKER_REMOTE_PATH);
+    transport.markWorkerInstalled(receipt.remotePath);
   }
 
-  return {
+  lastInstallReceipt = {
     ok: true,
-    remotePath: WORKER_REMOTE_PATH,
+    remotePath: receipt.remotePath,
+    runtimeRoot: receipt.runtimeRoot,
     version: REMOTE_WORKER_VERSION,
-    sha256: createHash("sha256").update(REMOTE_WORKER_SCRIPT_SOURCE).digest("hex"),
+    sha256: receipt.sha256,
+    length: receipt.length,
+    published: receipt.published === true,
+    state: "VERIFIED_PUBLISHED",
+    sessionId,
+    stagingPath: receipt.stagingPath,
+    byteLength: receipt.length,
+    workerVersion: REMOTE_WORKER_VERSION,
   };
+  return { ...lastInstallReceipt };
 }
 
 /**
- * Invoke the remote worker with a JSON request. Protocol stdout is parsed;
- * project process output lives inside the JSON result for runProcess.
+ * Invoke the remote worker with a JSON request over stdin.
+ *
+ * SSH remote-command string contains ONLY:
+ *   /usr/bin/node <verified-receipt.finalPath>
+ * Dynamic descriptor fields travel exclusively via stdin protocol.
+ *
+ * NEVER pass an argv array as `command` — Array.toString() yields
+ * `node,/tmp/...` (live WORKER_PROTOCOL exit=127).
  *
  * @param {object} transport
- * @param {{ workstationName: string, request: object, timeoutMs?: number }} opts
+ * @param {{
+ *   workstationName: string,
+ *   request: object,
+ *   timeoutMs?: number,
+ *   workerRemotePath?: string,
+ *   expectedSha256?: string,
+ *   runtimeRootPrefix?: string,
+ *   sessionId?: string,
+ *   taskId?: string,
+ *   installReceipt?: object,
+ *   allowInProcessWorker?: boolean,
+ * }} opts
  */
 export async function invokeRemoteWorker(transport, opts) {
   const { workstationName, request } = opts;
@@ -657,45 +758,163 @@ export async function invokeRemoteWorker(transport, opts) {
     throw new Error("invokeRemoteWorker requires request object");
   }
 
+  const receipt =
+    opts.installReceipt ||
+    (opts.workerRemotePath || opts.expectedSha256
+      ? {
+          ok: true,
+          published: true,
+          remotePath: opts.workerRemotePath || lastInstallReceipt?.remotePath,
+          sha256: opts.expectedSha256 || lastInstallReceipt?.sha256,
+          version: lastInstallReceipt?.version || REMOTE_WORKER_VERSION,
+          runtimeRoot:
+            lastInstallReceipt?.runtimeRoot ||
+            (opts.sessionId ? buildRuntimeRoot(opts.sessionId) : undefined),
+          length: lastInstallReceipt?.length,
+        }
+      : lastInstallReceipt);
+
+  const sessionId = opts.sessionId || opts.taskId || undefined;
+  assertWorkerInstallReceipt(receipt, {
+    sessionId,
+    expectedSha256: opts.expectedSha256 || receipt?.sha256,
+    expectedVersion: REMOTE_WORKER_VERSION,
+  });
+
+  const workerRemotePath = receipt.remotePath;
+  assertVerifiedWorkerPath(workerRemotePath, {
+    sessionId,
+    expectedSha256: receipt.sha256,
+    runtimeRoot: receipt.runtimeRoot,
+  });
+
+  const invocationId = request.id ?? `req-${Date.now()}`;
   const body = {
     v: REMOTE_WORKER_VERSION,
-    id: request.id ?? `req-${Date.now()}`,
+    id: invocationId,
+    sessionId: sessionId || request.sessionId || null,
+    taskId: opts.taskId || request.taskId || sessionId || null,
     ...request,
+    id: invocationId,
+    v: REMOTE_WORKER_VERSION,
   };
   assertNoCredentialCanaries(body);
 
-  // Preferred mock / in-process seam — keeps protocol messages off shell.
-  if (typeof transport.invokeWorkerRequest === "function") {
+  // In-process seam is OPT-IN only (unit helpers). Acceptance path always
+  // traverses executeCommand + encoded bootstrap + stdin (mock and GCP).
+  if (
+    opts.allowInProcessWorker === true &&
+    typeof transport.invokeWorkerRequest === "function"
+  ) {
     return transport.invokeWorkerRequest({ workstationName, request: body });
   }
 
-  const argv = ["node", WORKER_REMOTE_PATH];
-  const stdin = `${JSON.stringify(body)}\n`;
-  const result = await transport.executeCommand({
-    workstationName,
-    command: argv,
-    argv,
-    stdin,
-    timeoutMs: opts.timeoutMs,
+  const bootstrapCommand = encodeWorkerBootstrapCommand({
+    nodeExecutable: TRUSTED_REMOTE_NODE,
+    workerRemotePath,
+    sessionId,
+    expectedSha256: receipt.sha256,
   });
-
-  const stdout = String(result.stdout || "");
-  const line = stdout
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .find((l) => l.startsWith("{") && l.includes(`"v":"${REMOTE_WORKER_VERSION}"`));
-  if (!line) {
+  assertRemoteCommandString(bootstrapCommand);
+  if (looksLikeArrayCommaCoercion(bootstrapCommand)) {
     const err = new Error(
-      `worker protocol response missing (exit=${result.exitCode}): ${result.stderr || stdout.slice(0, 200)}`,
+      "bootstrap command looks like Array.toString coercion (node,/path)",
     );
     err.code = "WORKER_PROTOCOL";
     throw err;
   }
+
+  const stdin = Buffer.from(`${JSON.stringify(body)}\n`, "utf8");
+  const result = await transport.executeCommand({
+    workstationName,
+    command: bootstrapCommand,
+    stdin,
+    timeoutMs: opts.timeoutMs,
+  });
+
+  return parseWorkerProtocolResponse(result, {
+    expectedVersion: REMOTE_WORKER_VERSION,
+    expectedId: invocationId,
+    expectedSessionId: body.sessionId,
+    expectedTaskId: body.taskId,
+  });
+}
+
+/**
+ * Strict outer-protocol parse. Project stdout spoof JSON cannot become the response.
+ * @param {{ exitCode?: number, stdout?: string, stderr?: string }} result
+ * @param {{ expectedVersion: string, expectedId: string, expectedSessionId?: string|null, expectedTaskId?: string|null }} expect
+ */
+export function parseWorkerProtocolResponse(result, expect) {
+  const stdout = String(result.stdout || "");
+  const lines = stdout
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  const protocolLines = lines.filter((l) => {
+    if (!l.startsWith("{")) return false;
+    try {
+      const o = JSON.parse(l);
+      return (
+        o &&
+        typeof o === "object" &&
+        o.v === expect.expectedVersion &&
+        o.id === expect.expectedId
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  if (protocolLines.length === 0) {
+    const err = new Error(
+      `worker protocol response missing (exit=${result.exitCode}): ${String(result.stderr || stdout).slice(0, 200)}`,
+    );
+    err.code = "WORKER_PROTOCOL";
+    throw err;
+  }
+  if (protocolLines.length > 1) {
+    const err = new Error("duplicate worker protocol terminal envelopes");
+    err.code = "WORKER_PROTOCOL";
+    throw err;
+  }
+
   let parsed;
   try {
-    parsed = JSON.parse(line);
+    parsed = JSON.parse(protocolLines[0]);
   } catch (e) {
     const err = new Error(`worker protocol JSON parse failed: ${e.message}`);
+    err.code = "WORKER_PROTOCOL";
+    throw err;
+  }
+
+  if (parsed.v !== expect.expectedVersion) {
+    const err = new Error("worker protocol version mismatch");
+    err.code = "WORKER_PROTOCOL";
+    throw err;
+  }
+  if (parsed.id !== expect.expectedId) {
+    const err = new Error("worker protocol invocationId mismatch");
+    err.code = "WORKER_PROTOCOL";
+    throw err;
+  }
+  // Optional binding when worker echoes session/task (forward-compatible).
+  if (
+    expect.expectedSessionId != null &&
+    parsed.sessionId != null &&
+    parsed.sessionId !== expect.expectedSessionId
+  ) {
+    const err = new Error("worker protocol sessionId mismatch");
+    err.code = "WORKER_PROTOCOL";
+    throw err;
+  }
+  if (
+    expect.expectedTaskId != null &&
+    parsed.taskId != null &&
+    parsed.taskId !== expect.expectedTaskId
+  ) {
+    const err = new Error("worker protocol taskId mismatch");
     err.code = "WORKER_PROTOCOL";
     throw err;
   }

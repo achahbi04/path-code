@@ -347,12 +347,12 @@ export async function runPathcodeMain(argv, testIo = {}) {
     ? installCollisionGuard(prompt, inlineStudio)
     : () => {};
 
-  /** @param {() => Promise<void> | void} cycle */
+  /** @param {() => Promise<unknown> | unknown} cycle */
   async function runCycle(cycle) {
     if (typeof prompt.beginCycle === "function") prompt.beginCycle();
     if (ttyInline) inlineStudio.begin();
     try {
-      await cycle();
+      return await cycle();
     } finally {
       if (ttyInline) inlineStudio.finish();
       if (typeof prompt.endCycle === "function") prompt.endCycle();
@@ -502,7 +502,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
         "./pathcode-cli/general-session.mjs"
       );
       const runner = testIo.runGeneralSession ?? runGeneralEngineeringSession;
-      await runCycle(async () => {
+      const cycleNote = await runCycle(async () => {
         try {
           const sessionResult = await runner(prompt, {
             streams,
@@ -513,6 +513,12 @@ export async function runPathcodeMain(argv, testIo = {}) {
             unicode,
             checkoutRoot: root,
             executionMode: args.execution,
+            // Live GCP only when operator authorizes via GC1_LIVE_SMOKE=1.
+            // Default cloud mode stays mock ($0) for local/canonical safety.
+            skipLiveGcp: !(
+              args.execution === "cloud" &&
+              process.env.GC1_LIVE_SMOKE === "1"
+            ),
             credential: sessionCredential,
             onCredentialAcquired: (credential) => {
               if (typeof credential === "string" && credential.length > 0) {
@@ -528,14 +534,26 @@ export async function runPathcodeMain(argv, testIo = {}) {
           const calls =
             typeof sessionResult.modelCalls === "number" ? sessionResult.modelCalls : 0;
           sessionStats.modelCallCount += calls;
+          return null;
         } catch (err) {
           const message = err && err.message ? err.message : "unknown";
-          prompt.write(`Internal error (session continues): ${message}\n`);
+          // Structured failure into the living surface first; human recovery
+          // line is written after runCycle finishes the TTY frame.
           eventSink.emit("session.internal_error", { message });
           lastExitCode = 1;
           sessionStats.taskCount += 1;
+          return { __internalErrorMessage: message };
         }
       });
+      if (
+        cycleNote &&
+        typeof cycleNote === "object" &&
+        typeof cycleNote.__internalErrorMessage === "string"
+      ) {
+        prompt.write(
+          `Internal error (session continues): ${cycleNote.__internalErrorMessage}\n`,
+        );
+      }
       redrawPrompt(prompt, unicode, plain, sessionStats);
       void lastExitCode;
     }

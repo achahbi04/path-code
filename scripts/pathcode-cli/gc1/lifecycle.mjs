@@ -16,6 +16,7 @@ import {
   GC1_DEFAULT_DEADLINE_MS,
   GC1_ERROR,
   GC1_EXECUTION_READY_ATTEMPTS,
+  GC1_EXECUTION_READY_DEADLINE_MS,
   GC1_EXECUTION_READY_INTERVAL_MS,
   GC1_HEALTH_CHECK_COMMAND,
   GC1_HEALTH_CHECK_EXPECTED,
@@ -30,6 +31,52 @@ import {
 import { normalizeRemoteText } from "./remote-exec.mjs";
 
 /**
+ * Transient SSH/command-channel failures while the workstation is still warming.
+ * @param {{ exitCode?: number|null, stdout?: string, stderr?: string }} result
+ */
+export function isTransientExecutionChannelFailure(result) {
+  const exit = result?.exitCode;
+  const stderr = String(result?.stderr || "");
+  const stdout = String(result?.stdout || "");
+  if (
+    /PERMISSION_DENIED|Permission denied \(publickey\)|Host key verification failed|Could not resolve hostname|authentication failed|Invalid user/i.test(
+      stderr,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /Connection refused|Connection timed out|Connection reset|No route to host|ssh_exchange_identification|Connection closed by|Network is unreachable|Temporary failure|Broken pipe|kex_exchange_identification/i.test(
+      stderr,
+    )
+  ) {
+    return true;
+  }
+  // Warm-up: exit 0 with empty/missing health token, or SSH-ish exit 255.
+  if (exit === 255) return true;
+  if (exit === 0 && !stdoutMatchesHealthCheck(stdout)) return true;
+  return false;
+}
+
+function stdoutMatchesHealthCheck(stdout) {
+  return normalizeRemoteText(stdout) === GC1_HEALTH_CHECK_EXPECTED;
+}
+
+function stderrIsCleanForSuccess(stderr) {
+  const text = String(stderr ?? "");
+  // Token must never appear on stderr (no stderr-as-stdout shortcut).
+  if (text.includes(GC1_HEALTH_CHECK_EXPECTED)) return false;
+  if (
+    /PERMISSION_DENIED|Permission ['"]workstations\.|CREDENTIALS_MISSING|ERROR:\s/i.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * @param {object} options
  * @param {import("./transport.mjs").WorkstationTransport} options.transport
  * @param {number} [options.deadlineMs]
@@ -42,6 +89,8 @@ import { normalizeRemoteText } from "./remote-exec.mjs";
  * @param {{ hasCleanupPending?: () => boolean, listCleanupPending?: () => object[] }} [options.journal]
  *   GC1-c: CLEANUP_PENDING blocks another billable acquire.
  * @param {number} [options.sessionBudget] GC1-c live session budget (default unlimited for GC1-a tests)
+ * @param {string} [options.configId] workstation config id (default GC1_CONFIG; GC1-c passes GC1C_CONFIG)
+ * @param {string} [options.probeWorkstationId] probe workstation id (default GC1_PROBE_WORKSTATION)
  */
 export function createWorkstationLifecycleManager(options) {
   const transport = options.transport;
@@ -52,14 +101,39 @@ export function createWorkstationLifecycleManager(options) {
   const journal = options.journal ?? null;
   const sessionBudget =
     typeof options.sessionBudget === "number" ? options.sessionBudget : null;
+  const configId = options.configId || GC1_CONFIG;
+  const probeWorkstationId = options.probeWorkstationId || GC1_PROBE_WORKSTATION;
   let acquireCount = 0;
+
+  function cfgResourceName() {
+    return configName(undefined, undefined, configId);
+  }
+
+  function probeResourceName() {
+    return workstationName(probeWorkstationId, undefined, undefined, configId);
+  }
 
   const deadlineMs = options.deadlineMs ?? GC1_DEFAULT_DEADLINE_MS;
   const pollIntervalMs = options.pollIntervalMs ?? 25;
-  const executionReadyAttempts =
-    options.executionReadyAttempts ?? GC1_EXECUTION_READY_ATTEMPTS;
   const executionReadyIntervalMs =
     options.executionReadyIntervalMs ?? GC1_EXECUTION_READY_INTERVAL_MS;
+  // Production: 180s deadline. Tests may pass attempts×interval without deadline.
+  const executionReadyDeadlineMs =
+    options.executionReadyDeadlineMs ??
+    (options.executionReadyAttempts != null
+      ? // Wall-clock slack so attempt-bounded unit tests are not flaky.
+        Math.max(1, options.executionReadyAttempts) *
+          Math.max(1, executionReadyIntervalMs) +
+          5_000
+      : GC1_EXECUTION_READY_DEADLINE_MS);
+  const executionReadyAttempts =
+    options.executionReadyAttempts ??
+    Math.max(1, Math.ceil(executionReadyDeadlineMs / executionReadyIntervalMs));
+  /** When tests pass an explicit attempt cap, honor it as a hard bound. */
+  const executionReadyMaxAttempts =
+    options.executionReadyAttempts != null
+      ? options.executionReadyAttempts
+      : Number.POSITIVE_INFINITY;
   const weakenReadinessGate = options.weakenReadinessGate === true;
   const weakenExitOnlyExecutionReady =
     options.weakenExitOnlyExecutionReady === true;
@@ -146,20 +220,6 @@ export function createWorkstationLifecycleManager(options) {
     if (activeWorkstationName === name) activeWorkstationName = null;
   }
 
-  function stdoutMatchesHealthCheck(stdout) {
-    return normalizeRemoteText(stdout) === GC1_HEALTH_CHECK_EXPECTED;
-  }
-
-  function stderrIsCleanForSuccess(stderr) {
-    const text = String(stderr ?? "");
-    // Token must never appear on stderr (no stderr-as-stdout shortcut).
-    if (text.includes(GC1_HEALTH_CHECK_EXPECTED)) return false;
-    if (/PERMISSION_DENIED|Permission ['"]workstations\.|CREDENTIALS_MISSING|ERROR:\s/i.test(text)) {
-      return false;
-    }
-    return true;
-  }
-
   async function waitUntilRunning(name) {
     const started = Date.now();
     while (Date.now() - started < deadlineMs) {
@@ -188,7 +248,7 @@ export function createWorkstationLifecycleManager(options) {
 
   async function reconcileStartup() {
     reclaimed = [];
-    const parent = configName();
+    const parent = cfgResourceName();
     let listed = [];
     try {
       listed = await transport.listWorkstations(parent);
@@ -200,7 +260,7 @@ export function createWorkstationLifecycleManager(options) {
       const id = ws.workstationId || "";
       if (!id.startsWith(GC1_RESOURCE_PREFIX)) continue;
       // Reclaim orphaned GC1 probe workstations only — never cluster/config.
-      if (id === GC1_CLUSTER || id === GC1_CONFIG) continue;
+      if (id === GC1_CLUSTER || id === GC1_CONFIG || id === configId) continue;
 
       // Orphan = any matching prefix workstation left behind (probe or prior crash).
       try {
@@ -239,7 +299,7 @@ export function createWorkstationLifecycleManager(options) {
       clusterCreatedThisSession = true;
     }
 
-    const cfgName = configName();
+    const cfgName = cfgResourceName();
     let config = await transport.getConfig(cfgName);
     let createdConfig = false;
     if (!config) {
@@ -256,7 +316,7 @@ export function createWorkstationLifecycleManager(options) {
         throw new Error("cost fence runningTimeout mismatch");
       }
       lastConfigCreateBody = structuredClone(body);
-      config = await transport.createConfig(cName, GC1_CONFIG, body);
+      config = await transport.createConfig(cName, configId, body);
       createdConfig = true;
     } else {
       lastConfigCreateBody = structuredClone(config.body || buildConfigCreateBody());
@@ -280,19 +340,19 @@ export function createWorkstationLifecycleManager(options) {
    */
   async function startProbeWorkstation() {
     disposed = false;
-    const cfg = configName();
-    const name = workstationName(GC1_PROBE_WORKSTATION);
+    const cfg = cfgResourceName();
+    const name = probeResourceName();
 
     let existing = await transport.getWorkstation(name);
     if (!existing) {
       // Workstation create payload must not carry Control SA / tokens.
       const createBody = {
-        displayName: GC1_PROBE_WORKSTATION,
+        displayName: probeWorkstationId,
         labels: { "pathcode-gc1": "probe" },
       };
       assertIdentitySeparation(createBody);
       assertNoControlCredentialLeak(createBody);
-      existing = await transport.createWorkstation(cfg, GC1_PROBE_WORKSTATION, createBody);
+      existing = await transport.createWorkstation(cfg, probeWorkstationId, createBody);
       recordState(existing.state || "CREATING");
     }
 
@@ -324,25 +384,31 @@ export function createWorkstationLifecycleManager(options) {
   /**
    * EXECUTION READY: authenticated remote command round-trip with bounded retry.
    * STATE_RUNNING alone is insufficient — the container agent may still be
-   * wiring stdout (exit=0, empty stdout). Poll up to executionReadyAttempts
-   * with executionReadyIntervalMs between tries (default 6 × 3s = 18s).
+   * wiring the SSH/command channel. Poll every executionReadyIntervalMs until
+   * HEALTH_CHECK_OK or executionReadyDeadlineMs (production: 2s / 180s).
+   * Transient connection-not-ready failures retry; auth/config fail closed.
    * On deadline miss: force-dispose the probe (never leave it billing).
    */
   async function verifyExecutionReadiness(workstation) {
-    const name = workstation?.name || activeWorkstationName || workstationName();
+    const name = workstation?.name || activeWorkstationName || probeResourceName();
     let lastStdout = "";
     let lastExit = null;
+    let lastStderr = "";
     let attempts = 0;
+    const started = Date.now();
 
-    for (let i = 0; i < executionReadyAttempts; i += 1) {
-      attempts = i + 1;
+    while (
+      attempts < executionReadyMaxAttempts &&
+      Date.now() - started < executionReadyDeadlineMs
+    ) {
+      attempts += 1;
       const result = await transport.executeCommand({
         workstationName: name,
         command: GC1_HEALTH_CHECK_COMMAND,
       });
       lastExit = result.exitCode;
       lastStdout = String(result.stdout || "");
-      const lastStderr = String(result.stderr || "");
+      lastStderr = String(result.stderr || "");
       const normalized = normalizeRemoteText(lastStdout);
 
       const tokenOk = stdoutMatchesHealthCheck(lastStdout);
@@ -366,14 +432,26 @@ export function createWorkstationLifecycleManager(options) {
         };
       }
 
-      if (i + 1 < executionReadyAttempts) {
-        await delay(executionReadyIntervalMs);
+      // Permanent auth/config failures: fail closed immediately.
+      if (!isTransientExecutionChannelFailure(result) && !weakenExitOnlyExecutionReady) {
+        await forceDisposeProbe(name);
+        const err = new Error(
+          `${GC1_ERROR.EXECUTION_NOT_READY}: non-transient execution channel failure exit=${lastExit} stderr=${JSON.stringify(lastStderr)}; force-disposed`,
+        );
+        err.code = GC1_ERROR.EXECUTION_NOT_READY;
+        err.attempts = attempts;
+        err.permanent = true;
+        throw err;
       }
+
+      const remaining = executionReadyDeadlineMs - (Date.now() - started);
+      if (remaining <= 0) break;
+      await delay(Math.min(executionReadyIntervalMs, remaining));
     }
 
     await forceDisposeProbe(name);
     const err = new Error(
-      `${GC1_ERROR.EXECUTION_NOT_READY}: expected ${GC1_HEALTH_CHECK_EXPECTED} within ${executionReadyAttempts} attempts × ${executionReadyIntervalMs}ms; got exit=${lastExit} stdout=${JSON.stringify(lastStdout)}; force-disposed`,
+      `${GC1_ERROR.EXECUTION_NOT_READY}: expected ${GC1_HEALTH_CHECK_EXPECTED} within ${executionReadyDeadlineMs}ms (~${executionReadyIntervalMs}ms interval, ${attempts} attempts); got exit=${lastExit} stdout=${JSON.stringify(lastStdout)}; force-disposed`,
     );
     err.code = GC1_ERROR.EXECUTION_NOT_READY;
     err.attempts = attempts;
@@ -424,7 +502,7 @@ export function createWorkstationLifecycleManager(options) {
 
     teardownPromise = (async () => {
       clearTrackedTimers();
-      const name = activeWorkstationName || workstationName(GC1_PROBE_WORKSTATION);
+      const name = activeWorkstationName || probeResourceName();
       try {
         const ws = await transport.getWorkstation(name);
         if (ws) {
@@ -511,6 +589,7 @@ export function createWorkstationLifecycleManager(options) {
       weakenExitOnlyExecutionReady,
       executionReadyAttempts,
       executionReadyIntervalMs,
+      executionReadyDeadlineMs,
       lastConfigCreateBody: lastConfigCreateBody
         ? structuredClone(lastConfigCreateBody)
         : null,

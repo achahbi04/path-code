@@ -84,7 +84,166 @@ export function createEmptyStudioState() {
     heartbeat: null,
     acceptedTypes: [],
     ignoredForeignCount: 0,
+    /** GC1-c living product projection (event-driven; never minted). */
+    product: {
+      pathPhase: "Idle",
+      cloudFooter: null,
+      region: null,
+      projectFiles: /** @type {string[]} */ ([]),
+      /** @type {Array<{ path: string, role: string }>} */
+      projectEntries: [],
+      branch: null,
+      dirtySummary: null,
+      editableCount: 0,
+      contextCount: 0,
+      hydrationFiles: null,
+      cloudSelected: false,
+      workstationReady: false,
+      disposed: false,
+      infraFailure: null,
+      modelId: null,
+      providerLabel: null,
+      providerTurn: null,
+      /** @type {string[] | null} */
+      machineLines: null,
+      pathDetail: null,
+    },
   };
+}
+
+/**
+ * Success dispositions that may legally render Complete (after cleanup when cloud).
+ * @param {string} disposition
+ * @param {string} [summary]
+ */
+export function isSuccessfulTerminalDisposition(disposition, summary = "") {
+  const blob = `${disposition} ${summary}`;
+  return /MUTATION_APPLIED_AND_CONFIGURED_VALIDATION_ACCEPTED|CONFIGURED VALIDATION ACCEPTED|EDIT APPLIED · CONFIGURED VALIDATION ACCEPTED/i.test(
+    blob,
+  );
+}
+
+/**
+ * @param {string} disposition
+ * @param {string} [summary]
+ * @returns {"Complete"|"Failed"|"Blocked"|"Cancelled"|"Unknown"}
+ */
+export function classifyTerminalPathPhase(disposition, summary = "") {
+  const blob = `${disposition} ${summary}`;
+  if (/cancel|declined|CREDENTIAL_CANCELLED/i.test(blob)) return "Cancelled";
+  if (
+    /ESCALATION|AUTONOMY_ESCALATION|PRIMARY_MUTATED|cleanup\.pending|CLEANUP_PENDING/i.test(
+      blob,
+    )
+  ) {
+    return "Blocked";
+  }
+  if (isSuccessfulTerminalDisposition(disposition, summary)) return "Complete";
+  if (/UNKNOWN|^unknown$/i.test(String(disposition || "").trim())) return "Unknown";
+  // Fail closed: non-success outcomes never render as Complete.
+  if (
+    /fail|error|refuse|not.?established|NOT_READY|ACQUIRE|CREDENTIAL|unavailable|GC1|ENV_POLICY|STALE|GAP|DRIFT|CALL_FAILED|AUTH_FAILED|SNAPSHOT|REQUIRED|UNAVAILABLE|INVENTORY|MUTATION_STALE|VALIDATION_|SCOPE_|ADAPTER_|BRAIN_|H_REFUSED|EDIT_|CHECK_/i.test(
+      blob,
+    )
+  ) {
+    return "Failed";
+  }
+  return "Failed";
+}
+
+/**
+ * ONE authoritative PATH phase for PROJECT/PATH/EVIDENCE/footer — never optimistic Complete.
+ * @param {ReturnType<typeof createEmptyStudioState>} state
+ */
+export function projectAuthoritativePathPhase(state) {
+  const product = state.product || createEmptyStudioState().product;
+  const terminal = state.cards?.terminal;
+  const recorded = product.pathPhase || "Idle";
+
+  if (product.infraFailure) {
+    return "Infrastructure failure";
+  }
+
+  // Cloud mid-flight always wins over a premature terminal Complete.
+  if (product.cloudSelected && !product.disposed) {
+    if (/Cleaning up/i.test(recorded) || /Cleaning up/i.test(product.cloudFooter || "")) {
+      return "Cleaning up";
+    }
+    if (/Starting workstation/i.test(recorded) || /Starting workstation/i.test(product.cloudFooter || "")) {
+      if (terminal?.arrived) {
+        const classified = classifyTerminalPathPhase(
+          String(terminal.detail || ""),
+          "",
+        );
+        if (classified !== "Complete") return classified === "Failed" && /EXECUTION_NOT_READY|ACQUIRE|Infrastructure/i.test(String(terminal.detail || ""))
+          ? "Infrastructure failure"
+          : classified === "Failed"
+            ? "Failed"
+            : classified;
+      }
+      return "Starting workstation";
+    }
+    if (/Hydrating/i.test(recorded)) return "Hydrating";
+    if (/Preparing dependencies|Preparing environment/i.test(recorded)) {
+      return recorded;
+    }
+  }
+
+  if (terminal?.arrived) {
+    const parts = String(terminal.detail || "").split(" — ");
+    const disposition = parts[0] || terminal.detail || "";
+    const summary = parts.slice(1).join(" — ");
+    const classified = classifyTerminalPathPhase(disposition, summary);
+    if (classified === "Complete") {
+      if (product.cloudSelected && !product.disposed) {
+        return /Cleaning up/i.test(product.cloudFooter || "")
+          ? "Cleaning up"
+          : "Saving result";
+      }
+      if (state.cards.gate2?.arrived && state.cards.gate2.status !== "done") {
+        return "Failed";
+      }
+      return "Complete";
+    }
+    if (
+      classified === "Failed" &&
+      /EXECUTION_NOT_READY|ACQUIRE_FAILED|REMOTE_|Infrastructure|environment unavailable/i.test(
+        `${disposition} ${summary}`,
+      )
+    ) {
+      return "Infrastructure failure";
+    }
+    return classified;
+  }
+
+  if (
+    state.cards.validationRunning?.status === "active" &&
+    recorded !== "Investigating failure"
+  ) {
+    return "Testing";
+  }
+
+  return recorded;
+}
+
+/**
+ * @param {string} relativePath
+ * @param {{ editable?: boolean, context?: boolean, modified?: boolean }} flags
+ */
+function fileRole(relativePath, flags) {
+  if (flags.modified) return "modified remotely";
+  if (flags.editable) return "editable";
+  const base = String(relativePath).split("/").pop() || "";
+  if (/\.test\.|\.spec\.|_test\.|tests?\//i.test(relativePath)) return "validation";
+  if (
+    /^(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig.*\.json|Cargo\.toml|go\.mod|pom\.xml|build\.gradle)/i.test(
+      base,
+    )
+  ) {
+    return "execution";
+  }
+  if (flags.context) return "context";
+  return "support";
 }
 
 /**
@@ -99,6 +258,19 @@ function setCard(state, cardId, status, detail) {
   card.status = status;
   card.detail = detail;
   card.arrived = true;
+}
+
+function setPathPhase(state, phase) {
+  if (!state.product) return;
+  state.product.pathPhase = phase;
+}
+
+function setCloudFooter(state, text) {
+  if (!state.product) return;
+  state.product.cloudFooter = text;
+  if (text && /Disposed/i.test(text)) {
+    state.product.disposed = true;
+  }
 }
 
 /**
@@ -138,6 +310,9 @@ export function applyStudioEvent(state, event, opts = {}) {
 
   const type = event.type;
   state.acceptedTypes.push(type);
+  if (!state.product) {
+    state.product = createEmptyStudioState().product;
+  }
 
   switch (type) {
     case "session.task.received":
@@ -147,11 +322,19 @@ export function applyStudioEvent(state, event, opts = {}) {
         "done",
         typeof event.task === "string" ? event.task : "(task)",
       );
+      if (typeof event.modelId === "string") state.product.modelId = event.modelId;
+      if (typeof event.provider === "string") {
+        state.product.providerLabel = event.provider;
+      }
+      setPathPhase(state, "Understanding");
       break;
     case "session.preflight": {
       const branch = typeof event.branch === "string" ? event.branch : "?";
       const dirty = typeof event.dirtySummary === "string" ? event.dirtySummary : "?";
       setCard(state, "preflight", "done", `${branch}; ${dirty}`);
+      state.product.branch = branch;
+      state.product.dirtySummary = dirty;
+      setPathPhase(state, "Scoping");
       break;
     }
     case "session.disclosure":
@@ -170,9 +353,31 @@ export function applyStudioEvent(state, event, opts = {}) {
       break;
     }
     case "session.scope.admitted": {
-      const editable = Array.isArray(event.editable) ? event.editable.length : 0;
-      const context = Array.isArray(event.context) ? event.context.length : 0;
-      setCard(state, "scope", "done", `editable: ${editable} context: ${context}`);
+      const editable = Array.isArray(event.editable) ? event.editable : [];
+      const context = Array.isArray(event.context) ? event.context : [];
+      setCard(
+        state,
+        "scope",
+        "done",
+        `editable: ${editable.length} context: ${context.length}`,
+      );
+      state.product.editableCount = editable.length;
+      state.product.contextCount = context.length;
+      const editableSet = new Set(editable.map(String));
+      const contextSet = new Set(context.map(String));
+      const files = [
+        ...editable.map(String),
+        ...context.map(String).filter((p) => !editableSet.has(p)),
+      ];
+      state.product.projectFiles = files.slice(0, 12);
+      state.product.projectEntries = files.slice(0, 12).map((path) => ({
+        path,
+        role: fileRole(path, {
+          editable: editableSet.has(path),
+          context: contextSet.has(path),
+        }),
+      }));
+      setPathPhase(state, "Scoping");
       break;
     }
     case "session.reading": {
@@ -185,6 +390,14 @@ export function applyStudioEvent(state, event, opts = {}) {
       const n = typeof event.call === "number" ? event.call : "?";
       const of = typeof event.of === "number" ? event.of : "?";
       setCard(state, "reasoning", "active", `call ${n} of ${of}`);
+      state.product.providerTurn = { call: n, of };
+      if (typeof event.modelId === "string") {
+        state.product.modelId = event.modelId;
+      }
+      if (typeof event.provider === "string") {
+        state.product.providerLabel = event.provider;
+      }
+      setPathPhase(state, "Understanding");
       break;
     }
     case "session.gate1":
@@ -201,19 +414,35 @@ export function applyStudioEvent(state, event, opts = {}) {
       const after = typeof event.afterBytes === "number" ? event.afterBytes : 0;
       const prev = state.cards.edit.arrived ? `${state.cards.edit.detail}; ` : "";
       setCard(state, "edit", "done", `${prev}${path} ${before}→${after} bytes`);
+      setPathPhase(state, "Correcting");
       break;
     }
     case "session.recovery.checkpoint":
+    case "session.checkpoint.ready":
       setCard(
         state,
         "recovery",
         "done",
         `id ${event.id ?? "?"} — ${event.status ?? "READY"}`,
       );
+      setPathPhase(state, "Checkpointing");
       break;
     case "session.applying": {
       const files = Array.isArray(event.files) ? event.files : [];
       setCard(state, "applying", "active", `${files.length} file(s)`);
+      setPathPhase(state, "Applying");
+      if (files.length > 0) {
+        const first = String(files[0]);
+        state.product.pathDetail = first;
+        const entries = Array.isArray(state.product.projectEntries)
+          ? state.product.projectEntries
+          : [];
+        state.product.projectEntries = entries.map((e) =>
+          files.map(String).includes(e.path)
+            ? { ...e, role: "modified remotely" }
+            : e,
+        );
+      }
       break;
     }
     case "session.reobserved":
@@ -222,6 +451,7 @@ export function applyStudioEvent(state, event, opts = {}) {
       if (state.cards.applying.arrived) {
         state.cards.applying.status = "done";
       }
+      setPathPhase(state, "Verifying");
       break;
     case "session.validation.plan": {
       const checks = Array.isArray(event.checks) ? event.checks : [];
@@ -235,6 +465,7 @@ export function applyStudioEvent(state, event, opts = {}) {
         "active",
         typeof event.check === "string" ? event.check : "running",
       );
+      setPathPhase(state, "Testing");
       break;
     case "session.validation.result": {
       const check = typeof event.check === "string" ? event.check : "check";
@@ -247,6 +478,11 @@ export function applyStudioEvent(state, event, opts = {}) {
         state.cards.validationRunning.status = "done";
       }
       state.heartbeat = null;
+      if (/fail|error|not.?pass/i.test(status)) {
+        setPathPhase(state, "Investigating failure");
+      } else {
+        setPathPhase(state, "Verifying");
+      }
       break;
     }
     case "session.validation.skipped":
@@ -278,6 +514,21 @@ export function applyStudioEvent(state, event, opts = {}) {
         summary ? `${disposition} — ${summary}` : disposition,
       );
       state.heartbeat = null;
+      const classified = classifyTerminalPathPhase(disposition, summary);
+      if (classified === "Complete" && state.product.cloudSelected && !state.product.disposed) {
+        setPathPhase(state, "Saving result");
+      } else if (
+        classified === "Failed" &&
+        /EXECUTION_NOT_READY|ACQUIRE|REMOTE_|environment unavailable|Infrastructure/i.test(
+          `${disposition} ${summary}`,
+        )
+      ) {
+        state.product.infraFailure =
+          summary || disposition || "execution environment unavailable";
+        setPathPhase(state, "Infrastructure failure");
+      } else {
+        setPathPhase(state, classified);
+      }
       break;
     }
     case "session.finding": {
@@ -289,6 +540,7 @@ export function applyStudioEvent(state, event, opts = {}) {
     case "session.cancelled":
       setCard(state, "terminal", "refused", "cancelled");
       state.heartbeat = null;
+      setPathPhase(state, "Cancelled");
       break;
     case "session.internal_error":
       setCard(
@@ -297,6 +549,7 @@ export function applyStudioEvent(state, event, opts = {}) {
         "done",
         typeof event.message === "string" ? event.message : "internal error",
       );
+      setPathPhase(state, "Failed");
       break;
     case "session.heartbeat": {
       const stage = typeof event.stage === "string" ? event.stage : "stage";
@@ -305,8 +558,126 @@ export function applyStudioEvent(state, event, opts = {}) {
       state.heartbeat = { stage, elapsedMs };
       break;
     }
+    case "session.cloud.selected": {
+      state.product.cloudSelected = true;
+      if (typeof event.region === "string") state.product.region = event.region;
+      setPathPhase(state, "Preparing environment");
+      setCloudFooter(
+        state,
+        `☁ ${event.region || "cloud"} · Engineering Image · Selected`,
+      );
+      break;
+    }
+    case "session.environment.preparing": {
+      setPathPhase(state, "Starting workstation");
+      const config = typeof event.config === "string" ? event.config : "workstation";
+      setCloudFooter(state, `☁ Starting workstation · ${config}`);
+      break;
+    }
+    case "session.workstation.ready": {
+      setPathPhase(state, "Preparing environment");
+      state.product.workstationReady = true;
+      setCloudFooter(
+        state,
+        `☁ ${state.product.region || "europe-west4"} · Engineering Image · Ready`,
+      );
+      break;
+    }
+    case "session.machine.capabilities": {
+      const lines = Array.isArray(event.lines)
+        ? event.lines.map(String)
+        : null;
+      if (lines && lines.length > 0) {
+        state.product.machineLines = lines;
+      }
+      break;
+    }
+    case "session.hydration": {
+      setPathPhase(state, "Hydrating");
+      const files = typeof event.files === "number" ? event.files : null;
+      state.product.hydrationFiles = files;
+      const bytes =
+        typeof event.bytes === "number" ? event.bytes : null;
+      state.product.pathDetail =
+        files != null
+          ? `${files} files${bytes != null ? ` · ${(bytes / 1024).toFixed(1)} KB` : ""}`
+          : null;
+      setCloudFooter(
+        state,
+        `☁ ${state.product.region || "europe-west4"} · Engineering Image · Hydrating${
+          files != null ? ` · ${files} file(s)` : ""
+        }`,
+      );
+      break;
+    }
+    case "session.artifacts.saving":
+      setPathPhase(state, "Saving artifacts");
+      setCloudFooter(state, `☁ Saving artifacts…`);
+      break;
+    case "session.cleanup":
+      setPathPhase(state, "Cleaning up");
+      setCloudFooter(state, "☁ Cleaning up…");
+      break;
+    case "session.cleanup.pending":
+      setPathPhase(state, "Blocked");
+      setCloudFooter(state, "☁ Cleanup pending");
+      break;
+    case "session.workstation.disposed":
+      setCloudFooter(state, "☁ Disposed ✓");
+      state.product.disposed = true;
+      // Promote deferred Complete only after dispose when terminal was successful.
+      if (state.cards.terminal?.arrived) {
+        const parts = String(state.cards.terminal.detail || "").split(" — ");
+        if (isSuccessfulTerminalDisposition(parts[0] || "", parts.slice(1).join(" — "))) {
+          if (
+            !state.cards.gate2?.arrived ||
+            state.cards.gate2.status === "done"
+          ) {
+            setPathPhase(state, "Complete");
+          }
+        }
+      }
+      break;
+    case "session.environment.unavailable":
+    case "session.infrastructure.failure": {
+      const reason =
+        typeof event.message === "string"
+          ? event.message
+          : typeof event.code === "string"
+            ? event.code
+            : "execution environment unavailable";
+      state.product.infraFailure = reason;
+      setPathPhase(state, "Infrastructure failure");
+      setCloudFooter(state, "☁ Cleaning up…");
+      break;
+    }
     default:
       break;
+  }
+
+  // While validation is actively running, prefer Testing over stale phases.
+  if (
+    state.cards.validationRunning?.status === "active" &&
+    state.product.pathPhase !== "Investigating failure"
+  ) {
+    setPathPhase(state, "Testing");
+  }
+  // Cloud running footer while applying/validating after hydration.
+  if (
+    state.product.cloudSelected &&
+    !state.product.disposed &&
+    (state.cards.applying?.status === "active" ||
+      state.cards.validationRunning?.status === "active")
+  ) {
+    const sec = state.heartbeat
+      ? Math.floor(state.heartbeat.elapsedMs / 1000)
+      : null;
+    setCloudFooter(
+      state,
+      `☁ ${state.product.region || "europe-west4"} · Engineering Image · Running${
+        sec != null ? ` · ${sec}s` : ""
+      }`,
+    );
   }
 
   // P1 decoration probe hook — MUST NOT ship enabled.

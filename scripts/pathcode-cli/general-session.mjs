@@ -772,7 +772,10 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   let cloudCtx = null;
 
   if (executionMode === "cloud") {
-    emit("session.cloud.selected", { config: GC1C_CONFIG });
+    emit("session.cloud.selected", {
+      config: GC1C_CONFIG,
+      region: "europe-west4",
+    });
   }
 
   const task = validateTaskText(options.taskText);
@@ -783,14 +786,19 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     return { exitCode: 2, outcome: task.code, autonomyMode, modelCalls: 0 };
   }
 
-  emit("session.task.received", {
-    task: task.taskText.length > 200 ? `${task.taskText.slice(0, 200)}…` : task.taskText,
-  });
-
-  const modelId =
+  const modelIdForEmit =
     typeof options.modelId === "string" && options.modelId.trim() !== ""
       ? options.modelId.trim()
       : null;
+
+  emit("session.task.received", {
+    task: task.taskText.length > 200 ? `${task.taskText.slice(0, 200)}…` : task.taskText,
+    ...(modelIdForEmit
+      ? { modelId: modelIdForEmit, provider: "OpenAI" }
+      : {}),
+  });
+
+  const modelId = modelIdForEmit;
   if (modelId === null && options.brain === undefined) {
     prompt.write(
       "No model selected. Start with --model <id> or set PATHCODE_OPENAI_MODEL.\n",
@@ -1319,8 +1327,24 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
       },
     });
     if (!prepared.ok) {
-      prompt.write(`Cloud preparation refused: ${prepared.code} — ${prepared.message}\n`);
-      return finish({ exitCode: 1, outcome: prepared.code, modelCalls: 1 });
+      const human =
+        /EXECUTION_NOT_READY|ACQUIRE|NOT_READY/i.test(String(prepared.code || ""))
+          ? "Workstation execution channel did not become ready."
+          : String(prepared.message || prepared.code || "cloud preparation refused");
+      emit("session.infrastructure.failure", {
+        code: prepared.code,
+        message: human,
+      });
+      emit("session.cleanup", {});
+      if (!cardsOwnProgress) {
+        prompt.write(`Cloud preparation refused: ${prepared.code} — ${prepared.message}\n`);
+      }
+      return finish({
+        exitCode: 1,
+        outcome: prepared.code,
+        staleDetail: human,
+        modelCalls: 1,
+      });
     }
     cloudCtx = prepared;
     activeWorkspace = prepared.workspace;

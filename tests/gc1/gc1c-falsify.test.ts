@@ -128,11 +128,16 @@ describe("GC1C-L regression floor markers", () => {
       "gc1c-evidence.test.ts",
       "gc1c-lifecycle-terminal.test.ts",
       "gc1c-session-integration.test.ts",
+      "gc1c-runtime-delivery.test.ts",
     ];
     for (const name of gc1cTests) {
       const src = readFileSync(join(CHECKOUT, "tests/gc1", name), "utf8");
-      expect(src).not.toMatch(/from ["'].*gcp-transport/);
+      // Focused suites must not enable live smoke; gcp-transport may be imported
+      // only behind skipEnvGate + fake tunnel (runtime-delivery K).
       expect(src).not.toMatch(/GC1_LIVE_SMOKE\s*=/);
+      if (name !== "gc1c-runtime-delivery.test.ts") {
+        expect(src).not.toMatch(/from ["'].*gcp-transport/);
+      }
     }
   });
 });

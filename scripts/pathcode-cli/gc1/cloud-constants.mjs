@@ -9,6 +9,9 @@ import { IMAGE_DIGEST_HISTORY, DEFAULT_IMAGE_TAG } from "./engineering-image.mjs
 /** Workstation config pin reused from GC1-b (operator-verified). */
 export const GC1C_CONFIG = "pathcode-gc1b-config-v4";
 
+/** GC1-c probe id — distinct from GC1-a `pathcode-gc1-probe` on legacy config. */
+export const GC1C_PROBE_WORKSTATION = "pathcode-gc1c-probe";
+
 /** Live authorization: at most six workstation sessions for this dispatch. */
 export const GC1C_SESSION_BUDGET = 6;
 
