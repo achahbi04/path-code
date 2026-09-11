@@ -488,7 +488,6 @@ export function applyStudioEvent(state, event, opts = {}) {
       setPathPhase(state, "Testing");
       break;
     case "session.validation.result": {
-      state.product.ag1 = true;
       const check = typeof event.check === "string" ? event.check : "check";
       const status = typeof event.status === "string" ? event.status : "?";
       const prev = state.cards.validationResult.arrived
@@ -498,12 +497,15 @@ export function applyStudioEvent(state, event, opts = {}) {
       if (state.cards.validationRunning.arrived) {
         state.cards.validationRunning.status = "done";
       }
-      if (!Array.isArray(state.product.ag1Checks)) state.product.ag1Checks = [];
-      state.product.ag1Checks.push({
-        id: check,
-        kind: typeof event.kind === "string" ? event.kind : check,
-        ok: event.ok === true || status === "PASSED",
-      });
+      // Only accumulate AG1 check rows on the Antigravity product path.
+      if (state.product.ag1 === true) {
+        if (!Array.isArray(state.product.ag1Checks)) state.product.ag1Checks = [];
+        state.product.ag1Checks.push({
+          id: check,
+          kind: typeof event.kind === "string" ? event.kind : check,
+          ok: event.ok === true || status === "PASSED",
+        });
+      }
       state.heartbeat = null;
       if (/fail|error|not.?pass/i.test(status)) {
         setPathPhase(state, "Investigating failure");

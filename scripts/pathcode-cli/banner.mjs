@@ -122,20 +122,13 @@ Environment:
   GC1_LIVE_SMOKE=1     Required (with live transport) for real GCP workstations;
                        canonical/cloud tests use the mock transport ($0).
 
-A living general engineering session:
-  - the prompt stays open across tasks; each task is a fresh authority cycle
-  - the provider key is resolved once per process and never re-prompted
-  - requires a Git working tree, on a branch, with no merge/rebase in progress
-  - asks the model which files the task touches, then asks you to approve that list
-    (or admits the list under a bounded RUN policy)
-  - shows you the exact bytes of the edit before writing anything
-  - writes a recovery checkpoint before the first byte changes
-  - runs only checks discovered from your project metadata, after a separate approval
-    (or under the RUN-disclosed validation set in bounded mode)
-  - never commits, stashes, resets, cleans or checks out anything in Git
-  - uses at most 3 model calls per task and never retries automatically
-  - nothing earned in one cycle (challenge, catalog, observations, checkpoint)
-    authorizes the next
+A living PATH engineering session (local default):
+  - the prompt stays open across tasks; each task is a fresh isolated workspace
+  - PATH creates a unique task branch and worktree from the session baseline
+  - Antigravity engineers inside that envelope; PATH independently validates
+  - VERIFIED tasks advance the session baseline; failed work does not
+  - primary checkout stays untouched; merge the task branch when you choose
+  - cloud execution (--execution cloud) retains the historical Gate-1 OpenAI path
 
 Opening this screen does not read a key, scan a project, or call a provider.
 `;

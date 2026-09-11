@@ -15,18 +15,18 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { afterAll, describe, expect, it } from "vitest";
 
-import {
-  applyStudioEvent,
-  createEmptyStudioState,
-  projectAuthoritativePathPhase,
-} from "../../scripts/path-studio/state.mjs";
-
 const CHECKOUT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const AG1 = join(CHECKOUT_ROOT, "scripts/pathcode-cli/ag1");
 const SCRATCH_PARENT = join(CHECKOUT_ROOT, ".path-code-tmp", "ag1-test-scratch");
 
 async function load(name: string) {
   return import(`${pathToFileURL(join(AG1, name)).href}?b=${randomUUID()}`);
+}
+
+async function loadStudio() {
+  return import(
+    `${pathToFileURL(join(CHECKOUT_ROOT, "scripts/path-studio/state.mjs")).href}?b=${randomUUID()}`
+  );
 }
 
 function git(cwd: string, args: string[]) {
@@ -302,6 +302,11 @@ describe("AG1 G/H/I — finished ≠ VERIFIED; PATH validation owns result", () 
 
 describe("AG1 J — living UI receives real lifecycle events", () => {
   it("studio reducer projects AG1 engineering activities", async () => {
+    const {
+      applyStudioEvent,
+      createEmptyStudioState,
+      projectAuthoritativePathPhase,
+    } = await loadStudio();
     const sessionId = randomUUID();
     let state = createEmptyStudioState();
     const events = [

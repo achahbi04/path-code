@@ -103,9 +103,9 @@ describe("R2 living session loop (shell)", () => {
     const { exitCode, output } = await runRepl(
       ["first task please", "second task please", "/exit"],
       {
-        runGeneralSession: async (_p: unknown, options: Record<string, unknown>) => {
+        runAg1Session: async (_p: unknown, options: Record<string, unknown>) => {
           seen.push(options);
-          return { exitCode: 0, outcome: "OK", modelCalls: 3 };
+          return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 3 };
         },
       },
     );
@@ -113,8 +113,8 @@ describe("R2 living session loop (shell)", () => {
     expect(seen).toHaveLength(2);
     expect(seen[0]!.taskText).toBe("first task please");
     expect(seen[1]!.taskText).toBe("second task please");
-    expect(output).toContain("Session so far: 1 tasks, 3 model calls.");
-    expect(output).toContain("Session so far: 2 tasks, 6 model calls.");
+    expect(output).toContain("Session so far: 1 task, 3 engineering activities.");
+    expect(output).toContain("Session so far: 2 tasks, 6 engineering activities.");
     expect(output).toContain("Goodbye.");
   });
 
@@ -123,42 +123,42 @@ describe("R2 living session loop (shell)", () => {
     const { exitCode, output } = await runRepl(
       ["decline this", "run this next", "/exit"],
       {
-        runGeneralSession: async (_p: unknown, options: Record<string, unknown>) => {
+        runAg1Session: async (_p: unknown, options: Record<string, unknown>) => {
           if (options.taskText === "decline this") {
             outcomes.push("declined");
-            return { exitCode: 130, outcome: "START_DECLINED", modelCalls: 0 };
+            return { exitCode: 130, outcome: "CANCELLED", engineActivityCount: 0 };
           }
           outcomes.push("ran");
-          return { exitCode: 0, outcome: "OK", modelCalls: 3 };
+          return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 3 };
         },
       },
     );
     expect(exitCode).toBe(0);
     expect(outcomes).toEqual(["declined", "ran"]);
-    expect(output).toContain("Session so far: 2 tasks, 3 model calls.");
+    expect(output).toContain("Session so far: 2 tasks");
   });
 
   it("R2-H: escalation keeps the session", async () => {
     const { exitCode } = await runRepl(
       ["escalate please", "continue please", "/exit"],
       {
-        runGeneralSession: async (_p: unknown, options: Record<string, unknown>) => {
+        runAg1Session: async (_p: unknown, options: Record<string, unknown>) => {
           if (options.taskText === "escalate please") {
             return {
               exitCode: 1,
-              outcome: "AUTONOMY_ESCALATION_REQUIRED",
-              modelCalls: 1,
+              outcome: "FAILED",
+              engineActivityCount: 1,
             };
           }
-          return { exitCode: 0, outcome: "OK", modelCalls: 3 };
+          return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 3 };
         },
       },
     );
     expect(exitCode).toBe(0);
   });
 
-  it("R2-I: /model and /autonomy affect the NEXT cycle only", async () => {
-    const seen: Array<Record<string, unknown>> = [];
+  it("R2-I: /model and /autonomy still update shell settings between tasks", async () => {
+    const seen: string[] = [];
     const { output } = await runRepl(
       [
         "task-one",
@@ -168,59 +168,31 @@ describe("R2 living session loop (shell)", () => {
         "/exit",
       ],
       {
-        runGeneralSession: async (_p: unknown, options: Record<string, unknown>) => {
-          seen.push({
-            taskText: options.taskText,
-            modelId: options.modelId,
-            autonomyMode: options.autonomyMode,
-          });
-          return { exitCode: 0, outcome: "OK", modelCalls: 1 };
+        runAg1Session: async (_p: unknown, options: Record<string, unknown>) => {
+          seen.push(String(options.taskText));
+          return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 1 };
         },
       },
       ["--model", "gpt-first-model", "--autonomy", "review"],
     );
-    expect(seen).toEqual([
-      {
-        taskText: "task-one",
-        modelId: "gpt-first-model",
-        autonomyMode: "review",
-      },
-      {
-        taskText: "task-two",
-        modelId: "gpt-next-model",
-        autonomyMode: "bounded",
-      },
-    ]);
+    expect(seen).toEqual(["task-one", "task-two"]);
     expect(output).toContain("Model set to gpt-next-model for subsequent tasks.");
     expect(output).toContain("Autonomy set to bounded for subsequent tasks.");
   });
 
-  it("R2-E: key resolved once; second cycle gets credential with zero prompts", async () => {
-    let credentialPrompts = 0;
-    const credentialsSeen: Array<string | null | undefined> = [];
-    const { createPromptSession } = await importHost("terminal.mjs");
-    // Drive via runPathcodeMain with a prompt that counts hidden credential asks
-    // by wrapping the injected general session options.
+  it("R2-E: local AG1 path does not require OpenAI credential prompts", async () => {
+    let n = 0;
     const { exitCode } = await runRepl(
       ["task-a", "task-b", "/exit"],
       {
-        runGeneralSession: async (prompt: any, options: Record<string, unknown>) => {
-          credentialsSeen.push(options.credential as string | null | undefined);
-          if (options.credential == null && typeof options.onCredentialAcquired === "function") {
-            // Simulate first-cycle acquisition path used by the shell holder.
-            (options.onCredentialAcquired as (c: string) => void)("sk-test-session-key");
-            credentialPrompts += 1;
-          }
-          void prompt;
-          return { exitCode: 0, outcome: "OK", modelCalls: 1 };
+        runAg1Session: async () => {
+          n += 1;
+          return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 1 };
         },
       },
     );
     expect(exitCode).toBe(0);
-    expect(credentialsSeen[0]).toBeNull();
-    expect(credentialsSeen[1]).toBe("sk-test-session-key");
-    expect(credentialPrompts).toBe(1);
-    void createPromptSession;
+    expect(n).toBe(2);
   });
 
   it("R2-L: internal error in cycle 1 does not poison cycle 2", async () => {
@@ -228,10 +200,10 @@ describe("R2 living session loop (shell)", () => {
     const { exitCode, output } = await runRepl(
       ["boom", "recover-and-run", "/exit"],
       {
-        runGeneralSession: async () => {
+        runAg1Session: async () => {
           n += 1;
           if (n === 1) throw new Error("forced internal fault");
-          return { exitCode: 0, outcome: "OK", modelCalls: 2 };
+          return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 2 };
         },
       },
     );
@@ -246,9 +218,9 @@ describe("R2 living session loop (shell)", () => {
     const { exitCode } = await runRepl(
       ["edit something", "/recover mc-abcdef12", "after recover", "/exit"],
       {
-        runGeneralSession: async (_p: unknown, options: Record<string, unknown>) => {
+        runAg1Session: async (_p: unknown, options: Record<string, unknown>) => {
           order.push(`task:${options.taskText}`);
-          return { exitCode: 0, outcome: "OK", modelCalls: 3 };
+          return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 3 };
         },
         runRecover: async () => {
           order.push("recover");

@@ -80,13 +80,13 @@ async function runRepl(
 }
 
 describe("5G-M: a plain line at the prompt is an engineering task", () => {
-  it("5G-M: routes the operator's words to the General Session", async () => {
+  it("5G-M: routes the operator's words to the PATH engineering session", async () => {
     const seen: Array<Record<string, unknown>> = [];
     const task = "Fix the failing authentication test without changing the public API.";
     const { exitCode } = await runRepl([task, "/exit"], {
-      runGeneralSession: async (_prompt: unknown, options: Record<string, unknown>) => {
+      runAg1Session: async (_prompt: unknown, options: Record<string, unknown>) => {
         seen.push(options);
-        return { exitCode: 0, outcome: "TEST", modelCalls: 0 };
+        return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 1 };
       },
     });
 
@@ -94,13 +94,12 @@ describe("5G-M: a plain line at the prompt is an engineering task", () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]!.taskText).toBe(task);
     expect(seen[0]!.projectRoot).toBe(process.cwd());
-    expect(seen[0]!.modelId).toBe("gpt-test-fixture-model");
   });
 
   it("5G-M: an unknown slash command is not treated as a task", async () => {
     let called = false;
     const { output } = await runRepl(["/nonsense", "/exit"], {
-      runGeneralSession: async () => {
+      runAg1Session: async () => {
         called = true;
         return { exitCode: 0 };
       },
@@ -151,17 +150,17 @@ describe("5G-M / 5G-AF: help and welcome describe what the prompt accepts", () =
     expect(help).toContain("/help");
     expect(help).toContain("/exit");
     expect(help).toContain("PATHCODE_STATE_DIR");
-    expect(help).toContain("recovery checkpoint before the first byte changes");
+    expect(help).toContain("isolated workspace");
     expect(help).toContain("--events ndjson");
     expect(help).toContain("--events-out");
   });
 
-  it("5G-AF: the welcome screen says a checkpoint precedes any change", async () => {
+  it("5G-AF: the welcome screen describes isolated engineering + independent validation", async () => {
     const { renderWelcomeScreen } = await importHost("banner.mjs");
     const welcome = renderWelcomeScreen({ columns: 100, unicode: true, plain: false });
     expect(welcome).toContain("Describe an engineering task in your own words");
     expect(welcome).toContain("/recover <id>");
-    expect(welcome).toContain("/model <id>");
-    expect(welcome).toContain("A recovery checkpoint is written before any file changes.");
+    expect(welcome).toContain("PATH creates an isolated task workspace");
+    expect(welcome).toContain("PATH independently validates the final result");
   });
 });
