@@ -32,6 +32,9 @@ export const CREDENTIAL_CANARY_PATH_PATTERNS = Object.freeze([
   /(^|\/)\.ssh(\/|$)/i,
   /private[_-]?key/i,
   /OPENAI_API_KEY/i,
+  /PATHCODE_OPENAI_API_KEY/i,
+  /PATHCODE_LIVE_OPENAI/i,
+  /PATHCODE_GC1C_SECRET_CANARY/i,
   /GC1_CANARY_SECRET/i,
 ]);
 
@@ -363,6 +366,90 @@ export function assertPrimaryUnchanged(primaryRoot, snapshot) {
     throw err;
   }
   return check;
+}
+
+/**
+ * Capture local directionality state (content hashes + git status summary)
+ * for admitted paths — used to prove host→remote one-way effects.
+ * @param {string} projectRoot
+ * @param {readonly string[]} paths
+ */
+export function captureLocalDirectionalityState(projectRoot, paths) {
+  const root = resolve(String(projectRoot));
+  /** @type {Record<string, string>} */
+  const hashes = {};
+  for (const raw of paths ?? []) {
+    const norm = normalizeHydrationRelativePath(raw);
+    if (!norm.ok) {
+      const err = new Error(`directionality path refused: ${norm.detail}`);
+      err.code = norm.code;
+      throw err;
+    }
+    const abs = join(root, ...norm.path.split("/"));
+    if (!existsSync(abs)) {
+      const err = new Error(`directionality path missing: ${norm.path}`);
+      err.code = "DIRECTIONALITY_MISSING";
+      throw err;
+    }
+    hashes[norm.path] = createHash("sha256").update(readFileSync(abs)).digest("hex");
+  }
+  const dirtyState = captureDirtyStateSummary(root);
+  const statusPorcelain = gitOne(root, ["status", "--porcelain"]) ?? "";
+  return Object.freeze({
+    projectRoot: root,
+    capturedAtMs: Date.now(),
+    hashes: Object.freeze({ ...hashes }),
+    gitStatusSummary: Object.freeze({
+      ...dirtyState,
+      porcelain: statusPorcelain,
+    }),
+  });
+}
+
+/**
+ * Assert directionality state is unchanged (hashes + git status summary).
+ * @param {ReturnType<typeof captureLocalDirectionalityState>} before
+ * @param {ReturnType<typeof captureLocalDirectionalityState>} after
+ */
+export function assertDirectionalityUnchanged(before, after) {
+  if (!before || !after) {
+    const err = new Error("assertDirectionalityUnchanged requires before and after");
+    err.code = "DIRECTIONALITY_INVALID";
+    throw err;
+  }
+  if (before.projectRoot !== after.projectRoot) {
+    const err = new Error("directionality projectRoot mismatch");
+    err.code = "DIRECTIONALITY_ROOT";
+    throw err;
+  }
+  const beforePaths = Object.keys(before.hashes ?? {}).sort();
+  const afterPaths = Object.keys(after.hashes ?? {}).sort();
+  if (beforePaths.join("\0") !== afterPaths.join("\0")) {
+    const err = new Error("directionality path set changed");
+    err.code = "DIRECTIONALITY_PATHS";
+    throw err;
+  }
+  for (const p of beforePaths) {
+    if (before.hashes[p] !== after.hashes[p]) {
+      const err = new Error(`directionality hash changed: ${p}`);
+      err.code = "DIRECTIONALITY_HASH";
+      throw err;
+    }
+  }
+  const b = before.gitStatusSummary ?? {};
+  const a = after.gitStatusSummary ?? {};
+  if (
+    b.clean !== a.clean ||
+    b.modified !== a.modified ||
+    b.untracked !== a.untracked ||
+    b.unmerged !== a.unmerged ||
+    String(b.porcelain ?? "") !== String(a.porcelain ?? "")
+  ) {
+    const err = new Error("directionality git status summary changed");
+    err.code = "DIRECTIONALITY_GIT";
+    throw err;
+  }
+  return { ok: true };
 }
 
 function captureOriginIdentity(projectRoot, originOverride) {

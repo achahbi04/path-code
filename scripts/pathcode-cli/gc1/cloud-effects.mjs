@@ -644,16 +644,25 @@ function sanitizeRemoteEnv(env) {
   /** @type {Record<string, string>} */
   const out = {};
   if (!env || typeof env !== "object") return out;
+  const forbiddenKeys = new Set([
+    "OPENAI_API_KEY",
+    "PATHCODE_OPENAI_API_KEY",
+    "PATHCODE_LIVE_OPENAI",
+    "PATHCODE_GC1C_SECRET_CANARY",
+  ]);
   for (const [k, v] of Object.entries(env)) {
     if (typeof k !== "string" || typeof v !== "string") continue;
+    if (forbiddenKeys.has(k)) continue;
     if (/KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|OPENAI|ADC|GOOGLE_APPLICATION/i.test(k)) {
       continue;
     }
-    if (/GC1_CANARY_SECRET/.test(v)) continue;
+    if (/GC1_CANARY_SECRET|PATHCODE_GC1C_SECRET_CANARY/.test(v)) continue;
     out[k] = v;
   }
   return out;
 }
+
+export { sanitizeRemoteEnv };
 
 function findEntry(_workspace, _relativePath) {
   return null;

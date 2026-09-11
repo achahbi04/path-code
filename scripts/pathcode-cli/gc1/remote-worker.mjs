@@ -562,7 +562,11 @@ async function spawnLocalProcess(req) {
 export function assertNoCredentialCanaries(value, pathHint = "$") {
   if (typeof value === "string") {
     for (const re of CREDENTIAL_CANARY_PATH_PATTERNS) {
-      if (re.test(value) || value.includes("GC1_CANARY_SECRET")) {
+      if (
+        re.test(value) ||
+        value.includes("GC1_CANARY_SECRET") ||
+        value.includes("PATHCODE_GC1C_SECRET_CANARY")
+      ) {
         const err = new Error(`credential canary present in ${pathHint}`);
         err.code = "CREDENTIAL_CANARY";
         throw err;

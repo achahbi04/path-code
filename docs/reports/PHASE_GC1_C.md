@@ -254,10 +254,58 @@ Baseline comparison: 123→131 files, 1190→1210 tests (additive GC1-c + unchan
 ## Operator decision required (smallest)
 
 1. Export `OPENAI_API_KEY` (or run interactively so the hidden credential prompt works).  
-2. Approve/run live mutate budget (≤6 sessions):  
-   - living CLI accepted + honest-failure cycles on `fixtures/gc1c-live`  
-   - `GC1_LIVE_SMOKE=1 node scripts/gc1c-live-cancel-probe.mjs --confirm-cloud`  
-3. Re-open continuous drive only after credentials + live approval; do not invent proof.
+2. Approve/run live mutate budget (≤6 sessions) via the prepared harness:  
+   ```bash
+   GC1_LIVE_SMOKE=1 node scripts/gc1c-live-closure.mjs --confirm-cloud
+   ```
+   (accepted + honest-failure + cancel; seeds `PATHCODE_GC1C_SECRET_CANARY`; never prints secrets)  
+   Or separately: living CLI on `fixtures/gc1c-live` + `gc1c-live-cancel-probe.mjs`.  
+3. Re-open continuous drive only after live evidence lands; do not invent proof.
+
+---
+
+## FINAL LIVE CLOSURE — progress log (2026-09-11)
+
+### 0 — H-scope admission audit — PASS (local)
+
+**Invariant:** when `hydrationPaths` is omitted, effective H is **not** “hydrate arbitrary inventory.”
+
+Implementation:
+
+- `computeEffectiveHydrationSet` / `collectValidationSupportPaths` in `scripts/pathcode-cli/gc1/cloud-session.mjs`
+- Support paths = fixed `VALIDATION_SUPPORT_BASENAMES` only, **plus** deterministic `VALIDATION_SUPPORT_TEST_SUFFIXES` **only when** a planned check kind includes `TARGETED_TEST`
+- Unrelated siblings and secrets never enter H
+- Support-only paths are **not** added to E or P
+- For `executionMode === "cloud"`, H is computed **after** `admitScopePlan` and **disclosed** (`renderCloudHydrationDisclosure`) **before** scope challenge / bounded admission display
+- Exact disclosed list is persisted onto `approved.hydrationPaths` / `precomputedHydrationPaths` — **no silent re-widen** at hydrate time
+
+Positive proof + falsification: `tests/gc1/gc1c-h-scope-audit.test.ts`  
+Fixture result: H = `{src/edit.ts, src/context.ts, package.json}`; excludes sibling + `.env`; with TARGETED_TEST planned, `*.test.ts` joins as support-only only.
+
+### 1 — Synthetic credential canary — PASS (local); LIVE remote assertion NOT RUN
+
+- Module: `scripts/pathcode-cli/gc1/credential-boundary.mjs`
+- Forbidden remote keys: `OPENAI_API_KEY`, `PATHCODE_OPENAI_API_KEY`, `PATHCODE_LIVE_OPENAI`, `PATHCODE_GC1C_SECRET_CANARY`
+- Remote command reports only `CREDENTIAL_BOUNDARY_PASS` or `CREDENTIAL_BOUNDARY_VIOLATION:<name>` (never values)
+- Wired in `prepareCloudTaskEnvironment` after worker install; violation refuses the task
+- Local proofs: `tests/gc1/gc1c-credential-canary.test.ts` (3)
+
+### 2–5 — Live accepted / fail / cancel — NOT EXECUTED THIS TURN
+
+Prepared harness: `scripts/gc1c-live-closure.mjs` (real Brain + real GCP + directionality hashes + canary seed + cancel probe).
+
+**Blocking condition:** agent live-mutate / provider-credential execution requires an operator approval card; repeated approval attempts failed with `Could not find bubble for toolCallId` (no approval UI delivered). Per contract, live proof was **not invented**.
+
+No GC1-c billable workstation was acquired in this closure turn. Cluster/config preserved. CLEANUP_PENDING: none from this turn.
+
+### Focused local totals after H/canary closure
+
+| Suite | Result |
+|---|---|
+| `tests/gc1/` | **65 passed / 13 files** |
+| H-scope + canary + scope-snapshot focused | **8 passed** |
+
+Canonical `npm run check` **not** re-run this turn (live gates unmet; avoid non-causal canonical churn). Prior canonical: 131 files / 1210 tests PASS.
 
 ---
 
@@ -266,12 +314,16 @@ Baseline comparison: 123→131 files, 1190→1210 tests (additive GC1-c + unchan
 | Checkpoint | Full SHA |
 |---|---|
 | GC1-AB baseline | `462a18dfb9e6395f6efdd4028d0f2707f4b1be2e` |
-| Implementation | `be457781d24fb5943dfbe3acaced8ce25e4274fa` |
-| Report | `d4ae930c559f9de707c22591f90bcbe522555c20` |
+| Implementation (initial GC1-c) | `be457781d24fb5943dfbe3acaced8ce25e4274fa` |
+| Report (initial BLOCKED/PARTIAL) | `d4ae930c559f9de707c22591f90bcbe522555c20` |
+| Closure local (H/canary/harness) | *(this commit)* |
 
 ```text
 GC1-c CONTINUOUS DRIVE: BLOCKED/PARTIAL
-IMPLEMENTATION: be457781d24fb5943dfbe3acaced8ce25e4274fa
-BRANCH TIP: d4ae930c559f9de707c22591f90bcbe522555c20 (report checkpoint; verify with git rev-parse HEAD)
-STATUS: CLEAN after report checkpoint
+UNMET: LIVE_PROVIDER_AND_GCP_OPERATOR_APPROVAL (approval UI unavailable);
+       LIVE_ACCEPTED_CLI_CYCLE; LIVE_HONEST_FAILURE_CYCLE; LIVE_CANCELLATION
+PRESERVED: H-scope audit PASS; credential-canary local PASS; cluster pathcode-gc1-cluster;
+           config pathcode-gc1b-config-v4; CLEANUP_PENDING=none
+NEXT: export OPENAI_API_KEY; run
+      GC1_LIVE_SMOKE=1 node scripts/gc1c-live-closure.mjs --confirm-cloud
 ```

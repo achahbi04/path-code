@@ -41,6 +41,8 @@ export function createMockWorkstationTransport(options = {}) {
     workerInstalled: false,
     /** @type {object[]} */
     workerRequestLog: [],
+    /** @type {Record<string, string>} */
+    remoteEnv: { ...(options.remoteEnv ?? {}) },
   };
 
   /** @type {Map<string, object>} */
@@ -318,6 +320,37 @@ export function createMockWorkstationTransport(options = {}) {
         };
       }
 
+      // GC1-c credential boundary proof: evaluate presence of forbidden keys
+      // against seeded remoteEnv — never echo values.
+      if (
+        trimmed.includes("CREDENTIAL_BOUNDARY_PASS") ||
+        trimmed.includes("CREDENTIAL_BOUNDARY_VIOLATION")
+      ) {
+        const forbidden = [
+          "OPENAI_API_KEY",
+          "PATHCODE_OPENAI_API_KEY",
+          "PATHCODE_LIVE_OPENAI",
+          "PATHCODE_GC1C_SECRET_CANARY",
+        ];
+        for (const key of forbidden) {
+          if (
+            Object.prototype.hasOwnProperty.call(state.remoteEnv, key) &&
+            state.remoteEnv[key] != null
+          ) {
+            return {
+              stdout: `CREDENTIAL_BOUNDARY_VIOLATION:${key}\n`,
+              stderr: "",
+              exitCode: 1,
+            };
+          }
+        }
+        return {
+          stdout: "CREDENTIAL_BOUNDARY_PASS\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+
       // Read a hydrated remote file: `cat '<path>'` or `test -f ...`
       const catMatch = trimmed.match(/^cat\s+(?:'([^']*)'|"([^"]*)")\s*$/);
       if (catMatch) {
@@ -578,6 +611,19 @@ export function createMockWorkstationTransport(options = {}) {
 
     clearWorkerRequestLog() {
       state.workerRequestLog = [];
+    },
+
+    /**
+     * Seed remote process environment for credential-boundary proofs.
+     * Values are never returned by the boundary command — only presence matters.
+     * @param {Record<string, string>} env
+     */
+    seedRemoteEnv(env) {
+      state.remoteEnv = { ...(env ?? {}) };
+    },
+
+    getRemoteEnv() {
+      return { ...state.remoteEnv };
     },
 
     /** Expose remote FS map for GC1-c tests. */

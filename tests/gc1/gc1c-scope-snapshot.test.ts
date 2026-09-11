@@ -137,3 +137,26 @@ describe("GC1C-D snapshot currentness", () => {
     expect(readFileSync(join(dest2, "src/a.ts"), "utf8")).toBe("export const a = 1;\n");
   });
 });
+
+describe("GC1-c directionality helpers", () => {
+  it("mutate primary after capture → assert fails; restore → passes", async () => {
+    const {
+      captureLocalDirectionalityState,
+      assertDirectionalityUnchanged,
+    } = await load();
+    const root = makeRepo();
+    const paths = ["src/a.ts", "package.json"];
+    const before = captureLocalDirectionalityState(root, paths);
+    expect(before.hashes["src/a.ts"]).toMatch(/^[a-f0-9]{64}$/);
+
+    writeFileSync(join(root, "src/a.ts"), "export const a = mutated;\n");
+    const afterMut = captureLocalDirectionalityState(root, paths);
+    expect(() => assertDirectionalityUnchanged(before, afterMut)).toThrow(
+      /directionality hash changed/,
+    );
+
+    writeFileSync(join(root, "src/a.ts"), "export const a = 1;\n");
+    const afterRestore = captureLocalDirectionalityState(root, paths);
+    expect(assertDirectionalityUnchanged(before, afterRestore)).toEqual({ ok: true });
+  });
+});

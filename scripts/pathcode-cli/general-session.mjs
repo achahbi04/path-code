@@ -80,6 +80,7 @@ import {
   loadEditingHostDependencies,
   remapApprovedScopeEntries,
   remapValidationCandidatesForTaskWorkspace,
+  computeEffectiveHydrationSet,
   GC1C_CONFIG,
 } from "./gc1/cloud-session.mjs";
 
@@ -243,8 +244,9 @@ export function renderStartDisclosure(input) {
  * Render the approved-scope review. This is the list a human says yes to.
  * @param {any} approved
  * @param {string} planTaskSummary
+ * @param {{ hydrationPaths?: string[], supportOnly?: string[], executionMode?: string }} [extra]
  */
-export function renderScopeReview(approved, planTaskSummary) {
+export function renderScopeReview(approved, planTaskSummary, extra = {}) {
   const lines = ["", "— Scope review (model proposal, checked against this repository) —", ""];
   lines.push("Task as the model understood it:");
   lines.push(prefixUntrustedLines(planTaskSummary));
@@ -277,9 +279,52 @@ export function renderScopeReview(approved, planTaskSummary) {
       lines.push(`  ${prefixUntrustedLines(note).trim()}`);
     }
   }
+  if (
+    extra.executionMode === "cloud" &&
+    Array.isArray(extra.hydrationPaths) &&
+    extra.hydrationPaths.length > 0
+  ) {
+    lines.push("");
+    lines.push(
+      "— Cloud hydration set H (exact; disclosed before any remote hydrate) —",
+    );
+    lines.push(
+      "Paths snapshotted onto the remote task workspace (host-deterministic):",
+    );
+    const supportOnly = new Set(extra.supportOnly ?? []);
+    for (const p of extra.hydrationPaths) {
+      const tag = supportOnly.has(p) ? "support-only" : "in H";
+      lines.push(`  ${tag.padEnd(12)} ${p}`);
+    }
+    lines.push(
+      "Support-only paths are execution-only: not editable, and not provider-visible unless also listed under context (P).",
+    );
+  }
   lines.push("");
   lines.push(ESCAPE_LEGEND);
   lines.push("No file has been read for the model yet. Approving scope only opens these files.");
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Short cloud-only H disclosure for bounded policy admission (no full scope review).
+ * @param {{ hydrationPaths: string[], supportOnly?: string[] }} hydrationSet
+ */
+export function renderCloudHydrationDisclosure(hydrationSet) {
+  const lines = [
+    "",
+    "— Cloud hydration set H (exact; disclosed before any remote hydrate) —",
+    "Paths snapshotted onto the remote task workspace (host-deterministic):",
+  ];
+  const supportOnly = new Set(hydrationSet.supportOnly ?? []);
+  for (const p of hydrationSet.hydrationPaths ?? []) {
+    const tag = supportOnly.has(p) ? "support-only" : "in H";
+    lines.push(`  ${tag.padEnd(12)} ${p}`);
+  }
+  lines.push(
+    "Support-only paths are execution-only: not editable, and not provider-visible unless also listed under context (P).",
+  );
+  lines.push("");
   return `${lines.join("\n")}\n`;
 }
 
@@ -1126,6 +1171,25 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
   /** @type {any} */
   let approved = admitted.value;
 
+  // Cloud: compute effective H before scope challenge / bounded display so the
+  // operator sees the exact hydration set before any remote hydrate.
+  /** @type {null | { hydrationPaths: string[], editable: string[], context: string[], supportOnly: string[] }} */
+  let hydrationSet = null;
+  if (executionMode === "cloud") {
+    try {
+      hydrationSet = computeEffectiveHydrationSet({
+        approved,
+        inventory: preflight.inventory,
+        plannedCheckKinds: selection.planned.map((c) => c.kind),
+      });
+    } catch (e) {
+      prompt.write(
+        `Hydration set refused: ${e.code || "H_REFUSED"} — ${e.message}\n`,
+      );
+      return finish({ exitCode: 1, outcome: e.code || "H_REFUSED", modelCalls: 1 });
+    }
+  }
+
   if (isBounded) {
     const scopePolicy = evaluateScopeAgainstPolicy(boundedPolicy, approved);
     if (!scopePolicy.ok) {
@@ -1141,17 +1205,27 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
     prompt.write(
       `Scope admitted by bounded policy: editable: ${approved.editableTargets.length} context: ${approved.contextPaths.length}\n`,
     );
+    if (hydrationSet) {
+      prompt.write(renderCloudHydrationDisclosure(hydrationSet));
+    }
     emit("session.scope.admitted", {
       editable: approved.editableTargets.map((t) => t.relativePath),
       context: approved.contextPaths.map((p) => p.relativePath),
       admission: "admitted-by-policy",
+      ...(hydrationSet ? { hydration: hydrationSet.hydrationPaths } : {}),
     });
     emit("session.authority", {
       gate: "SCOPE",
       admission: "admitted-by-policy",
     });
   } else {
-    prompt.write(renderScopeReview(approved, parsed.value.taskSummary));
+    prompt.write(
+      renderScopeReview(approved, parsed.value.taskSummary, {
+        executionMode,
+        hydrationPaths: hydrationSet?.hydrationPaths,
+        supportOnly: hydrationSet?.supportOnly,
+      }),
+    );
     const scopeChallenge = options.scopeChallenge ?? newChallenge();
     prompt.write(
       `\nApprove THIS scope only by typing exactly: SCOPE ${scopeChallenge}\n`,
@@ -1173,7 +1247,17 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
       editable: approved.editableTargets.map((t) => t.relativePath),
       context: approved.contextPaths.map((p) => p.relativePath),
       admission: "challenge-accepted",
+      ...(hydrationSet ? { hydration: hydrationSet.hydrationPaths } : {}),
     });
+  }
+
+  // Persist the concrete disclosed H onto the cycle — prepareCloud must reuse
+  // this exact set (no silent widening after disclosure).
+  if (hydrationSet) {
+    approved = {
+      ...approved,
+      hydrationPaths: hydrationSet.hydrationPaths,
+    };
   }
 
   // Baseline fingerprints at scope admission (not yet disclosed to the provider).
@@ -1230,6 +1314,8 @@ export async function runGeneralEngineeringSession(prompt, options = {}) {
         scriptedProcessResults: options.scriptedProcessResults,
         remoteRoot: options.remoteRoot,
         deadlineMs: options.cloudDeadlineMs,
+        // Exact H disclosed before challenge/policy — no silent widening.
+        precomputedHydrationPaths: hydrationSet?.hydrationPaths,
       },
     });
     if (!prepared.ok) {

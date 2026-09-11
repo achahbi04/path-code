@@ -82,6 +82,8 @@ export {
   normalizeHydrationRelativePath,
   isCredentialCanaryPath,
   CREDENTIAL_CANARY_PATH_PATTERNS,
+  captureLocalDirectionalityState,
+  assertDirectionalityUnchanged,
 } from "./task-snapshot.mjs";
 export {
   REMOTE_WORKER_VERSION,
@@ -104,6 +106,7 @@ export {
   remapPathArgument,
   REMOTE_NODE_EXECUTABLE,
   REMOTE_NPM_CLI_JS,
+  sanitizeRemoteEnv,
 } from "./cloud-effects.mjs";
 export {
   createTaskJournal,
@@ -112,8 +115,19 @@ export {
   CLEANUP_VERIFIED,
 } from "./task-journal.mjs";
 export {
+  FORBIDDEN_REMOTE_CREDENTIAL_ENV_KEYS,
+  buildRemoteCredentialBoundaryCommand,
+  assertLocalSurfacesFreeOfCanary,
+  runRemoteCredentialBoundaryProof,
+} from "./credential-boundary.mjs";
+export {
   resolveHydrationPaths,
   collectValidationSupportPaths,
+  computeEffectiveHydrationSet,
+  assertHydrationSetExact,
+  isValidationSupportTestPath,
+  VALIDATION_SUPPORT_BASENAMES,
+  VALIDATION_SUPPORT_TEST_SUFFIXES,
   prepareCloudTaskEnvironment,
   finalizeCloudTask,
   remapApprovedScopeEntries,
