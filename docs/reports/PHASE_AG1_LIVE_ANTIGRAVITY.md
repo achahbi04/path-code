@@ -1,6 +1,8 @@
 # PHASE AG1 — Live Antigravity (operator acceptance)
 
-**Status:** LIVE PASS (credentialed Vertex/ADC)
+**Status:** LIVE PASS (credentialed Vertex/ADC) — **FROZEN**
+
+**AG1 freeze SHA:** `b6f8b828ee663da4c3a314549c4402703a6ac263`
 
 ## Divergence found (operator screenshot)
 
