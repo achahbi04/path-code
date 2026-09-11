@@ -3,7 +3,7 @@
 **Result: PASS**
 
 **AG1 freeze SHA:** `b6f8b828ee663da4c3a314549c4402703a6ac263`  
-**Current HEAD:** (recorded at report commit)
+**Current HEAD:** 
 
 ## Live repository
 
