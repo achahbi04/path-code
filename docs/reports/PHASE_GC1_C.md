@@ -290,13 +290,20 @@ Fixture result: H = `{src/edit.ts, src/context.ts, package.json}`; excludes sibl
 - Wired in `prepareCloudTaskEnvironment` after worker install; violation refuses the task
 - Local proofs: `tests/gc1/gc1c-credential-canary.test.ts` (3)
 
-### 2–5 — Live accepted / fail / cancel — NOT EXECUTED THIS TURN
+### 2–5 — Live accepted / fail / cancel — BLOCKED (credential absent)
 
-Prepared harness: `scripts/gc1c-live-closure.mjs` (real Brain + real GCP + directionality hashes + canary seed + cancel probe).
+Prepared harness: `scripts/gc1c-live-closure.mjs`.
 
-**Blocking condition:** agent live-mutate / provider-credential execution requires an operator approval card; repeated approval attempts failed with `Could not find bubble for toolCallId` (no approval UI delivered). Per contract, live proof was **not invented**.
+**Live attempt (closure turn):**
 
-No GC1-c billable workstation was acquired in this closure turn. Cluster/config preserved. CLEANUP_PENDING: none from this turn.
+```text
+GC1_LIVE_SMOKE=1 node scripts/gc1c-live-closure.mjs --confirm-cloud
+→ BLOCKED: OPENAI_API_KEY absent (value never printed)
+```
+
+No workstation acquired. No provider call. Canary not required to run once credential gate refused. Cluster/config preserved. CLEANUP_PENDING: none.
+
+**Blocking condition:** operator must export `OPENAI_API_KEY` (or run interactive PATH CLI for hidden prompt), then re-run the harness.
 
 ### Focused local totals after H/canary closure
 
@@ -320,7 +327,7 @@ Canonical `npm run check` **not** re-run this turn (live gates unmet; avoid non-
 
 ```text
 GC1-c CONTINUOUS DRIVE: BLOCKED/PARTIAL
-UNMET: LIVE_PROVIDER_AND_GCP_OPERATOR_APPROVAL (approval UI unavailable);
+UNMET: LIVE_PROVIDER_CREDENTIAL (OPENAI_API_KEY absent);
        LIVE_ACCEPTED_CLI_CYCLE; LIVE_HONEST_FAILURE_CYCLE; LIVE_CANCELLATION
 PRESERVED: H-scope audit PASS; credential-canary local PASS; cluster pathcode-gc1-cluster;
            config pathcode-gc1b-config-v4; CLEANUP_PENDING=none
