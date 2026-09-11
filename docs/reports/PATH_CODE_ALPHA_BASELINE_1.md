@@ -14,4 +14,4 @@ Canonical product freeze of the accepted AG1 + AG2 working loop.
 | AG2 report | `docs/reports/PHASE_AG2_FULL_PRODUCT_LOOP.md` |
 | AG1 report | `docs/reports/PHASE_AG1_LIVE_ANTIGRAVITY.md` |
 
-The freeze commit SHA is recorded in this file’s tip commit after commit.
+**Freeze commit:** 
