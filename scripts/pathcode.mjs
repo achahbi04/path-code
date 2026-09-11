@@ -216,9 +216,15 @@ function redrawPrompt(prompt, unicode, plain, sessionStats) {
       sessionStats.engineActivityCount > 0
         ? `, ${sessionStats.engineActivityCount} engineering activities`
         : "";
-    // Do not report legacy OpenAI "model calls" for AG1 — that counter is not AG1 proof.
+    const handoff =
+      typeof sessionStats.lastVerifiedBranch === "string" &&
+      sessionStats.lastVerifiedBranch &&
+      typeof sessionStats.sessionBaseCommit === "string" &&
+      sessionStats.sessionBaseCommit
+        ? `\nLatest verified task branch: ${sessionStats.lastVerifiedBranch}\nSession commit: ${sessionStats.sessionBaseCommit.slice(0, 12)}\nTo adopt: git merge ${sessionStats.lastVerifiedBranch}\n`
+        : "";
     prompt.write(
-      `Session so far: ${sessionStats.taskCount} task${sessionStats.taskCount === 1 ? "" : "s"}${engine}.\n`,
+      `Session so far: ${sessionStats.taskCount} task${sessionStats.taskCount === 1 ? "" : "s"}${engine}.\n${handoff}`,
     );
   }
   prompt.write(promptPrefix(unicode, plain));
@@ -294,7 +300,15 @@ export async function runPathcodeMain(argv, testIo = {}) {
   let autonomyMode = args.autonomy;
   /** @type {string | null} */
   let sessionCredential = null;
-  const sessionStats = { taskCount: 0, modelCallCount: 0, engineActivityCount: 0 };
+  const sessionStats = {
+    taskCount: 0,
+    modelCallCount: 0,
+    engineActivityCount: 0,
+    /** @type {string | null} */
+    sessionBaseCommit: null,
+    /** @type {string | null} */
+    lastVerifiedBranch: null,
+  };
   /** @type {number} */
   let lastExitCode = 0;
 
@@ -547,12 +561,23 @@ export async function runPathcodeMain(argv, testIo = {}) {
               checkoutRoot: root,
               sessionEventEmit: eventSink.emit,
               cardsOwnProgress: ttyInline,
+              sessionBaseCommit: sessionStats.sessionBaseCommit,
             });
           }
           lastExitCode = sessionResult.exitCode ?? 1;
           sessionStats.taskCount += 1;
           if (typeof sessionResult.engineActivityCount === "number") {
             sessionStats.engineActivityCount += sessionResult.engineActivityCount;
+          }
+          if (
+            sessionResult.advancesSession === true &&
+            typeof sessionResult.sessionBaseCommit === "string" &&
+            sessionResult.sessionBaseCommit
+          ) {
+            sessionStats.sessionBaseCommit = sessionResult.sessionBaseCommit;
+            if (typeof sessionResult.taskBranch === "string") {
+              sessionStats.lastVerifiedBranch = sessionResult.taskBranch;
+            }
           }
           // Legacy OpenAI counter only when general-session reports modelCalls.
           if (

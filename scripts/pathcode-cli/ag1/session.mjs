@@ -11,11 +11,14 @@ import { assertAg1VenvReady } from "./venv-guard.mjs";
 import { proveLocalSandboxConfinement } from "./sandbox-proof.mjs";
 import { detectAg1Auth } from "./auth-detect.mjs";
 import { hydrateAg1CloudEnv } from "./cloud-env.mjs";
+import { admitPrimaryCheckout } from "./admission.mjs";
+import { commitTaskWorktree } from "./task-commit.mjs";
 import {
   capturePrimaryFingerprint,
   collectWorktreeResult,
   createTaskWorktree,
   primaryUntouched,
+  removeTaskWorktree,
 } from "./task-worktree.mjs";
 import {
   classifyAg1Result,
@@ -31,7 +34,7 @@ export const AG1_DEFAULT_MAX_TOOL_CALLS = 200;
 const ACTIVITY_LABELS = Object.freeze({
   understanding: "Understanding",
   inspecting: "Inspecting",
-  editing: "Editing",
+  editing: "Implementing",
   implementing: "Implementing",
   running_command: "Running command",
   testing: "Testing",
@@ -77,6 +80,7 @@ export function scrubEngineIdentity(text) {
  *   wallClockMs?: number,
  *   cardsOwnProgress?: boolean,
  *   unicode?: boolean,
+ *   sessionBaseCommit?: string | null,
  * }} options
  */
 export async function runAntigravityEngineeringSession(prompt, options = {}) {
@@ -151,19 +155,41 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     };
   }
 
+  const admission = admitPrimaryCheckout(projectRoot);
+  if (!admission.ok) {
+    write(`${admission.message}\n`);
+    emit("session.terminal", {
+      disposition: admission.code,
+      summary: admission.message,
+    });
+    return {
+      exitCode: 2,
+      outcome: admission.code,
+      classification: "NOT_VERIFIED",
+      blocked: true,
+      blocker: admission.message,
+      engineActivityCount: 0,
+    };
+  }
+
+  const sessionBaseCommit =
+    typeof options.sessionBaseCommit === "string" &&
+    options.sessionBaseCommit.trim() !== ""
+      ? options.sessionBaseCommit.trim()
+      : admission.head;
+
   const primaryBefore = capturePrimaryFingerprint(projectRoot);
   emit("session.preflight", {
-    branch: primaryBefore.branch,
-    head: primaryBefore.head,
-    dirtySummary:
-      primaryBefore.porcelain && primaryBefore.porcelain.length > 0
-        ? "dirty"
-        : "clean",
+    branch: admission.branch,
+    head: admission.head,
+    sessionBaseCommit,
+    dirtySummary: "clean",
   });
 
   const worktree = createTaskWorktree({
     primaryRoot: projectRoot,
     taskId,
+    baselineCommit: sessionBaseCommit,
     ...(options.checkoutRoot ? { checkoutRoot: options.checkoutRoot } : {}),
   });
   if (!worktree.ok) {
@@ -176,11 +202,13 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       exitCode: 2,
       outcome: worktree.code,
       classification: "NOT_VERIFIED",
+      engineActivityCount: 0,
     };
   }
 
   emit("session.engineering.workspace", {
-    taskId,
+    taskId: worktree.taskId,
+    taskBranch: worktree.taskBranch,
     workspace: worktree.worktreePath,
     baselineHead: worktree.baseline.head,
     status: "ready",
@@ -407,6 +435,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         emit("session.validation.result", {
           id: check.id,
           check: check.id,
+          kind: check.kind,
           ok: check.ok,
           status: check.ok ? "PASSED" : "FAILED",
           exitCode: check.exitCode,
@@ -442,7 +471,6 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     terminalDisposition = "CANCELLED";
     terminalSummary = "cancelled";
   } else if (agentFailed || terminalMsg?.type === "failed") {
-    // Engine never completed — PATH must not claim Verified/Complete.
     classification = "FAILED";
     terminalDisposition = String(terminalMsg?.code || "AG1_ENGINE_FAILED");
     terminalSummary = scrubEngineIdentity(
@@ -454,7 +482,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       validation,
     });
     terminalDisposition = classification;
-    terminalSummary = validation?.reason ?? String(terminalMsg?.type ?? lastActivity);
+    terminalSummary =
+      validation?.reason ?? String(terminalMsg?.type ?? lastActivity);
   }
 
   if (
@@ -465,49 +494,184 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     throw new Error("AG1 invariant violated: finished implied VERIFIED");
   }
 
+  const hasChanges = gitResult.changedFiles.length > 0;
+  /** @type {string | null} */
+  let commitSha = null;
+  /** @type {string | null} */
+  let commitStatus = null;
+  /** @type {string | null} */
+  let preservedPath = null;
+  let advancesSession = false;
+
+  if (classification === "VERIFIED") {
+    if (hasChanges) {
+      const committed = commitTaskWorktree({
+        worktreePath: worktree.worktreePath,
+        message: `PATH: verified task ${worktree.taskId}`,
+      });
+      if (!committed.ok) {
+        if (committed.code === "GIT_IDENTITY_REQUIRED") {
+          terminalDisposition = "GIT_IDENTITY_REQUIRED";
+          terminalSummary = committed.message;
+          preservedPath = worktree.worktreePath;
+          commitStatus = "IDENTITY_BLOCKED";
+        } else {
+          terminalDisposition = String(committed.code || "GIT_COMMIT_FAILED");
+          terminalSummary = String(committed.message || "commit failed");
+          preservedPath = worktree.worktreePath;
+          commitStatus = "COMMIT_FAILED";
+        }
+      } else if (!committed.skipped && committed.commitSha) {
+        commitSha = committed.commitSha;
+        commitStatus = "VERIFIED";
+        advancesSession = true;
+      } else {
+        // Verified with no file changes — still a truthful terminal, no commit.
+        commitStatus = "NO_CHANGES";
+        advancesSession = true;
+        commitSha = worktree.baseline.head;
+      }
+    } else {
+      commitStatus = "NO_CHANGES";
+      advancesSession = true;
+      commitSha = worktree.baseline.head;
+    }
+  } else if (
+    hasChanges &&
+    (classification === "PARTIALLY_VERIFIED" ||
+      classification === "FAILED" ||
+      terminalDisposition === "CANCELLED" ||
+      classification === "NOT_VERIFIED")
+  ) {
+    const label =
+      classification === "PARTIALLY_VERIFIED"
+        ? "PARTIALLY VERIFIED"
+        : "UNVERIFIED";
+    const committed = commitTaskWorktree({
+      worktreePath: worktree.worktreePath,
+      message: `PATH WIP: preserve ${label.toLowerCase()} task ${worktree.taskId}`,
+    });
+    if (!committed.ok) {
+      if (committed.code === "GIT_IDENTITY_REQUIRED") {
+        preservedPath = worktree.worktreePath;
+        commitStatus = "IDENTITY_BLOCKED";
+        write(`${committed.message}\n`);
+      } else {
+        preservedPath = worktree.worktreePath;
+        commitStatus = "COMMIT_FAILED";
+      }
+    } else if (!committed.skipped && committed.commitSha) {
+      commitSha = committed.commitSha;
+      commitStatus = label;
+    }
+  }
+
+  /** @type {{ ok: boolean, code?: string } | null} */
+  let cleanup = null;
+  if (preservedPath) {
+    cleanup = {
+      ok: false,
+      code: "CLEANUP_DEFERRED",
+    };
+  } else {
+    cleanup = removeTaskWorktree(projectRoot, worktree.worktreePath);
+    if (!cleanup.ok) {
+      emit("session.engineering.cleanup", {
+        status: "CLEANUP_INCOMPLETE",
+        worktreePath: worktree.worktreePath,
+        taskBranch: worktree.taskBranch,
+        commitSha,
+      });
+    }
+  }
+
+  const checkSummaries = Array.isArray(validation?.checks)
+    ? validation.checks.map((c) => ({
+        id: c.id,
+        kind: c.kind,
+        ok: c.ok,
+        exitCode: c.exitCode,
+        command: c.command,
+      }))
+    : [];
+
   emit("session.engineering.result", {
-    classification,
+    classification:
+      terminalDisposition === "GIT_IDENTITY_REQUIRED"
+        ? classification
+        : classification,
     changedFiles: gitResult.changedFiles,
     primaryUntouched: untouched,
     durationMs: Date.now() - startedAt,
     allowShell,
     sandbox: sandbox.code,
+    taskBranch: worktree.taskBranch,
+    commitSha,
+    commitStatus,
+    advancesSession,
+    checks: checkSummaries,
   });
 
-  write(
-    `\nResult: ${classification}` +
-      `\nChanged files: ${gitResult.changedFiles.length}` +
-      `\nPrimary checkout untouched: ${untouched ? "yes" : "NO"}` +
-      `\n`,
-  );
-  if (gitResult.changedFiles.length > 0) {
-    for (const f of gitResult.changedFiles.slice(0, 40)) {
-      write(`  - ${f}\n`);
-    }
-  }
-  if (gitResult.diffStat) {
-    write(`${gitResult.diffStat}\n`);
-  }
+  write(`\n${formatAg2ResultBanner({
+    classification:
+      terminalDisposition === "CANCELLED"
+        ? "CANCELLED"
+        : terminalDisposition === "GIT_IDENTITY_REQUIRED"
+          ? "GIT_IDENTITY_REQUIRED"
+          : classification,
+    changedFiles: gitResult.changedFiles,
+    validation,
+    taskBranch: worktree.taskBranch,
+    commitSha,
+    commitStatus,
+    primaryUntouched: untouched,
+    preservedPath,
+    cleanup,
+  })}`);
 
   emit("session.terminal", {
-    disposition: terminalDisposition,
+    disposition:
+      terminalDisposition === "CANCELLED"
+        ? "CANCELLED"
+        : terminalDisposition === "GIT_IDENTITY_REQUIRED"
+          ? "GIT_IDENTITY_REQUIRED"
+          : classification,
     summary: terminalSummary,
+    taskBranch: worktree.taskBranch,
+    commitSha,
   });
 
   await agent.close();
 
   const exitCode = agentCancelled
     ? 130
-    : classification === "VERIFIED" || classification === "PARTIALLY_VERIFIED"
-      ? 0
-      : 1;
+    : terminalDisposition === "GIT_IDENTITY_REQUIRED"
+      ? 2
+      : classification === "VERIFIED" || classification === "PARTIALLY_VERIFIED"
+        ? 0
+        : 1;
 
   return {
     exitCode,
-    outcome: agentCancelled ? "CANCELLED" : terminalDisposition,
-    classification,
-    taskId,
-    worktreePath: worktree.worktreePath,
+    outcome:
+      terminalDisposition === "CANCELLED"
+        ? "CANCELLED"
+        : terminalDisposition === "GIT_IDENTITY_REQUIRED"
+          ? "GIT_IDENTITY_REQUIRED"
+          : classification,
+    classification:
+      terminalDisposition === "CANCELLED" ? "NOT_VERIFIED" : classification,
+    taskId: worktree.taskId,
+    taskBranch: worktree.taskBranch,
+    commitSha,
+    commitStatus,
+    advancesSession,
+    sessionBaseCommit: advancesSession
+      ? commitSha || worktree.baseline.head
+      : null,
+    baselineCommit: worktree.baseline.head,
+    worktreePath: preservedPath || (cleanup?.ok ? null : worktree.worktreePath),
+    cleanup,
     changedFiles: gitResult.changedFiles,
     diff: gitResult.diff,
     validation,
@@ -518,4 +682,65 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     modelCalls: 0,
     diagFile: typeof agent.getDiagFile === "function" ? agent.getDiagFile() : null,
   };
+}
+
+/**
+ * Product-facing result banner (no engine branding).
+ * @param {Record<string, any>} r
+ */
+function formatAg2ResultBanner(r) {
+  const lines = [];
+  const label =
+    r.classification === "VERIFIED"
+      ? "✓ VERIFIED"
+      : r.classification === "PARTIALLY_VERIFIED"
+        ? "◐ PARTIALLY VERIFIED"
+        : r.classification === "CANCELLED"
+          ? "— CANCELLED"
+          : r.classification === "GIT_IDENTITY_REQUIRED"
+            ? "✕ GIT IDENTITY REQUIRED"
+            : r.classification === "FAILED"
+              ? "✕ FAILED"
+              : "— NOT VERIFIED";
+  lines.push(`Result: ${label}`);
+  lines.push(`Files changed: ${r.changedFiles?.length ?? 0}`);
+  if (Array.isArray(r.validation?.checks)) {
+    for (const c of r.validation.checks) {
+      const mark = c.ok ? "✓" : "✕";
+      const kind =
+        c.kind === "TYPECHECK"
+          ? "Typecheck"
+          : c.kind === "TARGETED_TEST" || /test/i.test(String(c.id))
+            ? "Tests"
+            : c.kind === "BUILD" || /build/i.test(String(c.id))
+              ? "Build"
+              : String(c.id || c.kind || "Check");
+      lines.push(`${kind}: ${mark}`);
+    }
+  }
+  if (r.taskBranch) lines.push(`Task branch: ${r.taskBranch}`);
+  if (r.commitSha) lines.push(`Commit: ${r.commitSha}`);
+  if (r.commitStatus && r.commitStatus !== "VERIFIED" && r.commitStatus !== "NO_CHANGES") {
+    lines.push(`Status: ${r.commitStatus}`);
+  }
+  lines.push(
+    `Primary checkout untouched: ${r.primaryUntouched ? "yes" : "NO"}`,
+  );
+  if (r.classification === "VERIFIED" && r.taskBranch && r.commitSha) {
+    lines.push("");
+    lines.push("To merge this work:");
+    lines.push(`git merge ${r.taskBranch}`);
+  }
+  if (r.preservedPath) {
+    lines.push(`Preserved worktree: ${r.preservedPath}`);
+  }
+  if (r.cleanup && r.cleanup.ok === false && r.cleanup.code === "CLEANUP_INCOMPLETE") {
+    lines.push("Cleanup: CLEANUP_INCOMPLETE");
+  }
+  if (r.changedFiles?.length) {
+    for (const f of r.changedFiles.slice(0, 40)) {
+      lines.push(`  - ${f}`);
+    }
+  }
+  return `${lines.join("\n")}\n`;
 }

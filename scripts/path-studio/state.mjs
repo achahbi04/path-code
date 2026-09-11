@@ -137,7 +137,7 @@ export function classifyTerminalPathPhase(disposition, summary = "") {
   const blob = `${disposition} ${summary}`;
   if (/cancel|declined|CREDENTIAL_CANCELLED/i.test(blob)) return "Cancelled";
   if (
-    /ESCALATION|AUTONOMY_ESCALATION|PRIMARY_MUTATED|cleanup\.pending|CLEANUP_PENDING|AG1_AUTH_REQUIRED/i.test(
+    /ESCALATION|AUTONOMY_ESCALATION|PRIMARY_MUTATED|cleanup\.pending|CLEANUP_PENDING|AG1_AUTH_REQUIRED|DIRTY_PRIMARY_TREE|DETACHED_HEAD_BLOCKED|GIT_IDENTITY_REQUIRED/i.test(
       blob,
     )
   ) {
@@ -488,6 +488,7 @@ export function applyStudioEvent(state, event, opts = {}) {
       setPathPhase(state, "Testing");
       break;
     case "session.validation.result": {
+      state.product.ag1 = true;
       const check = typeof event.check === "string" ? event.check : "check";
       const status = typeof event.status === "string" ? event.status : "?";
       const prev = state.cards.validationResult.arrived
@@ -497,6 +498,12 @@ export function applyStudioEvent(state, event, opts = {}) {
       if (state.cards.validationRunning.arrived) {
         state.cards.validationRunning.status = "done";
       }
+      if (!Array.isArray(state.product.ag1Checks)) state.product.ag1Checks = [];
+      state.product.ag1Checks.push({
+        id: check,
+        kind: typeof event.kind === "string" ? event.kind : check,
+        ok: event.ok === true || status === "PASSED",
+      });
       state.heartbeat = null;
       if (/fail|error|not.?pass/i.test(status)) {
         setPathPhase(state, "Investigating failure");
@@ -733,6 +740,13 @@ export function applyStudioEvent(state, event, opts = {}) {
     }
     case "session.engineering.result": {
       state.product.ag1 = true;
+      if (Array.isArray(event.checks)) {
+        state.product.ag1Checks = event.checks.map((c) => ({
+          id: typeof c?.id === "string" ? c.id : "",
+          kind: typeof c?.kind === "string" ? c.kind : "",
+          ok: c?.ok === true,
+        }));
+      }
       const classification =
         typeof event.classification === "string"
           ? event.classification

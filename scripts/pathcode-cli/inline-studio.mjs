@@ -137,7 +137,7 @@ export function buildEvidenceLines(state) {
     lines.push("Environment     ✕");
   }
 
-  // AG1: show engineering lifecycle evidence — never legacy Gate 1 / Gate 2.
+  // AG1/AG2: show engineering lifecycle evidence — never legacy Gate 1 / Gate 2.
   if (product.ag1 === true) {
     lines.push(
       state.cards.recovery?.arrived ? "Workspace       ✓" : "Workspace       —",
@@ -162,30 +162,44 @@ export function buildEvidenceLines(state) {
     } else {
       lines.push("Mutation        —");
     }
-    const vRes = state.cards.validationResult;
-    const detail = vRes?.detail || "";
-    if (state.cards.validationRunning?.status === "active") {
+
+    const checks = Array.isArray(product.ag1Checks) ? product.ag1Checks : [];
+    if (state.cards.validationRunning?.status === "active" && checks.length === 0) {
       lines.push("Verifying       ●");
-    } else if (vRes?.arrived) {
-      if (/fail|FAILED/i.test(detail)) {
-        lines.push("Validation      ✕");
-      } else if (/PASSED|pass/i.test(detail)) {
-        lines.push("Validation      ✓");
-      } else {
-        lines.push("Validation      —");
+    } else if (checks.length > 0) {
+      for (const c of checks) {
+        const kind = String(c.kind || c.id || "Check");
+        const label =
+          kind === "TYPECHECK"
+            ? "Typecheck"
+            : kind === "TARGETED_TEST" || /test/i.test(kind)
+              ? "Tests"
+              : kind === "BUILD" || /build/i.test(kind)
+                ? "Build"
+                : kind.slice(0, 12);
+        const pad = " ".repeat(Math.max(1, 14 - label.length));
+        lines.push(`${label}${pad}${c.ok ? "✓" : "✕"}`);
       }
+    } else if (state.cards.validationResult?.arrived) {
+      const detail = state.cards.validationResult.detail || "";
+      if (/fail|FAILED/i.test(detail)) lines.push("Validation      ✕");
+      else if (/PASSED|pass/i.test(detail)) lines.push("Validation      ✓");
+      else lines.push("Validation      —");
     } else if (state.cards.validationSkipped?.arrived) {
       lines.push("Validation      —");
     } else {
       lines.push("Validation      —");
     }
+
     const term = state.cards.terminal;
     if (term?.arrived) {
       const d = String(term.detail || "");
       if (/^VERIFIED\b/i.test(d)) lines.push("Result          ✓");
       else if (/PARTIALLY_VERIFIED/i.test(d)) lines.push("Result          ◐");
-      else if (/FAILED|NOT_VERIFIED|AG1_/i.test(d)) lines.push("Result          ✕");
-      else lines.push("Result          —");
+      else if (/CANCELLED/i.test(d)) lines.push("Result          —");
+      else if (/FAILED|NOT_VERIFIED|AG1_|DIRTY_|DETACHED_|GIT_/i.test(d)) {
+        lines.push("Result          ✕");
+      } else lines.push("Result          —");
     } else {
       lines.push("Result          —");
     }
