@@ -113,6 +113,12 @@ export function createEmptyStudioState() {
       ag1Mutation: false,
       /** @type {string[]} */
       ag1Activities: [],
+      /** AG4 GitHub delivery projection. */
+      deliveryPhase: null,
+      /** @type {{ remote: string, baseBranch: string, taskBranch: string, status: string } | null} */
+      deliveryApproval: null,
+      /** @type {{ status: string, remote: string | null, prNumber: number | null, prUrl: string | null, remoteBranchOk: boolean, prOk: boolean, message: string | null } | null} */
+      deliveryResult: null,
     },
   };
 }
@@ -175,6 +181,14 @@ export function projectAuthoritativePathPhase(state) {
 
   if (product.infraFailure) {
     return "Infrastructure failure";
+  }
+
+  // AG4 delivery phases override the Verified terminal while publication is active.
+  if (
+    typeof product.deliveryPhase === "string" &&
+    product.deliveryPhase.trim() !== ""
+  ) {
+    return product.deliveryPhase;
   }
 
   // Cloud mid-flight always wins over a premature terminal Complete.
@@ -800,6 +814,53 @@ export function applyStudioEvent(state, event, opts = {}) {
       state.product.infraFailure = reason;
       setPathPhase(state, "Infrastructure failure");
       setCloudFooter(state, "☁ Cleaning up…");
+      break;
+    }
+    case "session.delivery.phase": {
+      const phase =
+        typeof event.phase === "string" && event.phase.trim()
+          ? event.phase.trim()
+          : "Preparing GitHub delivery";
+      state.product.deliveryPhase = phase;
+      setPathPhase(state, phase);
+      break;
+    }
+    case "session.delivery.approval": {
+      state.product.deliveryPhase = "Awaiting publication approval";
+      state.product.deliveryApproval = {
+        remote: typeof event.remote === "string" ? event.remote : "",
+        baseBranch: typeof event.baseBranch === "string" ? event.baseBranch : "",
+        taskBranch: typeof event.taskBranch === "string" ? event.taskBranch : "",
+        status: typeof event.status === "string" ? event.status : "pending",
+      };
+      setPathPhase(state, "Awaiting publication approval");
+      break;
+    }
+    case "session.delivery.result": {
+      const status = typeof event.status === "string" ? event.status : "";
+      state.product.deliveryResult = {
+        status,
+        remote: typeof event.remote === "string" ? event.remote : null,
+        prNumber: typeof event.prNumber === "number" ? event.prNumber : null,
+        prUrl: typeof event.prUrl === "string" ? event.prUrl : null,
+        remoteBranchOk: event.remoteBranchOk === true,
+        prOk: event.prOk === true,
+        message: typeof event.message === "string" ? event.message : null,
+      };
+      if (status === "PUBLISHED") {
+        state.product.deliveryPhase = "Pull request created";
+        setPathPhase(state, "Pull request created");
+      } else if (status === "DECLINED") {
+        state.product.deliveryPhase = "Verified";
+        state.product.deliveryApproval = null;
+        setPathPhase(state, "Verified");
+      } else if (status === "CANCELLED") {
+        state.product.deliveryPhase = "Cancelled";
+        setPathPhase(state, "Cancelled");
+      } else if (status) {
+        state.product.deliveryPhase = status;
+        setPathPhase(state, status);
+      }
       break;
     }
     default:

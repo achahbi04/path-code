@@ -22,6 +22,7 @@ import {
   resolvePathRuntimeRoot,
 } from "../paths.mjs";
 import { buildNoninteractiveEngineeringEnv } from "./noninteractive-env.mjs";
+import { sanitizeEngineEnvForPublication } from "../ag4/credential-isolation.mjs";
 
 /**
  * @typedef {{
@@ -56,7 +57,8 @@ import { buildNoninteractiveEngineeringEnv } from "./noninteractive-env.mjs";
  */
 export function buildBridgeChildEnv(override) {
   const base = override ? { ...override } : { ...process.env };
-  return buildNoninteractiveEngineeringEnv(base);
+  const noninteractive = buildNoninteractiveEngineeringEnv(base);
+  return sanitizeEngineEnvForPublication(noninteractive);
 }
 
 /**

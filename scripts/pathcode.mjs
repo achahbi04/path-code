@@ -61,6 +61,7 @@ function parseArgs(argv) {
    *   events: null | "ndjson",
    *   eventsOut: string | null,
    *   execution: "local" | "cloud",
+   *   issue: number | null,
    *   rest: string[],
    * }} */
   const out = {
@@ -71,6 +72,7 @@ function parseArgs(argv) {
     events: null,
     eventsOut: null,
     execution: "local",
+    issue: null,
     rest: [],
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -81,6 +83,15 @@ function parseArgs(argv) {
     }
     if (a === "--version") {
       out.version = true;
+      continue;
+    }
+    if (a === "--issue") {
+      const next = argv[i + 1];
+      if (typeof next !== "string" || !/^\d+$/.test(next.trim())) {
+        return { ok: false, message: "Usage: pathcode --issue <number>" };
+      }
+      out.issue = Number(next.trim());
+      i += 1;
       continue;
     }
     if (a === "--model") {
@@ -484,7 +495,228 @@ export async function runPathcodeMain(argv, testIo = {}) {
     }
   }
 
+  /**
+   * Run one local AG1 (or cloud) engineering cycle; optionally AG4 delivery.
+   * @param {string} taskText
+   * @param {{
+   *   issueNumber?: number | null,
+   *   issueTitle?: string | null,
+   * }} [issueMeta]
+   */
+  async function runEngineeringTask(taskText, issueMeta = {}) {
+    const cycleNote = await runCycle(async (signal) => {
+      try {
+        let sessionResult;
+        if (args.execution === "cloud") {
+          const { runGeneralEngineeringSession } = await import(
+            "./pathcode-cli/general-session.mjs"
+          );
+          const runner = testIo.runGeneralSession ?? runGeneralEngineeringSession;
+          sessionResult = await runner(prompt, {
+            streams,
+            taskText,
+            projectRoot,
+            modelId,
+            autonomyMode,
+            unicode,
+            checkoutRoot: root,
+            executionMode: "cloud",
+            skipLiveGcp: !(process.env.GC1_LIVE_SMOKE === "1"),
+            credential: sessionCredential,
+            onCredentialAcquired: (credential) => {
+              if (typeof credential === "string" && credential.length > 0) {
+                sessionCredential = credential;
+              }
+            },
+            sessionEventEmit: eventSink.emit,
+            cardsOwnProgress: ttyInline,
+            signal,
+          });
+        } else {
+          const { runAntigravityEngineeringSession } = await import(
+            "./pathcode-cli/ag1/session.mjs"
+          );
+          const runner =
+            testIo.runAg1Session ?? runAntigravityEngineeringSession;
+          sessionResult = await runner(prompt, {
+            streams,
+            taskText,
+            projectRoot,
+            unicode,
+            checkoutRoot: root,
+            sessionEventEmit: eventSink.emit,
+            cardsOwnProgress: ttyInline,
+            sessionBaseCommit: sessionStats.sessionBaseCommit,
+            signal,
+          });
+        }
+        lastExitCode = sessionResult.exitCode ?? 1;
+        sessionStats.taskCount += 1;
+        if (typeof sessionResult.engineActivityCount === "number") {
+          sessionStats.engineActivityCount += sessionResult.engineActivityCount;
+        }
+        if (
+          sessionResult.advancesSession === true &&
+          typeof sessionResult.sessionBaseCommit === "string" &&
+          sessionResult.sessionBaseCommit
+        ) {
+          sessionStats.sessionBaseCommit = sessionResult.sessionBaseCommit;
+          if (typeof sessionResult.taskBranch === "string") {
+            sessionStats.lastVerifiedBranch = sessionResult.taskBranch;
+          }
+        }
+        if (
+          args.execution === "cloud" &&
+          typeof sessionResult.modelCalls === "number"
+        ) {
+          sessionStats.modelCallCount += sessionResult.modelCalls;
+        }
+
+        // AG4 delivery runs in a fresh TUI cycle after engineering teardown
+        // (below). Keep the engineering result clean here.
+        return sessionResult;
+      } catch (err) {
+        const message = err && err.message ? err.message : "unknown";
+        eventSink.emit("session.internal_error", { message });
+        lastExitCode = 1;
+        sessionStats.taskCount += 1;
+        return { __internalErrorMessage: message };
+      }
+    });
+
+    // After engineering alternate-screen exit: optional GitHub publication cycle.
+    if (
+      cycleNote &&
+      typeof cycleNote === "object" &&
+      !cycleNote.__internalErrorMessage &&
+      issueMeta.issueNumber != null &&
+      cycleNote.classification === "VERIFIED" &&
+      cycleNote.advancesSession === true
+    ) {
+      const { runGithubDeliveryAfterVerified, formatDeliverySummary } =
+        await import("./pathcode-cli/ag4/delivery.mjs");
+      const deliveryRunner =
+        testIo.runGithubDelivery ?? runGithubDeliveryAfterVerified;
+      const delivery = await runCycle(async (signal) => {
+        // Rehydrate living surface with the already-earned VERIFIED result.
+        eventSink.emit("session.engineering.result", {
+          classification: cycleNote.classification,
+          changedFiles: cycleNote.changedFiles || [],
+          primaryUntouched: cycleNote.primaryUntouched === true,
+          taskBranch: cycleNote.taskBranch,
+          commitSha: cycleNote.commitSha,
+          advancesSession: true,
+          checks: Array.isArray(cycleNote.validation?.checks)
+            ? cycleNote.validation.checks
+            : [],
+        });
+        eventSink.emit("session.terminal", {
+          disposition: "VERIFIED",
+          summary: "All configured final checks passed.",
+          taskBranch: cycleNote.taskBranch,
+          commitSha: cycleNote.commitSha,
+        });
+        return deliveryRunner({
+          projectRoot,
+          prompt,
+          emit: eventSink.emit,
+          sessionResult: cycleNote,
+          issueNumber: issueMeta.issueNumber,
+          issueTitle: issueMeta.issueTitle ?? null,
+          cardsOwnProgress: ttyInline,
+          signal,
+        });
+      });
+      cycleNote.delivery = delivery;
+      const extra = formatDeliverySummary(delivery);
+      if (extra.length && typeof cycleNote.durableSummary === "string") {
+        cycleNote.durableSummary =
+          cycleNote.durableSummary.replace(/\s*$/, "") +
+          "\n" +
+          extra.join("\n") +
+          "\n";
+      }
+    }
+
+    if (
+      cycleNote &&
+      typeof cycleNote === "object" &&
+      typeof cycleNote.__internalErrorMessage === "string"
+    ) {
+      prompt.write(
+        `Internal error (session continues): ${cycleNote.__internalErrorMessage}\n`,
+      );
+    } else if (
+      cycleNote &&
+      typeof cycleNote === "object" &&
+      typeof cycleNote.durableSummary === "string" &&
+      cycleNote.durableSummary.trim()
+    ) {
+      prompt.write(`\n${cycleNote.durableSummary}`);
+    }
+    return cycleNote;
+  }
+
   try {
+    // AG4 — optional issue entry: pathcode --issue N
+    /** @type {{ number: number, title: string, taskText: string, contextBytes: number } | null} */
+    let issueSeed = null;
+    if (typeof args.issue === "number" && args.issue > 0) {
+      const { assertGithubCliReady, resolveGithubRemoteTarget } = await import(
+        "./pathcode-cli/ag4/remote.mjs"
+      );
+      const { fetchGithubIssue, issueToTaskText } = await import(
+        "./pathcode-cli/ag4/issue.mjs"
+      );
+      const ready = assertGithubCliReady(projectRoot);
+      if (!ready.ok) {
+        prompt.write(`${ready.message}\n`);
+        return 2;
+      }
+      const target = resolveGithubRemoteTarget(projectRoot);
+      if (!target.ok) {
+        prompt.write(`${target.message}\n`);
+        return 2;
+      }
+      const issue = fetchGithubIssue({
+        nameWithOwner: target.nameWithOwner,
+        issueNumber: args.issue,
+        cwd: projectRoot,
+      });
+      if (!issue.ok) {
+        prompt.write(`${issue.message}\n`);
+        return 2;
+      }
+      issueSeed = {
+        number: issue.number,
+        title: issue.title,
+        taskText: issueToTaskText(issue),
+        contextBytes: issue.bounded.bytes,
+      };
+      prompt.write(
+        `Issue #${issue.number} — ${issue.title}\n` +
+          `Context ${issue.bounded.bytes} bytes` +
+          `${issue.bounded.truncated ? " (truncated)" : ""}\n` +
+          `Remote ${target.remoteName} → ${target.nameWithOwner}\n\n`,
+      );
+    }
+
+    if (issueSeed) {
+      if (args.execution === "cloud") {
+        const prereq = resolveRuntimePrerequisites(root);
+        if (!prereq.ok) {
+          prompt.write(`${prereq.message}\n`);
+          return 2;
+        }
+      }
+      await runEngineeringTask(issueSeed.taskText, {
+        issueNumber: issueSeed.number,
+        issueTitle: issueSeed.title,
+      });
+      redrawPrompt(prompt, unicode, plain, sessionStats);
+      issueSeed = null;
+    }
+
     while (!prompt.isStopped()) {
       const line = await prompt.askLine("repl", "");
       if (line == null) {
@@ -616,8 +848,6 @@ export async function runPathcodeMain(argv, testIo = {}) {
       }
 
       // Any other line is an engineering task for the project in this directory.
-      // AG1: local default path is Antigravity via PATH gateway (not Gate-1 OpenAI).
-      // Cloud execution remains the historical GC1 general-session path.
       const packageCheck = assertPathPackagePresent(root);
       if (!packageCheck.ok) {
         prompt.write(`${packageCheck.message}\n`);
@@ -632,102 +862,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
           continue;
         }
       }
-      const cycleNote = await runCycle(async (signal) => {
-        try {
-          let sessionResult;
-          if (args.execution === "cloud") {
-            const { runGeneralEngineeringSession } = await import(
-              "./pathcode-cli/general-session.mjs"
-            );
-            const runner = testIo.runGeneralSession ?? runGeneralEngineeringSession;
-            sessionResult = await runner(prompt, {
-              streams,
-              taskText: cmd,
-              projectRoot,
-              modelId,
-              autonomyMode,
-              unicode,
-              checkoutRoot: root,
-              executionMode: "cloud",
-              skipLiveGcp: !(process.env.GC1_LIVE_SMOKE === "1"),
-              credential: sessionCredential,
-              onCredentialAcquired: (credential) => {
-                if (typeof credential === "string" && credential.length > 0) {
-                  sessionCredential = credential;
-                }
-              },
-              sessionEventEmit: eventSink.emit,
-              cardsOwnProgress: ttyInline,
-              signal,
-            });
-          } else {
-            const { runAntigravityEngineeringSession } = await import(
-              "./pathcode-cli/ag1/session.mjs"
-            );
-            const runner =
-              testIo.runAg1Session ?? runAntigravityEngineeringSession;
-            sessionResult = await runner(prompt, {
-              streams,
-              taskText: cmd,
-              projectRoot,
-              unicode,
-              checkoutRoot: root,
-              sessionEventEmit: eventSink.emit,
-              cardsOwnProgress: ttyInline,
-              sessionBaseCommit: sessionStats.sessionBaseCommit,
-              signal,
-            });
-          }
-          lastExitCode = sessionResult.exitCode ?? 1;
-          sessionStats.taskCount += 1;
-          if (typeof sessionResult.engineActivityCount === "number") {
-            sessionStats.engineActivityCount += sessionResult.engineActivityCount;
-          }
-          if (
-            sessionResult.advancesSession === true &&
-            typeof sessionResult.sessionBaseCommit === "string" &&
-            sessionResult.sessionBaseCommit
-          ) {
-            sessionStats.sessionBaseCommit = sessionResult.sessionBaseCommit;
-            if (typeof sessionResult.taskBranch === "string") {
-              sessionStats.lastVerifiedBranch = sessionResult.taskBranch;
-            }
-          }
-          // Legacy OpenAI counter only when general-session reports modelCalls.
-          if (
-            args.execution === "cloud" &&
-            typeof sessionResult.modelCalls === "number"
-          ) {
-            sessionStats.modelCallCount += sessionResult.modelCalls;
-          }
-          return sessionResult;
-        } catch (err) {
-          const message = err && err.message ? err.message : "unknown";
-          // Structured failure into the living surface first; human recovery
-          // line is written after runCycle finishes the TTY frame.
-          eventSink.emit("session.internal_error", { message });
-          lastExitCode = 1;
-          sessionStats.taskCount += 1;
-          return { __internalErrorMessage: message };
-        }
-      });
-      if (
-        cycleNote &&
-        typeof cycleNote === "object" &&
-        typeof cycleNote.__internalErrorMessage === "string"
-      ) {
-        prompt.write(
-          `Internal error (session continues): ${cycleNote.__internalErrorMessage}\n`,
-        );
-      } else if (
-        cycleNote &&
-        typeof cycleNote === "object" &&
-        typeof cycleNote.durableSummary === "string" &&
-        cycleNote.durableSummary.trim()
-      ) {
-        // Durable summary lands in normal scrollback after alternate-screen exit.
-        prompt.write(`\n${cycleNote.durableSummary}`);
-      }
+      await runEngineeringTask(cmd);
       redrawPrompt(prompt, unicode, plain, sessionStats);
       void lastExitCode;
     }

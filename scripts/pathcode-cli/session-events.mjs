@@ -58,6 +58,10 @@ export const SESSION_EVENT_TYPES = Object.freeze([
   "session.engineering.tool",
   "session.engineering.result",
   "session.engineering.bridge",
+  // AG4 — GitHub delivery (post-VERIFIED; not engineering authority).
+  "session.delivery.phase",
+  "session.delivery.approval",
+  "session.delivery.result",
 ]);
 
 /** Default heartbeat cadence while a stage await is in flight. */
@@ -396,6 +400,17 @@ export function renderSessionEventHuman(event) {
     case "session.engineering.bridge": {
       // Development evidence only — never print engine branding to the living UI.
       return "";
+    }
+    case "session.delivery.phase": {
+      const phase = s(event.phase, "GitHub delivery");
+      return `Delivery: ${phase}\n`;
+    }
+    case "session.delivery.approval": {
+      return "Awaiting publication approval\n";
+    }
+    case "session.delivery.result": {
+      const status = s(event.status, "DONE");
+      return `Delivery result: ${status}\n`;
     }
     case "session.internal_error": {
       const message = s(event.message, "internal error");

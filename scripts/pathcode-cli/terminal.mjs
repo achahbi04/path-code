@@ -6,6 +6,7 @@
 import { createInterface } from "node:readline";
 import { randomBytes } from "node:crypto";
 import { escapeForTerminalDisplay } from "./escape.mjs";
+import { classifyPublicationKey } from "./ag4/approval-keys.mjs";
 
 /**
  * @typedef {{
@@ -400,6 +401,122 @@ export function createPromptSession(streams, options = {}) {
     });
   }
 
+  /**
+   * AG4 one-shot publication approval. First recognized key wins.
+   * y/Y approve; n/N/Enter/Esc decline; Ctrl-C cancel.
+   * When showPrompt is false, the living TUI owns the visible copy.
+   * @param {{
+   *   remote: string,
+   *   baseBranch: string,
+   *   taskBranch: string,
+   *   showPrompt?: boolean,
+   *   onListening?: () => void,
+   * }} info
+   * @returns {Promise<"approve"|"decline"|"cancel">}
+   */
+  async function askPublicationDecision(info) {
+    if (isStopped() || mode === "closed") return "cancel";
+    mode = "secret";
+    activePromptId = "ag4-publish";
+    try {
+      rl.off("SIGINT", onCycleSigint);
+    } catch {
+      // ignore
+    }
+    // Do not rl.pause() here: pausing readline around setRawMode under a PTY
+    // has been observed to tear down the living session before the one-shot
+    // key arrives. Raw stdin listener alone owns the decision.
+
+    const wasRaw = streams.stdin.isRaw === true;
+    let settled = false;
+
+    if (info.showPrompt !== false) {
+      write(
+        `\nRemote\n  ${info.remote}\n\nBase\n  ${info.baseBranch}\n\nAction\n  Push ${info.taskBranch} and create PR\n\n` +
+          `Publish verified work to GitHub and create a pull request? [y/N] `,
+      );
+    }
+
+    return await new Promise((resolve) => {
+      function finish(result) {
+        if (settled) return;
+        settled = true;
+        try {
+          streams.stdin.setRawMode(wasRaw);
+        } catch {
+          // ignore
+        }
+        streams.stdin.removeListener("data", onData);
+        streams.stdin.removeListener("error", onError);
+        write("\n");
+        mode = "idle";
+        activePromptId = null;
+        if (cycleActive) {
+          try {
+            rl.on("SIGINT", onCycleSigint);
+          } catch {
+            // ignore
+          }
+        }
+        resolve(result);
+      }
+
+      function onError() {
+        finish("decline");
+      }
+
+      function onData(buf) {
+        const data = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+        for (let i = 0; i < data.length; i += 1) {
+          const b = data[i];
+          if (b === 0x03) {
+            // Ctrl-C
+            if (!cycleActive) requestStop();
+            else cycleCancelInProgress = true;
+            finish("cancel");
+            return;
+          }
+          const decision = classifyPublicationKey(b);
+          if (decision === "approve" || decision === "decline" || decision === "cancel") {
+            if (decision === "cancel") {
+              if (!cycleActive) requestStop();
+              else cycleCancelInProgress = true;
+            }
+            finish(decision);
+            return;
+          }
+          // ignore other keys
+        }
+      }
+
+      try {
+        streams.stdin.setRawMode(true);
+      } catch {
+        finish("decline");
+        return;
+      }
+      try {
+        // Keep the event loop alive while waiting for the one-shot key.
+        streams.stdin.ref();
+      } catch {
+        // ignore
+      }
+      streams.stdin.on("data", onData);
+      streams.stdin.on("error", onError);
+      if (typeof info.onListening === "function") {
+        // Arm UI after the listener is attached; defer so paint does not race.
+        setImmediate(() => {
+          if (settled) return;
+          try {
+            info.onListening();
+          } catch {
+            // ignore UI emit failures
+          }
+        });
+      }
+    });
+  }
+
   function close() {
     if (mode === "closed") return;
     mode = "closed";
@@ -415,6 +532,7 @@ export function createPromptSession(streams, options = {}) {
     writeErr,
     askLine,
     askHiddenCredential,
+    askPublicationDecision,
     requestStop,
     clearStop,
     beginCycle,

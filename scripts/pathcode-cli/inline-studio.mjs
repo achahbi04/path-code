@@ -199,6 +199,9 @@ export function buildEvidenceLines(state) {
     } else {
       lines.push("Result          —");
     }
+    const delivery = product.deliveryResult;
+    if (delivery?.remoteBranchOk) lines.push("Remote branch  ✓");
+    if (delivery?.prOk) lines.push("Pull request   ✓");
     return lines;
   }
 
@@ -299,9 +302,18 @@ export function buildEvidenceLines(state) {
  * @param {string} phase
  */
 function pathGlyph(phase) {
-  if (phase === "Complete" || phase === "Verified") return "✓";
+  if (phase === "Complete" || phase === "Verified" || phase === "Pull request created")
+    return "✓";
   if (phase === "Partially verified") return "◐";
-  if (phase === "Failed" || phase === "Infrastructure failure" || phase === "Not verified") return "✕";
+  if (
+    phase === "Failed" ||
+    phase === "Infrastructure failure" ||
+    phase === "Not verified" ||
+    /_FAILED|_CONFLICT|_MISMATCH|_NOT_AUTHORIZED|_REQUIRED|_AMBIGUOUS|_CHANGED/i.test(
+      phase,
+    )
+  )
+    return "✕";
   if (phase === "Blocked") return "■";
   if (phase === "Cancelled" || phase === "Cancelling") return "○";
   if (phase === "Unknown" || phase === "Unconfirmed") return "○";
@@ -459,6 +471,21 @@ export function buildLivingProductLines(state, viewport) {
     }
     if (product.pathDetail && !/^google|gemini|antigravity|vertex/i.test(String(product.pathDetail))) {
       pathCol.push(style.dim(`  ${String(product.pathDetail).slice(0, colW - 2)}`));
+    }
+    const approval = product.deliveryApproval;
+    if (approval && pathPhase === "Awaiting publication approval") {
+      pathCol.push("");
+      pathCol.push(style.dim("Remote"));
+      pathCol.push(`  ${String(approval.remote || "").slice(0, colW - 2)}`);
+      pathCol.push(style.dim("Base"));
+      pathCol.push(`  ${String(approval.baseBranch || "").slice(0, colW - 2)}`);
+      pathCol.push(style.dim("Action"));
+      pathCol.push(
+        `  Push ${String(approval.taskBranch || "").slice(0, Math.max(8, colW - 10))} and create PR`,
+      );
+      pathCol.push("");
+      pathCol.push("Publish verified work to GitHub");
+      pathCol.push("and create a pull request? [y/N]");
     }
   } else {
     if (pathPhase === "Starting workstation") {

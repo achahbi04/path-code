@@ -99,6 +99,8 @@ At the prompt:
 Flags:
   --help, -h              Show help and exit
   --version               Show package version and exit
+  --issue <number>        Load a GitHub issue as task context, then offer
+                          publication (push + PR) only after local VERIFIED
   --model <id>            Select the OpenAI model (else PATHCODE_OPENAI_MODEL, else prompt)
   --autonomy review|bounded
                           Session consent mode (default: review). review keeps
