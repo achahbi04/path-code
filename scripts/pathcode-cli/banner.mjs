@@ -99,6 +99,7 @@ At the prompt:
 Flags:
   --help, -h              Show help and exit
   --version               Show package version and exit
+  doctor                  Concise readiness check (install, runtime, Git, auth)
   --issue <number>        Load a GitHub issue as task context, then offer
                           publication (push + PR) only after local VERIFIED
   --model <id>            Select the OpenAI model (else PATHCODE_OPENAI_MODEL, else prompt)

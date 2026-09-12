@@ -6,19 +6,37 @@
  * TARGET_PROJECT_ROOT — user's Git repository (cwd discovery)
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
+/**
+ * Real filesystem location of this module (symlink-safe for npm/pnpm/nvm bins).
+ */
+function resolveHereDir() {
+  const fromMeta = fileURLToPath(import.meta.url);
+  try {
+    return dirname(realpathSync(fromMeta));
+  } catch {
+    return dirname(fromMeta);
+  }
+}
+
+const HERE = resolveHereDir();
 
 /**
  * Absolute PATH package root (contains package.json). Never process.cwd().
+ * Resolves through symlinks so global bin wrappers still find installed assets.
  */
 export function resolvePathPackageRoot() {
-  return resolve(join(HERE, "..", ".."));
+  const candidate = resolve(join(HERE, "..", ".."));
+  try {
+    return realpathSync(candidate);
+  } catch {
+    return candidate;
+  }
 }
 
 /** @deprecated Prefer resolvePathPackageRoot — kept for AG1/AG2 call sites. */
@@ -59,9 +77,17 @@ export function resolvePathRuntimeRoot(opts = {}) {
 
 /**
  * Discover the Git project root for the operator's cwd.
+ * Also records TARGET_WORKING_SUBDIR when invoked from a repository subdirectory.
  *
  * @param {string} [cwd]
- * @returns {{ ok: true, projectRoot: string, gitDir: string } | { ok: false, code: string, message: string }}
+ * @returns {{
+ *   ok: true,
+ *   projectRoot: string,
+ *   gitRepositoryRoot: string,
+ *   workingSubdir: string,
+ *   invocationCwd: string,
+ *   gitDir: string,
+ * } | { ok: false, code: string, message: string }}
  */
 export function resolveTargetProjectRoot(cwd = process.cwd()) {
   const start = resolve(cwd);
@@ -82,7 +108,12 @@ export function resolveTargetProjectRoot(cwd = process.cwd()) {
       message: "PATH requires a Git repository. cd into a project and try again.",
     };
   }
-  const projectRoot = resolve((probe.stdout || "").trim());
+  let projectRoot = resolve((probe.stdout || "").trim());
+  try {
+    projectRoot = realpathSync(projectRoot);
+  } catch {
+    // keep resolved
+  }
   if (!projectRoot || !existsSync(projectRoot)) {
     return {
       ok: false,
@@ -90,11 +121,57 @@ export function resolveTargetProjectRoot(cwd = process.cwd()) {
       message: "PATH could not resolve the Git project root.",
     };
   }
+
+  let invocationCwd = start;
+  try {
+    invocationCwd = realpathSync(start);
+  } catch {
+    // keep resolved
+  }
+
+  const rel = relative(projectRoot, invocationCwd);
+  if (rel.startsWith("..") || rel.includes(`..${sep}`)) {
+    return {
+      ok: false,
+      code: "INVALID_WORKING_SUBDIR",
+      message:
+        "Invocation directory is outside the Git repository root. cd into the project and try again.",
+    };
+  }
+  const workingSubdir =
+    rel === "" || rel === "."
+      ? ""
+      : rel.split(/[/\\]/).filter(Boolean).join("/");
+
   return {
     ok: true,
     projectRoot,
+    gitRepositoryRoot: projectRoot,
+    workingSubdir,
+    invocationCwd,
     gitDir: join(projectRoot, ".git"),
   };
+}
+
+/**
+ * Effective engineering cwd inside a task worktree for a recorded subdirectory.
+ *
+ * @param {string} worktreePath
+ * @param {string} [workingSubdir]
+ */
+export function resolveEngineeringCwd(worktreePath, workingSubdir = "") {
+  const root = resolve(worktreePath);
+  const sub =
+    typeof workingSubdir === "string"
+      ? workingSubdir.split(/[/\\]/).filter(Boolean).join("/")
+      : "";
+  if (!sub) return root;
+  const candidate = resolve(root, sub);
+  const rel = relative(root, candidate);
+  if (rel.startsWith("..") || rel.includes(`..${sep}`)) {
+    return root;
+  }
+  return candidate;
 }
 
 /**

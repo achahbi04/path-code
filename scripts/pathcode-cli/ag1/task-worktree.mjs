@@ -7,7 +7,10 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 
-import { resolveCheckoutRoot } from "../paths.mjs";
+import {
+  resolveCheckoutRoot,
+  resolvePathRuntimeRoot,
+} from "../paths.mjs";
 
 /**
  * @param {string} cwd
@@ -96,13 +99,19 @@ export function allocateTaskIdentity(primaryRoot, preferredId) {
  *   baselineCommit?: string,
  *   tasksParent?: string,
  *   checkoutRoot?: string,
+ *   runtimeRoot?: string,
  * }} input
  */
 export function createTaskWorktree(input) {
   const primaryRoot = resolve(input.primaryRoot);
   const checkoutRoot = input.checkoutRoot ?? resolveCheckoutRoot();
+  const runtimeRoot =
+    input.runtimeRoot ??
+    resolvePathRuntimeRoot({ packageRoot: checkoutRoot });
+  // AG5: disposable task worktrees live under PATH_RUNTIME_ROOT (never the
+  // installed package tree, which must remain a relocatable read-only asset).
   const tasksParent =
-    input.tasksParent ?? join(checkoutRoot, ".path-code-tmp", "ag1-tasks");
+    input.tasksParent ?? join(runtimeRoot, "ag1-tasks");
 
   mkdirSync(tasksParent, { recursive: true });
 
@@ -247,7 +256,9 @@ export function removeTaskWorktree(primaryRoot, worktreePath, opts = {}) {
       // leave inspectable
     }
   }
-  if (opts.prune !== false) {
+  // AG5: never unconditionally prune — that can drop unrelated user worktrees.
+  // Callers that need prune must opt in after proving only PATH-owned stale entries.
+  if (opts.prune === true) {
     git(primaryRoot, ["worktree", "prune"]);
   }
   const after = capturePrimaryFingerprint(primaryRoot);

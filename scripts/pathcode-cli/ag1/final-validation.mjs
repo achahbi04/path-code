@@ -10,7 +10,9 @@ import {
   discoverValidationCandidates,
   selectPlannedChecks,
 } from "../validation-candidates.mjs";
+import { discoverNativeValidationCandidates } from "../ag5/native-validation.mjs";
 import { buildTrialChildEnvironment } from "../child-env.mjs";
+import { sanitizeProjectCommandEnv } from "../ag5/project-env.mjs";
 
 /**
  * @typedef {"VERIFIED" | "PARTIALLY_VERIFIED" | "FAILED" | "NOT_VERIFIED"} Ag1ResultClass
@@ -28,12 +30,20 @@ import { buildTrialChildEnvironment } from "../child-env.mjs";
  */
 function runPreparedRequest(request, signal) {
   return new Promise((resolve) => {
-  const childEnv = {
+  const childEnv = sanitizeProjectCommandEnv({
     ...request.env,
     PATH: process.env.PATH ?? "",
+    // Native toolchains (Go/Rust/etc.) need ordinary host identity for caches.
+    ...(typeof process.env.HOME === "string" ? { HOME: process.env.HOME } : {}),
+    ...(typeof process.env.USER === "string" ? { USER: process.env.USER } : {}),
+    ...(typeof process.env.TMPDIR === "string"
+      ? { TMPDIR: process.env.TMPDIR }
+      : {}),
+    ...(typeof process.env.TMP === "string" ? { TMP: process.env.TMP } : {}),
+    ...(typeof process.env.TEMP === "string" ? { TEMP: process.env.TEMP } : {}),
     GIT_TERMINAL_PROMPT: "0",
     PATHCODE_NONINTERACTIVE: "1",
-  };
+  });
     const child = spawn(request.executable, request.argv, {
       cwd: request.cwd,
       env: childEnv,
@@ -101,53 +111,66 @@ function runPreparedRequest(request, signal) {
 }
 
 /**
- * Discover and run project-defined validation against the task worktree.
- * Never invents commands. Agent completion does not set classification.
+ * Discover and run project-defined validation against the task worktree
+ * (or engineering subdirectory inside it). Never invents commands.
  *
  * @param {{
  *   worktreePath: string,
+ *   engineeringCwd?: string,
  *   signal?: AbortSignal,
  * }} input
  */
 export async function runIndependentFinalValidation(input) {
   const worktreePath = input.worktreePath;
-  const packageJsonPath = join(worktreePath, "package.json");
+  const validationRoot =
+    typeof input.engineeringCwd === "string" && input.engineeringCwd.trim()
+      ? input.engineeringCwd
+      : worktreePath;
 
-  if (!existsSync(packageJsonPath)) {
-    return {
-      classification: /** @type {Ag1ResultClass} */ ("NOT_VERIFIED"),
-      reason: "No package.json in task worktree; no discoverable npm validation.",
-      checks: [],
-    };
-  }
-
-  let packageJsonText;
-  try {
-    packageJsonText = readFileSync(packageJsonPath, "utf8");
-  } catch {
-    return {
-      classification: /** @type {Ag1ResultClass} */ ("NOT_VERIFIED"),
-      reason: "package.json unreadable.",
-      checks: [],
-    };
-  }
-
+  const packageJsonPath = join(validationRoot, "package.json");
   const childEnv = buildTrialChildEnvironment(process.env);
-  const discovery = discoverValidationCandidates({
-    projectRoot: worktreePath,
-    packageJsonText,
-    childEnv,
-  });
 
-  const selection = selectPlannedChecks(discovery.candidates);
+  /** @type {Array<object>} */
+  let candidates = [];
+  /** @type {Array<object>} */
+  let refused = [];
+
+  if (existsSync(packageJsonPath)) {
+    let packageJsonText = null;
+    try {
+      packageJsonText = readFileSync(packageJsonPath, "utf8");
+    } catch {
+      return {
+        classification: /** @type {Ag1ResultClass} */ ("NOT_VERIFIED"),
+        reason: "package.json unreadable.",
+        checks: [],
+      };
+    }
+    const discovery = discoverValidationCandidates({
+      projectRoot: validationRoot,
+      packageJsonText,
+      childEnv,
+    });
+    candidates = discovery.candidates;
+    refused = discovery.refused ?? [];
+  }
+
+  // AG5: when npm/tsc discovery is empty, admit native metadata-backed checks.
+  if (candidates.length === 0) {
+    candidates = discoverNativeValidationCandidates(validationRoot);
+  }
+
+  const selection = selectPlannedChecks(candidates);
   const checksToRun = selection.planned;
 
   if (!Array.isArray(checksToRun) || checksToRun.length === 0) {
     return {
       classification: /** @type {Ag1ResultClass} */ ("NOT_VERIFIED"),
-      reason: "No admissible validation candidates for final checks.",
+      reason: existsSync(packageJsonPath)
+        ? "No admissible validation candidates for final checks."
+        : "No discoverable project validation (no package.json / native metadata checks).",
       checks: [],
-      refused: discovery.refused ?? [],
+      refused,
     };
   }
 
@@ -181,7 +204,7 @@ export async function runIndependentFinalValidation(input) {
       {
         executable: request.executable,
         argv: request.argv,
-        cwd: request.cwd ?? worktreePath,
+        cwd: request.cwd ?? validationRoot,
         env: { ...childEnv, ...(request.env ?? {}) },
         timeoutMs:
           typeof request.timeoutMs === "number" ? request.timeoutMs : 300_000,
@@ -202,7 +225,6 @@ export async function runIndependentFinalValidation(input) {
     });
   }
 
-  // Silence unused if no progress hook bound.
   void emitProgress;
 
   if (results.length === 0) {

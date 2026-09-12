@@ -26,6 +26,7 @@ import {
   runIndependentFinalValidation,
   setFinalValidationProgressHook,
 } from "./final-validation.mjs";
+import { resolveEngineeringCwd } from "../paths.mjs";
 
 /** Default wall clock — finite, not a 5-call micro-budget. */
 export const AG1_DEFAULT_WALL_CLOCK_MS = 1_200_000;
@@ -76,6 +77,7 @@ export function scrubEngineIdentity(text) {
  *   taskText: string,
  *   projectRoot: string,
  *   checkoutRoot?: string,
+ *   workingSubdir?: string,
  *   sessionEventEmit?: (type: string, fields?: Record<string, unknown>) => void,
  *   signal?: AbortSignal,
  *   wallClockMs?: number,
@@ -230,6 +232,12 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     taskId: worktree.taskId,
     taskBranch: worktree.taskBranch,
     workspace: worktree.worktreePath,
+    workingSubdir:
+      typeof options.workingSubdir === "string" ? options.workingSubdir : "",
+    engineeringCwd: resolveEngineeringCwd(
+      worktree.worktreePath,
+      typeof options.workingSubdir === "string" ? options.workingSubdir : "",
+    ),
     baselineHead: worktree.baseline.head,
     status: "ready",
   });
@@ -388,9 +396,15 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     detail: "starting engineering bridge",
   });
 
+  const engineeringCwd = resolveEngineeringCwd(
+    worktree.worktreePath,
+    typeof options.workingSubdir === "string" ? options.workingSubdir : "",
+  );
+
   const startResult = await agent.startTask({
     taskId,
     workspace: worktree.worktreePath,
+    defaultCwd: engineeringCwd,
     task: taskText,
     allowShell,
     budget: {
@@ -460,6 +474,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     try {
       validation = await runIndependentFinalValidation({
         worktreePath: worktree.worktreePath,
+        engineeringCwd,
         signal: ac.signal,
       });
       for (const check of validation.checks) {

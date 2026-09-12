@@ -46,6 +46,8 @@ import {
 import { ensureAg1Runtime } from "./pathcode-cli/ag1/runtime-bootstrap.mjs";
 import { admitPrimaryCheckout } from "./pathcode-cli/ag1/admission.mjs";
 import { basename } from "node:path";
+import { recoverPathOwnedStaleWorktrees } from "./pathcode-cli/ag5/orphan-recovery.mjs";
+import { runPathcodeDoctor } from "./pathcode-cli/ag5/doctor.mjs";
 
 const root = resolvePathPackageRoot();
 
@@ -56,6 +58,7 @@ function parseArgs(argv) {
   /** @type {{
    *   help: boolean,
    *   version: boolean,
+   *   doctor: boolean,
    *   model: string | null,
    *   autonomy: "review" | "bounded",
    *   events: null | "ndjson",
@@ -67,6 +70,7 @@ function parseArgs(argv) {
   const out = {
     help: false,
     version: false,
+    doctor: false,
     model: null,
     autonomy: "review",
     events: null,
@@ -83,6 +87,10 @@ function parseArgs(argv) {
     }
     if (a === "--version") {
       out.version = true;
+      continue;
+    }
+    if (a === "doctor" || a === "--doctor") {
+      out.doctor = true;
       continue;
     }
     if (a === "--issue") {
@@ -303,6 +311,12 @@ export async function runPathcodeMain(argv, testIo = {}) {
     return 0;
   }
 
+  if (args.doctor) {
+    const report = runPathcodeDoctor({ packageRoot: root, cwd: process.cwd() });
+    stdout.write(report.text);
+    return report.exitCode;
+  }
+
   if (args.rest.length > 0) {
     // Preserve foundation unknown-arg / legacy behavior.
     return await delegateLegacy(args.rest);
@@ -324,6 +338,8 @@ export async function runPathcodeMain(argv, testIo = {}) {
     return 2;
   }
   const projectRoot = project.projectRoot;
+  const workingSubdir =
+    typeof project.workingSubdir === "string" ? project.workingSubdir : "";
   const projectName = basename(projectRoot);
 
   /** @type {{ branch: string | null, clean: boolean | null }} */
@@ -345,6 +361,16 @@ export async function runPathcodeMain(argv, testIo = {}) {
     await ensureAg1Runtime({ packageRoot: root });
   } catch {
     // non-fatal at shell open; task start will re-check
+  }
+
+  // AG5: reclaim PATH-owned stale worktrees only; never global user prune.
+  try {
+    recoverPathOwnedStaleWorktrees({
+      projectRoot,
+      checkoutRoot: root,
+    });
+  } catch {
+    // non-fatal
   }
 
   if (!interactive) {
@@ -542,6 +568,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
             streams,
             taskText,
             projectRoot,
+            workingSubdir,
             unicode,
             checkoutRoot: root,
             sessionEventEmit: eventSink.emit,

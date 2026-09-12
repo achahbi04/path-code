@@ -23,6 +23,7 @@ import {
 } from "../paths.mjs";
 import { buildNoninteractiveEngineeringEnv } from "./noninteractive-env.mjs";
 import { sanitizeEngineEnvForPublication } from "../ag4/credential-isolation.mjs";
+import { sanitizeProjectCommandEnv } from "../ag5/project-env.mjs";
 
 /**
  * @typedef {{
@@ -36,6 +37,7 @@ import { sanitizeEngineEnvForPublication } from "../ag4/credential-isolation.mjs
  *     commandTimeoutSeconds?: number,
  *   },
  *   allowShell?: boolean,
+ *   defaultCwd?: string,
  * }} StartTaskInput
  */
 
@@ -44,6 +46,7 @@ import { sanitizeEngineEnvForPublication } from "../ag4/credential-isolation.mjs
  *   onEvent?: (msg: Record<string, unknown>) => void,
  *   onDiagnostic?: (kind: string, text: string) => void,
  *   checkoutRoot?: string,
+ *   runtimeRoot?: string,
  *   pythonPath?: string,
  *   bridgeScript?: string,
  *   env?: NodeJS.ProcessEnv,
@@ -51,14 +54,18 @@ import { sanitizeEngineEnvForPublication } from "../ag4/credential-isolation.mjs
  */
 
 /**
- * Build child env: inherit process.env (including auth) unless overridden.
- * AG3: apply noninteractive engineering guards (never global CI=true).
+ * Build child env for the Antigravity bridge process.
+ * Uses absolute interpreter (caller); strips private Python markers that would
+ * otherwise leak into SDK-spawned project commands via limited_env PATH inheritance.
  * @param {NodeJS.ProcessEnv | undefined} override
  */
 export function buildBridgeChildEnv(override) {
   const base = override ? { ...override } : { ...process.env };
   const noninteractive = buildNoninteractiveEngineeringEnv(base);
-  return sanitizeEngineEnvForPublication(noninteractive);
+  const publicationSafe = sanitizeEngineEnvForPublication(noninteractive);
+  // Keep auth/locale for the bridge; strip venv activation markers so project
+  // commands do not inherit PATH's private Antigravity Python environment.
+  return sanitizeProjectCommandEnv(publicationSafe);
 }
 
 /**
@@ -258,6 +265,9 @@ export function createAntigravityEngineeringAgent(options = {}) {
       task: input.task,
       budget: input.budget ?? {},
       allowShell: input.allowShell !== false,
+      ...(typeof input.defaultCwd === "string" && input.defaultCwd.trim()
+        ? { defaultCwd: input.defaultCwd.trim() }
+        : {}),
     };
     noteDiagnostic("stdin_start", JSON.stringify({ taskId: input.taskId, workspace: input.workspace }));
     writeCommand(cmd);

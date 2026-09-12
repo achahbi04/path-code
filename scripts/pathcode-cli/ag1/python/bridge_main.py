@@ -111,6 +111,13 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
 
     task_id = payload.get("taskId") or "unknown"
     workspace = Path(payload["workspace"]).resolve()
+    default_cwd_raw = payload.get("defaultCwd") or payload.get("default_cwd")
+    if isinstance(default_cwd_raw, str) and default_cwd_raw.strip():
+        default_cwd = Path(default_cwd_raw).expanduser().resolve()
+        if not _is_within(workspace, default_cwd):
+            default_cwd = workspace
+    else:
+        default_cwd = workspace
     task_text = payload.get("task") or ""
     budget = payload.get("budget") or {}
     allow_shell = bool(payload.get("allowShell", True))
@@ -122,6 +129,7 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
     wall_ms = int(budget.get("wallClockMs") or 1_200_000)
 
     # Limited env: keep PATH/HOME/locale and auth vars the SDK needs; drop unrelated secrets.
+    # AG5: never forward PATH-private Python venv markers into project commands.
     limited_env: dict[str, str] = {}
     keep_keys = (
         "PATH",
@@ -145,10 +153,43 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
         "GOOGLE_APPLICATION_CREDENTIALS",
         "CLOUDSDK_CORE_PROJECT",
     )
+    deny_keys = {
+        "VIRTUAL_ENV",
+        "PYTHONHOME",
+        "PYTHONPATH",
+        "CONDA_PREFIX",
+        "CONDA_DEFAULT_ENV",
+        "CONDA_PROMPT_MODIFIER",
+        "CONDA_SHLVL",
+        "CONDA_PYTHON_EXE",
+        "CONDA_EXE",
+        "_OLD_VIRTUAL_PATH",
+        "_OLD_VIRTUAL_PYTHONHOME",
+        "_OLD_VIRTUAL_PS1",
+    }
     for key in keep_keys:
+        if key in deny_keys:
+            continue
         val = os.environ.get(key)
         if isinstance(val, str) and val != "":
             limited_env[key] = val
+    # Strip PATH-owned ag1-venv bin directories from PATH if present.
+    path_val = limited_env.get("PATH", "")
+    if path_val:
+        parts = path_val.split(os.pathsep)
+        cleaned = []
+        for part in parts:
+            norm = os.path.normpath(part)
+            if norm.endswith(os.path.join("ag1-venv", "bin")) or norm.endswith(
+                os.path.join("ag1-venv", "Scripts")
+            ):
+                continue
+            if f"{os.sep}ag1-venv{os.sep}" in norm and (
+                norm.endswith(f"{os.sep}bin") or norm.endswith(f"{os.sep}Scripts")
+            ):
+                continue
+            cleaned.append(part)
+        limited_env["PATH"] = os.pathsep.join(cleaned)
     # AG3 noninteractive engineering guards (never global CI=true).
     limited_env["GIT_TERMINAL_PROMPT"] = "0"
     limited_env["GCM_INTERACTIVE"] = "never"
@@ -192,16 +233,19 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                             ),
                         )
                 cwd_raw = args.get("Cwd") or args.get("cwd")
-                resolved = _resolve_under(workspace, str(cwd_raw) if cwd_raw is not None else None)
+                if cwd_raw is None or str(cwd_raw).strip() == "":
+                    resolved = default_cwd
+                else:
+                    resolved = _resolve_under(workspace, str(cwd_raw))
                 if resolved is None or not _is_within(workspace, resolved):
                     return HookResult(
                         allow=False,
                         message="Command Cwd is outside the task workspace and was refused.",
                     )
-                # Force canonical Cwd inside the worktree.
+                # Keep the resolved cwd (subdir-aware); do not collapse to repo root.
                 return HookResult(
                     allow=True,
-                    modified_args={**args, "Cwd": str(workspace)},
+                    modified_args={**args, "Cwd": str(resolved)},
                 )
             # File tools are workspace-scoped by harness + workspace_only policy.
             return HookResult(allow=True)
@@ -372,10 +416,12 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                 prompt = (
                     f"Engineering task:\n{task_text}\n\n"
                     f"Workspace: {workspace}\n"
+                    f"Default command cwd: {default_cwd}\n"
                     "Stay inside this workspace. You MUST investigate the repository, "
                     "edit files as needed to complete the task, and run the project's "
                     "existing test/typecheck scripts while debugging. Do not stop after "
-                    "only reading files — implement the fix."
+                    "only reading files — implement the fix. Prefer the default command "
+                    "cwd for package-local validation when it differs from the workspace root."
                 )
                 response = await asyncio.wait_for(
                     agent.chat(prompt), timeout=wall_ms / 1000.0
