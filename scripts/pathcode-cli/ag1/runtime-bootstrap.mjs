@@ -36,6 +36,21 @@ export function resolveRuntimeVenvRoot(runtimeRoot) {
 }
 
 /**
+ * True when the venv interpreter can run pip (incomplete interrupted bootstraps fail this).
+ * @param {string} pythonBin
+ */
+export function isVenvPipReady(pythonBin) {
+  if (!existsSync(pythonBin)) return false;
+  const probe = spawnSync(pythonBin, ["-m", "pip", "--version"], {
+    encoding: "utf8",
+    env: process.env,
+    timeout: 20_000,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  return probe.status === 0;
+}
+
+/**
  * @param {string} runtimeRoot
  */
 export function resolveRuntimeMarkerPath(runtimeRoot) {
@@ -156,7 +171,7 @@ export async function ensureAg1Runtime(opts = {}) {
 
   const healthy =
     !opts.force &&
-    existsSync(pythonBin) &&
+    isVenvPipReady(pythonBin) &&
     isRuntimeMarkerHealthy(runtimeRoot, packageRoot);
 
   if (healthy) {
@@ -193,6 +208,7 @@ export async function ensureAg1Runtime(opts = {}) {
     await delay(POLL_MS);
     if (
       existsSync(pythonBin) &&
+      isVenvPipReady(pythonBin) &&
       isRuntimeMarkerHealthy(runtimeRoot, packageRoot)
     ) {
       return {
@@ -211,7 +227,7 @@ export async function ensureAg1Runtime(opts = {}) {
     // Re-check under lock.
     if (
       !opts.force &&
-      existsSync(pythonBin) &&
+      isVenvPipReady(pythonBin) &&
       isRuntimeMarkerHealthy(runtimeRoot, packageRoot)
     ) {
       return {
@@ -223,7 +239,11 @@ export async function ensureAg1Runtime(opts = {}) {
       };
     }
 
-    if (opts.force && existsSync(venvRoot)) {
+    // Interrupted first-run can leave a python binary without pip — rebuild.
+    if (
+      existsSync(venvRoot) &&
+      (opts.force || (existsSync(pythonBin) && !isVenvPipReady(pythonBin)))
+    ) {
       rmSync(venvRoot, { recursive: true, force: true });
     }
 
@@ -250,11 +270,35 @@ export async function ensureAg1Runtime(opts = {}) {
       { encoding: "utf8", env: process.env },
     );
     if (pipUpgrade.status !== 0) {
-      return {
-        ok: false,
-        code: "RUNTIME_PIP_FAILED",
-        message: (pipUpgrade.stderr || "pip upgrade failed").slice(0, 400),
-      };
+      // One automatic rebuild if pip is still missing after create.
+      try {
+        rmSync(venvRoot, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+      const recreate = spawnSync("python3", ["-m", "venv", venvRoot], {
+        encoding: "utf8",
+        env: process.env,
+      });
+      if (recreate.status !== 0) {
+        return {
+          ok: false,
+          code: "RUNTIME_PIP_FAILED",
+          message: (pipUpgrade.stderr || "pip upgrade failed").slice(0, 400),
+        };
+      }
+      const pipRetry = spawnSync(
+        pythonBin,
+        ["-m", "pip", "install", "--upgrade", "pip"],
+        { encoding: "utf8", env: process.env },
+      );
+      if (pipRetry.status !== 0) {
+        return {
+          ok: false,
+          code: "RUNTIME_PIP_FAILED",
+          message: (pipRetry.stderr || "pip upgrade failed").slice(0, 400),
+        };
+      }
     }
     const pipInstall = spawnSync(
       pythonBin,

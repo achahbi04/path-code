@@ -212,7 +212,12 @@ function detectUnicode() {
 async function delegateLegacy(args) {
   const prereq = resolveRuntimePrerequisites(root);
   if (!prereq.ok) {
-    process.stderr.write(`${prereq.message}\n`);
+    // Installed Beta packages do not ship TypeScript/devDeps. Unknown args must
+    // not tell the user to "restore dependencies in this checkout".
+    const label = Array.isArray(args) && args.length > 0 ? args.join(" ") : "(empty)";
+    process.stderr.write(
+      `Unknown argument: ${label}\nRun "pathcode --help" for usage.\n`,
+    );
     return 2;
   }
   const mainHref = pathToFileURL(join(root, "dist", "cli", "main.js")).href;

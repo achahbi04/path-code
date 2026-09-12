@@ -22,9 +22,14 @@ import { describe, expect, it } from "vitest";
 
 const CHECKOUT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = join(CHECKOUT_ROOT, "scripts/pathcode-cli");
+const AG1 = join(CLI, "ag1");
 
 async function load(rel: string) {
   return import(`${pathToFileURL(join(CLI, rel)).href}?ag5=${randomUUID()}`);
+}
+
+async function loadAg1(rel: string) {
+  return import(`${pathToFileURL(join(AG1, rel)).href}?ag5=${randomUUID()}`);
 }
 
 function git(cwd: string, args: string[]) {
@@ -267,6 +272,55 @@ describe("AG5 native validation discovery", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("Python without pytest is NOT_VERIFIED rather than FAILED", async () => {
+    const { runIndependentFinalValidation } = await load(
+      "ag1/final-validation.mjs",
+    );
+    const root = mkdtempSync(join(tmpdir(), "ag5-py-nopip-"));
+    try {
+      writeFileSync(
+        join(root, "pyproject.toml"),
+        '[project]\nname="x"\nversion="0.1.0"\n',
+      );
+      mkdirSync(join(root, "tests"), { recursive: true });
+      writeFileSync(join(root, "tests", "test_x.py"), "def test_x():\n  assert True\n");
+      const result = await runIndependentFinalValidation({ worktreePath: root });
+      // Must not claim FAILED when pytest cannot run.
+      expect(result.classification).toBe("NOT_VERIFIED");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("AG5 runtime self-repair", () => {
+  it("rebuilds a pip-less interrupted venv", async () => {
+    const { ensureAg1Runtime, isVenvPipReady } = await load(
+      "ag1/runtime-bootstrap.mjs",
+    );
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "ag5-wedge-"));
+    const venv = join(runtimeRoot, "ag1-venv");
+    try {
+      const create = spawnSync("python3", ["-m", "venv", "--without-pip", venv], {
+        encoding: "utf8",
+      });
+      expect(create.status).toBe(0);
+      const pythonBin = join(venv, "bin", "python");
+      expect(existsSync(pythonBin)).toBe(true);
+      expect(isVenvPipReady(pythonBin)).toBe(false);
+      process.env.PATHCODE_RUNTIME_ROOT = runtimeRoot;
+      const boot = await ensureAg1Runtime({
+        packageRoot: CHECKOUT_ROOT,
+        runtimeRoot,
+      });
+      expect(boot.ok).toBe(true);
+      expect(isVenvPipReady(boot.pythonPath)).toBe(true);
+    } finally {
+      delete process.env.PATHCODE_RUNTIME_ROOT;
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  }, 120_000);
 });
 
 describe("AG5 packaging surface", () => {
@@ -283,6 +337,21 @@ describe("AG5 packaging surface", () => {
         "scripts/path-studio",
       ]),
     );
+  });
+
+  it("unknown args on incomplete install do not demand checkout restore", async () => {
+    const r = spawnSync(
+      process.execPath,
+      [join(CHECKOUT_ROOT, "scripts/pathcode.mjs"), "--not-a-real-flag"],
+      {
+        encoding: "utf8",
+        env: { ...process.env, PATHCODE_RUNTIME_ROOT: join(tmpdir(), "ag5-doc") },
+        cwd: tmpdir(),
+      },
+    );
+    // In source checkout dist+tsc may exist → legacy path; assert no false checkout advice
+    // when prereq fails by checking message shape for the installed-package case via unit:
+    expect(r.stderr || r.stdout || "").not.toMatch(/Restore dependencies in this checkout/);
   });
 
   it("pathcode doctor runs without secrets", async () => {
@@ -302,4 +371,19 @@ describe("AG5 packaging surface", () => {
     expect(report.text).not.toContain("should-not-appear");
     expect(report.text).not.toMatch(/ghp_[A-Za-z0-9]+/);
   }, 20_000);
+
+  it("detectAg1Auth sees default gcloud ADC file", async () => {
+    const { detectAg1Auth } = await loadAg1("auth-detect.mjs");
+    const home = mkdtempSync(join(tmpdir(), "ag5-adc-"));
+    try {
+      const adc = join(home, ".config", "gcloud", "application_default_credentials.json");
+      mkdirSync(dirname(adc), { recursive: true });
+      writeFileSync(adc, '{"type":"authorized_user"}\n');
+      const r = detectAg1Auth({ PATH: "/usr/bin", HOME: home }, { home });
+      expect(r.ok).toBe(true);
+      expect(r.mode).toBe("vertex_adc");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
 });

@@ -38,6 +38,23 @@ function resolveHostBinary(bin, projectRoot) {
 }
 
 /**
+ * @param {string} pythonPath
+ */
+function pythonCanImportPytest(pythonPath) {
+  const probe = spawnSync(
+    pythonPath,
+    ["-c", "import pytest"],
+    {
+      encoding: "utf8",
+      env: process.env,
+      timeout: 15_000,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  return probe.status === 0;
+}
+
+/**
  * @param {string} projectRoot
  * @returns {Array<object>}
  */
@@ -95,7 +112,7 @@ export function discoverNativeValidationCandidates(projectRoot) {
           },
           disclosure: { command: "pytest", chain: [], lifecycleHooks: [] },
         });
-      } else if (python) {
+      } else if (python && pythonCanImportPytest(python)) {
         candidates.push({
           id: "python-pytest-module",
           kind: "TARGETED_TEST",
@@ -114,6 +131,8 @@ export function discoverNativeValidationCandidates(projectRoot) {
           },
         });
       }
+      // If Python metadata exists but pytest is unavailable, emit no candidate
+      // (honest NOT_VERIFIED) — never invent a FAILED run.
     }
   }
 

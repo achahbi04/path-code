@@ -1,9 +1,11 @@
 # PATH CODE — AG5 BETA / REAL-WORLD HARDENING
 
-**Result: PASS (candidate freeze)**
+**Result: PASS**
 
 **Branch:** `cursor/pathcode-antigravity-v1`  
 **Parent baseline:** AG4 `1ce454c0ad4a9bd8dd2f144e4bba3aa8b8746104`
+
+Blocker fixes after independent concurrent findings: F-AG5-11…14 (pytest probe, pip-less venv repair, unknown-arg product message, default ADC detect).
 
 ## Package / install
 
