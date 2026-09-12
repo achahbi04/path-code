@@ -149,6 +149,10 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
         val = os.environ.get(key)
         if isinstance(val, str) and val != "":
             limited_env[key] = val
+    # AG3 noninteractive engineering guards (never global CI=true).
+    limited_env["GIT_TERMINAL_PROMPT"] = "0"
+    limited_env["GCM_INTERACTIVE"] = "never"
+    limited_env["PATHCODE_NONINTERACTIVE"] = "1"
 
     class CwdConfineHook(PreToolCallDecideHook):
         async def run(self, context, data: ToolCall) -> HookResult:  # type: ignore[override]
@@ -167,6 +171,26 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                         allow=False,
                         message="High-impact external command denied for this engineering session.",
                     )
+                # AG3: block known interactive-only commands before they hang PATH.
+                interactive_patterns = (
+                    r"\bpython3?\s+-i\b",
+                    r"\bnode\s+(?:--interactive|-i)\b",
+                    r"\birb\b",
+                    r"\bprisma\s+studio\b",
+                    r"\b(?:vim|nvim|nano|less|more)\b",
+                    r"\bgit\s+add\s+-p\b",
+                    r"\bgit\s+rebase\s+-i\b",
+                )
+                for pat in interactive_patterns:
+                    if re.search(pat, cmd, re.I):
+                        return HookResult(
+                            allow=False,
+                            message=(
+                                "INTERACTIVE_COMMAND_BLOCKED: interactive command "
+                                "refused for autonomous engineering. Prefer "
+                                "noninteractive flags when available."
+                            ),
+                        )
                 cwd_raw = args.get("Cwd") or args.get("cwd")
                 resolved = _resolve_under(workspace, str(cwd_raw) if cwd_raw is not None else None)
                 if resolved is None or not _is_within(workspace, resolved):
@@ -259,8 +283,11 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
         "You are the PATH engineering engine. Complete the coding task inside the "
         "configured workspace only. Investigate, edit, run tests/typechecks/builds "
         "as needed, diagnose failures, and correct your own work. Do not push to "
-        "remotes, deploy, or access secrets outside the workspace. When finished, "
-        "use the finish tool. Do not ask the operator clarifying questions."
+        "remotes, deploy, or access secrets outside the workspace. Never run "
+        "interactive prompts (editors, REPLs, git add -p). Prefer noninteractive "
+        "flags such as --yes / --non-interactive when a tool requires confirmation. "
+        "When finished, use the finish tool. Do not ask the operator clarifying "
+        "questions."
     )
 
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")

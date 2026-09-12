@@ -131,7 +131,7 @@ describe("GC1-c living product surface", () => {
       status: "grounded",
     });
     const lines = buildInlineCardLines(state, { rows: 40, columns: 80 });
-    expect(lines.join("\n")).toContain("PATH STUDIO — live");
+    expect(lines.join("\n")).toContain("PATH ● Code");
     expect(lines.join("\n")).toMatch(/Gate 1/);
   });
 });

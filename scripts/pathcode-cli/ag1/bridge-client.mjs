@@ -17,7 +17,11 @@ import {
   createJsonlParser,
   isRecognizedBridgeMessage,
 } from "./jsonl-parser.mjs";
-import { resolveCheckoutRoot } from "../paths.mjs";
+import {
+  resolvePathPackageRoot,
+  resolvePathRuntimeRoot,
+} from "../paths.mjs";
+import { buildNoninteractiveEngineeringEnv } from "./noninteractive-env.mjs";
 
 /**
  * @typedef {{
@@ -46,30 +50,29 @@ import { resolveCheckoutRoot } from "../paths.mjs";
  */
 
 /**
- * Build child env: inherit process.env (including GEMINI_API_KEY) unless overridden.
- * Never strip auth keys. Optionally strip nothing by default.
+ * Build child env: inherit process.env (including auth) unless overridden.
+ * AG3: apply noninteractive engineering guards (never global CI=true).
  * @param {NodeJS.ProcessEnv | undefined} override
  */
 export function buildBridgeChildEnv(override) {
-  if (override) return { ...override };
-  // Explicit shallow copy of process.env — Node spawn inherits by default when
-  // env is omitted; we pass a copy so diagnostics can assert key presence
-  // without printing values.
-  return { ...process.env };
+  const base = override ? { ...override } : { ...process.env };
+  return buildNoninteractiveEngineeringEnv(base);
 }
 
 /**
  * @param {AgentOptions} [options]
  */
 export function createAntigravityEngineeringAgent(options = {}) {
-  const checkoutRoot = options.checkoutRoot ?? resolveCheckoutRoot();
+  const checkoutRoot = options.checkoutRoot ?? resolvePathPackageRoot();
+  const runtimeRoot =
+    options.runtimeRoot ?? resolvePathRuntimeRoot({ packageRoot: checkoutRoot });
   /** @type {import('node:child_process').ChildProcessWithoutNullStreams | null} */
   let child = null;
   /** @type {ReturnType<typeof createJsonlParser> | null} */
   let parser = null;
   const diagnostics = [];
   const MAX_DIAG = 400;
-  const diagDir = join(checkoutRoot, ".path-code-tmp", "ag1-diag");
+  const diagDir = join(runtimeRoot, "diag");
   try {
     mkdirSync(diagDir, { recursive: true });
   } catch {
@@ -192,6 +195,14 @@ export function createAntigravityEngineeringAgent(options = {}) {
 
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
+    if (child.stdin) {
+      child.stdin.on("error", (err) => {
+        noteDiagnostic(
+          "stdin_error",
+          err && err.message ? String(err.message) : "stdin error",
+        );
+      });
+    }
 
     child.stdout.on("data", (chunk) => {
       parser?.push(String(chunk));
@@ -258,10 +269,22 @@ export function createAntigravityEngineeringAgent(options = {}) {
   }
 
   function cancel() {
-    writeCommand({ type: "cancel" });
-    if (child && !child.killed) {
+    try {
+      writeCommand({ type: "cancel" });
+    } catch {
+      // ignore
+    }
+    const proc = child;
+    if (proc && !proc.killed) {
       try {
-        child.kill("SIGTERM");
+        if (proc.stdin && !proc.stdin.destroyed) {
+          try {
+            proc.stdin.end();
+          } catch {
+            // ignore
+          }
+        }
+        proc.kill("SIGTERM");
       } catch {
         // ignore
       }
@@ -269,9 +292,20 @@ export function createAntigravityEngineeringAgent(options = {}) {
   }
 
   async function close() {
-    writeCommand({ type: "close" });
     const proc = child;
     if (!proc) return;
+    try {
+      writeCommand({ type: "close" });
+    } catch {
+      // ignore
+    }
+    try {
+      if (proc.stdin && !proc.stdin.destroyed) {
+        proc.stdin.end();
+      }
+    } catch {
+      // ignore
+    }
     await new Promise((resolve) => {
       const timer = setTimeout(() => {
         try {
@@ -293,12 +327,19 @@ export function createAntigravityEngineeringAgent(options = {}) {
    * @param {Record<string, unknown>} cmd
    */
   function writeCommand(cmd) {
-    if (!child || !child.stdin || child.stdin.destroyed) {
+    if (!child || !child.stdin || child.stdin.destroyed || child.killed) {
       noteDiagnostic("stdin_unavailable", JSON.stringify(cmd.type ?? "unknown"));
       return;
     }
     try {
-      child.stdin.write(`${JSON.stringify(cmd)}\n`);
+      child.stdin.write(`${JSON.stringify(cmd)}\n`, (err) => {
+        if (err) {
+          noteDiagnostic(
+            "stdin_write_error",
+            err && err.message ? String(err.message) : "write failed",
+          );
+        }
+      });
     } catch (err) {
       noteDiagnostic(
         "stdin_write_error",

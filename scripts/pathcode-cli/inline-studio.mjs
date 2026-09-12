@@ -25,7 +25,13 @@ const HIDE_CURSOR = "\u001b[?25l";
 const SHOW_CURSOR = "\u001b[?25h";
 const ERASE_LINE = "\u001b[2K";
 const ERASE_BELOW = "\u001b[J";
+const ENTER_ALT = "\u001b[?1049h";
+const EXIT_ALT = "\u001b[?1049l";
+const HOME = "\u001b[H";
+const RESET_GRAPHICS = "\u001b[0m";
 const CR = "\r";
+const MAX_FPS = 24;
+const FRAME_MIN_MS = Math.floor(1000 / MAX_FPS);
 
 /**
  * Visible width with ANSI escape sequences stripped (1b).
@@ -145,16 +151,6 @@ export function buildEvidenceLines(state) {
     lines.push(
       state.cards.recovery?.arrived ? "Recovery        ✓" : "Recovery        —",
     );
-    const activities = Array.isArray(product.ag1Activities)
-      ? product.ag1Activities
-      : [];
-    if (activities.length === 0) {
-      lines.push("Activity        —");
-    } else {
-      for (const label of activities.slice(-6)) {
-        lines.push(`◆ ${label}`);
-      }
-    }
     if (product.ag1Mutation) {
       lines.push("Mutation        ✓");
     } else if (state.cards.applying?.status === "active") {
@@ -312,8 +308,46 @@ function pathGlyph(phase) {
   return "◆";
 }
 
+/** @returns {boolean} */
+function colorEnabled() {
+  if (process.env.NO_COLOR != null && process.env.NO_COLOR !== "") return false;
+  if (process.env.FORCE_COLOR === "0") return false;
+  return true;
+}
+
 /**
- * Wide living product surface: PROJECT | PATH | EVIDENCE + MACHINE + footer.
+ * @param {string} text
+ * @param {string} code
+ */
+function paint(text, code) {
+  if (!colorEnabled() || !text) return text;
+  return `\u001b[${code}m${text}\u001b[0m`;
+}
+
+const style = {
+  dim: (t) => paint(t, "2"),
+  bold: (t) => paint(t, "1"),
+  cyan: (t) => paint(t, "36"),
+  green: (t) => paint(t, "32"),
+  red: (t) => paint(t, "31"),
+  yellow: (t) => paint(t, "33"),
+  white: (t) => paint(t, "37"),
+};
+
+/**
+ * @param {string} text
+ * @param {number} width
+ */
+function padVisible(text, width) {
+  const w = visibleWidth(text);
+  if (w >= width) return truncateVisible(text, width);
+  return `${text}${" ".repeat(width - w)}`;
+}
+
+/**
+ * Wide living product surface: PROJECT | PATH | EVIDENCE.
+ * Visual north star: framed cockpit, calm hierarchy, dense but anchored.
+ * Truth rules unchanged — real events only; no provider branding on AG1.
  *
  * @param {ReturnType<typeof createEmptyStudioState>} state
  * @param {{ rows: number, columns: number }} viewport
@@ -329,8 +363,12 @@ export function buildLivingProductLines(state, viewport) {
       ? Math.floor(viewport.rows)
       : 24;
   const maxHeight = Math.max(10, rows - 2);
-  const gap = 2;
-  const colW = Math.max(12, Math.floor((columns - gap * 2) / 3));
+  const inner = Math.max(24, columns - 2);
+  const gap = 1;
+  // Layout: [col][gap][│][gap][col][gap][│][gap][col]  == inner
+  const fixed = gap * 4 + 2;
+  const colW = Math.max(10, Math.floor((inner - fixed) / 3));
+  const colWR = Math.max(colW, inner - fixed - colW * 2);
 
   const product = state.product || {
     pathPhase: "Idle",
@@ -342,108 +380,298 @@ export function buildLivingProductLines(state, viewport) {
   };
 
   const pathPhase = projectAuthoritativePathPhase(state);
+  const isAg1 = product.ag1 === true;
+
+  const branchRaw = product.branch
+    ? String(product.branch).replace(/\s+@\s+\S+/, "")
+    : null;
+  const dirty = product.dirtySummary ? String(product.dirtySummary) : null;
+  const projectName =
+    typeof product.projectName === "string" && product.projectName
+      ? product.projectName
+      : null;
 
   /** @type {string[]} */
-  const projectCol = ["PROJECT", ""];
+  const projectCol = [style.bold(style.cyan("PROJECT")), ""];
   const entries = Array.isArray(product.projectEntries)
     ? product.projectEntries
     : [];
   if (entries.length > 0) {
     for (const e of entries.slice(0, 6)) {
-      projectCol.push(String(e.path));
-      projectCol.push(`  ${e.role}`);
+      projectCol.push(style.white(String(e.path)));
+      projectCol.push(style.dim(`  ${e.role}`));
     }
   } else {
     const files = Array.isArray(product.projectFiles) ? product.projectFiles : [];
     if (files.length === 0) {
-      projectCol.push(product.ag1 ? "(engineering…)" : "(awaiting scope)");
+      projectCol.push(style.dim(isAg1 ? "(engineering…)" : "(awaiting scope)"));
     } else {
       for (const f of files.slice(0, 6)) {
-        projectCol.push(String(f));
+        projectCol.push(style.white(String(f)));
       }
     }
   }
   projectCol.push("");
-  const branch = product.branch ? String(product.branch).replace(/\s+@\s+\S+/, "") : null;
-  const dirty = product.dirtySummary ? String(product.dirtySummary) : null;
-  if (branch || dirty) {
-    projectCol.push([branch, dirty].filter(Boolean).join(" · "));
+  if (branchRaw || dirty) {
+    const gitLine = [branchRaw, dirty].filter(Boolean).join(" · ");
+    projectCol.push(style.dim("Git"));
+    projectCol.push(
+      /clean/i.test(String(dirty))
+        ? style.green(`  ${gitLine}`)
+        : style.yellow(`  ${gitLine}`),
+    );
+  }
+  const fileCount = entries.length || (product.projectFiles?.length ?? 0);
+  if (fileCount > 0) {
+    projectCol.push(style.dim(`${fileCount} file${fileCount === 1 ? "" : "s"} in scope`));
   }
 
   /** @type {string[]} */
-  const pathCol = ["PATH", "", `${pathGlyph(pathPhase)} ${pathPhase}`];
-  if (pathPhase === "Starting workstation") {
-    const region = product.region || "europe-west4";
-    const sec = state.heartbeat
-      ? Math.floor(state.heartbeat.elapsedMs / 1000)
-      : null;
-    pathCol.push(`  ${region}${sec != null ? ` · ${sec}s` : ""}`);
-  } else if (pathPhase === "Hydrating" && product.pathDetail) {
-    pathCol.push(`  ${product.pathDetail}`);
-  } else if (pathPhase === "Applying" && product.pathDetail) {
-    pathCol.push(`  ${product.pathDetail}`);
-  } else if (pathPhase === "Testing" && state.cards.validationRunning?.detail) {
-    pathCol.push(`  ${state.cards.validationRunning.detail}`);
-  } else if (pathPhase === "Infrastructure failure" && product.infraFailure) {
-    pathCol.push(`  ${String(product.infraFailure).slice(0, colW - 2)}`);
-  }
+  const pathCol = [style.bold(style.cyan("PATH")), ""];
+  const phaseMark = pathGlyph(pathPhase);
+  const phaseLine =
+    phaseMark === "✓"
+      ? style.green(`${phaseMark} ${pathPhase}`)
+      : phaseMark === "✕"
+        ? style.red(`${phaseMark} ${pathPhase}`)
+        : phaseMark === "◐"
+          ? style.yellow(`${phaseMark} ${pathPhase}`)
+          : style.cyan(`${phaseMark} ${pathPhase}`);
+  pathCol.push(phaseLine);
 
-  const modelId = product.modelId || null;
-  const provider = product.providerLabel || (modelId ? "OpenAI" : null);
-  if (provider || modelId) {
-    pathCol.push("");
-    pathCol.push("Provider");
-    pathCol.push(`  ${[provider, modelId].filter(Boolean).join(" · ")}`);
-    if (product.providerTurn) {
-      const t = product.providerTurn;
-      pathCol.push(`  bounded · turn ${t.call}/${t.of}`);
+  if (isAg1) {
+    const activities = Array.isArray(product.ag1Activities)
+      ? product.ag1Activities
+      : [];
+    // Observable activity trail (never private model reasoning).
+    const trail = activities.slice(-5);
+    if (trail.length > 0) {
+      pathCol.push("");
+      pathCol.push(style.dim("Activity"));
+      for (const label of trail) {
+        const current = label === pathPhase;
+        pathCol.push(
+          current
+            ? style.cyan(`  ◆ ${label}`)
+            : style.dim(`  · ${label}`),
+        );
+      }
+    }
+    if (product.pathDetail && !/^google|gemini|antigravity|vertex/i.test(String(product.pathDetail))) {
+      pathCol.push(style.dim(`  ${String(product.pathDetail).slice(0, colW - 2)}`));
+    }
+  } else {
+    if (pathPhase === "Starting workstation") {
+      const region = product.region || "europe-west4";
+      const sec = state.heartbeat
+        ? Math.floor(state.heartbeat.elapsedMs / 1000)
+        : null;
+      pathCol.push(style.dim(`  ${region}${sec != null ? ` · ${sec}s` : ""}`));
+    } else if (pathPhase === "Hydrating" && product.pathDetail) {
+      pathCol.push(style.dim(`  ${product.pathDetail}`));
+    } else if (pathPhase === "Applying" && product.pathDetail) {
+      pathCol.push(style.dim(`  ${product.pathDetail}`));
+    } else if (pathPhase === "Testing" && state.cards.validationRunning?.detail) {
+      pathCol.push(style.dim(`  ${state.cards.validationRunning.detail}`));
+    } else if (pathPhase === "Infrastructure failure" && product.infraFailure) {
+      pathCol.push(style.red(`  ${String(product.infraFailure).slice(0, colW - 2)}`));
+    }
+
+    // Legacy cloud path may show provider; AG1 never does.
+    const modelId = product.modelId || null;
+    const provider = product.providerLabel || (modelId ? "OpenAI" : null);
+    if (provider || modelId) {
+      pathCol.push("");
+      pathCol.push(style.dim("Provider"));
+      pathCol.push(`  ${[provider, modelId].filter(Boolean).join(" · ")}`);
+      if (product.providerTurn) {
+        const t = product.providerTurn;
+        pathCol.push(style.dim(`  bounded · turn ${t.call}/${t.of}`));
+      }
     }
   }
 
   /** @type {string[]} */
-  const evidenceCol = ["EVIDENCE", "", ...buildEvidenceLines(state)];
+  const evidenceCol = [
+    style.bold(style.cyan("EVIDENCE")),
+    "",
+    ...buildEvidenceLines(state),
+  ];
 
-  const height = Math.max(projectCol.length, pathCol.length, evidenceCol.length);
+  const height = Math.max(projectCol.length, pathCol.length, evidenceCol.length, 6);
+  /** @type {string[]} */
+  const bodyRows = [];
+  for (let i = 0; i < height; i += 1) {
+    const a = padVisible(fitLine(` ${projectCol[i] ?? ""}`, colW), colW);
+    const b = padVisible(fitLine(` ${pathCol[i] ?? ""}`, colW), colW);
+    const c = padVisible(fitLine(` ${evidenceCol[i] ?? ""}`, colWR), colWR);
+    const row = `${a}${" ".repeat(gap)}${style.dim("│")}${" ".repeat(gap)}${b}${" ".repeat(gap)}${style.dim("│")}${" ".repeat(gap)}${c}`;
+    bodyRows.push(padVisible(row, inner));
+  }
+
+  const headerLeft = style.bold(style.cyan("PATH ● Code"));
+  const headerRightParts = [];
+  if (projectName) headerRightParts.push(projectName);
+  if (branchRaw) headerRightParts.push(branchRaw);
+  if (dirty) headerRightParts.push(dirty);
+  const headerRight = style.dim(headerRightParts.join(" · "));
+  const headerGap = Math.max(
+    1,
+    inner - visibleWidth(headerLeft) - visibleWidth(headerRight) - 2,
+  );
+  const headerInner = ` ${headerLeft}${" ".repeat(headerGap)}${headerRight} `;
+
   /** @type {string[]} */
   const lines = [];
-  for (let i = 0; i < height; i += 1) {
-    const a = fitLine(projectCol[i] ?? "", colW).padEnd(colW, " ");
-    const b = fitLine(pathCol[i] ?? "", colW).padEnd(colW, " ");
-    const c = fitLine(evidenceCol[i] ?? "", colW);
-    lines.push(fitLine(`${a}${" ".repeat(gap)}${b}${" ".repeat(gap)}${c}`, columns));
+  lines.push(fitLine(`╭${"─".repeat(inner)}╮`, columns));
+  lines.push(fitLine(`│${padVisible(headerInner.trimEnd(), inner)}│`, columns));
+  // Three-column divider aligned to body gutters.
+  const leftSeg = colW + gap;
+  const midSeg = colW + gap;
+  const rightSeg = Math.max(0, inner - leftSeg - midSeg - 2);
+  lines.push(
+    fitLine(
+      `├${"─".repeat(leftSeg)}${style.dim("┬")}${"─".repeat(midSeg)}${style.dim("┬")}${"─".repeat(rightSeg)}┤`,
+      columns,
+    ),
+  );
+  for (const row of bodyRows) {
+    lines.push(fitLine(`│${row}│`, columns));
   }
 
   const machineLines = Array.isArray(product.machineLines)
     ? product.machineLines
     : null;
   if (machineLines && machineLines.length > 0 && product.workstationReady) {
-    lines.push(fitLine("─".repeat(Math.min(columns, 80)), columns));
-    lines.push(fitLine("MACHINE", columns));
+    lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+    lines.push(fitLine(`│${padVisible(style.bold(" MACHINE"), inner)}│`, columns));
     for (const ml of machineLines) {
-      lines.push(fitLine(ml, columns));
+      lines.push(fitLine(`│${padVisible(` ${ml}`, inner)}│`, columns));
     }
   }
 
-  lines.push(fitLine("─".repeat(Math.min(columns, 80)), columns));
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
   let footer =
     product.cloudFooter ||
     (state.heartbeat
       ? `☁ working · ${state.heartbeat.stage} · ${Math.floor(state.heartbeat.elapsedMs / 1000)}s`
       : "");
-  // Keep footer coherent with authoritative PATH (no Complete + Starting).
+  if (isAg1) {
+    const sec = state.heartbeat
+      ? Math.floor(state.heartbeat.elapsedMs / 1000)
+      : null;
+    const mm = sec != null ? String(Math.floor(sec / 60)).padStart(2, "0") : null;
+    const ss = sec != null ? String(sec % 60).padStart(2, "0") : null;
+    footer =
+      sec != null
+        ? `PATH Engineering Session · ${mm}:${ss}`
+        : "PATH Engineering Session";
+  }
   if (
+    !isAg1 &&
     pathPhase === "Starting workstation" &&
     footer &&
     !/Starting/i.test(footer)
   ) {
     footer = `☁ ${product.region || "europe-west4"} · Engineering Image · Starting`;
   }
-  if (pathPhase === "Infrastructure failure") {
+  if (!isAg1 && pathPhase === "Infrastructure failure") {
     footer = product.disposed ? "☁ Disposed ✓" : "☁ Cleaning up…";
   }
-  if (footer) {
-    lines.push(fitLine(footer, columns));
+  lines.push(
+    fitLine(`│${padVisible(` ${style.dim(footer || "")}`, inner)}│`, columns),
+  );
+  lines.push(fitLine(`╰${"─".repeat(inner)}╯`, columns));
+  return lines.slice(0, maxHeight);
+}
+
+/**
+ * Narrow/mid AG1 stacked cockpit — same truth model, denser vertical hierarchy.
+ *
+ * @param {ReturnType<typeof createEmptyStudioState>} state
+ * @param {{ rows: number, columns: number }} viewport
+ * @returns {string[]}
+ */
+export function buildCompactAg1Lines(state, viewport) {
+  const columns =
+    typeof viewport.columns === "number" && viewport.columns > 0
+      ? Math.floor(viewport.columns)
+      : 80;
+  const rows =
+    typeof viewport.rows === "number" && viewport.rows > 0
+      ? Math.floor(viewport.rows)
+      : 24;
+  const maxHeight = Math.max(8, rows - 2);
+  const inner = Math.max(20, columns - 2);
+  const product = state.product || {};
+  const pathPhase = projectAuthoritativePathPhase(state);
+  const branch = product.branch
+    ? String(product.branch).replace(/\s+@\s+\S+/, "")
+    : null;
+  const dirty = product.dirtySummary ? String(product.dirtySummary) : null;
+  const projectName =
+    typeof product.projectName === "string" ? product.projectName : null;
+
+  /** @type {string[]} */
+  const lines = [];
+  lines.push(fitLine(`╭${"─".repeat(inner)}╮`, columns));
+  const head = [
+    style.bold(style.cyan("PATH ● Code")),
+    style.dim([projectName, branch, dirty].filter(Boolean).join(" · ")),
+  ]
+    .filter((p) => visibleWidth(p) > 0)
+    .join("  ");
+  lines.push(fitLine(`│${padVisible(` ${head}`, inner)}│`, columns));
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+
+  lines.push(fitLine(`│${padVisible(` ${style.bold(style.cyan("PROJECT"))}`, inner)}│`, columns));
+  const entries = Array.isArray(product.projectEntries) ? product.projectEntries : [];
+  if (entries.length === 0) {
+    lines.push(fitLine(`│${padVisible(style.dim("  (engineering…)"), inner)}│`, columns));
+  } else {
+    for (const e of entries.slice(0, 4)) {
+      lines.push(fitLine(`│${padVisible(`  ${e.path}`, inner)}│`, columns));
+      lines.push(fitLine(`│${padVisible(style.dim(`    ${e.role}`), inner)}│`, columns));
+    }
   }
+
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+  lines.push(fitLine(`│${padVisible(` ${style.bold(style.cyan("PATH"))}`, inner)}│`, columns));
+  const mark = pathGlyph(pathPhase);
+  lines.push(
+    fitLine(
+      `│${padVisible(`  ${style.cyan(`${mark} ${pathPhase}`)}`, inner)}│`,
+      columns,
+    ),
+  );
+  const activities = Array.isArray(product.ag1Activities)
+    ? product.ag1Activities.slice(-4)
+    : [];
+  for (const label of activities) {
+    lines.push(
+      fitLine(
+        `│${padVisible(style.dim(`  · ${label}`), inner)}│`,
+        columns,
+      ),
+    );
+  }
+
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+  lines.push(fitLine(`│${padVisible(` ${style.bold(style.cyan("EVIDENCE"))}`, inner)}│`, columns));
+  for (const ev of buildEvidenceLines(state).slice(0, 8)) {
+    lines.push(fitLine(`│${padVisible(`  ${ev}`, inner)}│`, columns));
+  }
+
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+  const sec = state.heartbeat
+    ? Math.floor(state.heartbeat.elapsedMs / 1000)
+    : null;
+  const footer =
+    sec != null
+      ? `PATH Engineering Session · ${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`
+      : "PATH Engineering Session";
+  lines.push(fitLine(`│${padVisible(` ${style.dim(footer)}`, inner)}│`, columns));
+  lines.push(fitLine(`╰${"─".repeat(inner)}╯`, columns));
   return lines.slice(0, maxHeight);
 }
 
@@ -468,6 +696,12 @@ export function buildInlineCardLines(state, viewport) {
     return buildLivingProductLines(state, viewport);
   }
 
+  // Mid-width / narrow: stacked framed layout for AG1 (any width below wide).
+  // Below 72 columns still uses the compact cockpit — never legacy card dump for AG1.
+  if (state.product?.ag1 === true) {
+    return buildCompactAg1Lines(state, viewport);
+  }
+
   const rows =
     typeof viewport.rows === "number" && viewport.rows > 0
       ? Math.floor(viewport.rows)
@@ -477,12 +711,12 @@ export function buildInlineCardLines(state, viewport) {
 
   /** @type {string[]} */
   const header = [];
-  header.push(fitLine("PATH STUDIO — live", columns));
+  header.push(fitLine(style.bold(style.cyan("PATH ● Code")), columns));
   header.push(
     fitLine(
       state.sessionId
-        ? `session: ${state.sessionId}`
-        : "session: (waiting for first event)",
+        ? style.dim(`session: ${state.sessionId}`)
+        : style.dim("session: (waiting for first event)"),
       columns,
     ),
   );
@@ -616,6 +850,49 @@ export function assembleAnsiFrame(lines, opts) {
 }
 
 /**
+ * Assemble a line-diff frame for the managed alternate-screen surface.
+ * Positions only changed rows; never console.clear().
+ *
+ * @param {string[]} lines
+ * @param {string[]} prevLines
+ * @param {{ columns: number, forceFull?: boolean }} opts
+ */
+export function assembleAltScreenDiff(lines, prevLines, opts) {
+  const columns =
+    typeof opts.columns === "number" && opts.columns > 0
+      ? Math.floor(opts.columns)
+      : 80;
+  const forceFull = opts.forceFull === true;
+  /** @type {string[]} */
+  const parts = [HIDE_CURSOR];
+  if (forceFull || !prevLines || prevLines.length === 0) {
+    parts.push(HOME);
+    for (let i = 0; i < lines.length; i += 1) {
+      parts.push(CR, ERASE_LINE, lines[i] ?? "", "\n");
+    }
+    parts.push(ERASE_BELOW);
+    return parts.join("");
+  }
+  const max = Math.max(lines.length, prevLines.length);
+  for (let i = 0; i < max; i += 1) {
+    const next = lines[i];
+    const prev = prevLines[i];
+    if (next === undefined) {
+      // Erase leftover taller frame rows.
+      parts.push(`\u001b[${i + 1};1H`, ERASE_LINE);
+      continue;
+    }
+    if (prev !== next) {
+      parts.push(`\u001b[${i + 1};1H`, ERASE_LINE, fitLine(next, columns));
+    }
+  }
+  if (lines.length < prevLines.length) {
+    parts.push(`\u001b[${lines.length + 1};1H`, ERASE_BELOW);
+  }
+  return parts.join("");
+}
+
+/**
  * @param {{
  *   stdout?: NodeJS.WritableStream & {
  *     isTTY?: boolean,
@@ -628,6 +905,7 @@ export function assembleAnsiFrame(lines, opts) {
  *   enabled?: boolean,
  *   writePlain?: (text: string) => void,
  *   decorateGate2Accepted?: boolean,
+ *   alternateScreen?: boolean,
  * }} [options]
  */
 export function createInlineStudioRenderer(options = {}) {
@@ -636,6 +914,7 @@ export function createInlineStudioRenderer(options = {}) {
     typeof options.enabled === "boolean"
       ? options.enabled
       : stdout.isTTY === true;
+  const useAltScreen = options.alternateScreen === true && enabled === true;
 
   /** @type {ReturnType<typeof createEmptyStudioState>} */
   let state = createEmptyStudioState();
@@ -643,6 +922,9 @@ export function createInlineStudioRenderer(options = {}) {
   let prevHeight = 0;
   let needsReanchor = false;
   let cursorHidden = false;
+  let altScreenActive = false;
+  /** @type {string[]} */
+  let prevLines = [];
   /** @type {((this: any) => void) | null} */
   let resizeListener = null;
   let writeCount = 0;
@@ -650,6 +932,11 @@ export function createInlineStudioRenderer(options = {}) {
   const diagnostics = [];
   const frames = [];
   const decorateGate2Accepted = options.decorateGate2Accepted === true;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let pendingTimer = null;
+  let lastFrameAt = 0;
+  let dirty = false;
+  let forceFull = false;
 
   function readViewport() {
     const rows =
@@ -672,6 +959,13 @@ export function createInlineStudioRenderer(options = {}) {
     resizeListener = null;
   }
 
+  function clearPending() {
+    if (pendingTimer !== null) {
+      clearTimeout(pendingTimer);
+      pendingTimer = null;
+    }
+  }
+
   function restoreCursor() {
     if (!enabled) {
       cursorHidden = false;
@@ -685,14 +979,40 @@ export function createInlineStudioRenderer(options = {}) {
     cursorHidden = false;
   }
 
+  function exitAltScreen() {
+    if (!altScreenActive) return;
+    try {
+      stdout.write(`${SHOW_CURSOR}${EXIT_ALT}${RESET_GRAPHICS}`);
+    } catch {
+      // best effort
+    }
+    altScreenActive = false;
+    cursorHidden = false;
+  }
+
+  /**
+   * Idempotent full restore for this renderer instance.
+   */
+  function restoreTerminalState() {
+    clearPending();
+    detachResize();
+    exitAltScreen();
+    if (cursorHidden) restoreCursor();
+    prevLines = [];
+    prevHeight = 0;
+    active = false;
+    dirty = false;
+  }
+
   function emitFrame(frame) {
     writeCount += 1;
     frames.push(frame);
     stdout.write(frame);
   }
 
-  function redraw() {
+  function paintNow() {
     if (!enabled || !active) return;
+    dirty = false;
     const viewport = readViewport();
     const lines = buildInlineCardLines(state, viewport);
     const text = `${lines.join("\n")}\n`;
@@ -702,6 +1022,28 @@ export function createInlineStudioRenderer(options = {}) {
         throw new Error("PI-I: visible width exceeds columns");
       }
     }
+
+    if (useAltScreen) {
+      if (!altScreenActive) {
+        emitFrame(`${ENTER_ALT}${HIDE_CURSOR}${HOME}`);
+        altScreenActive = true;
+        cursorHidden = true;
+        forceFull = true;
+      }
+      const frame = assembleAltScreenDiff(lines, prevLines, {
+        columns: viewport.columns,
+        forceFull: forceFull || needsReanchor || prevLines.length === 0,
+      });
+      emitFrame(frame);
+      prevLines = lines.slice();
+      prevHeight = lines.length;
+      needsReanchor = false;
+      forceFull = false;
+      lastFrameAt = Date.now();
+      return;
+    }
+
+    // Legacy in-place scrollback mode (tests / opt-out).
     const frame = assembleAnsiFrame(lines, {
       prevHeight,
       reanchor: needsReanchor,
@@ -710,39 +1052,81 @@ export function createInlineStudioRenderer(options = {}) {
     cursorHidden = true;
     emitFrame(frame);
     prevHeight = lines.length;
+    prevLines = lines.slice();
     needsReanchor = false;
+    lastFrameAt = Date.now();
+  }
+
+  function scheduleFrame() {
+    if (!enabled || !active) return;
+    dirty = true;
+    // Legacy in-place mode: paint every event immediately (existing PI proofs).
+    // Alternate-screen mode: coalesce bursts to a max frame rate.
+    if (!useAltScreen || lastFrameAt === 0) {
+      clearPending();
+      paintNow();
+      return;
+    }
+    if (pendingTimer !== null) return;
+    const elapsed = Date.now() - lastFrameAt;
+    const wait = Math.max(0, FRAME_MIN_MS - elapsed);
+    pendingTimer = setTimeout(() => {
+      pendingTimer = null;
+      if (dirty && active) paintNow();
+    }, wait);
+  }
+
+  function redraw() {
+    // Immediate path used by resize; still respects coalesce via schedule when bursty.
+    clearPending();
+    if (active && enabled) paintNow();
   }
 
   function begin() {
-    // Tear down any prior cycle handles before arming a new one (R2-K / 1e / 1f).
     detachResize();
-    if (cursorHidden) restoreCursor();
+    clearPending();
+    restoreTerminalState();
     state = createEmptyStudioState();
     active = true;
     prevHeight = 0;
+    prevLines = [];
     needsReanchor = false;
+    forceFull = true;
     writeCount = 0;
     frames.length = 0;
+    lastFrameAt = 0;
     if (enabled && typeof stdout.on === "function") {
       resizeListener = () => {
-        if (active) redraw();
+        if (!active) return;
+        forceFull = true;
+        needsReanchor = true;
+        redraw();
       };
       stdout.on("resize", resizeListener);
     }
   }
 
   /**
-   * End the card cycle: detach resize, restore cursor, leave final cards on screen.
-   * Safe on every terminal path (completion / refusal / escalation / error / SIGINT).
+   * End the card cycle: leave alt screen, restore cursor.
+   * Final durable summary is printed by the host on the normal screen.
    */
   function finish() {
-    detachResize();
-    if (cursorHidden) {
-      restoreCursor();
+    clearPending();
+    if (dirty && active && enabled) {
+      try {
+        paintNow();
+      } catch {
+        // best effort final paint
+      }
     }
+    detachResize();
+    exitAltScreen();
+    if (cursorHidden) restoreCursor();
     active = false;
     prevHeight = 0;
+    prevLines = [];
     needsReanchor = false;
+    dirty = false;
   }
 
   /**
@@ -750,13 +1134,11 @@ export function createInlineStudioRenderer(options = {}) {
    */
   function onEvent(event) {
     if (!active) {
-      // Auto-begin on first event if the host forgot begin() — still tears down.
       begin();
     }
     applyStudioEvent(state, event, { decorateGate2Accepted });
 
     if (!enabled) {
-      // Non-TTY: plain sequential progress lines (no ANSI cursor codes).
       const plain = renderSessionEventHuman(event);
       if (!plain) return;
       if (typeof options.writePlain === "function") {
@@ -769,15 +1151,16 @@ export function createInlineStudioRenderer(options = {}) {
       return;
     }
 
-    redraw();
+    scheduleFrame();
   }
 
   function noteExternalWrite() {
     if (!active || !enabled) return;
-    // Collision guard (1d): next redraw re-anchors instead of cursor-up.
     needsReanchor = true;
+    forceFull = true;
     prevHeight = 0;
-    if (cursorHidden) {
+    prevLines = [];
+    if (cursorHidden && !altScreenActive) {
       restoreCursor();
     }
   }
@@ -802,10 +1185,12 @@ export function createInlineStudioRenderer(options = {}) {
       prevHeight,
       needsReanchor,
       cursorHidden,
+      altScreenActive,
       writeCount,
       frames: frames.slice(),
       diagnostics: diagnostics.slice(),
       hasResizeListener: resizeListener !== null,
+      useAltScreen,
     };
   }
 
@@ -817,10 +1202,10 @@ export function createInlineStudioRenderer(options = {}) {
     noteDiagnostic,
     finish,
     dispose: () => finish(),
+    restoreTerminalState,
     isActive,
     getState,
     stats,
-    // Exported for SIGINT / cycle cleanup parity with finish.
     restoreCursor,
     detachResize,
   };

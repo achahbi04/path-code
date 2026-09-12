@@ -13,6 +13,7 @@ import {
   mkdir,
   readlink,
   symlink,
+  unlink,
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -20,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   resolveCheckoutRoot,
-  resolveRuntimePrerequisites,
+  assertPathPackagePresent,
 } from "./pathcode-cli/paths.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -37,23 +38,26 @@ export async function runInstallPathcodeLocal(options = {}) {
     : argv.includes("--check")
       ? "check"
       : "usage";
+  const force = argv.includes("--force");
 
   if (mode === "usage") {
     process.stdout.write(`Usage:
   node scripts/install-pathcode-local.mjs --check
   node scripts/install-pathcode-local.mjs --install
+  node scripts/install-pathcode-local.mjs --install --force
 
 Creates only ~/.local/bin/pathcode as a user-local symlink to this checkout.
 Does not modify shell startup files, PATH, credentials, or other commands.
 This is a development link, not an immutable installed release.
+--force replaces an existing pathcode symlink that points elsewhere.
 `);
     return 2;
   }
 
   const root = resolveCheckoutRoot();
-  const prereq = resolveRuntimePrerequisites(root);
-  if (!prereq.ok) {
-    process.stderr.write(`${prereq.message}\n`);
+  const present = assertPathPackagePresent(root);
+  if (!present.ok) {
+    process.stderr.write(`${present.message}\n`);
     return 2;
   }
 
@@ -120,10 +124,22 @@ This is a development link, not an immutable installed release.
       remindPath(binDir);
       return 0;
     }
-    process.stderr.write(
-      `Refusing to overwrite different symlink at ${linkPath} -> ${resolved}\n`,
-    );
-    return 1;
+    if (!force) {
+      process.stderr.write(
+        `Refusing to overwrite different symlink at ${linkPath} -> ${resolved}\n`,
+      );
+      process.stderr.write("Re-run with --force to replace it.\n");
+      return 1;
+    }
+    try {
+      await unlink(linkPath);
+    } catch (err) {
+      process.stderr.write(
+        `Cannot remove existing symlink ${linkPath}: ${err && err.code}\n`,
+      );
+      return 1;
+    }
+    existing = null;
   }
 
   try {

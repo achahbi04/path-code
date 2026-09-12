@@ -1,5 +1,6 @@
 /**
- * AG1 — resolve and guard the project-owned Antigravity virtualenv Python.
+ * AG1 — resolve and guard the Antigravity virtualenv Python.
+ * AG3: venv lives under PATH_RUNTIME_ROOT (never inside the package tree).
  * Never fall back to global/system python/python3/py.
  */
 
@@ -8,24 +9,52 @@ import { dirname, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { resolveCheckoutRoot } from "../paths.mjs";
+import {
+  resolvePathPackageRoot,
+  resolvePathRuntimeRoot,
+} from "../paths.mjs";
 
 export const AG1_SDK_PIN = "google-antigravity==0.1.16";
-export const AG1_VENV_REL = join(".path-code-tmp", "ag1-venv");
+
+/** @deprecated AG3 uses PATH_RUNTIME_ROOT; kept for test string checks. */
+export const AG1_VENV_REL = "ag1-venv";
 
 /**
- * @param {string} [checkoutRoot]
+ * @param {{
+ *   packageRoot?: string,
+ *   runtimeRoot?: string,
+ *   checkoutRoot?: string,
+ * }} [options]
  */
-export function resolveAg1VenvRoot(checkoutRoot = resolveCheckoutRoot()) {
-  return resolve(checkoutRoot, AG1_VENV_REL);
+export function resolveAg1VenvRoot(options = {}) {
+  // Backward-compat: if a string was passed historically as checkoutRoot.
+  if (typeof options === "string") {
+    const runtimeRoot = resolvePathRuntimeRoot({ packageRoot: options });
+    return join(runtimeRoot, AG1_VENV_REL);
+  }
+  const packageRoot =
+    options.packageRoot ??
+    options.checkoutRoot ??
+    resolvePathPackageRoot();
+  const runtimeRoot =
+    options.runtimeRoot ?? resolvePathRuntimeRoot({ packageRoot });
+  return join(runtimeRoot, AG1_VENV_REL);
 }
 
 /**
  * Absolute path to the venv Python executable (platform-aware).
- * @param {string} [checkoutRoot]
+ * @param {string | {
+ *   packageRoot?: string,
+ *   runtimeRoot?: string,
+ *   checkoutRoot?: string,
+ * }} [optionsOrCheckout]
  */
-export function resolveAg1PythonExecutable(checkoutRoot = resolveCheckoutRoot()) {
-  const venvRoot = resolveAg1VenvRoot(checkoutRoot);
+export function resolveAg1PythonExecutable(optionsOrCheckout) {
+  const options =
+    typeof optionsOrCheckout === "string"
+      ? { checkoutRoot: optionsOrCheckout }
+      : optionsOrCheckout ?? {};
+  const venvRoot = resolveAg1VenvRoot(options);
   if (process.platform === "win32") {
     return join(venvRoot, "Scripts", "python.exe");
   }
@@ -33,12 +62,12 @@ export function resolveAg1PythonExecutable(checkoutRoot = resolveCheckoutRoot())
 }
 
 /**
- * Absolute path to the JSONL bridge entry script.
- * @param {string} [checkoutRoot]
+ * Absolute path to the JSONL bridge entry script (package asset).
+ * @param {string} [packageRoot]
  */
-export function resolveAg1BridgeScript(checkoutRoot = resolveCheckoutRoot()) {
+export function resolveAg1BridgeScript(packageRoot = resolvePathPackageRoot()) {
   return join(
-    checkoutRoot,
+    packageRoot,
     "scripts",
     "pathcode-cli",
     "ag1",
@@ -64,32 +93,30 @@ function isUnderVenv(pythonPath, venvRoot) {
  *
  * @param {{
  *   checkoutRoot?: string,
+ *   packageRoot?: string,
+ *   runtimeRoot?: string,
  *   pythonPath?: string,
  * }} [options]
- * @returns {{
- *   ok: true,
- *   pythonPath: string,
- *   venvRoot: string,
- *   prefix: string,
- *   package: string,
- * } | {
- *   ok: false,
- *   code: string,
- *   message: string,
- * }}
  */
 export function assertAg1VenvReady(options = {}) {
-  const checkoutRoot = options.checkoutRoot ?? resolveCheckoutRoot();
-  const venvRoot = resolveAg1VenvRoot(checkoutRoot);
-  const pythonPath = options.pythonPath ?? resolveAg1PythonExecutable(checkoutRoot);
+  const packageRoot =
+    options.packageRoot ??
+    options.checkoutRoot ??
+    resolvePathPackageRoot();
+  const runtimeRoot =
+    options.runtimeRoot ?? resolvePathRuntimeRoot({ packageRoot });
+  const venvRoot = resolveAg1VenvRoot({ packageRoot, runtimeRoot });
+  const pythonPath =
+    options.pythonPath ??
+    resolveAg1PythonExecutable({ packageRoot, runtimeRoot });
 
   if (!existsSync(pythonPath)) {
     return {
       ok: false,
       code: "AG1_VENV_MISSING",
       message:
-        `AG1 virtualenv Python not found at ${pythonPath}. ` +
-        `Create it and install ${AG1_SDK_PIN} into .path-code-tmp/ag1-venv.`,
+        `PATH engine runtime not ready. ` +
+        `PATH will attempt automatic repair on next startup.`,
     };
   }
 
@@ -98,14 +125,12 @@ export function assertAg1VenvReady(options = {}) {
       ok: false,
       code: "AG1_VENV_WRONG_INTERPRETER",
       message:
-        `Refusing interpreter outside AG1 venv: ${pythonPath} (expected under ${venvRoot}).`,
+        `Refusing interpreter outside PATH runtime venv: ${pythonPath}.`,
     };
   }
 
-  // Reject bare names that would rely on PATH activation.
   const base = pythonPath.split(/[/\\]/).pop() ?? "";
   if (base === "python" || base === "python3" || base === "py") {
-    // Absolute path ending in python/python3 is fine for venv; bare relative names are not.
     if (!pythonPath.includes(sep) && !pythonPath.includes("/")) {
       return {
         ok: false,
@@ -132,7 +157,7 @@ export function assertAg1VenvReady(options = {}) {
     return {
       ok: false,
       code: "AG1_VENV_SPAWN_FAILED",
-      message: `Failed to spawn AG1 venv python: ${probe.error.message}`,
+      message: `Failed to spawn PATH engine python: ${probe.error.message}`,
     };
   }
   if (probe.status !== 0) {
@@ -140,7 +165,7 @@ export function assertAg1VenvReady(options = {}) {
       ok: false,
       code: "AG1_VENV_IMPORT_FAILED",
       message:
-        `Pinned google-antigravity import failed under ${pythonPath}. ` +
+        `PATH engine import failed. ` +
         `stderr: ${(probe.stderr || "").slice(0, 400)}`,
     };
   }
@@ -167,13 +192,12 @@ export function assertAg1VenvReady(options = {}) {
   }
 
   if (resolvedPrefix !== resolvedVenv && !resolvedPrefix.startsWith(resolvedVenv + sep)) {
-    // sys.prefix should be the venv root.
     if (resolve(prefix) !== resolve(venvRoot)) {
       return {
         ok: false,
         code: "AG1_VENV_PREFIX_MISMATCH",
         message:
-          `Interpreter sys.prefix ${prefix} is not the AG1 venv ${venvRoot}. ` +
+          `Interpreter sys.prefix is not the PATH runtime venv. ` +
           `No silent fallback to global Python.`,
       };
     }
@@ -183,7 +207,7 @@ export function assertAg1VenvReady(options = {}) {
     return {
       ok: false,
       code: "AG1_VENV_IMPORT_FAILED",
-      message: `google-antigravity did not import cleanly from ${pythonPath}.`,
+      message: `Engine package did not import cleanly.`,
     };
   }
 
@@ -199,6 +223,8 @@ export function assertAg1VenvReady(options = {}) {
     ok: true,
     pythonPath: resolve(pythonPath),
     venvRoot: resolve(venvRoot),
+    runtimeRoot: resolve(runtimeRoot),
+    packageRoot: resolve(packageRoot),
     prefix,
     package: `google-antigravity==${version}`,
   };

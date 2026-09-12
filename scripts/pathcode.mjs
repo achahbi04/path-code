@@ -15,13 +15,14 @@ import { join } from "node:path";
 
 import {
   renderHelpText,
-  renderWelcomeScreen,
   COMPACT_NAME,
   ASCII_NAME,
 } from "./pathcode-cli/banner.mjs";
 import {
-  resolveCheckoutRoot,
   resolveRuntimePrerequisites,
+  assertPathPackagePresent,
+  resolveTargetProjectRoot,
+  resolvePathPackageRoot,
 } from "./pathcode-cli/paths.mjs";
 import {
   createPromptSession,
@@ -37,8 +38,16 @@ import {
   createInlineStudioRenderer,
   installCollisionGuard,
 } from "./pathcode-cli/inline-studio.mjs";
+import {
+  installTerminalRestoreGuards,
+  restoreTerminal,
+  setActiveTerminalCleanup,
+} from "./pathcode-cli/terminal-restore.mjs";
+import { ensureAg1Runtime } from "./pathcode-cli/ag1/runtime-bootstrap.mjs";
+import { admitPrimaryCheckout } from "./pathcode-cli/ag1/admission.mjs";
+import { basename } from "node:path";
 
-const root = resolveCheckoutRoot();
+const root = resolvePathPackageRoot();
 
 /**
  * @param {readonly string[]} argv
@@ -196,6 +205,24 @@ async function delegateLegacy(args) {
 }
 
 /**
+ * Quiet AG3 product startup — no provider/engine branding.
+ * @param {{
+ *   unicode: boolean,
+ *   plain: boolean,
+ *   projectName: string,
+ *   branch: string | null,
+ *   clean: boolean | null,
+ * }} info
+ */
+function renderQuietStartup(info) {
+  const name = info.unicode && !info.plain ? COMPACT_NAME : ASCII_NAME;
+  const branch = info.branch || "detached";
+  const clean =
+    info.clean === true ? "clean" : info.clean === false ? "dirty" : "unknown";
+  return `${name}\n${info.projectName} · ${branch} · ${clean}\n\n${name} > `;
+}
+
+/**
  * @param {boolean} unicode
  * @param {boolean} plain
  */
@@ -270,28 +297,68 @@ export async function runPathcodeMain(argv, testIo = {}) {
     return await delegateLegacy(args.rest);
   }
 
-  // Bare launch: welcome. No key, no network, no workspace scan.
+  // Bare launch: quiet product shell. Bootstrap runtime; discover project.
   const streams = { stdin, stdout, stderr };
   const interactive = isInteractiveTty(streams);
 
+  const packageOk = assertPathPackagePresent(root);
+  if (!packageOk.ok) {
+    stderr.write(`${packageOk.message}\n`);
+    return 2;
+  }
+
+  const project = resolveTargetProjectRoot(process.cwd());
+  if (!project.ok) {
+    stderr.write(`${project.message}\n`);
+    return 2;
+  }
+  const projectRoot = project.projectRoot;
+  const projectName = basename(projectRoot);
+
+  /** @type {{ branch: string | null, clean: boolean | null }} */
+  let gitSummary = { branch: null, clean: null };
+  const admission = admitPrimaryCheckout(projectRoot);
+  if (admission.ok) {
+    gitSummary = { branch: admission.branch, clean: true };
+  } else if (admission.code === "DIRTY_PRIMARY_TREE") {
+    gitSummary = {
+      branch: typeof admission.branch === "string" ? admission.branch : null,
+      clean: false,
+    };
+  } else if (admission.code === "DETACHED_HEAD_BLOCKED") {
+    gitSummary = { branch: null, clean: null };
+  }
+
+  // Quiet runtime bootstrap (venv under PATH_RUNTIME_ROOT). Failures surface later.
+  try {
+    await ensureAg1Runtime({ packageRoot: root });
+  } catch {
+    // non-fatal at shell open; task start will re-check
+  }
+
   if (!interactive) {
     stdout.write(
-      renderWelcomeScreen({ columns, unicode, plain: true }).replace(
-        /\nPATH [●*] Code > $/,
-        "\n",
-      ),
+      renderQuietStartup({
+        unicode,
+        plain: true,
+        projectName,
+        branch: gitSummary.branch,
+        clean: gitSummary.clean,
+      }).replace(/\nPATH [●*] Code > $/, "\n"),
     );
     stdout.write(
-      "(Non-interactive stdout: showing welcome only. Use a TTY for /trial.)\n",
+      "(Non-interactive: showing project identity only. Use a TTY for engineering.)\n",
     );
     return 0;
   }
 
   stdout.write(
-    renderWelcomeScreen({
-      columns,
+    renderQuietStartup({
       unicode,
       plain,
+      projectName,
+      branch: gitSummary.branch,
+      clean: gitSummary.clean,
     }),
   );
 
@@ -346,6 +413,41 @@ export async function runPathcodeMain(argv, testIo = {}) {
   const inlineStudio = createInlineStudioRenderer({
     stdout: streams.stdout,
     enabled: ttyInline,
+    alternateScreen: true,
+  });
+
+  /** @type {AbortController | null} */
+  let cycleAbort = null;
+
+  installTerminalRestoreGuards({
+    onSigint: () => {
+      if (
+        inlineStudio.isActive() ||
+        (typeof prompt?.isCycleActive === "function" && prompt.isCycleActive())
+      ) {
+        if (typeof prompt.requestCycleCancel === "function") {
+          prompt.requestCycleCancel();
+        }
+        try {
+          cycleAbort?.abort();
+        } catch {
+          // ignore
+        }
+        return "handled";
+      }
+      return "exit";
+    },
+  });
+  setActiveTerminalCleanup(() => {
+    try {
+      if (typeof inlineStudio.restoreTerminalState === "function") {
+        inlineStudio.restoreTerminalState();
+      } else {
+        inlineStudio.finish();
+      }
+    } catch {
+      // ignore
+    }
   });
 
   const eventsMode = args.events === "ndjson" ? "both" : "human";
@@ -367,13 +469,15 @@ export async function runPathcodeMain(argv, testIo = {}) {
     ? installCollisionGuard(prompt, inlineStudio)
     : () => {};
 
-  /** @param {() => Promise<unknown> | unknown} cycle */
+  /** @param {(signal: AbortSignal) => Promise<unknown> | unknown} cycle */
   async function runCycle(cycle) {
+    cycleAbort = new AbortController();
     if (typeof prompt.beginCycle === "function") prompt.beginCycle();
     if (ttyInline) inlineStudio.begin();
     try {
-      return await cycle();
+      return await cycle(cycleAbort.signal);
     } finally {
+      cycleAbort = null;
       if (ttyInline) inlineStudio.finish();
       if (typeof prompt.endCycle === "function") prompt.endCycle();
       if (typeof prompt.clearStop === "function") prompt.clearStop();
@@ -514,13 +618,21 @@ export async function runPathcodeMain(argv, testIo = {}) {
       // Any other line is an engineering task for the project in this directory.
       // AG1: local default path is Antigravity via PATH gateway (not Gate-1 OpenAI).
       // Cloud execution remains the historical GC1 general-session path.
-      const prereq = resolveRuntimePrerequisites(root);
-      if (!prereq.ok) {
-        prompt.write(`${prereq.message}\n`);
+      const packageCheck = assertPathPackagePresent(root);
+      if (!packageCheck.ok) {
+        prompt.write(`${packageCheck.message}\n`);
         redrawPrompt(prompt, unicode, plain, sessionStats);
         continue;
       }
-      const cycleNote = await runCycle(async () => {
+      if (args.execution === "cloud") {
+        const prereq = resolveRuntimePrerequisites(root);
+        if (!prereq.ok) {
+          prompt.write(`${prereq.message}\n`);
+          redrawPrompt(prompt, unicode, plain, sessionStats);
+          continue;
+        }
+      }
+      const cycleNote = await runCycle(async (signal) => {
         try {
           let sessionResult;
           if (args.execution === "cloud") {
@@ -531,7 +643,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
             sessionResult = await runner(prompt, {
               streams,
               taskText: cmd,
-              projectRoot: process.cwd(),
+              projectRoot,
               modelId,
               autonomyMode,
               unicode,
@@ -546,6 +658,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
               },
               sessionEventEmit: eventSink.emit,
               cardsOwnProgress: ttyInline,
+              signal,
             });
           } else {
             const { runAntigravityEngineeringSession } = await import(
@@ -556,12 +669,13 @@ export async function runPathcodeMain(argv, testIo = {}) {
             sessionResult = await runner(prompt, {
               streams,
               taskText: cmd,
-              projectRoot: process.cwd(),
+              projectRoot,
               unicode,
               checkoutRoot: root,
               sessionEventEmit: eventSink.emit,
               cardsOwnProgress: ttyInline,
               sessionBaseCommit: sessionStats.sessionBaseCommit,
+              signal,
             });
           }
           lastExitCode = sessionResult.exitCode ?? 1;
@@ -586,7 +700,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
           ) {
             sessionStats.modelCallCount += sessionResult.modelCalls;
           }
-          return null;
+          return sessionResult;
         } catch (err) {
           const message = err && err.message ? err.message : "unknown";
           // Structured failure into the living surface first; human recovery
@@ -605,6 +719,14 @@ export async function runPathcodeMain(argv, testIo = {}) {
         prompt.write(
           `Internal error (session continues): ${cycleNote.__internalErrorMessage}\n`,
         );
+      } else if (
+        cycleNote &&
+        typeof cycleNote === "object" &&
+        typeof cycleNote.durableSummary === "string" &&
+        cycleNote.durableSummary.trim()
+      ) {
+        // Durable summary lands in normal scrollback after alternate-screen exit.
+        prompt.write(`\n${cycleNote.durableSummary}`);
       }
       redrawPrompt(prompt, unicode, plain, sessionStats);
       void lastExitCode;
@@ -615,7 +737,9 @@ export async function runPathcodeMain(argv, testIo = {}) {
     // Scrub session credential from the bag on leave.
     sessionCredential = null;
     uninstallCollisionGuard();
+    setActiveTerminalCleanup(null);
     if (ttyInline) inlineStudio.finish();
+    restoreTerminal({ stdout: streams.stdout, stdin: streams.stdin });
     if (eventsOut !== null) {
       eventsOut.close();
       eventsOut = null;

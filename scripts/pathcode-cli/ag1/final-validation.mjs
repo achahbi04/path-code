@@ -28,10 +28,12 @@ import { buildTrialChildEnvironment } from "../child-env.mjs";
  */
 function runPreparedRequest(request, signal) {
   return new Promise((resolve) => {
-    const childEnv = {
-      ...request.env,
-      PATH: process.env.PATH ?? "",
-    };
+  const childEnv = {
+    ...request.env,
+    PATH: process.env.PATH ?? "",
+    GIT_TERMINAL_PROMPT: "0",
+    PATHCODE_NONINTERACTIVE: "1",
+  };
     const child = spawn(request.executable, request.argv, {
       cwd: request.cwd,
       env: childEnv,

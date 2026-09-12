@@ -9,15 +9,41 @@ import {
   rmSync,
   existsSync,
   mkdtempSync,
+  symlinkSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const CHECKOUT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const AG1 = join(CHECKOUT_ROOT, "scripts/pathcode-cli/ag1");
 const SCRATCH_PARENT = join(CHECKOUT_ROOT, ".path-code-tmp", "ag1-test-scratch");
+const TEST_RUNTIME = join(CHECKOUT_ROOT, ".path-code-tmp", "ag1-test-runtime");
+
+// AG3: point AG1 venv resolution at a test runtime rooted beside the legacy venv.
+beforeAll(() => {
+  mkdirSync(TEST_RUNTIME, { recursive: true });
+  const link = join(TEST_RUNTIME, "ag1-venv");
+  const legacy = join(CHECKOUT_ROOT, ".path-code-tmp", "ag1-venv");
+  try {
+    if (!existsSync(link) && existsSync(legacy)) {
+      symlinkSync(legacy, link);
+    }
+  } catch {
+    // ignore
+  }
+  writeFileSync(
+    join(TEST_RUNTIME, "runtime.marker.json"),
+    JSON.stringify({
+      pathVersion: "0.1.0",
+      sdkPin: "google-antigravity==0.1.16",
+      venv: link,
+    }),
+    "utf8",
+  );
+  process.env.PATHCODE_RUNTIME_ROOT = TEST_RUNTIME;
+});
 
 async function load(name: string) {
   return import(`${pathToFileURL(join(AG1, name)).href}?b=${randomUUID()}`);

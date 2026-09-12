@@ -94,6 +94,7 @@ export function createEmptyStudioState() {
       projectEntries: [],
       branch: null,
       dirtySummary: null,
+      projectName: null,
       editableCount: 0,
       contextCount: 0,
       hydrationFiles: null,
@@ -354,6 +355,9 @@ export function applyStudioEvent(state, event, opts = {}) {
       setCard(state, "preflight", "done", `${branch}; ${dirty}`);
       state.product.branch = branch;
       state.product.dirtySummary = dirty;
+      if (typeof event.projectName === "string" && event.projectName.trim()) {
+        state.product.projectName = event.projectName.trim();
+      }
       setPathPhase(state, "Scoping");
       break;
     }

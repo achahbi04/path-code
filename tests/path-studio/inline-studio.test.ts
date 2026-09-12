@@ -143,8 +143,8 @@ describe("PI-A / PI-B in-place TTY updates", () => {
     expect(joined).toMatch(/\u001b\[\d+A/); // cursor-up after first frame
     expect(joined).toContain("Gate 2");
     expect(joined).toContain("accepted");
-    // Not a fresh unbounded stack of "PATH STUDIO" headers without cursor-up.
-    const headers = joined.split("PATH STUDIO — live").length - 1;
+    // Not a fresh unbounded stack of "PATH ● Code" headers without cursor-up.
+    const headers = joined.split("PATH ● Code").length - 1;
     expect(headers).toBe(events.length);
     // After first frame, subsequent frames use cursor-up (in-place).
     const upCount = (joined.match(/\u001b\[\d+A/g) ?? []).length;

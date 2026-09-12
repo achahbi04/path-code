@@ -4,10 +4,11 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
+import { resolve, basename } from "node:path";
 
 import { createAntigravityEngineeringAgent } from "./bridge-client.mjs";
 import { assertAg1VenvReady } from "./venv-guard.mjs";
+import { ensureAg1Runtime } from "./runtime-bootstrap.mjs";
 import { proveLocalSandboxConfinement } from "./sandbox-proof.mjs";
 import { detectAg1Auth } from "./auth-detect.mjs";
 import { hydrateAg1CloudEnv } from "./cloud-env.mjs";
@@ -122,8 +123,26 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     mode: "ag1",
   });
 
+  const boot = await ensureAg1Runtime({
+    ...(options.checkoutRoot ? { packageRoot: options.checkoutRoot } : {}),
+  });
+  if (!boot.ok) {
+    write(`${boot.message}\n`);
+    emit("session.terminal", {
+      disposition: boot.code,
+      summary: scrubEngineIdentity(boot.message),
+    });
+    return {
+      exitCode: 2,
+      outcome: boot.code,
+      classification: "NOT_VERIFIED",
+    };
+  }
+
   const venv = assertAg1VenvReady({
     ...(options.checkoutRoot ? { checkoutRoot: options.checkoutRoot } : {}),
+    ...(boot.runtimeRoot ? { runtimeRoot: boot.runtimeRoot } : {}),
+    ...(boot.pythonPath ? { pythonPath: boot.pythonPath } : {}),
   });
   if (!venv.ok) {
     write(`${venv.message}\n`);
@@ -184,6 +203,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     head: admission.head,
     sessionBaseCommit,
     dirtySummary: "clean",
+    projectName: basename(projectRoot),
   });
 
   const worktree = createTaskWorktree({
@@ -243,6 +263,13 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
 
   const pollCancel = setInterval(() => {
     if (typeof prompt?.isStopped === "function" && prompt.isStopped()) {
+      ac.abort();
+      return;
+    }
+    if (
+      typeof prompt?.isCycleCancelRequested === "function" &&
+      prompt.isCycleCancelRequested()
+    ) {
       ac.abort();
     }
   }, 250);
@@ -387,7 +414,11 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         `${startResult.message || "bridge start failed"}${diagHint ? ` (diag: ${diagHint})` : ""}`,
       ),
     });
-    await agent.close();
+    try {
+      await agent.close();
+    } catch {
+      // ignore
+    }
     return {
       exitCode: 2,
       outcome: startResult.code,
@@ -612,7 +643,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     checks: checkSummaries,
   });
 
-  write(`\n${formatAg2ResultBanner({
+  const durableSummary = formatAg2ResultBanner({
     classification:
       terminalDisposition === "CANCELLED"
         ? "CANCELLED"
@@ -627,7 +658,12 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     primaryUntouched: untouched,
     preservedPath,
     cleanup,
-  })}`);
+  });
+  // When the living TUI owns stdout, defer the durable summary until after
+  // alternate-screen exit (pathcode prints durableSummary).
+  if (!options.cardsOwnProgress) {
+    write(`\n${durableSummary}`);
+  }
 
   emit("session.terminal", {
     disposition:
@@ -641,7 +677,11 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     commitSha,
   });
 
-  await agent.close();
+  try {
+    await agent.close();
+  } catch {
+    // Cancellation/close races must not crash the REPL.
+  }
 
   const exitCode = agentCancelled
     ? 130
@@ -666,6 +706,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     commitSha,
     commitStatus,
     advancesSession,
+    durableSummary,
     sessionBaseCommit: advancesSession
       ? commitSha || worktree.baseline.head
       : null,

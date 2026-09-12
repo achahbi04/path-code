@@ -139,9 +139,16 @@ export function createPromptSession(streams, options = {}) {
   function beginCycle() {
     cycleActive = true;
     cycleCancelInProgress = false;
+    // Mid-cycle SIGINT must cancel engineering even when askLine is not waiting.
+    rl.on("SIGINT", onCycleSigint);
   }
 
   function endCycle() {
+    try {
+      rl.off("SIGINT", onCycleSigint);
+    } catch {
+      // ignore
+    }
     cycleActive = false;
     cycleCancelInProgress = false;
   }
@@ -152,6 +159,25 @@ export function createPromptSession(streams, options = {}) {
 
   function isStopped() {
     return stopRequested || options.signal?.aborted === true;
+  }
+
+  function isCycleCancelRequested() {
+    return cycleCancelInProgress === true;
+  }
+
+  /**
+   * Request cooperative cancel of the active engineering cycle (Ctrl-C).
+   * Does not stop the long-lived REPL.
+   */
+  function requestCycleCancel() {
+    if (!cycleActive) return false;
+    if (cycleCancelInProgress) return true;
+    cycleCancelInProgress = true;
+    return true;
+  }
+
+  function onCycleSigint() {
+    handleSigintCancel(() => {});
   }
 
   /**
@@ -190,6 +216,12 @@ export function createPromptSession(streams, options = {}) {
     mode = "awaiting";
     activePromptId = promptId;
     write(promptText);
+    // askLine owns SIGINT while awaiting; detach the mid-cycle listener.
+    try {
+      rl.off("SIGINT", onCycleSigint);
+    } catch {
+      // ignore
+    }
     const line = await new Promise((resolve) => {
       const onLine = (value) => {
         cleanup();
@@ -224,6 +256,9 @@ export function createPromptSession(streams, options = {}) {
     });
     mode = "idle";
     activePromptId = null;
+    if (cycleActive) {
+      rl.on("SIGINT", onCycleSigint);
+    }
     // Mid-cycle cancel must not permanently stop the living session.
     if (isStopped() && !cycleActive) {
       return null;
@@ -385,6 +420,8 @@ export function createPromptSession(streams, options = {}) {
     beginCycle,
     endCycle,
     isCycleActive,
+    isCycleCancelRequested,
+    requestCycleCancel,
     isStopped,
     close,
     getActivePromptId: () => activePromptId,

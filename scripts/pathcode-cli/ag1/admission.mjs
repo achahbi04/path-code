@@ -80,6 +80,7 @@ export function admitPrimaryCheckout(projectRoot) {
     return {
       ok: false,
       code: "DIRTY_PRIMARY_TREE",
+      branch: branch.stdout,
       message:
         "PATH found uncommitted work in this project.\n" +
         "Commit or stash those changes before starting an autonomous task.",

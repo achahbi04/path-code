@@ -123,7 +123,7 @@ describe("T01 T03 packaging and offline entry", () => {
       const bare = spawnSync(symlinkPath, [], { encoding: "utf8", env });
       expect(bare.status).toBe(0);
       expect(bare.stdout).toMatch(/PATH \* Code|PATH ● Code/);
-      expect(bare.stdout).toContain("Non-interactive stdout");
+      expect(bare.stdout).toContain("Non-interactive:");
       expect(bare.stdout).not.toContain("sk-");
       expect(bare.stderr).toBe("");
 
@@ -134,7 +134,7 @@ describe("T01 T03 packaging and offline entry", () => {
       );
       expect(modeled.status).toBe(0);
       expect(modeled.stdout).toMatch(/PATH \* Code|PATH ● Code/);
-      expect(modeled.stdout).toContain("Non-interactive stdout");
+      expect(modeled.stdout).toContain("Non-interactive:");
       expect(modeled.stderr).toBe("");
 
       const help = spawnSync(symlinkPath, ["--help"], { encoding: "utf8", env });
