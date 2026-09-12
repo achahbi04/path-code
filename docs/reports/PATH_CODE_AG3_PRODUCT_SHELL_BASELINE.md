@@ -45,3 +45,8 @@ npm run check PASS
 - This freeze: `docs/reports/PATH_CODE_AG3_PRODUCT_SHELL_BASELINE.md`
 
 AG1 and AG2 remain accepted and frozen. Do not reopen their architecture from this baseline.
+## Freeze tip
+
+Freeze commit: `e2a6684af2b5bdf6662c4c5b45b3bbc49c1ed68e`
+
+Accepted implementation: `a9224956314cf944f3f8fb27503f780cf41778b7`
