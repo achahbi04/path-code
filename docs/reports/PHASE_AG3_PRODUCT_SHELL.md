@@ -2,6 +2,8 @@
 
 **Result: PASS**
 
+**Frozen as:** PATH CODE — AG3 PRODUCT SHELL BASELINE  
+**Accepted implementation HEAD:** `a9224956314cf944f3f8fb27503f780cf41778b7`  
 **Baseline:** PATH CODE ALPHA — BASELINE 1 (`da2d0d8fd519970624d5955f0954ea0492ef5c4c`)
 
 ## Live acceptance (ONLY `pathcode`)
