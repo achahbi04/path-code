@@ -49,7 +49,7 @@ describe("GC1-c living product surface", () => {
     ];
     for (const e of events) applyStudioEvent(state, e);
 
-    expect(state.product.pathPhase).toBe("Testing");
+    expect(state.product.pathPhase).toBe("Verifying");
     expect(state.product.cloudFooter).toMatch(/Running|Hydrating|Ready|☁/);
     expect(state.cards.gate2.arrived).toBe(false);
 
@@ -62,7 +62,7 @@ describe("GC1-c living product surface", () => {
     expect(text).toContain("PATH");
     expect(text).toContain("EVIDENCE");
     expect(text).toContain("src/greet.ts");
-    expect(text).toMatch(/◆ Testing|◆ Verifying|◆/);
+    expect(text).toMatch(/◆ Verifying|◆ Testing|◆/);
     expect(text).toContain("Gate 1");
     expect(text).toContain("Gate 2          waiting");
     expect(text).not.toMatch(/Gate 2\s+✓/);

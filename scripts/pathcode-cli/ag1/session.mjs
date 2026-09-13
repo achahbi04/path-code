@@ -27,6 +27,10 @@ import {
   setFinalValidationProgressHook,
 } from "./final-validation.mjs";
 import { resolveEngineeringCwd } from "../paths.mjs";
+import {
+  buildBoundedDiffPreview,
+  buildFullResultInspectCommand,
+} from "../ag7/diff-preview.mjs";
 
 /** Default wall clock — finite, not a 5-call micro-budget. */
 export const AG1_DEFAULT_WALL_CLOCK_MS = 1_200_000;
@@ -642,6 +646,15 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       }))
     : [];
 
+  const baselineSha = worktree.baseline.head;
+  const inspectCommand = buildFullResultInspectCommand({
+    baselineSha,
+    resultSha: commitSha,
+  });
+  const preview = buildBoundedDiffPreview(gitResult.diff || "", {
+    changedFiles: gitResult.changedFiles,
+  });
+
   emit("session.engineering.result", {
     classification:
       terminalDisposition === "GIT_IDENTITY_REQUIRED"
@@ -654,9 +667,15 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     sandbox: sandbox.code,
     taskBranch: worktree.taskBranch,
     commitSha,
+    baselineSha,
     commitStatus,
     advancesSession,
     checks: checkSummaries,
+    inspectCommand,
+    preservedArtifact: preservedPath || null,
+    diffPreviewLines: preview.lines,
+    diffPreviewTruncated: preview.truncated,
+    diffPreviewShownFiles: preview.shownFiles,
   });
 
   const durableSummary = formatAg2ResultBanner({
@@ -670,10 +689,13 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     validation,
     taskBranch: worktree.taskBranch,
     commitSha,
+    baselineSha,
     commitStatus,
     primaryUntouched: untouched,
     preservedPath,
     cleanup,
+    inspectCommand,
+    diffPreview: preview,
   });
   // When the living TUI owns stdout, defer the durable summary until after
   // alternate-screen exit (pathcode prints durableSummary).
@@ -776,6 +798,7 @@ function formatAg2ResultBanner(r) {
     }
   }
   if (r.taskBranch) lines.push(`Task branch: ${r.taskBranch}`);
+  if (r.baselineSha) lines.push(`Baseline: ${r.baselineSha}`);
   if (r.commitSha) lines.push(`Commit: ${r.commitSha}`);
   if (r.commitStatus && r.commitStatus !== "VERIFIED" && r.commitStatus !== "NO_CHANGES") {
     lines.push(`Status: ${r.commitStatus}`);
@@ -783,6 +806,14 @@ function formatAg2ResultBanner(r) {
   lines.push(
     `Primary checkout untouched: ${r.primaryUntouched ? "yes" : "NO"}`,
   );
+  if (r.inspectCommand) {
+    lines.push("");
+    lines.push("Inspect full result:");
+    lines.push(r.inspectCommand);
+  } else if (r.preservedPath) {
+    lines.push("");
+    lines.push(`Preserved task artifact: ${r.preservedPath}`);
+  }
   if (r.classification === "VERIFIED" && r.taskBranch && r.commitSha) {
     lines.push("");
     lines.push("To merge this work:");
@@ -794,9 +825,31 @@ function formatAg2ResultBanner(r) {
   if (r.cleanup && r.cleanup.ok === false && r.cleanup.code === "CLEANUP_INCOMPLETE") {
     lines.push("Cleanup: CLEANUP_INCOMPLETE");
   }
-  if (r.changedFiles?.length) {
-    for (const f of r.changedFiles.slice(0, 40)) {
+  const files = Array.isArray(r.changedFiles) ? r.changedFiles : [];
+  if (files.length) {
+    lines.push("");
+    lines.push("Changed files:");
+    for (const f of files.slice(0, 5)) {
       lines.push(`  - ${f}`);
+    }
+    if (files.length > 5) {
+      lines.push(`  (${5} of ${files.length} changed files shown)`);
+    }
+  }
+  const preview = r.diffPreview;
+  if (preview && Array.isArray(preview.lines) && preview.lines.length > 0) {
+    lines.push("");
+    lines.push("Diff preview:");
+    for (const line of preview.lines) {
+      lines.push(line);
+    }
+    if (preview.truncated) {
+      lines.push("Diff preview truncated");
+      if (preview.fileTruncated) {
+        lines.push(
+          `${preview.shownFiles} of ${preview.totalFiles} changed files shown`,
+        );
+      }
     }
   }
   return `${lines.join("\n")}\n`;

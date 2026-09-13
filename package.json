@@ -32,7 +32,8 @@
     "scripts/pathcode-cli/ag1/**",
     "scripts/pathcode-cli/ag4/**",
     "scripts/pathcode-cli/ag5/**",
-    "scripts/pathcode-cli/ag6/**"
+    "scripts/pathcode-cli/ag6/**",
+    "scripts/pathcode-cli/ag7/**"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",

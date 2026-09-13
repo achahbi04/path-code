@@ -113,6 +113,26 @@ export function createEmptyStudioState() {
       ag1Mutation: false,
       /** @type {string[]} */
       ag1Activities: [],
+      /** @type {Array<{ label: string, detail: string }>} */
+      recentOps: [],
+      /** Current observable detail (command/file) from a real tool event. */
+      currentDetail: null,
+      /** Primary vs task branch clarity. */
+      primaryBranch: null,
+      taskBranch: null,
+      baselineSha: null,
+      resultSha: null,
+      changedFileTotal: 0,
+      /** Provisional engine-time check feedback (not final PATH validation). */
+      engineCheckFeedback: null,
+      finalValidationStarted: false,
+      finalValidationComplete: false,
+      /** Bounded presentation-only diff preview lines. */
+      diffPreviewLines: /** @type {string[]} */ ([]),
+      diffPreviewTruncated: false,
+      diffPreviewShownFiles: 0,
+      inspectCommand: null,
+      preservedArtifact: null,
       /** AG4 GitHub delivery projection. */
       deliveryPhase: null,
       /** @type {{ remote: string, baseBranch: string, taskBranch: string, status: string } | null} */
@@ -368,7 +388,11 @@ export function applyStudioEvent(state, event, opts = {}) {
       const dirty = typeof event.dirtySummary === "string" ? event.dirtySummary : "?";
       setCard(state, "preflight", "done", `${branch}; ${dirty}`);
       state.product.branch = branch;
+      state.product.primaryBranch = branch;
       state.product.dirtySummary = dirty;
+      if (typeof event.head === "string" && /^[0-9a-f]{7,40}$/i.test(event.head)) {
+        state.product.baselineSha = event.head;
+      }
       if (typeof event.projectName === "string" && event.projectName.trim()) {
         state.product.projectName = event.projectName.trim();
       }
@@ -494,6 +518,11 @@ export function applyStudioEvent(state, event, opts = {}) {
     case "session.validation.plan": {
       const checks = Array.isArray(event.checks) ? event.checks : [];
       setCard(state, "validationPlan", "done", `${checks.length} check(s)`);
+      state.product.finalValidationStarted = true;
+      state.product.engineCheckFeedback = null;
+      // Reset provisional check rows; final validation owns ag1Checks from here.
+      state.product.ag1Checks = [];
+      setPathPhase(state, "Verifying");
       break;
     }
     case "session.validation.running":
@@ -503,7 +532,8 @@ export function applyStudioEvent(state, event, opts = {}) {
         "active",
         typeof event.check === "string" ? event.check : "running",
       );
-      setPathPhase(state, "Testing");
+      state.product.finalValidationStarted = true;
+      setPathPhase(state, "Verifying");
       break;
     case "session.validation.result": {
       const check = typeof event.check === "string" ? event.check : "check";
@@ -525,6 +555,7 @@ export function applyStudioEvent(state, event, opts = {}) {
         });
       }
       state.heartbeat = null;
+      state.product.finalValidationStarted = true;
       if (/fail|error|not.?pass/i.test(status)) {
         setPathPhase(state, "Investigating failure");
       } else {
@@ -695,11 +726,19 @@ export function applyStudioEvent(state, event, opts = {}) {
           ? `baseline ${event.baselineHead.slice(0, 12)}`
           : "task workspace",
       );
+      if (typeof event.taskBranch === "string" && event.taskBranch.trim()) {
+        state.product.taskBranch = event.taskBranch.trim();
+      }
+      if (typeof event.baselineHead === "string" && /^[0-9a-f]{7,40}$/i.test(event.baselineHead)) {
+        state.product.baselineSha = event.baselineHead;
+      }
       setPathPhase(state, "Understanding");
       break;
     }
     case "session.engineering.bridge": {
       state.product.ag1 = true;
+      // Bridge/spawn diagnostics stay off the operator-facing detail line.
+      // Raw exit/code strings must not masquerade as the current command.
       if (typeof event.detail === "string") {
         state.product.pathDetail = event.detail.slice(0, 80);
       }
@@ -713,6 +752,8 @@ export function applyStudioEvent(state, event, opts = {}) {
         typeof event.label === "string"
           ? event.label
           : activity || "Working";
+      const detail =
+        typeof event.detail === "string" ? event.detail.slice(0, 96) : null;
       // Agent "complete" is NOT a product terminal — only PATH validation is.
       if (/^complete$/i.test(activity) || /^complete$/i.test(label)) {
         setPathPhase(state, "Finishing");
@@ -720,22 +761,39 @@ export function applyStudioEvent(state, event, opts = {}) {
       }
       if (/^failed$/i.test(activity) || /^failed$/i.test(label)) {
         setPathPhase(state, "Failed");
+        if (detail) state.product.currentDetail = detail;
         break;
       }
-      setPathPhase(state, label);
-      if (/edit|implement/i.test(label)) {
-        setCard(state, "applying", "active", label);
+      // Honest general state when label is vague.
+      const phaseLabel =
+        label && label.trim() ? label : "Working";
+      setPathPhase(state, phaseLabel);
+      if (detail) state.product.currentDetail = detail;
+      if (/edit|implement/i.test(phaseLabel)) {
+        setCard(state, "applying", "active", phaseLabel);
         state.product.ag1Mutation = true;
-      } else if (/test|verif/i.test(label)) {
-        setCard(state, "validationRunning", "active", label);
-      } else if (/inspect|read|understand/i.test(label)) {
-        setCard(state, "reading", "active", label);
+      } else if (/inspect|read|understand/i.test(phaseLabel)) {
+        setCard(state, "reading", "active", phaseLabel);
+      } else if (/test/i.test(phaseLabel) && !/verif/i.test(phaseLabel)) {
+        // Engine-time testing is provisional — do not mark final validation cards.
+        state.product.engineCheckFeedback = "running";
       }
       if (!Array.isArray(state.product.ag1Activities)) {
         state.product.ag1Activities = [];
       }
-      if (state.product.ag1Activities[state.product.ag1Activities.length - 1] !== label) {
-        state.product.ag1Activities.push(label);
+      if (state.product.ag1Activities[state.product.ag1Activities.length - 1] !== phaseLabel) {
+        state.product.ag1Activities.push(phaseLabel);
+      }
+      if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
+      const lastOp = state.product.recentOps[state.product.recentOps.length - 1];
+      if (!lastOp || lastOp.label !== phaseLabel || (detail && lastOp.detail !== detail)) {
+        state.product.recentOps.push({
+          label: phaseLabel,
+          detail: detail || "",
+        });
+        if (state.product.recentOps.length > 8) {
+          state.product.recentOps = state.product.recentOps.slice(-8);
+        }
       }
       break;
     }
@@ -747,19 +805,85 @@ export function applyStudioEvent(state, event, opts = {}) {
           : typeof event.tool === "string"
             ? event.tool
             : "tool";
-      if (event.kind === "file_edit") {
-        setCard(state, "edit", "done", summary.slice(0, 120));
+      const firstLine = summary.split(/\r?\n/, 1)[0].trim();
+      let detail = firstLine.slice(0, 96);
+      const kind = typeof event.kind === "string" ? event.kind : "";
+      const tool = typeof event.tool === "string" ? event.tool : "";
+      if (
+        kind === "command" ||
+        kind === "test" ||
+        /run_command/i.test(tool) ||
+        /run_command/i.test(summary)
+      ) {
+        const m =
+          summary.match(/CommandLine[=:\s]+([^\n]+)/i) ||
+          summary.match(/run_command\s+([^\n]+)/i);
+        let cmd = (m?.[1] || firstLine.replace(/^run_command\s*/i, "")).trim();
+        // Post-tool summaries often carry stdout, not the argv — stay honest.
+        const looksLikeOutput =
+          /^[✔✖ℹ✓✗]/.test(cmd) ||
+          /^(PASS|FAIL|ok|tests?\s+\d|suites?\s+\d)/i.test(cmd) ||
+          /^(package\.json|src|test)\b/.test(cmd) ||
+          summary.includes("\n");
+        if (!cmd || looksLikeOutput) {
+          detail =
+            kind === "test" || /test/i.test(state.product.pathPhase || "")
+              ? "cmd tests"
+              : "cmd finished";
+        } else {
+          detail = `cmd ${cmd.slice(0, 90)}`;
+        }
+        setPathPhase(state, kind === "test" ? "Testing" : "Running command");
+        if (kind === "test") state.product.engineCheckFeedback = "running";
+      } else if (kind === "file_edit" || /edit_file|create_file/i.test(tool)) {
+        const pathMatch = summary.match(/(?:^|\s)([^\s]+?\.[A-Za-z0-9]{1,8})\b/);
+        if (pathMatch) {
+          detail = `edit ${pathMatch[1]}`;
+        } else {
+          const note = firstLine
+            .replace(/^(edit_file|create_file)\s*/i, "")
+            .trim();
+          detail = note ? `edit · ${note.slice(0, 80)}` : `edit ${tool || "file"}`;
+        }
+        setCard(state, "edit", "done", detail);
         state.product.ag1Mutation = true;
         if (state.cards.applying) {
           state.cards.applying.arrived = true;
           state.cards.applying.status = "done";
-          state.cards.applying.detail = summary.slice(0, 80);
+          state.cards.applying.detail = detail.slice(0, 80);
         }
+        if (!state.product.projectFiles.includes(pathMatch?.[1] || "")) {
+          const p = pathMatch?.[1];
+          if (p) {
+            if (!state.product.projectFiles.includes(p)) state.product.projectFiles.push(p);
+            state.product.projectEntries.push({ path: p, role: "modified" });
+            state.product.changedFileTotal = Math.max(
+              state.product.changedFileTotal || 0,
+              state.product.projectFiles.length,
+            );
+          }
+        }
+      } else if (kind === "inspect" || /view_file|list_dir|find_file|search_dir/i.test(tool)) {
+        const pathMatch = summary.match(/(?:^|\s)([^\s]+?\.[A-Za-z0-9]{1,8})\b/);
+        detail = pathMatch ? `read ${pathMatch[1]}` : `inspect ${tool || "files"}`;
+      }
+      state.product.currentDetail = detail;
+      state.product.pathDetail = detail.slice(0, 80);
+      if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
+      state.product.recentOps.push({
+        label: state.product.pathPhase || "Working",
+        detail,
+      });
+      if (state.product.recentOps.length > 8) {
+        state.product.recentOps = state.product.recentOps.slice(-8);
       }
       break;
     }
     case "session.engineering.result": {
       state.product.ag1 = true;
+      state.product.finalValidationStarted = true;
+      state.product.finalValidationComplete = true;
+      state.product.engineCheckFeedback = null;
       if (Array.isArray(event.checks)) {
         state.product.ag1Checks = event.checks.map((c) => ({
           id: typeof c?.id === "string" ? c.id : "",
@@ -772,8 +896,37 @@ export function applyStudioEvent(state, event, opts = {}) {
           ? event.classification
           : "NOT_VERIFIED";
       const files = Array.isArray(event.changedFiles)
-        ? event.changedFiles.length
-        : 0;
+        ? event.changedFiles
+        : [];
+      state.product.changedFileTotal = files.length;
+      if (typeof event.taskBranch === "string" && event.taskBranch.trim()) {
+        state.product.taskBranch = event.taskBranch.trim();
+      }
+      if (typeof event.commitSha === "string" && /^[0-9a-f]{7,40}$/i.test(event.commitSha)) {
+        state.product.resultSha = event.commitSha;
+      }
+      if (typeof event.baselineSha === "string" && /^[0-9a-f]{7,40}$/i.test(event.baselineSha)) {
+        state.product.baselineSha = event.baselineSha;
+      }
+      if (typeof event.inspectCommand === "string" && event.inspectCommand.trim()) {
+        state.product.inspectCommand = event.inspectCommand.trim();
+      } else if (state.product.baselineSha && state.product.resultSha) {
+        state.product.inspectCommand =
+          `git diff --no-ext-diff --no-textconv ${state.product.baselineSha} ${state.product.resultSha} --`;
+      }
+      if (typeof event.preservedArtifact === "string" && event.preservedArtifact.trim()) {
+        state.product.preservedArtifact = event.preservedArtifact.trim();
+      }
+      if (Array.isArray(event.diffPreviewLines)) {
+        state.product.diffPreviewLines = event.diffPreviewLines
+          .filter((l) => typeof l === "string")
+          .slice(0, 50);
+        state.product.diffPreviewTruncated = event.diffPreviewTruncated === true;
+        state.product.diffPreviewShownFiles =
+          typeof event.diffPreviewShownFiles === "number"
+            ? event.diffPreviewShownFiles
+            : Math.min(5, files.length);
+      }
       const phase =
         classification === "VERIFIED"
           ? "Verified"
@@ -781,25 +934,24 @@ export function applyStudioEvent(state, event, opts = {}) {
             ? "Partially verified"
             : classification === "FAILED"
               ? "Failed"
-              : "Not verified";
+              : classification === "CANCELLED"
+                ? "Cancelled"
+                : "Not verified";
       setCard(
         state,
         "terminal",
         classification === "VERIFIED" ? "done" : "refused",
-        `${classification} — ${files} file(s)`,
+        `${classification} — ${files.length} file(s)`,
       );
-      if (Array.isArray(event.changedFiles)) {
-        for (const p of event.changedFiles.slice(0, 40)) {
-          if (typeof p !== "string") continue;
-          if (!state.product.projectFiles.includes(p)) {
-            state.product.projectFiles.push(p);
-          }
-          state.product.projectEntries.push({
-            path: p,
-            role: fileRole(p, { modified: true }),
-          });
-        }
-      }
+      // Replace project entries with the actual changed-file set (stable sort).
+      state.product.projectFiles = files.slice().sort();
+      state.product.projectEntries = files.slice().sort().map((path) => ({
+        path,
+        role: "modified",
+      }));
+      // Clear bridge/tool residue so the phase label owns the PATH column.
+      state.product.currentDetail =
+        files.length > 0 ? `${files.length} file(s) changed` : null;
       setPathPhase(state, phase);
       break;
     }
@@ -867,12 +1019,14 @@ export function applyStudioEvent(state, event, opts = {}) {
       break;
   }
 
-  // While validation is actively running, prefer Testing over stale phases.
+  // While PATH independent validation is actively running, prefer Verifying.
   if (
+    state.product.finalValidationStarted === true &&
     state.cards.validationRunning?.status === "active" &&
-    state.product.pathPhase !== "Investigating failure"
+    state.product.pathPhase !== "Investigating failure" &&
+    !state.cards.terminal?.arrived
   ) {
-    setPathPhase(state, "Testing");
+    setPathPhase(state, "Verifying");
   }
   // Cloud running footer while applying/validating after hydration.
   if (

@@ -1,0 +1,20 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ PATH ● Code                                                                                                      g7-live2 · main · clean │
+├─────────────────────────────────────────────┬─────────────────────────────────────────────┬──────────────────────────────────────────────┤
+│ PROJECT                                     │  PATH                                        │  EVIDENCE                                   │
+│                                             │                                              │                                             │
+│ g7-live2                                    │  ✓ Verified                                  │  Workspace       ✓                          │
+│                                             │    2 file(s) changed                         │  Mutation        ✓                          │
+│ Branches                                    │                                              │  Typecheck     ✓                            │
+│   primary  main                             │  Recent                                      │  Tests         ✓                            │
+│   task     path/task-a17754f9-7d7b-42da-93… │    · Inspecting · read sum.js                │  Final validate  ✓                          │
+│   clean                                     │    · Implementing                            │  Result          ✓                          │
+│                                             │    · Implementing · edit · Add multiply fun… │                                             │
+│ Changed files                               │    · Testing                                 │                                             │
+│   src/sum.js                                │    · Testing · cmd tests                     │                                             │
+│   test/sum.test.js                          │                                              │                                             │
+│   2 files changed                           │  Inspect full result                         │                                             │
+│                                             │    git diff --no-ext-diff --no-textconv 6e4… │                                             │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ git diff --no-ext-diff --no-textconv 6e48c366387c0c8ea921ccee99a83e8ad3243ae0 ef0a76da3e2d441613de445346aaf73e54a73289 --                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

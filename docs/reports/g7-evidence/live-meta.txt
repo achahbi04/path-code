@@ -1,0 +1,3 @@
+CANDIDATE=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+PACKAGE_ROOT=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
+node v26.5.0

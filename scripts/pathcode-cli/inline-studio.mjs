@@ -148,9 +148,6 @@ export function buildEvidenceLines(state) {
     lines.push(
       state.cards.recovery?.arrived ? "Workspace       ✓" : "Workspace       —",
     );
-    lines.push(
-      state.cards.recovery?.arrived ? "Recovery        ✓" : "Recovery        —",
-    );
     if (product.ag1Mutation) {
       lines.push("Mutation        ✓");
     } else if (state.cards.applying?.status === "active") {
@@ -159,32 +156,53 @@ export function buildEvidenceLines(state) {
       lines.push("Mutation        —");
     }
 
+    // Provisional engine-time feedback — never pretend this is final validation.
+    if (
+      product.engineCheckFeedback === "running" &&
+      product.finalValidationStarted !== true
+    ) {
+      lines.push("Eng. checks     ●");
+    } else if (
+      product.engineCheckFeedback &&
+      product.finalValidationStarted !== true
+    ) {
+      lines.push(`Eng. checks     ${product.engineCheckFeedback}`);
+    }
+
     const checks = Array.isArray(product.ag1Checks) ? product.ag1Checks : [];
-    if (state.cards.validationRunning?.status === "active" && checks.length === 0) {
-      lines.push("Verifying       ●");
-    } else if (checks.length > 0) {
-      for (const c of checks) {
-        const kind = String(c.kind || c.id || "Check");
-        const label =
-          kind === "TYPECHECK"
-            ? "Typecheck"
-            : kind === "TARGETED_TEST" || /test/i.test(kind)
-              ? "Tests"
-              : kind === "BUILD" || /build/i.test(kind)
-                ? "Build"
-                : kind.slice(0, 12);
-        const pad = " ".repeat(Math.max(1, 14 - label.length));
-        lines.push(`${label}${pad}${c.ok ? "✓" : "✕"}`);
+    if (product.finalValidationStarted === true) {
+      if (
+        state.cards.validationRunning?.status === "active" &&
+        checks.length === 0
+      ) {
+        lines.push("Final validate  ●");
+      } else if (checks.length > 0) {
+        for (const c of checks) {
+          const kind = String(c.kind || c.id || "Check");
+          const label =
+            kind === "TYPECHECK"
+              ? "Typecheck"
+              : kind === "TARGETED_TEST" || /test/i.test(kind)
+                ? "Tests"
+                : kind === "BUILD" || /build/i.test(kind)
+                  ? "Build"
+                  : kind.slice(0, 12);
+          const pad = " ".repeat(Math.max(1, 14 - label.length));
+          lines.push(`${label}${pad}${c.ok ? "✓" : "✕"}`);
+        }
+        if (product.finalValidationComplete === true) {
+          lines.push("Final validate  ✓");
+        }
+      } else if (state.cards.validationResult?.arrived) {
+        const detail = state.cards.validationResult.detail || "";
+        if (/fail|FAILED/i.test(detail)) lines.push("Final validate  ✕");
+        else if (/PASSED|pass/i.test(detail)) lines.push("Final validate  ✓");
+        else lines.push("Final validate  —");
+      } else {
+        lines.push("Final validate  ●");
       }
-    } else if (state.cards.validationResult?.arrived) {
-      const detail = state.cards.validationResult.detail || "";
-      if (/fail|FAILED/i.test(detail)) lines.push("Validation      ✕");
-      else if (/PASSED|pass/i.test(detail)) lines.push("Validation      ✓");
-      else lines.push("Validation      —");
-    } else if (state.cards.validationSkipped?.arrived) {
-      lines.push("Validation      —");
     } else {
-      lines.push("Validation      —");
+      lines.push("Final validate  —");
     }
 
     const term = state.cards.terminal;
@@ -405,37 +423,76 @@ export function buildLivingProductLines(state, viewport) {
 
   /** @type {string[]} */
   const projectCol = [style.bold(style.cyan("PROJECT")), ""];
+  if (projectName) {
+    projectCol.push(style.white(projectName));
+    projectCol.push("");
+  }
+  const primaryBranch =
+    typeof product.primaryBranch === "string" && product.primaryBranch
+      ? product.primaryBranch
+      : branchRaw;
+  const taskBranch =
+    typeof product.taskBranch === "string" && product.taskBranch
+      ? product.taskBranch
+      : null;
+  if (primaryBranch || taskBranch) {
+    projectCol.push(style.dim("Branches"));
+    if (primaryBranch) {
+      projectCol.push(style.green(`  primary  ${primaryBranch}`));
+    }
+    if (taskBranch) {
+      projectCol.push(style.cyan(`  task     ${taskBranch}`));
+    } else if (isAg1) {
+      projectCol.push(style.dim("  task     (creating…)"));
+    }
+    if (dirty && !/clean/i.test(String(dirty))) {
+      projectCol.push(style.yellow(`  ${dirty}`));
+    } else if (dirty) {
+      projectCol.push(style.dim(`  ${dirty}`));
+    }
+    projectCol.push("");
+  }
+
   const entries = Array.isArray(product.projectEntries)
     ? product.projectEntries
     : [];
-  if (entries.length > 0) {
-    for (const e of entries.slice(0, 6)) {
-      projectCol.push(style.white(String(e.path)));
-      projectCol.push(style.dim(`  ${e.role}`));
+  const totalFiles =
+    typeof product.changedFileTotal === "number" && product.changedFileTotal > 0
+      ? product.changedFileTotal
+      : entries.length || (product.projectFiles?.length ?? 0);
+  const showEntries = entries.slice(0, 5);
+  if (showEntries.length > 0) {
+    projectCol.push(style.dim("Changed files"));
+    for (const e of showEntries) {
+      projectCol.push(style.white(`  ${String(e.path)}`));
+      if (e.role && e.role !== "modified") {
+        projectCol.push(style.dim(`    ${e.role}`));
+      }
+    }
+    if (totalFiles > showEntries.length) {
+      projectCol.push(
+        style.dim(`  ${showEntries.length} of ${totalFiles} changed files shown`),
+      );
+    } else if (totalFiles > 0) {
+      projectCol.push(
+        style.dim(
+          `  ${totalFiles} file${totalFiles === 1 ? "" : "s"} changed`,
+        ),
+      );
     }
   } else {
     const files = Array.isArray(product.projectFiles) ? product.projectFiles : [];
     if (files.length === 0) {
       projectCol.push(style.dim(isAg1 ? "(engineering…)" : "(awaiting scope)"));
     } else {
-      for (const f of files.slice(0, 6)) {
-        projectCol.push(style.white(String(f)));
+      projectCol.push(style.dim("Files"));
+      for (const f of files.slice(0, 5)) {
+        projectCol.push(style.white(`  ${String(f)}`));
+      }
+      if (files.length > 5) {
+        projectCol.push(style.dim(`  5 of ${files.length} shown`));
       }
     }
-  }
-  projectCol.push("");
-  if (branchRaw || dirty) {
-    const gitLine = [branchRaw, dirty].filter(Boolean).join(" · ");
-    projectCol.push(style.dim("Git"));
-    projectCol.push(
-      /clean/i.test(String(dirty))
-        ? style.green(`  ${gitLine}`)
-        : style.yellow(`  ${gitLine}`),
-    );
-  }
-  const fileCount = entries.length || (product.projectFiles?.length ?? 0);
-  if (fileCount > 0) {
-    projectCol.push(style.dim(`${fileCount} file${fileCount === 1 ? "" : "s"} in scope`));
   }
 
   /** @type {string[]} */
@@ -452,25 +509,39 @@ export function buildLivingProductLines(state, viewport) {
   pathCol.push(phaseLine);
 
   if (isAg1) {
-    const activities = Array.isArray(product.ag1Activities)
-      ? product.ag1Activities
-      : [];
-    // Observable activity trail (never private model reasoning).
-    const trail = activities.slice(-5);
+    const currentDetail =
+      typeof product.currentDetail === "string" && product.currentDetail
+        ? product.currentDetail
+        : typeof product.pathDetail === "string"
+          ? product.pathDetail
+          : null;
+    if (
+      currentDetail &&
+      !/^google|gemini|antigravity|vertex/i.test(String(currentDetail))
+    ) {
+      pathCol.push(style.dim(`  ${String(currentDetail).slice(0, colW - 2)}`));
+    }
+    const ops = Array.isArray(product.recentOps) ? product.recentOps : [];
+    const trail =
+      ops.length > 0
+        ? ops.slice(-5)
+        : (Array.isArray(product.ag1Activities) ? product.ag1Activities : [])
+            .slice(-5)
+            .map((label) => ({ label, detail: "" }));
     if (trail.length > 0) {
       pathCol.push("");
-      pathCol.push(style.dim("Activity"));
-      for (const label of trail) {
+      pathCol.push(style.dim("Recent"));
+      for (const item of trail) {
+        const label = typeof item === "string" ? item : item.label;
+        const detail = typeof item === "string" ? "" : item.detail || "";
         const current = label === pathPhase;
+        const line = detail ? `${label} · ${detail}` : label;
         pathCol.push(
           current
-            ? style.cyan(`  ◆ ${label}`)
-            : style.dim(`  · ${label}`),
+            ? style.cyan(`  ◆ ${String(line).slice(0, colW - 4)}`)
+            : style.dim(`  · ${String(line).slice(0, colW - 4)}`),
         );
       }
-    }
-    if (product.pathDetail && !/^google|gemini|antigravity|vertex/i.test(String(product.pathDetail))) {
-      pathCol.push(style.dim(`  ${String(product.pathDetail).slice(0, colW - 2)}`));
     }
     const approval = product.deliveryApproval;
     if (approval && pathPhase === "Awaiting publication approval") {
@@ -486,6 +557,23 @@ export function buildLivingProductLines(state, viewport) {
       pathCol.push("");
       pathCol.push("Publish verified work to GitHub");
       pathCol.push("and create a pull request? [y/N]");
+    }
+    if (
+      state.cards.terminal?.arrived &&
+      typeof product.inspectCommand === "string" &&
+      product.inspectCommand
+    ) {
+      pathCol.push("");
+      pathCol.push(style.dim("Inspect full result"));
+      pathCol.push(`  ${product.inspectCommand}`);
+    } else if (
+      state.cards.terminal?.arrived &&
+      typeof product.preservedArtifact === "string" &&
+      product.preservedArtifact
+    ) {
+      pathCol.push("");
+      pathCol.push(style.dim("Preserved artifact"));
+      pathCol.push(`  ${product.preservedArtifact}`);
     }
   } else {
     if (pathPhase === "Starting workstation") {
@@ -589,10 +677,24 @@ export function buildLivingProductLines(state, viewport) {
       : null;
     const mm = sec != null ? String(Math.floor(sec / 60)).padStart(2, "0") : null;
     const ss = sec != null ? String(sec % 60).padStart(2, "0") : null;
-    footer =
-      sec != null
-        ? `PATH Engineering Session · ${mm}:${ss}`
-        : "PATH Engineering Session";
+    if (
+      state.cards.terminal?.arrived &&
+      typeof product.inspectCommand === "string" &&
+      product.inspectCommand
+    ) {
+      footer = product.inspectCommand;
+    } else if (
+      state.cards.terminal?.arrived &&
+      typeof product.preservedArtifact === "string" &&
+      product.preservedArtifact
+    ) {
+      footer = `Preserved: ${product.preservedArtifact}`;
+    } else {
+      footer =
+        sec != null
+          ? `PATH Engineering Session · ${mm}:${ss}`
+          : "PATH Engineering Session";
+    }
   }
   if (
     !isAg1 &&
@@ -652,13 +754,34 @@ export function buildCompactAg1Lines(state, viewport) {
   lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
 
   lines.push(fitLine(`│${padVisible(` ${style.bold(style.cyan("PROJECT"))}`, inner)}│`, columns));
+  const primary =
+    typeof product.primaryBranch === "string" ? product.primaryBranch : branch;
+  const task =
+    typeof product.taskBranch === "string" ? product.taskBranch : null;
+  if (primary) {
+    lines.push(fitLine(`│${padVisible(style.dim(`  primary  ${primary}`), inner)}│`, columns));
+  }
+  if (task) {
+    lines.push(fitLine(`│${padVisible(style.cyan(`  task     ${task}`), inner)}│`, columns));
+  }
   const entries = Array.isArray(product.projectEntries) ? product.projectEntries : [];
+  const totalFiles =
+    typeof product.changedFileTotal === "number" && product.changedFileTotal > 0
+      ? product.changedFileTotal
+      : entries.length;
   if (entries.length === 0) {
     lines.push(fitLine(`│${padVisible(style.dim("  (engineering…)"), inner)}│`, columns));
   } else {
-    for (const e of entries.slice(0, 4)) {
+    for (const e of entries.slice(0, 5)) {
       lines.push(fitLine(`│${padVisible(`  ${e.path}`, inner)}│`, columns));
-      lines.push(fitLine(`│${padVisible(style.dim(`    ${e.role}`), inner)}│`, columns));
+    }
+    if (totalFiles > 5) {
+      lines.push(
+        fitLine(
+          `│${padVisible(style.dim(`  5 of ${totalFiles} changed files shown`), inner)}│`,
+          columns,
+        ),
+      );
     }
   }
 
@@ -671,13 +794,33 @@ export function buildCompactAg1Lines(state, viewport) {
       columns,
     ),
   );
-  const activities = Array.isArray(product.ag1Activities)
-    ? product.ag1Activities.slice(-4)
-    : [];
-  for (const label of activities) {
+  if (typeof product.currentDetail === "string" && product.currentDetail) {
     lines.push(
       fitLine(
-        `│${padVisible(style.dim(`  · ${label}`), inner)}│`,
+        `│${padVisible(style.dim(`  ${product.currentDetail.slice(0, Math.max(12, inner - 4))}`), inner)}│`,
+        columns,
+      ),
+    );
+  }
+  const ops = Array.isArray(product.recentOps)
+    ? product.recentOps.slice(-4)
+    : (Array.isArray(product.ag1Activities) ? product.ag1Activities.slice(-4) : []).map(
+        (label) => ({ label, detail: "" }),
+      );
+  for (const item of ops) {
+    const label = item.label || String(item);
+    const detail = item.detail ? ` · ${item.detail}` : "";
+    lines.push(
+      fitLine(
+        `│${padVisible(style.dim(`  · ${label}${detail}`.slice(0, Math.max(12, inner - 4))), inner)}│`,
+        columns,
+      ),
+    );
+  }
+  if (typeof product.inspectCommand === "string" && product.inspectCommand && state.cards.terminal?.arrived) {
+    lines.push(
+      fitLine(
+        `│${padVisible(style.dim(`  ${product.inspectCommand}`), inner)}│`,
         columns,
       ),
     );
@@ -693,10 +836,17 @@ export function buildCompactAg1Lines(state, viewport) {
   const sec = state.heartbeat
     ? Math.floor(state.heartbeat.elapsedMs / 1000)
     : null;
-  const footer =
+  let footer =
     sec != null
       ? `PATH Engineering Session · ${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`
       : "PATH Engineering Session";
+  if (
+    state.cards.terminal?.arrived &&
+    typeof product.inspectCommand === "string" &&
+    product.inspectCommand
+  ) {
+    footer = product.inspectCommand;
+  }
   lines.push(fitLine(`│${padVisible(` ${style.dim(footer)}`, inner)}│`, columns));
   lines.push(fitLine(`╰${"─".repeat(inner)}╯`, columns));
   return lines.slice(0, maxHeight);

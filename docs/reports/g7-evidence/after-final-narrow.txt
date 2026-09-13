@@ -1,0 +1,28 @@
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ PATH ● Code  g7-live2 · main · clean                                         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ PROJECT                                                                      │
+│  primary  main                                                               │
+│  task     path/task-a17754f9-7d7b-42da-93b7-3a21d4e25de8                     │
+│  src/sum.js                                                                  │
+│  test/sum.test.js                                                            │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ PATH                                                                         │
+│  ✓ Verified                                                                  │
+│  2 file(s) changed                                                           │
+│  · Implementing                                                              │
+│  · Implementing · edit · Add multiply function                               │
+│  · Testing                                                                   │
+│  · Testing · cmd tests                                                       │
+│  git diff --no-ext-diff --no-textconv 6e48c366387c0c8ea921ccee99a83e8ad3243a…│
+├──────────────────────────────────────────────────────────────────────────────┤
+│ EVIDENCE                                                                     │
+│  Workspace       ✓                                                           │
+│  Mutation        ✓                                                           │
+│  Typecheck     ✓                                                             │
+│  Tests         ✓                                                             │
+│  Final validate  ✓                                                           │
+│  Result          ✓                                                           │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ git diff --no-ext-diff --no-textconv 6e48c366387c0c8ea921ccee99a83e8ad3243ae…│
+╰──────────────────────────────────────────────────────────────────────────────╯

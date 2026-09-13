@@ -1,0 +1,226 @@
+[
+  {
+    "type": "session.task.received"
+  },
+  {
+    "type": "session.preflight"
+  },
+  {
+    "type": "session.engineering.workspace"
+  },
+  {
+    "type": "session.recovery.checkpoint"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "understanding"
+  },
+  {
+    "type": "session.engineering.bridge"
+  },
+  {
+    "type": "session.engineering.bridge"
+  },
+  {
+    "type": "session.engineering.bridge"
+  },
+  {
+    "type": "session.engineering.bridge"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "understanding"
+  },
+  {
+    "type": "session.engineering.bridge"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "understanding"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "running_command"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "testing"
+  },
+  {
+    "type": "session.engineering.tool",
+    "summary": "run_command package.json\nsrc\ntest\n\n./src:\nsum.js\n\n./test:\nsum.test.js"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "inspecting"
+  },
+  {
+    "type": "session.reading"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "inspecting"
+  },
+  {
+    "type": "session.reading"
+  },
+  {
+    "type": "session.engineering.tool",
+    "summary": "view_file View sum.js"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "editing"
+  },
+  {
+    "type": "session.applying",
+    "summary": "editing in task workspace"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "editing"
+  },
+  {
+    "type": "session.applying",
+    "summary": "editing in task workspace"
+  },
+  {
+    "type": "session.engineering.tool",
+    "summary": "edit_file Add multiply function"
+  },
+  {
+    "type": "session.edit.summary"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "inspecting"
+  },
+  {
+    "type": "session.reading"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "inspecting"
+  },
+  {
+    "type": "session.reading"
+  },
+  {
+    "type": "session.engineering.tool",
+    "summary": "view_file View sum.test.js"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "editing"
+  },
+  {
+    "type": "session.applying",
+    "summary": "editing in task workspace"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "editing"
+  },
+  {
+    "type": "session.applying",
+    "summary": "editing in task workspace"
+  },
+  {
+    "type": "session.engineering.tool",
+    "summary": "edit_file Import multiply function"
+  },
+  {
+    "type": "session.edit.summary"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "editing"
+  },
+  {
+    "type": "session.applying",
+    "summary": "editing in task workspace"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "editing"
+  },
+  {
+    "type": "session.applying",
+    "summary": "editing in task workspace"
+  },
+  {
+    "type": "session.engineering.tool",
+    "summary": "edit_file Add multiply test case"
+  },
+  {
+    "type": "session.edit.summary"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "inspecting"
+  },
+  {
+    "type": "session.reading"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "inspecting"
+  },
+  {
+    "type": "session.reading"
+  },
+  {
+    "type": "session.engineering.tool",
+    "summary": "view_file View package.json"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "running_command"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "testing"
+  },
+  {
+    "type": "session.engineering.tool",
+    "summary": "run_command ✔ sum (0.738667ms)\n✔ multiply (0.118791ms)\nℹ tests 2\nℹ suites 0\nℹ pass 2\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 114.683875"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "complete"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "verifying"
+  },
+  {
+    "type": "session.validation.plan",
+    "summary": "independent final validation"
+  },
+  {
+    "type": "session.validation.running"
+  },
+  {
+    "type": "session.validation.running"
+  },
+  {
+    "type": "session.validation.result"
+  },
+  {
+    "type": "session.validation.result"
+  },
+  {
+    "type": "session.engineering.result",
+    "classification": "VERIFIED"
+  },
+  {
+    "type": "session.terminal",
+    "summary": "All configured final checks passed."
+  },
+  {
+    "type": "session.engineering.bridge"
+  },
+  {
+    "type": "session.engineering.bridge"
+  }
+]
