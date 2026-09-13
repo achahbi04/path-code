@@ -1,0 +1,19 @@
+{
+  "prompt1": true,
+  "colorIdle": true,
+  "literalU001b": false,
+  "hasColorSgr": true,
+  "hasRealEsc": true,
+  "verified": true,
+  "resultSection": true,
+  "prompt2": true,
+  "altEnter": 1,
+  "stayedSingleEnter": true,
+  "exitAlt": true,
+  "showCursor": true,
+  "exitCode": 0,
+  "primaryUntouched": true,
+  "candidate": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs",
+  "packageRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+  "projectRoot": "/tmp/pathcode-g7-cockpit-color/repo"
+}

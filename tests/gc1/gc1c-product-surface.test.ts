@@ -348,7 +348,11 @@ describe("GC1-c living product surface authority (R1–R10)", () => {
     });
     const text = lines.join("\n");
     expect(text).not.toMatch(/\u001b\[2J/);
-    expect(fitLine("evil\u001b[2J", 20)).not.toContain("\u001b[2J");
+    // Untrusted fragments must be escaped before styling; fitLine preserves
+    // trusted SGR ESC bytes and must not re-escape them.
+    expect(fitLine("evil\u001b[2J", 20)).toContain("\u001b[2J");
+    expect(fitLine("\u001b[36mcyan\u001b[0m", 20)).toContain("\u001b");
+    expect(fitLine("\u001b[36mcyan\u001b[0m", 20)).not.toContain("\\u001b");
   });
 
   it("PROJECT shows main · clean and file roles", async () => {

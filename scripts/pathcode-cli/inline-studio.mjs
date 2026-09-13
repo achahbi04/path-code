@@ -81,14 +81,30 @@ export function truncateVisible(text, maxCols) {
 }
 
 /**
+ * Escape untrusted fragments (paths, tool summaries, commands) BEFORE styling.
+ * Trusted SGR from paint()/style.* must never pass through this.
+ * @param {unknown} text
+ */
+export function safeDisplay(text) {
+  return escapeForTerminalDisplay(typeof text === "string" ? text : String(text ?? ""))
+    .replace(/\r?\n/g, " ");
+}
+
+/**
+ * Fit a rendered line for the TTY by visible width.
+ *
+ * CRITICAL: do not run escapeForTerminalDisplay here. paint()/style.* already
+ * inject real ESC (0x1b) SGR bytes; escaping them produced literal "\\u001b"
+ * on the operator Terminal. Untrusted payloads must be safeDisplay()'d first.
+ *
  * @param {string} text
  * @param {number} columns
  */
 export function fitLine(text, columns) {
   const cols =
     typeof columns === "number" && columns > 0 ? Math.floor(columns) : 80;
-  const sanitized = escapeForTerminalDisplay(text).replace(/\r?\n/g, " ");
-  return truncateVisible(sanitized, cols);
+  const flattened = String(text ?? "").replace(/\r?\n/g, " ");
+  return truncateVisible(flattened, cols);
 }
 
 /**
@@ -124,9 +140,12 @@ function formatCardLine(card, compact, columns) {
             ? "[>]"
             : "[*]";
   if (compact) {
-    return fitLine(`${mark} ${card.title}`, columns);
+    return fitLine(`${mark} ${safeDisplay(card.title)}`, columns);
   }
-  return fitLine(`${mark} ${card.title}: ${card.detail}`, columns);
+  return fitLine(
+    `${mark} ${safeDisplay(card.title)}: ${safeDisplay(card.detail)}`,
+    columns,
+  );
 }
 
 /**
@@ -161,12 +180,12 @@ export function buildEvidenceLines(state) {
       product.engineCheckFeedback === "running" &&
       product.finalValidationStarted !== true
     ) {
-      lines.push("Eng. checks     ●");
+      lines.push("Eng. tests      ●");
     } else if (
       product.engineCheckFeedback &&
       product.finalValidationStarted !== true
     ) {
-      lines.push(`Eng. checks     ${product.engineCheckFeedback}`);
+      lines.push(`Eng. tests      ${safeDisplay(product.engineCheckFeedback)}`);
     }
 
     const checks = Array.isArray(product.ag1Checks) ? product.ag1Checks : [];
@@ -424,7 +443,7 @@ export function buildLivingProductLines(state, viewport) {
   /** @type {string[]} */
   const projectCol = [style.bold(style.cyan("PROJECT")), ""];
   if (projectName) {
-    projectCol.push(style.white(projectName));
+    projectCol.push(style.white(safeDisplay(projectName)));
     projectCol.push("");
   }
   const primaryBranch =
@@ -438,17 +457,17 @@ export function buildLivingProductLines(state, viewport) {
   if (primaryBranch || taskBranch) {
     projectCol.push(style.dim("Branches"));
     if (primaryBranch) {
-      projectCol.push(style.green(`  primary  ${primaryBranch}`));
+      projectCol.push(style.green(`  primary  ${safeDisplay(primaryBranch)}`));
     }
     if (taskBranch) {
-      projectCol.push(style.cyan(`  task     ${taskBranch}`));
+      projectCol.push(style.cyan(`  task     ${safeDisplay(taskBranch)}`));
     } else if (isAg1) {
       projectCol.push(style.dim("  task     (creating…)"));
     }
     if (dirty && !/clean/i.test(String(dirty))) {
-      projectCol.push(style.yellow(`  ${dirty}`));
+      projectCol.push(style.yellow(`  ${safeDisplay(dirty)}`));
     } else if (dirty) {
-      projectCol.push(style.dim(`  ${dirty}`));
+      projectCol.push(style.dim(`  ${safeDisplay(dirty)}`));
     }
     projectCol.push("");
   }
@@ -462,16 +481,18 @@ export function buildLivingProductLines(state, viewport) {
       : entries.length || (product.projectFiles?.length ?? 0);
   const showEntries = entries.slice(0, 5);
   if (showEntries.length > 0) {
-    projectCol.push(style.dim("Changed files"));
+    projectCol.push(style.dim("Activity"));
     for (const e of showEntries) {
-      projectCol.push(style.white(`  ${String(e.path)}`));
-      if (e.role && e.role !== "modified") {
-        projectCol.push(style.dim(`    ${e.role}`));
-      }
+      projectCol.push(style.white(`  ${safeDisplay(e.path)}`));
+      const role =
+        typeof e.role === "string" && e.role.trim() ? e.role.trim() : "modified";
+      projectCol.push(style.dim(`    ${safeDisplay(role)}`));
     }
     if (totalFiles > showEntries.length) {
       projectCol.push(
-        style.dim(`  ${showEntries.length} of ${totalFiles} changed files shown`),
+        style.dim(
+          `  ${showEntries.length} of ${totalFiles} changed files shown`,
+        ),
       );
     } else if (totalFiles > 0) {
       projectCol.push(
@@ -487,7 +508,7 @@ export function buildLivingProductLines(state, viewport) {
     } else {
       projectCol.push(style.dim("Files"));
       for (const f of files.slice(0, 5)) {
-        projectCol.push(style.white(`  ${String(f)}`));
+        projectCol.push(style.white(`  ${safeDisplay(f)}`));
       }
       if (files.length > 5) {
         projectCol.push(style.dim(`  5 of ${files.length} shown`));
@@ -500,26 +521,26 @@ export function buildLivingProductLines(state, viewport) {
   const phaseMark = pathGlyph(pathPhase);
   const phaseLine =
     phaseMark === "✓"
-      ? style.green(`${phaseMark} ${pathPhase}`)
+      ? style.green(`${phaseMark} ${safeDisplay(pathPhase)}`)
       : phaseMark === "✕"
-        ? style.red(`${phaseMark} ${pathPhase}`)
+        ? style.red(`${phaseMark} ${safeDisplay(pathPhase)}`)
         : phaseMark === "◐"
-          ? style.yellow(`${phaseMark} ${pathPhase}`)
-          : style.cyan(`${phaseMark} ${pathPhase}`);
+          ? style.yellow(`${phaseMark} ${safeDisplay(pathPhase)}`)
+          : style.cyan(`${phaseMark} ${safeDisplay(pathPhase)}`);
   pathCol.push(phaseLine);
 
   if (isAg1) {
     const currentDetail =
       typeof product.currentDetail === "string" && product.currentDetail
         ? product.currentDetail
-        : typeof product.pathDetail === "string"
-          ? product.pathDetail
-          : null;
+        : null;
     if (
       currentDetail &&
-      !/^google|gemini|antigravity|vertex/i.test(String(currentDetail))
+      !/^google|gemini|antigravity|vertex|pid=|python=/i.test(String(currentDetail))
     ) {
-      pathCol.push(style.dim(`  ${String(currentDetail).slice(0, colW - 2)}`));
+      pathCol.push(
+        style.dim(`  ${safeDisplay(String(currentDetail)).slice(0, colW - 2)}`),
+      );
     }
     const ops = Array.isArray(product.recentOps) ? product.recentOps : [];
     const trail =
@@ -538,8 +559,42 @@ export function buildLivingProductLines(state, viewport) {
         const line = detail ? `${label} · ${detail}` : label;
         pathCol.push(
           current
-            ? style.cyan(`  ◆ ${String(line).slice(0, colW - 4)}`)
-            : style.dim(`  · ${String(line).slice(0, colW - 4)}`),
+            ? style.cyan(
+                `  ◆ ${safeDisplay(String(line)).slice(0, colW - 4)}`,
+              )
+            : style.dim(
+                `  · ${safeDisplay(String(line)).slice(0, colW - 4)}`,
+              ),
+        );
+      }
+    }
+    const history = Array.isArray(product.sessionHistory)
+      ? product.sessionHistory.slice(-4)
+      : [];
+    if (history.length > 0 && state.cards.terminal?.arrived) {
+      pathCol.push("");
+      pathCol.push(style.dim("Session"));
+      for (const h of history) {
+        const mark =
+          h.classification === "VERIFIED"
+            ? "✓"
+            : h.classification === "PARTIALLY_VERIFIED"
+              ? "◐"
+              : h.classification === "CANCELLED"
+                ? "○"
+                : "✕";
+        const color =
+          mark === "✓"
+            ? style.green
+            : mark === "✕"
+              ? style.red
+              : mark === "◐"
+                ? style.yellow
+                : style.dim;
+        pathCol.push(
+          color(
+            `  ${mark} ${safeDisplay(h.preview || "task").slice(0, colW - 4)}`,
+          ),
         );
       }
     }
@@ -547,33 +602,18 @@ export function buildLivingProductLines(state, viewport) {
     if (approval && pathPhase === "Awaiting publication approval") {
       pathCol.push("");
       pathCol.push(style.dim("Remote"));
-      pathCol.push(`  ${String(approval.remote || "").slice(0, colW - 2)}`);
+      pathCol.push(`  ${safeDisplay(approval.remote || "").slice(0, colW - 2)}`);
       pathCol.push(style.dim("Base"));
-      pathCol.push(`  ${String(approval.baseBranch || "").slice(0, colW - 2)}`);
+      pathCol.push(
+        `  ${safeDisplay(approval.baseBranch || "").slice(0, colW - 2)}`,
+      );
       pathCol.push(style.dim("Action"));
       pathCol.push(
-        `  Push ${String(approval.taskBranch || "").slice(0, Math.max(8, colW - 10))} and create PR`,
+        `  Push ${safeDisplay(approval.taskBranch || "").slice(0, Math.max(8, colW - 10))} and create PR`,
       );
       pathCol.push("");
       pathCol.push("Publish verified work to GitHub");
       pathCol.push("and create a pull request? [y/N]");
-    }
-    if (
-      state.cards.terminal?.arrived &&
-      typeof product.inspectCommand === "string" &&
-      product.inspectCommand
-    ) {
-      pathCol.push("");
-      pathCol.push(style.dim("Inspect full result"));
-      pathCol.push(`  ${product.inspectCommand}`);
-    } else if (
-      state.cards.terminal?.arrived &&
-      typeof product.preservedArtifact === "string" &&
-      product.preservedArtifact
-    ) {
-      pathCol.push("");
-      pathCol.push(style.dim("Preserved artifact"));
-      pathCol.push(`  ${product.preservedArtifact}`);
     }
   } else {
     if (pathPhase === "Starting workstation") {
@@ -581,24 +621,29 @@ export function buildLivingProductLines(state, viewport) {
       const sec = state.heartbeat
         ? Math.floor(state.heartbeat.elapsedMs / 1000)
         : null;
-      pathCol.push(style.dim(`  ${region}${sec != null ? ` · ${sec}s` : ""}`));
+      pathCol.push(style.dim(`  ${safeDisplay(region)}${sec != null ? ` · ${sec}s` : ""}`));
     } else if (pathPhase === "Hydrating" && product.pathDetail) {
-      pathCol.push(style.dim(`  ${product.pathDetail}`));
+      pathCol.push(style.dim(`  ${safeDisplay(product.pathDetail)}`));
     } else if (pathPhase === "Applying" && product.pathDetail) {
-      pathCol.push(style.dim(`  ${product.pathDetail}`));
+      pathCol.push(style.dim(`  ${safeDisplay(product.pathDetail)}`));
     } else if (pathPhase === "Testing" && state.cards.validationRunning?.detail) {
-      pathCol.push(style.dim(`  ${state.cards.validationRunning.detail}`));
+      pathCol.push(
+        style.dim(`  ${safeDisplay(state.cards.validationRunning.detail)}`),
+      );
     } else if (pathPhase === "Infrastructure failure" && product.infraFailure) {
-      pathCol.push(style.red(`  ${String(product.infraFailure).slice(0, colW - 2)}`));
+      pathCol.push(
+        style.red(`  ${safeDisplay(String(product.infraFailure)).slice(0, colW - 2)}`),
+      );
     }
 
-    // Legacy cloud path may show provider; AG1 never does.
     const modelId = product.modelId || null;
     const provider = product.providerLabel || (modelId ? "OpenAI" : null);
     if (provider || modelId) {
       pathCol.push("");
       pathCol.push(style.dim("Provider"));
-      pathCol.push(`  ${[provider, modelId].filter(Boolean).join(" · ")}`);
+      pathCol.push(
+        `  ${safeDisplay([provider, modelId].filter(Boolean).join(" · "))}`,
+      );
       if (product.providerTurn) {
         const t = product.providerTurn;
         pathCol.push(style.dim(`  bounded · turn ${t.call}/${t.of}`));
@@ -610,7 +655,13 @@ export function buildLivingProductLines(state, viewport) {
   const evidenceCol = [
     style.bold(style.cyan("EVIDENCE")),
     "",
-    ...buildEvidenceLines(state),
+    ...buildEvidenceLines(state).map((line) => {
+      if (/\s✓\s*$/.test(line) || /\s✓$/.test(line)) return style.green(line);
+      if (/\s✕\s*$/.test(line) || /\s✕$/.test(line)) return style.red(line);
+      if (/\s●\s*$/.test(line) || /\s●$/.test(line)) return style.yellow(line);
+      if (/—\s*$/.test(line)) return style.dim(line);
+      return line;
+    }),
   ];
 
   const height = Math.max(projectCol.length, pathCol.length, evidenceCol.length, 6);
@@ -666,6 +717,86 @@ export function buildLivingProductLines(state, viewport) {
   }
 
   lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+
+  // In-cockpit RESULT (session-long): never dump a separate scrollback report.
+  if (isAg1 && state.cards.terminal?.arrived) {
+    lines.push(
+      fitLine(`│${padVisible(` ${style.bold(style.cyan("RESULT"))}`, inner)}│`, columns),
+    );
+    const branch =
+      typeof product.taskBranch === "string" ? product.taskBranch : "";
+    const sha =
+      typeof product.resultSha === "string" ? product.resultSha.slice(0, 12) : "";
+    const classLabel = String(pathPhase || "Not verified");
+    const headBits = [branch, sha].filter(Boolean).join(" · ");
+    if (headBits) {
+      lines.push(
+        fitLine(
+          `│${padVisible(` ${style.dim(safeDisplay(headBits))}`, inner)}│`,
+          columns,
+        ),
+      );
+    }
+    const fileN =
+      typeof product.changedFileTotal === "number"
+        ? product.changedFileTotal
+        : Array.isArray(product.projectFiles)
+          ? product.projectFiles.length
+          : 0;
+    const resultTone =
+      pathPhase === "Verified"
+        ? style.green
+        : pathPhase === "Failed" || pathPhase === "Not verified"
+          ? style.red
+          : pathPhase === "Partially verified"
+            ? style.yellow
+            : style.dim;
+    lines.push(
+      fitLine(
+        `│${padVisible(
+          ` ${resultTone(`${fileN} file${fileN === 1 ? "" : "s"} changed · ${safeDisplay(classLabel)}`)}`,
+          inner,
+        )}│`,
+        columns,
+      ),
+    );
+    const preview = Array.isArray(product.diffPreviewLines)
+      ? product.diffPreviewLines.filter((l) => typeof l === "string").slice(0, 8)
+      : [];
+    if (preview.length > 0) {
+      lines.push(fitLine(`│${padVisible(` ${style.dim("Diff preview")}`, inner)}│`, columns));
+      for (const pl of preview) {
+        const tone = pl.startsWith("+")
+          ? style.green
+          : pl.startsWith("-")
+            ? style.red
+            : style.dim;
+        lines.push(
+          fitLine(
+            `│${padVisible(` ${tone(safeDisplay(pl).slice(0, Math.max(12, inner - 4)))}`, inner)}│`,
+            columns,
+          ),
+        );
+      }
+      if (product.diffPreviewTruncated) {
+        lines.push(
+          fitLine(`│${padVisible(` ${style.dim("… truncated")}`, inner)}│`, columns),
+        );
+      }
+    } else if (
+      typeof product.inspectCommand === "string" &&
+      product.inspectCommand
+    ) {
+      lines.push(
+        fitLine(
+          `│${padVisible(` ${style.dim(safeDisplay(product.inspectCommand))}`, inner)}│`,
+          columns,
+        ),
+      );
+    }
+    lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+  }
+
   let footer =
     product.cloudFooter ||
     (state.heartbeat
@@ -677,23 +808,18 @@ export function buildLivingProductLines(state, viewport) {
       : null;
     const mm = sec != null ? String(Math.floor(sec / 60)).padStart(2, "0") : null;
     const ss = sec != null ? String(sec % 60).padStart(2, "0") : null;
-    if (
-      state.cards.terminal?.arrived &&
-      typeof product.inspectCommand === "string" &&
-      product.inspectCommand
-    ) {
-      footer = product.inspectCommand;
-    } else if (
-      state.cards.terminal?.arrived &&
-      typeof product.preservedArtifact === "string" &&
-      product.preservedArtifact
-    ) {
-      footer = `Preserved: ${product.preservedArtifact}`;
-    } else {
+    if (product.awaitingInput === true && typeof product.cockpitPrompt === "string") {
+      footer = product.cockpitPrompt;
+    } else if (!state.cards.terminal?.arrived) {
       footer =
         sec != null
           ? `PATH Engineering Session · ${mm}:${ss}`
           : "PATH Engineering Session";
+    } else {
+      footer =
+        typeof product.cockpitPrompt === "string" && product.cockpitPrompt
+          ? product.cockpitPrompt
+          : "PATH ● Code > ";
     }
   }
   if (
@@ -707,9 +833,11 @@ export function buildLivingProductLines(state, viewport) {
   if (!isAg1 && pathPhase === "Infrastructure failure") {
     footer = product.disposed ? "☁ Disposed ✓" : "☁ Cleaning up…";
   }
-  lines.push(
-    fitLine(`│${padVisible(` ${style.dim(footer || "")}`, inner)}│`, columns),
-  );
+  const footerPainted =
+    product.awaitingInput === true
+      ? style.cyan(safeDisplay(footer || ""))
+      : style.dim(safeDisplay(footer || ""));
+  lines.push(fitLine(`│${padVisible(` ${footerPainted}`, inner)}│`, columns));
   lines.push(fitLine(`╰${"─".repeat(inner)}╯`, columns));
   return lines.slice(0, maxHeight);
 }
@@ -759,10 +887,20 @@ export function buildCompactAg1Lines(state, viewport) {
   const task =
     typeof product.taskBranch === "string" ? product.taskBranch : null;
   if (primary) {
-    lines.push(fitLine(`│${padVisible(style.dim(`  primary  ${primary}`), inner)}│`, columns));
+    lines.push(
+      fitLine(
+        `│${padVisible(style.dim(`  primary  ${safeDisplay(primary)}`), inner)}│`,
+        columns,
+      ),
+    );
   }
   if (task) {
-    lines.push(fitLine(`│${padVisible(style.cyan(`  task     ${task}`), inner)}│`, columns));
+    lines.push(
+      fitLine(
+        `│${padVisible(style.cyan(`  task     ${safeDisplay(task)}`), inner)}│`,
+        columns,
+      ),
+    );
   }
   const entries = Array.isArray(product.projectEntries) ? product.projectEntries : [];
   const totalFiles =
@@ -773,7 +911,20 @@ export function buildCompactAg1Lines(state, viewport) {
     lines.push(fitLine(`│${padVisible(style.dim("  (engineering…)"), inner)}│`, columns));
   } else {
     for (const e of entries.slice(0, 5)) {
-      lines.push(fitLine(`│${padVisible(`  ${e.path}`, inner)}│`, columns));
+      lines.push(
+        fitLine(
+          `│${padVisible(`  ${safeDisplay(e.path)}`, inner)}│`,
+          columns,
+        ),
+      );
+      if (e.role) {
+        lines.push(
+          fitLine(
+            `│${padVisible(style.dim(`    ${safeDisplay(e.role)}`), inner)}│`,
+            columns,
+          ),
+        );
+      }
     }
     if (totalFiles > 5) {
       lines.push(
@@ -788,16 +939,24 @@ export function buildCompactAg1Lines(state, viewport) {
   lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
   lines.push(fitLine(`│${padVisible(` ${style.bold(style.cyan("PATH"))}`, inner)}│`, columns));
   const mark = pathGlyph(pathPhase);
+  const phasePaint =
+    mark === "✓"
+      ? style.green
+      : mark === "✕"
+        ? style.red
+        : mark === "◐"
+          ? style.yellow
+          : style.cyan;
   lines.push(
     fitLine(
-      `│${padVisible(`  ${style.cyan(`${mark} ${pathPhase}`)}`, inner)}│`,
+      `│${padVisible(`  ${phasePaint(`${mark} ${safeDisplay(pathPhase)}`)}`, inner)}│`,
       columns,
     ),
   );
   if (typeof product.currentDetail === "string" && product.currentDetail) {
     lines.push(
       fitLine(
-        `│${padVisible(style.dim(`  ${product.currentDetail.slice(0, Math.max(12, inner - 4))}`), inner)}│`,
+        `│${padVisible(style.dim(`  ${safeDisplay(product.currentDetail).slice(0, Math.max(12, inner - 4))}`), inner)}│`,
         columns,
       ),
     );
@@ -812,15 +971,7 @@ export function buildCompactAg1Lines(state, viewport) {
     const detail = item.detail ? ` · ${item.detail}` : "";
     lines.push(
       fitLine(
-        `│${padVisible(style.dim(`  · ${label}${detail}`.slice(0, Math.max(12, inner - 4))), inner)}│`,
-        columns,
-      ),
-    );
-  }
-  if (typeof product.inspectCommand === "string" && product.inspectCommand && state.cards.terminal?.arrived) {
-    lines.push(
-      fitLine(
-        `│${padVisible(style.dim(`  ${product.inspectCommand}`), inner)}│`,
+        `│${padVisible(style.dim(`  · ${safeDisplay(`${label}${detail}`).slice(0, Math.max(12, inner - 4))}`), inner)}│`,
         columns,
       ),
     );
@@ -829,7 +980,60 @@ export function buildCompactAg1Lines(state, viewport) {
   lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
   lines.push(fitLine(`│${padVisible(` ${style.bold(style.cyan("EVIDENCE"))}`, inner)}│`, columns));
   for (const ev of buildEvidenceLines(state).slice(0, 8)) {
-    lines.push(fitLine(`│${padVisible(`  ${ev}`, inner)}│`, columns));
+    const painted = /\s✓\s*$/.test(ev)
+      ? style.green(ev)
+      : /\s✕\s*$/.test(ev)
+        ? style.red(ev)
+        : /\s●\s*$/.test(ev)
+          ? style.yellow(ev)
+          : style.dim(ev);
+    lines.push(fitLine(`│${padVisible(`  ${painted}`, inner)}│`, columns));
+  }
+
+  if (state.cards.terminal?.arrived) {
+    lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+    lines.push(
+      fitLine(`│${padVisible(` ${style.bold(style.cyan("RESULT"))}`, inner)}│`, columns),
+    );
+    const bits = [
+      typeof product.taskBranch === "string" ? product.taskBranch : null,
+      typeof product.resultSha === "string" ? product.resultSha.slice(0, 12) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    if (bits) {
+      lines.push(
+        fitLine(`│${padVisible(` ${style.dim(safeDisplay(bits))}`, inner)}│`, columns),
+      );
+    }
+    const preview = Array.isArray(product.diffPreviewLines)
+      ? product.diffPreviewLines.slice(0, 5)
+      : [];
+    for (const pl of preview) {
+      const tone = String(pl).startsWith("+")
+        ? style.green
+        : String(pl).startsWith("-")
+          ? style.red
+          : style.dim;
+      lines.push(
+        fitLine(
+          `│${padVisible(` ${tone(safeDisplay(pl).slice(0, Math.max(12, inner - 4)))}`, inner)}│`,
+          columns,
+        ),
+      );
+    }
+    if (
+      preview.length === 0 &&
+      typeof product.inspectCommand === "string" &&
+      product.inspectCommand
+    ) {
+      lines.push(
+        fitLine(
+          `│${padVisible(` ${style.dim(safeDisplay(product.inspectCommand))}`, inner)}│`,
+          columns,
+        ),
+      );
+    }
   }
 
   lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
@@ -840,14 +1044,19 @@ export function buildCompactAg1Lines(state, viewport) {
     sec != null
       ? `PATH Engineering Session · ${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`
       : "PATH Engineering Session";
-  if (
-    state.cards.terminal?.arrived &&
-    typeof product.inspectCommand === "string" &&
-    product.inspectCommand
-  ) {
-    footer = product.inspectCommand;
+  if (product.awaitingInput === true && typeof product.cockpitPrompt === "string") {
+    footer = product.cockpitPrompt;
+  } else if (state.cards.terminal?.arrived) {
+    footer =
+      typeof product.cockpitPrompt === "string" && product.cockpitPrompt
+        ? product.cockpitPrompt
+        : "PATH ● Code > ";
   }
-  lines.push(fitLine(`│${padVisible(` ${style.dim(footer)}`, inner)}│`, columns));
+  const footerPainted =
+    product.awaitingInput === true
+      ? style.cyan(safeDisplay(footer))
+      : style.dim(safeDisplay(footer));
+  lines.push(fitLine(`│${padVisible(` ${footerPainted}`, inner)}│`, columns));
   lines.push(fitLine(`╰${"─".repeat(inner)}╯`, columns));
   return lines.slice(0, maxHeight);
 }
@@ -1096,6 +1305,7 @@ export function createInlineStudioRenderer(options = {}) {
   /** @type {ReturnType<typeof createEmptyStudioState>} */
   let state = createEmptyStudioState();
   let active = false;
+  let sessionOwned = false;
   let prevHeight = 0;
   let needsReanchor = false;
   let cursorHidden = false;
@@ -1262,17 +1472,25 @@ export function createInlineStudioRenderer(options = {}) {
   function begin() {
     detachResize();
     clearPending();
-    restoreTerminalState();
-    state = createEmptyStudioState();
+    // Session-long cockpit: do not tear down alt-screen between tasks.
+    if (!sessionOwned) {
+      restoreTerminalState();
+      state = createEmptyStudioState();
+    }
     active = true;
-    prevHeight = 0;
-    prevLines = [];
+    sessionOwned = true;
+    prevHeight = sessionOwned && altScreenActive ? prevHeight : 0;
+    if (!altScreenActive) {
+      prevLines = [];
+      prevHeight = 0;
+    }
     needsReanchor = false;
     forceFull = true;
     writeCount = 0;
     frames.length = 0;
     lastFrameAt = 0;
-    if (enabled && typeof stdout.on === "function") {
+    state.product.awaitingInput = false;
+    if (enabled && typeof stdout.on === "function" && resizeListener === null) {
       resizeListener = () => {
         if (!active) return;
         forceFull = true;
@@ -1284,8 +1502,73 @@ export function createInlineStudioRenderer(options = {}) {
   }
 
   /**
+   * Soft-reset task-scoped fields while keeping the session-long alt screen
+   * and compact session history.
+   */
+  function startTask() {
+    const keep = {
+      sessionHistory: Array.isArray(state.product?.sessionHistory)
+        ? state.product.sessionHistory.slice()
+        : [],
+      projectName: state.product?.projectName ?? null,
+      branch: state.product?.branch ?? null,
+      primaryBranch: state.product?.primaryBranch ?? null,
+      dirtySummary: state.product?.dirtySummary ?? null,
+      ag1: true,
+    };
+    if (!sessionOwned || !active) {
+      begin();
+    }
+    state = createEmptyStudioState();
+    state.product.sessionHistory = keep.sessionHistory;
+    state.product.projectName = keep.projectName;
+    state.product.branch = keep.branch;
+    state.product.primaryBranch = keep.primaryBranch;
+    state.product.dirtySummary = keep.dirtySummary;
+    state.product.ag1 = keep.ag1;
+    state.product.awaitingInput = false;
+    state.product.cockpitPrompt = null;
+    forceFull = true;
+    dirty = true;
+    try {
+      stdout.write(HIDE_CURSOR);
+      cursorHidden = true;
+    } catch {
+      // ignore
+    }
+    scheduleFrame();
+  }
+
+  /**
+   * Show the in-cockpit idle prompt without leaving alternate screen.
+   * @param {string} promptText
+   */
+  function setIdlePrompt(promptText) {
+    if (!sessionOwned) begin();
+    active = true;
+    state.product.ag1 = true;
+    state.product.awaitingInput = true;
+    state.product.cockpitPrompt =
+      typeof promptText === "string" && promptText
+        ? promptText
+        : "PATH ● Code > ";
+    forceFull = true;
+    clearPending();
+    paintNow();
+    // Place the live readline cursor on the cockpit prompt row. Writing the
+    // prompt text (ending in "> ") also keeps scripted TTY harnesses feeding.
+    try {
+      const row = Math.max(1, prevLines.length || 1);
+      stdout.write(`${SHOW_CURSOR}\u001b[${row};3H${state.product.cockpitPrompt}`);
+      cursorHidden = false;
+    } catch {
+      // ignore
+    }
+  }
+
+  /**
    * End the card cycle: leave alt screen, restore cursor.
-   * Final durable summary is printed by the host on the normal screen.
+   * Only for explicit PATH exit / fatal restore — not after each task.
    */
   function finish() {
     clearPending();
@@ -1300,6 +1583,7 @@ export function createInlineStudioRenderer(options = {}) {
     exitAltScreen();
     if (cursorHidden) restoreCursor();
     active = false;
+    sessionOwned = false;
     prevHeight = 0;
     prevLines = [];
     needsReanchor = false;
@@ -1374,6 +1658,8 @@ export function createInlineStudioRenderer(options = {}) {
   return {
     enabled,
     begin,
+    startTask,
+    setIdlePrompt,
     onEvent,
     noteExternalWrite,
     noteDiagnostic,
@@ -1403,8 +1689,10 @@ export function installCollisionGuard(prompt, renderer) {
   prompt.write = (text) => {
     const raw = String(text ?? "");
     if (renderer.isActive() && renderer.enabled) {
+      // Session-long cockpit owns the TTY. Suppress scrollback dumps, including
+      // durable result banners and prompt redraws that would tear the frame.
       const interactive =
-        /Approve THIS|typing exactly:|Your task:|ESCAPE_LEGEND|APPLY |CHECK |SCOPE |RESTORE |\/recover|Goodbye|Usage:|Model set|PATH ●|Path Code >/i.test(
+        /Approve THIS|typing exactly:|Your task:|ESCAPE_LEGEND|APPLY |CHECK |SCOPE |RESTORE |\/recover|Goodbye|Usage:|Model set to|Autonomy set to|Unknown command|Internal error|checkpoint id|not a checkpoint/i.test(
           raw,
         );
       if (!interactive) {
@@ -1414,6 +1702,7 @@ export function installCollisionGuard(prompt, renderer) {
         }
         return;
       }
+      // Interactive challenges briefly surface; re-anchor after.
       renderer.noteExternalWrite();
     }
     return original(text);

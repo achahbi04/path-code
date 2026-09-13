@@ -1,0 +1,42 @@
+{
+  "sessionLong": {
+    "prompt1": true,
+    "altAtIdle": true,
+    "activity": true,
+    "resizeOk": true,
+    "afterCancelPrompt": true,
+    "altAfterCancel": true,
+    "verified": true,
+    "resultSection": true,
+    "promptAfterOk": true,
+    "altAfterOk": true,
+    "noExitBetweenTasks": true,
+    "literalU001b": false,
+    "exitAltOnQuit": true,
+    "showCursorOnQuit": true,
+    "childExitCode": 0,
+    "primaryUntouched": true,
+    "altEnterCount": 1
+  },
+  "colorProof": {
+    "prompt1": true,
+    "colorIdle": true,
+    "literalU001b": false,
+    "hasColorSgr": true,
+    "hasRealEsc": true,
+    "verified": true,
+    "resultSection": true,
+    "prompt2": true,
+    "altEnter": 1,
+    "stayedSingleEnter": true,
+    "exitAlt": true,
+    "showCursor": true,
+    "exitCode": 0,
+    "primaryUntouched": true,
+    "candidate": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs",
+    "packageRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+    "projectRoot": "/tmp/pathcode-g7-cockpit-color/repo"
+  },
+  "ansiRootCause": "fitLine() applied escapeForTerminalDisplay() to already-styled lines, converting trusted ESC 0x1b into literal \\u001b",
+  "productionSeamFixed": "fitLine preserves ESC; untrusted fragments use safeDisplay() before paint(); stdout.write receives real ANSI frames"
+}

@@ -86,3 +86,14 @@ restore helper · D large diff · E session handoff — PASS
 Antigravity remains the engineering engine. PATH owns project/task/session,
 worktree lifecycle, independent validation, durable Git result, optional GitHub
 delivery. No fake telemetry; timers animate only while work is pending.
+
+
+## Living Cockpit Completion (follow-on)
+
+**Root cause of literal ANSI:** `fitLine()` ran `escapeForTerminalDisplay()` on
+already-styled lines, turning trusted ESC `0x1b` into literal `\u001b`.
+
+**Fix:** `fitLine` preserves ESC; untrusted fragments use `safeDisplay()` before
+`paint()`. Session-long alt-screen cockpit keeps RESULT + prompt inside PATH.
+
+Evidence: `docs/reports/g7-evidence/live-cockpit/`

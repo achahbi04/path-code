@@ -1,0 +1,39 @@
+     │
+│  Workspace       ✓                                                                     │
+│  Mutation        ✓                                                                     │
+> ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ PATH ● Code                                                                                                          repo · main · clean │
+├─────────────────────────────────────────────┬─────────────────────────────────────────────┬──────────────────────────────────────────────┤
+│ PROJECT                                     │  PATH                                        │  EVIDENCE                                   │
+│                                             │                                              │                                             │
+│ repo                                        │  ✓ Verified                                  │  Workspace       ✓                          │
+│                                             │    2 file(s) changed                         │  Mutation        ✓                          │
+│ Branches                                    │                                              │  Typecheck     ✓                            │
+│   primary  main                             │  Recent                                      │  Tests         ✓                            │
+│   task     path/task-0f0acbbd-bbaa-42f5-91… │    · Applying · edit · Add subtract test ca… │  Final validate  ✓                          │
+│   clean                                     │    · Running command                         │  Result          ✓                          │
+│                                             │    · Testing                                 │                                             │
+│ Activity                                    │    · Testing · cmd tests                     │                                             │
+│   src/sum.js                                │    · Verifying                               │                                             │
+│     modified                                │                                              │                                             │
+│   test/sum.test.js                          │  Session                                     │                                             │
+│     modified                                │    ✓ Add subtract(a,b) in src/sum.js and no… │                                             │
+│   2 files changed                           │                                              │                                             │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ RESULT                                                                                                                                   │
+│ path/task-0f0acbbd-bbaa-42f5-91a1-5e629ad9328f · 31484fc1295b                                                                            │
+│ 2 files changed · Verified                                                                                                               │
+│ Diff preview                                                                                                                             │
+│ diff --git a/src/sum.js b/src/sum.js                                                                                                     │
+│ index 8148a6e..ecbedf2 100644                                                                                                            │
+│ --- a/src/sum.js                                                                                                                         │
+│ +++ b/src/sum.js                                                                                                                         │
+│ @@ -1 +1,2 @@                                                                                                                            │
+│  export function sum(a,b){return a+b;}                                                                                                   │
+│ +export function subtract(a,b){return a-b;}                                                                                              │
+│ diff --git a/test/sum.test.js b/test/sum.test.js                                                                                         │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ PATH ● Code >                                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+/quit
+Goodbye.

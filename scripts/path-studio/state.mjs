@@ -133,6 +133,13 @@ export function createEmptyStudioState() {
       diffPreviewShownFiles: 0,
       inspectCommand: null,
       preservedArtifact: null,
+      /** Compact multi-task history inside the session-long cockpit. */
+      sessionHistory: /** @type {Array<{ preview: string, classification: string }>} */ ([]),
+      /** Idle prompt text rendered inside the cockpit frame. */
+      cockpitPrompt: null,
+      awaitingInput: false,
+      /** Last task preview for session history. */
+      taskPreview: null,
       /** AG4 GitHub delivery projection. */
       deliveryPhase: null,
       /** @type {{ remote: string, baseBranch: string, taskBranch: string, status: string } | null} */
@@ -377,6 +384,18 @@ export function applyStudioEvent(state, event, opts = {}) {
       if (event.mode === "ag1") {
         state.product.ag1 = true;
       }
+      {
+        const preview =
+          typeof event.task === "string"
+            ? event.task
+            : typeof event.preview === "string"
+              ? event.preview
+              : null;
+        if (preview) {
+          state.product.taskPreview = preview.slice(0, 80);
+        }
+      }
+      state.product.awaitingInput = false;
       if (typeof event.modelId === "string") state.product.modelId = event.modelId;
       if (typeof event.provider === "string") {
         state.product.providerLabel = event.provider;
@@ -737,11 +756,7 @@ export function applyStudioEvent(state, event, opts = {}) {
     }
     case "session.engineering.bridge": {
       state.product.ag1 = true;
-      // Bridge/spawn diagnostics stay off the operator-facing detail line.
-      // Raw exit/code strings must not masquerade as the current command.
-      if (typeof event.detail === "string") {
-        state.product.pathDetail = event.detail.slice(0, 80);
-      }
+      // Bridge/spawn diagnostics stay off the operator-facing detail lines.
       break;
     }
     case "session.engineering.activity": {
@@ -866,6 +881,22 @@ export function applyStudioEvent(state, event, opts = {}) {
       } else if (kind === "inspect" || /view_file|list_dir|find_file|search_dir/i.test(tool)) {
         const pathMatch = summary.match(/(?:^|\s)([^\s]+?\.[A-Za-z0-9]{1,8})\b/);
         detail = pathMatch ? `read ${pathMatch[1]}` : `inspect ${tool || "files"}`;
+        if (pathMatch?.[1]) {
+          const p = pathMatch[1];
+          if (!state.product.projectFiles.includes(p)) {
+            state.product.projectFiles.push(p);
+          }
+          const entries = Array.isArray(state.product.projectEntries)
+            ? state.product.projectEntries
+            : [];
+          const existing = entries.find((e) => e.path === p);
+          if (existing) {
+            if (existing.role !== "modified") existing.role = "inspecting";
+          } else {
+            entries.push({ path: p, role: "inspecting" });
+          }
+          state.product.projectEntries = entries;
+        }
       }
       state.product.currentDetail = detail;
       state.product.pathDetail = detail.slice(0, 80);
@@ -884,6 +915,7 @@ export function applyStudioEvent(state, event, opts = {}) {
       state.product.finalValidationStarted = true;
       state.product.finalValidationComplete = true;
       state.product.engineCheckFeedback = null;
+      state.product.awaitingInput = false;
       if (Array.isArray(event.checks)) {
         state.product.ag1Checks = event.checks.map((c) => ({
           id: typeof c?.id === "string" ? c.id : "",
@@ -951,7 +983,17 @@ export function applyStudioEvent(state, event, opts = {}) {
       }));
       // Clear bridge/tool residue so the phase label owns the PATH column.
       state.product.currentDetail =
-        files.length > 0 ? `${files.length} file(s) changed` : null;
+        files.length > 0 ? `${files.length} file(s) changed` : "Engineering complete";
+      if (!Array.isArray(state.product.sessionHistory)) {
+        state.product.sessionHistory = [];
+      }
+      state.product.sessionHistory.push({
+        preview: String(state.product.taskPreview || "task").slice(0, 60),
+        classification,
+      });
+      if (state.product.sessionHistory.length > 8) {
+        state.product.sessionHistory = state.product.sessionHistory.slice(-8);
+      }
       setPathPhase(state, phase);
       break;
     }

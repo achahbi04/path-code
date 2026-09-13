@@ -247,7 +247,8 @@ function renderQuietStartup(info) {
   const branch = info.branch || "detached";
   const clean =
     info.clean === true ? "clean" : info.clean === false ? "dirty" : "unknown";
-  return `${name}\n${info.projectName} · ${branch} · ${clean}\n\n${name} > `;
+  // Identity only — the session-long cockpit owns the live prompt.
+  return `${name}\n${info.projectName} · ${branch} · ${clean}\n\n`;
 }
 
 /**
@@ -264,7 +265,12 @@ function promptPrefix(unicode, plain) {
  * @param {boolean} plain
  * @param {{ taskCount: number, modelCallCount: number }} sessionStats
  */
-function redrawPrompt(prompt, unicode, plain, sessionStats) {
+function redrawPrompt(prompt, unicode, plain, sessionStats, inlineStudio = null) {
+  if (inlineStudio && typeof inlineStudio.setIdlePrompt === "function") {
+    // Keep the operator inside the session-long cockpit.
+    inlineStudio.setIdlePrompt(promptPrefix(unicode, plain));
+    return;
+  }
   if (sessionStats.taskCount > 0) {
     const engine =
       typeof sessionStats.engineActivityCount === "number" &&
@@ -473,15 +479,19 @@ export async function runPathcodeMain(argv, testIo = {}) {
     alternateScreen: true,
   });
 
+  // Non-cockpit TTY (e.g. NDJSON on stdout): traditional scrollback prompt.
+  if (!ttyInline) {
+    stdout.write(promptPrefix(unicode, plain));
+  }
+
   /** @type {AbortController | null} */
   let cycleAbort = null;
 
   installTerminalRestoreGuards({
     onSigint: () => {
-      if (
-        inlineStudio.isActive() ||
-        (typeof prompt?.isCycleActive === "function" && prompt.isCycleActive())
-      ) {
+      // Only cooperative-cancel while an engineering cycle is active.
+      // Session-long cockpit stays active between tasks; idle Ctrl-C exits PATH.
+      if (typeof prompt?.isCycleActive === "function" && prompt.isCycleActive()) {
         if (typeof prompt.requestCycleCancel === "function") {
           prompt.requestCycleCancel();
         }
@@ -530,12 +540,18 @@ export async function runPathcodeMain(argv, testIo = {}) {
   async function runCycle(cycle) {
     cycleAbort = new AbortController();
     if (typeof prompt.beginCycle === "function") prompt.beginCycle();
-    if (ttyInline) inlineStudio.begin();
+    if (ttyInline) {
+      if (typeof inlineStudio.startTask === "function") {
+        inlineStudio.startTask();
+      } else {
+        inlineStudio.begin();
+      }
+    }
     try {
       return await cycle(cycleAbort.signal);
     } finally {
       cycleAbort = null;
-      if (ttyInline) inlineStudio.finish();
+      // Session-long cockpit: keep alt-screen; do not finish() after each task.
       if (typeof prompt.endCycle === "function") prompt.endCycle();
       if (typeof prompt.clearStop === "function") prompt.clearStop();
     }
@@ -699,7 +715,10 @@ export async function runPathcodeMain(argv, testIo = {}) {
       typeof cycleNote.durableSummary === "string" &&
       cycleNote.durableSummary.trim()
     ) {
-      prompt.write(`\n${cycleNote.durableSummary}`);
+      // Session-long cockpit keeps the result inside the frame — no scrollback dump.
+      if (!ttyInline) {
+        prompt.write(`\n${cycleNote.durableSummary}`);
+      }
     }
     return cycleNote;
   }
@@ -760,8 +779,28 @@ export async function runPathcodeMain(argv, testIo = {}) {
         issueNumber: issueSeed.number,
         issueTitle: issueSeed.title,
       });
-      redrawPrompt(prompt, unicode, plain, sessionStats);
+      redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
       issueSeed = null;
+    } else if (ttyInline) {
+      // Enter the session-long cockpit immediately; prompt lives inside PATH.
+      inlineStudio.begin();
+      inlineStudio.onEvent({
+        type: "session.started",
+        sessionId,
+      });
+      inlineStudio.onEvent({
+        type: "session.preflight",
+        sessionId,
+        branch: gitSummary.branch || "unknown",
+        dirtySummary:
+          gitSummary.clean === true
+            ? "clean"
+            : gitSummary.clean === false
+              ? "dirty"
+              : "unknown",
+        projectName,
+      });
+      redrawPrompt(prompt, unicode, plain, sessionStats, inlineStudio);
     }
 
     while (!prompt.isStopped()) {
@@ -773,7 +812,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
       }
       const cmd = line.trim();
       if (cmd === "") {
-        prompt.write(promptPrefix(unicode, plain));
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }
       if (cmd === "/exit" || cmd === "/quit") {
@@ -783,7 +822,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
       }
       if (cmd === "/help") {
         prompt.write(renderHelpText({ unicode, plain }));
-        redrawPrompt(prompt, unicode, plain, sessionStats);
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }
 
@@ -793,12 +832,12 @@ export async function runPathcodeMain(argv, testIo = {}) {
         const next = parts[1];
         if (parts.length !== 2 || !next || next.startsWith("-")) {
           prompt.write("Usage: /model <id>\n");
-          redrawPrompt(prompt, unicode, plain, sessionStats);
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
           continue;
         }
         modelId = next.trim();
         prompt.write(`Model set to ${modelId} for subsequent tasks.\n`);
-        redrawPrompt(prompt, unicode, plain, sessionStats);
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }
       if (cmd.startsWith("/autonomy")) {
@@ -806,18 +845,18 @@ export async function runPathcodeMain(argv, testIo = {}) {
         const next = parts[1];
         if (parts.length !== 2 || !next) {
           prompt.write("Usage: /autonomy <review|bounded>\n");
-          redrawPrompt(prompt, unicode, plain, sessionStats);
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
           continue;
         }
         const parsedAutonomy = parseAutonomyMode(next);
         if (!parsedAutonomy.ok) {
           prompt.write(`${parsedAutonomy.message}\n`);
-          redrawPrompt(prompt, unicode, plain, sessionStats);
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
           continue;
         }
         autonomyMode = parsedAutonomy.mode;
         prompt.write(`Autonomy set to ${autonomyMode} for subsequent tasks.\n`);
-        redrawPrompt(prompt, unicode, plain, sessionStats);
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }
 
@@ -825,7 +864,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
         const prereq = resolveRuntimePrerequisites(root);
         if (!prereq.ok) {
           prompt.write(`${prereq.message}\n`);
-          redrawPrompt(prompt, unicode, plain, sessionStats);
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
           continue;
         }
         await runCycle(async () => {
@@ -847,7 +886,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
             lastExitCode = 1;
           }
         });
-        redrawPrompt(prompt, unicode, plain, sessionStats);
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }
 
@@ -858,13 +897,13 @@ export async function runPathcodeMain(argv, testIo = {}) {
         const parsedCommand = parseRecoverCommand(cmd);
         if (!parsedCommand.ok) {
           prompt.write(`${parsedCommand.message ?? "Usage: /recover <checkpoint-id>"}\n`);
-          redrawPrompt(prompt, unicode, plain, sessionStats);
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
           continue;
         }
         const prereq = resolveRuntimePrerequisites(root);
         if (!prereq.ok) {
           prompt.write(`${prereq.message}\n`);
-          redrawPrompt(prompt, unicode, plain, sessionStats);
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
           continue;
         }
         await runCycle(async () => {
@@ -883,14 +922,14 @@ export async function runPathcodeMain(argv, testIo = {}) {
             lastExitCode = 1;
           }
         });
-        redrawPrompt(prompt, unicode, plain, sessionStats);
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }
 
       if (cmd.startsWith("/")) {
         prompt.write(`Unknown command: ${cmd}\n`);
         prompt.write(renderHelpText({ unicode, plain }));
-        redrawPrompt(prompt, unicode, plain, sessionStats);
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }
 
@@ -898,19 +937,19 @@ export async function runPathcodeMain(argv, testIo = {}) {
       const packageCheck = assertPathPackagePresent(root);
       if (!packageCheck.ok) {
         prompt.write(`${packageCheck.message}\n`);
-        redrawPrompt(prompt, unicode, plain, sessionStats);
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }
       if (args.execution === "cloud") {
         const prereq = resolveRuntimePrerequisites(root);
         if (!prereq.ok) {
           prompt.write(`${prereq.message}\n`);
-          redrawPrompt(prompt, unicode, plain, sessionStats);
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
           continue;
         }
       }
       await runEngineeringTask(cmd);
-      redrawPrompt(prompt, unicode, plain, sessionStats);
+      redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
       void lastExitCode;
     }
     if (ttyInline) inlineStudio.finish();

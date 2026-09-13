@@ -113,9 +113,10 @@ describe("R2 living session loop (shell)", () => {
     expect(seen).toHaveLength(2);
     expect(seen[0]!.taskText).toBe("first task please");
     expect(seen[1]!.taskText).toBe("second task please");
-    expect(output).toContain("Session so far: 1 task, 3 engineering activities.");
-    expect(output).toContain("Session so far: 2 tasks, 6 engineering activities.");
+    expect(output).toMatch(/PATH [●*] Code >/);
     expect(output).toContain("Goodbye.");
+    // Session-long cockpit: continuity stays in-frame (no scrollback session dump).
+    expect(output).toMatch(/\u001b\[\?1049h/);
   });
 
   it("R2-F: declining keeps the session; next task runs", async () => {
@@ -135,7 +136,8 @@ describe("R2 living session loop (shell)", () => {
     );
     expect(exitCode).toBe(0);
     expect(outcomes).toEqual(["declined", "ran"]);
-    expect(output).toContain("Session so far: 2 tasks");
+    expect(output).toMatch(/PATH [●*] Code >/);
+    expect(output).toContain("Goodbye.");
   });
 
   it("R2-H: escalation keeps the session", async () => {
@@ -210,7 +212,8 @@ describe("R2 living session loop (shell)", () => {
     expect(exitCode).toBe(0);
     expect(n).toBe(2);
     expect(output).toContain("Internal error (session continues): forced internal fault");
-    expect(output).toContain("Session so far: 2 tasks");
+    expect(output).toMatch(/PATH [●*] Code >/);
+    expect(output).toContain("Goodbye.");
   });
 
   it("R2-J: /recover between tasks returns to the prompt", async () => {
