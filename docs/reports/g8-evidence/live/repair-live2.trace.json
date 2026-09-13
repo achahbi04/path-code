@@ -1,0 +1,78 @@
+[
+  {
+    "type": "session.engineering.activity",
+    "activity": "complete",
+    "label": "Finishing"
+  },
+  {
+    "type": "session.engineering.handoff"
+  },
+  {
+    "type": "session.validation.plan"
+  },
+  {
+    "type": "session.validation.running",
+    "check": "npm-typecheck"
+  },
+  {
+    "type": "session.validation.running",
+    "check": "npm-test"
+  },
+  {
+    "type": "session.validation.result",
+    "check": "npm-typecheck",
+    "ok": true,
+    "status": "PASSED"
+  },
+  {
+    "type": "session.validation.result",
+    "check": "npm-test",
+    "ok": false,
+    "status": "FAILED"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "repairing",
+    "label": "Repairing"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "repairing",
+    "label": "Repairing"
+  },
+  {
+    "type": "session.engineering.activity",
+    "activity": "complete",
+    "label": "Finishing"
+  },
+  {
+    "type": "session.engineering.handoff"
+  },
+  {
+    "type": "session.validation.plan"
+  },
+  {
+    "type": "session.validation.running",
+    "check": "npm-typecheck"
+  },
+  {
+    "type": "session.validation.running",
+    "check": "npm-test"
+  },
+  {
+    "type": "session.validation.result",
+    "check": "npm-typecheck",
+    "ok": true,
+    "status": "PASSED"
+  },
+  {
+    "type": "session.validation.result",
+    "check": "npm-test",
+    "ok": true,
+    "status": "PASSED"
+  },
+  {
+    "type": "session.terminal",
+    "disposition": "VERIFIED"
+  }
+]

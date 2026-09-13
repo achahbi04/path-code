@@ -1,0 +1,159 @@
+{
+  "capturedAt": "2026-09-13T21:53:55.611Z",
+  "fixtureRoot": "/tmp/pathcode-g8-mcp/repo",
+  "mcpConfigPath": "/tmp/pathcode-g8-mcp/repo/.mcp.json",
+  "readonlyServerScript": "/tmp/pathcode-g8-mcp/readonly-mcp-server.mjs",
+  "sdkNote": "SDK_NOTE=sdk_pack_ok_but_stub_used_for_stdio_simplicity",
+  "discoveredServerNames": [
+    "docs",
+    "evil_deploy",
+    "mixed_workspace"
+  ],
+  "policyResults": [
+    {
+      "name": "docs",
+      "enabled": true,
+      "trustClass": "read_only",
+      "denialReason": null,
+      "enabled_tools": [
+        "lookup_doc"
+      ],
+      "disabled_tools": null,
+      "envAfterSanitize": {
+        "PATH": "/usr/bin:/bin",
+        "HOME": "/tmp",
+        "LANG": "C"
+      },
+      "classifiedTools": [
+        {
+          "name": "lookup_doc",
+          "description": "read-only documentation lookup / search project docs",
+          "trust": "read_only"
+        }
+      ],
+      "command": "node",
+      "args": [
+        "/tmp/pathcode-g8-mcp/readonly-mcp-server.mjs"
+      ]
+    },
+    {
+      "name": "evil_deploy",
+      "enabled": false,
+      "trustClass": "external_mutation",
+      "denialReason": "external_mutation tools denied; no read_only tools remain",
+      "enabled_tools": [],
+      "disabled_tools": [
+        "deploy_prod",
+        "billing_charge"
+      ],
+      "envAfterSanitize": {
+        "PATH": "/usr/bin"
+      },
+      "classifiedTools": [
+        {
+          "name": "deploy_prod",
+          "description": "deploy and publish to production cloud",
+          "trust": "external_mutation"
+        },
+        {
+          "name": "billing_charge",
+          "description": "charge billing account / invoice payment",
+          "trust": "external_mutation"
+        }
+      ],
+      "command": "node",
+      "args": [
+        "-e",
+        "process.stderr.write('evil stub should never run\n'); process.exit(1)"
+      ]
+    },
+    {
+      "name": "mixed_workspace",
+      "enabled": true,
+      "trustClass": "read_only",
+      "denialReason": "mutation tools hidden; only read_only tools exposed to engine",
+      "enabled_tools": [
+        "list_files"
+      ],
+      "disabled_tools": [
+        "write_file",
+        "deploy_prod"
+      ],
+      "envAfterSanitize": {
+        "PATH": "/usr/bin"
+      },
+      "classifiedTools": [
+        {
+          "name": "list_files",
+          "description": "list files read-only in the workspace",
+          "trust": "read_only"
+        },
+        {
+          "name": "write_file",
+          "description": "write a file in the workspace",
+          "trust": "workspace_mutation"
+        },
+        {
+          "name": "deploy_prod",
+          "description": "deploy and publish to cloud",
+          "trust": "external_mutation"
+        }
+      ],
+      "command": "node",
+      "args": [
+        "-e",
+        "process.exit(0)"
+      ]
+    }
+  ],
+  "antigravityMcpServersEnabledOnly": [
+    {
+      "type": "stdio",
+      "name": "docs",
+      "command": "node",
+      "args": [
+        "/tmp/pathcode-g8-mcp/readonly-mcp-server.mjs"
+      ],
+      "env": {
+        "PATH": "/usr/bin:/bin",
+        "HOME": "/tmp",
+        "LANG": "C"
+      },
+      "enabled_tools": [
+        "lookup_doc"
+      ]
+    },
+    {
+      "type": "stdio",
+      "name": "mixed_workspace",
+      "command": "node",
+      "args": [
+        "-e",
+        "process.exit(0)"
+      ],
+      "env": {
+        "PATH": "/usr/bin"
+      },
+      "enabled_tools": [
+        "list_files"
+      ],
+      "disabled_tools": [
+        "write_file",
+        "deploy_prod"
+      ]
+    }
+  ],
+  "assertionsObserved": {
+    "docs_enabled": true,
+    "docs_lookup_doc_only": true,
+    "evil_deploy_disabled": true,
+    "evil_deploy_external": true,
+    "mixed_hides_mutations_keeps_list": true,
+    "secrets_stripped": true
+  },
+  "stdioToolsListProbe": {
+    "status": 0,
+    "stdoutTail": "Content-Length: 221\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"name\":\"lookup_doc\",\"description\":\"Read-only documentation lookup returning fixed project docs text\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"topic\":{\"type\":\"string\"}}}}]}}",
+    "stderrTail": ""
+  }
+}

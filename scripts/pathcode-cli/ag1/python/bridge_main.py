@@ -24,18 +24,48 @@ def _emit(obj: dict[str, Any]) -> None:
     sys.stdout.flush()
 
 
+def _looks_like_mcp_tool(name: str, args: dict[str, Any] | None = None) -> bool:
+    n = (name or "").lower()
+    args = args or {}
+    if args.get("server_name") or args.get("serverName") or args.get("mcp_server"):
+        return True
+    if "mcp" in n:
+        return True
+    # Antigravity MCP tools are often namespaced as "server/tool".
+    if "/" in n and not n.startswith(("http://", "https://", "./", "../")):
+        return True
+    return False
+
+
 def _activity_for_tool(name: str, args: dict[str, Any] | None = None) -> str:
     n = (name or "").lower()
     args = args or {}
+    if _looks_like_mcp_tool(name, args):
+        return "mcp"
     cmd = str(args.get("CommandLine") or args.get("command") or "").lower()
     if n in ("view_file", "list_directory", "find_file", "search_directory"):
         return "inspecting"
     if n in ("edit_file", "create_file"):
         return "editing"
     if n == "run_command":
-        if any(t in cmd for t in ("test", "vitest", "pytest", "jest", "mocha")):
+        test_markers = (
+            "test",
+            "vitest",
+            "pytest",
+            "jest",
+            "mocha",
+            "cargo test",
+            "cargo check",
+            "go test",
+            "ctest",
+            "cmake --build",
+            "bazel test",
+            "mvn test",
+            "gradle test",
+        )
+        if any(t in cmd for t in test_markers):
             return "testing"
-        if any(t in cmd for t in ("tsc", "typecheck", "mypy", "eslint", "lint")):
+        if any(t in cmd for t in ("tsc", "typecheck", "mypy", "eslint", "lint", "cargo clippy")):
             return "testing"
         if any(t in cmd for t in ("build", "compile")):
             return "testing"
@@ -45,6 +75,55 @@ def _activity_for_tool(name: str, args: dict[str, Any] | None = None) -> str:
     if n in ("ask_question",):
         return "understanding"
     return "inspecting"
+
+
+def _normalize_mcp_servers(raw: Any) -> list[Any]:
+    """Coerce start-payload mcpServers into LocalAgentConfig mcp_servers entries."""
+    if not isinstance(raw, list) or not raw:
+        return []
+    try:
+        from google.antigravity.types import McpStdioServer, McpStreamableHttpServer
+    except Exception:  # noqa: BLE001
+        # Fall back to plain dicts; pydantic may still coerce.
+        return [item for item in raw if isinstance(item, dict)]
+
+    servers: list[Any] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            stype = str(item.get("type") or "stdio").lower()
+            name = str(item.get("name") or "mcp")
+            common: dict[str, Any] = {"name": name}
+            if item.get("enabled_tools") is not None:
+                common["enabled_tools"] = item.get("enabled_tools")
+            if item.get("disabled_tools") is not None:
+                common["disabled_tools"] = item.get("disabled_tools")
+            if item.get("timeout_seconds") is not None:
+                common["timeout_seconds"] = item.get("timeout_seconds")
+            if stype in ("http", "streamable_http", "sse"):
+                url = item.get("url")
+                if not url:
+                    continue
+                kwargs: dict[str, Any] = {**common, "url": str(url)}
+                if item.get("headers") is not None:
+                    kwargs["headers"] = item.get("headers")
+                servers.append(McpStreamableHttpServer(**kwargs))
+            else:
+                command = item.get("command")
+                if not command:
+                    continue
+                kwargs = {
+                    **common,
+                    "command": str(command),
+                    "args": list(item.get("args") or []),
+                }
+                if item.get("env") is not None:
+                    kwargs["env"] = item.get("env")
+                servers.append(McpStdioServer(**kwargs))
+        except Exception as exc:  # noqa: BLE001
+            _diag(f"mcp server config skipped: {exc!r}")
+    return servers
 
 
 _HIGH_RISK_PATTERNS = [
@@ -87,6 +166,9 @@ def _is_within(root: Path, path: Path) -> bool:
 class BridgeState:
     def __init__(self) -> None:
         self.cancel_requested = asyncio.Event()
+        self.continue_event = asyncio.Event()
+        self.continue_text: str | None = None
+        self.done_event = asyncio.Event()
         self.agent = None
         self.task: asyncio.Task | None = None
         self.workspace: Path | None = None
@@ -94,6 +176,8 @@ class BridgeState:
 
 
 STATE = BridgeState()
+MAX_CONTINUES = 3
+CONTINUE_WAIT_SECONDS = 300.0
 
 
 async def _run_engineering_task(payload: dict[str, Any]) -> None:
@@ -257,7 +341,15 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                 # PostToolCallHook receives ToolResult (name/result/…).
                 name = getattr(data, "name", "") or ""
                 result_text = str(getattr(data, "result", "") or "")
-                activity = _activity_for_tool(str(name), {"CommandLine": result_text})
+                server_name = (
+                    getattr(data, "server_name", None)
+                    or getattr(data, "serverName", None)
+                    or ""
+                )
+                observe_args: dict[str, Any] = {"CommandLine": result_text}
+                if server_name:
+                    observe_args["server_name"] = str(server_name)
+                activity = _activity_for_tool(str(name), observe_args)
                 kind = (
                     "command"
                     if "run_command" in str(name)
@@ -267,14 +359,18 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                 )
                 if activity == "testing":
                     kind = "test"
-                _emit(
-                    {
-                        "type": "activity",
-                        "taskId": task_id,
-                        "activity": activity,
-                        "tool": str(name),
-                    }
-                )
+                if activity == "mcp":
+                    kind = "mcp"
+                activity_msg: dict[str, Any] = {
+                    "type": "activity",
+                    "taskId": task_id,
+                    "activity": activity,
+                    "tool": str(name),
+                }
+                if activity == "mcp":
+                    detail = str(server_name or name)[:120]
+                    activity_msg["detail"] = detail
+                _emit(activity_msg)
                 summary = f"{name} {result_text}".strip()[:400]
                 _emit(
                     {
@@ -300,6 +396,10 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
     if allow_shell:
         enabled.append(BuiltinTools.RUN_COMMAND)
 
+    mcp_servers = _normalize_mcp_servers(
+        payload.get("mcpServers") or payload.get("mcp_servers")
+    )
+
     policies = [
         *policy.workspace_only([str(workspace)]),
         policy.deny(BuiltinTools.SEARCH_WEB.value),
@@ -320,6 +420,20 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
     else:
         policies.append(policy.deny(BuiltinTools.RUN_COMMAND.value))
 
+    # Allow only the filtered MCP tools PATH already scoped (enabled_tools).
+    # Without this, deny_all hides/denies MCP even when LocalAgentConfig lists servers.
+    for mcp_cfg in mcp_servers:
+        enabled_tools = getattr(mcp_cfg, "enabled_tools", None)
+        try:
+            if isinstance(enabled_tools, list) and enabled_tools:
+                policies.extend(policy.allow(mcp_cfg, mcp_tools=enabled_tools))
+            else:
+                # No explicit allowlist on the config → server-wide allow for
+                # this trusted/filtered server only (still deny_all for others).
+                policies.extend(policy.allow(mcp_cfg))
+        except Exception as exc:  # noqa: BLE001
+            _diag(f"mcp policy allow failed: {exc!r}")
+
     # Deny-by-default for anything else.
     policies.insert(0, policy.deny_all())
 
@@ -333,6 +447,12 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
         "When finished, use the finish tool. Do not ask the operator clarifying "
         "questions."
     )
+    capability_brief = payload.get("capabilityBrief") or payload.get("capability_brief")
+    if isinstance(capability_brief, str) and capability_brief.strip():
+        system_instructions = (
+            f"{system_instructions}\n\nCapability briefing (factual):\n"
+            f"{capability_brief.strip()[:4000]}"
+        )
 
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     project = os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ.get(
@@ -375,6 +495,9 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
             max_tool_calls=max_tool_calls,
         ),
     }
+    if mcp_servers:
+        config_kwargs["mcp_servers"] = mcp_servers
+        _diag(f"mcp_servers={len(mcp_servers)}")
     if use_vertex and project:
         config_kwargs["vertex"] = True
         config_kwargs["project"] = project
@@ -413,6 +536,87 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
 
             cancel_watcher = asyncio.create_task(_watch_cancel())
             try:
+                loop = asyncio.get_running_loop()
+                deadline = loop.time() + (wall_ms / 1000.0)
+
+                async def _drain_response(response: Any) -> str:
+                    async def _drain_tools() -> None:
+                        try:
+                            async for call in response.tool_calls:
+                                name = getattr(call, "name", "") or ""
+                                args = dict(getattr(call, "args", None) or {})
+                                activity = _activity_for_tool(str(name), args)
+                                msg: dict[str, Any] = {
+                                    "type": "activity",
+                                    "taskId": task_id,
+                                    "activity": activity,
+                                    "tool": str(name),
+                                }
+                                if activity == "mcp":
+                                    detail = str(
+                                        args.get("server_name")
+                                        or args.get("serverName")
+                                        or name
+                                    )[:120]
+                                    msg["detail"] = detail
+                                _emit(msg)
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception as exc:  # noqa: BLE001
+                            _diag(f"tool_calls stream: {exc!r}")
+                            raise
+
+                    async def _drain_text() -> str:
+                        return await response.text()
+
+                    tools_task = asyncio.create_task(_drain_tools())
+                    try:
+                        # Shield the response drain so harness teardown CancelledError
+                        # cannot swallow a real engine/auth failure mid-flight.
+                        text = await asyncio.shield(_drain_text())
+                    except Exception as exc:  # noqa: BLE001
+                        tools_task.cancel()
+                        with contextlib.suppress(Exception):
+                            await tools_task
+                        raise RuntimeError(
+                            f"engineering response failed: {exc!r}"
+                        ) from exc
+                    with contextlib.suppress(Exception):
+                        await tools_task
+                    return text or ""
+
+                async def _wait_parent_signal(timeout_s: float) -> str:
+                    """Return 'continue' | 'done' | 'cancel' | 'timeout'."""
+                    STATE.continue_event.clear()
+                    cont_t = asyncio.create_task(STATE.continue_event.wait())
+                    done_t = asyncio.create_task(STATE.done_event.wait())
+                    cancel_t = asyncio.create_task(STATE.cancel_requested.wait())
+                    try:
+                        done_set, pending = await asyncio.wait(
+                            {cont_t, done_t, cancel_t},
+                            timeout=max(0.1, timeout_s),
+                            return_when=asyncio.FIRST_COMPLETED,
+                        )
+                        for t in pending:
+                            t.cancel()
+                            with contextlib.suppress(asyncio.CancelledError):
+                                await t
+                        if STATE.cancel_requested.is_set():
+                            return "cancel"
+                        if STATE.done_event.is_set():
+                            return "done"
+                        if STATE.continue_event.is_set():
+                            return "continue"
+                        if not done_set:
+                            return "timeout"
+                        return "timeout"
+                    finally:
+                        for t in (cont_t, done_t, cancel_t):
+                            if not t.done():
+                                t.cancel()
+                                with contextlib.suppress(asyncio.CancelledError):
+                                    await t
+
                 prompt = (
                     f"Engineering task:\n{task_text}\n\n"
                     f"Workspace: {workspace}\n"
@@ -423,44 +627,9 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                     "only reading files — implement the fix. Prefer the default command "
                     "cwd for package-local validation when it differs from the workspace root."
                 )
-                response = await asyncio.wait_for(
-                    agent.chat(prompt), timeout=wall_ms / 1000.0
-                )
-
-                async def _drain_tools() -> None:
-                    try:
-                        async for call in response.tool_calls:
-                            name = getattr(call, "name", "") or ""
-                            args = dict(getattr(call, "args", None) or {})
-                            _emit(
-                                {
-                                    "type": "activity",
-                                    "taskId": task_id,
-                                    "activity": _activity_for_tool(str(name), args),
-                                    "tool": str(name),
-                                }
-                            )
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception as exc:  # noqa: BLE001
-                        _diag(f"tool_calls stream: {exc!r}")
-                        raise
-
-                async def _drain_text() -> str:
-                    return await response.text()
-
-                tools_task = asyncio.create_task(_drain_tools())
-                try:
-                    # Shield the response drain so harness teardown CancelledError
-                    # cannot swallow a real engine/auth failure mid-flight.
-                    text = await asyncio.shield(_drain_text())
-                except Exception as exc:  # noqa: BLE001
-                    tools_task.cancel()
-                    with contextlib.suppress(Exception):
-                        await tools_task
-                    raise RuntimeError(f"engineering response failed: {exc!r}") from exc
-                with contextlib.suppress(Exception):
-                    await tools_task
+                remaining = max(1.0, deadline - loop.time())
+                response = await asyncio.wait_for(agent.chat(prompt), timeout=remaining)
+                text = await _drain_response(response)
 
                 if STATE.cancel_requested.is_set():
                     _emit({"type": "cancelled", "taskId": task_id})
@@ -473,6 +642,50 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                         "summary": (text or "")[:2000],
                     }
                 )
+
+                continues = 0
+                while continues < MAX_CONTINUES:
+                    remaining = deadline - loop.time()
+                    if remaining <= 1.0:
+                        _diag("continue wait skipped: wall clock exhausted")
+                        break
+                    wait_s = min(CONTINUE_WAIT_SECONDS, remaining)
+                    signal = await _wait_parent_signal(wait_s)
+                    if signal == "cancel":
+                        _emit({"type": "cancelled", "taskId": task_id})
+                        return
+                    if signal in ("done", "timeout"):
+                        _diag(f"continue loop end: {signal}")
+                        break
+
+                    continue_text = STATE.continue_text or ""
+                    STATE.continue_text = None
+                    continues += 1
+                    _emit(
+                        {
+                            "type": "activity",
+                            "taskId": task_id,
+                            "activity": "repairing",
+                            "detail": "same-session repair",
+                        }
+                    )
+                    remaining = max(1.0, deadline - loop.time())
+                    response = await asyncio.wait_for(
+                        agent.chat(continue_text), timeout=remaining
+                    )
+                    text = await _drain_response(response)
+
+                    if STATE.cancel_requested.is_set():
+                        _emit({"type": "cancelled", "taskId": task_id})
+                        return
+
+                    _emit(
+                        {
+                            "type": "finished",
+                            "taskId": task_id,
+                            "summary": (text or "")[:2000],
+                        }
+                    )
             finally:
                 cancel_watcher.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
@@ -579,7 +792,18 @@ async def _stdin_loop() -> None:
                 )
                 continue
             STATE.cancel_requested.clear()
+            STATE.continue_event.clear()
+            STATE.done_event.clear()
+            STATE.continue_text = None
             STATE.task = asyncio.create_task(_run_engineering_task(msg))
+        elif mtype == "continue":
+            text = msg.get("text")
+            STATE.continue_text = str(text) if text is not None else ""
+            STATE.continue_event.set()
+            _diag(f"continue command received chars={len(STATE.continue_text)}")
+        elif mtype == "done":
+            STATE.done_event.set()
+            _diag("done command received")
         elif mtype == "cancel":
             _diag("cancel command received")
             STATE.cancel_requested.set()
@@ -587,6 +811,7 @@ async def _stdin_loop() -> None:
                 STATE.task.cancel()
         elif mtype == "close":
             _diag("close command received")
+            STATE.done_event.set()
             STATE.cancel_requested.set()
             if STATE.task and not STATE.task.done():
                 STATE.task.cancel()

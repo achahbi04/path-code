@@ -4,7 +4,7 @@
  * project file exists and the host binary is available.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -185,10 +185,27 @@ export function discoverNativeValidationCandidates(projectRoot, options = {}) {
     }
   }
 
-  // Rust
+  // Rust — cargo check (static) before cargo test when available.
   if (existsSync(join(root, "Cargo.toml"))) {
     const cargo = resolveHostBinary("cargo", toolRoots);
     if (cargo) {
+      candidates.push({
+        id: "cargo-check",
+        kind: "TYPECHECK",
+        source: "CARGO_CHECK",
+        label: "cargo check",
+        request: {
+          executable: cargo,
+          argv: ["check"],
+          cwd: root,
+          timeoutMs: NATIVE_TIMEOUT_MS,
+        },
+        disclosure: {
+          command: "cargo check",
+          chain: [],
+          lifecycleHooks: [],
+        },
+      });
       candidates.push({
         id: "cargo-test",
         kind: "TARGETED_TEST",
@@ -206,6 +223,135 @@ export function discoverNativeValidationCandidates(projectRoot, options = {}) {
           lifecycleHooks: [],
         },
       });
+    }
+  }
+
+  // Make — only admit test/check when the Makefile declares those targets.
+  const makefilePath = join(root, "Makefile");
+  if (existsSync(makefilePath)) {
+    const makeBin = resolveHostBinary("make", toolRoots);
+    if (makeBin) {
+      let makefileText = "";
+      try {
+        makefileText = readFileSync(makefilePath, "utf8");
+      } catch {
+        makefileText = "";
+      }
+      if (/^test\s*:/m.test(makefileText)) {
+        candidates.push({
+          id: "make-test",
+          kind: "TARGETED_TEST",
+          source: "MAKE_TEST",
+          label: "make test",
+          request: {
+            executable: makeBin,
+            argv: ["test"],
+            cwd: root,
+            timeoutMs: NATIVE_TIMEOUT_MS,
+          },
+          disclosure: {
+            command: "make test",
+            chain: [],
+            lifecycleHooks: [],
+          },
+        });
+      } else if (/^check\s*:/m.test(makefileText)) {
+        candidates.push({
+          id: "make-check",
+          kind: "TARGETED_TEST",
+          source: "MAKE_CHECK",
+          label: "make check",
+          request: {
+            executable: makeBin,
+            argv: ["check"],
+            cwd: root,
+            timeoutMs: NATIVE_TIMEOUT_MS,
+          },
+          disclosure: {
+            command: "make check",
+            chain: [],
+            lifecycleHooks: [],
+          },
+        });
+      }
+    }
+  }
+
+  // CMake — ctest only when an existing build/ tree is present (configured).
+  if (existsSync(join(root, "CMakeLists.txt")) && existsSync(join(root, "build"))) {
+    const ctest = resolveHostBinary("ctest", toolRoots);
+    if (ctest) {
+      candidates.push({
+        id: "ctest",
+        kind: "TARGETED_TEST",
+        source: "CTEST",
+        label: "ctest --test-dir build",
+        request: {
+          executable: ctest,
+          argv: ["--test-dir", "build", "--output-on-failure"],
+          cwd: root,
+          timeoutMs: NATIVE_TIMEOUT_MS,
+        },
+        disclosure: {
+          command: "ctest --test-dir build --output-on-failure",
+          chain: [],
+          lifecycleHooks: [],
+        },
+      });
+    }
+  }
+
+  // Bazel — only when workspace markers + BUILD files exist.
+  const hasBazelWorkspace =
+    existsSync(join(root, "MODULE.bazel")) ||
+    existsSync(join(root, "WORKSPACE")) ||
+    existsSync(join(root, "WORKSPACE.bazel"));
+  if (hasBazelWorkspace) {
+    let hasBuildFiles =
+      existsSync(join(root, "BUILD")) || existsSync(join(root, "BUILD.bazel"));
+    if (!hasBuildFiles) {
+      try {
+        for (const entry of readdirSync(root, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
+          if (entry.name.startsWith(".") || entry.name === "node_modules") {
+            continue;
+          }
+          const sub = join(root, entry.name);
+          if (
+            existsSync(join(sub, "BUILD")) ||
+            existsSync(join(sub, "BUILD.bazel"))
+          ) {
+            hasBuildFiles = true;
+            break;
+          }
+        }
+      } catch {
+        hasBuildFiles = false;
+      }
+    }
+    if (hasBuildFiles) {
+      const bazel =
+        resolveHostBinary("bazelisk", toolRoots) ||
+        resolveHostBinary("bazel", toolRoots);
+      if (bazel) {
+        candidates.push({
+          id: "bazel-test",
+          kind: "TARGETED_TEST",
+          source: "BAZEL_TEST",
+          label: "bazel test //...",
+          request: {
+            executable: bazel,
+            argv: ["test", "//..."],
+            cwd: root,
+            timeoutMs: NATIVE_TIMEOUT_MS,
+          },
+          disclosure: {
+            command: "bazel test //...",
+            chain: [],
+            lifecycleHooks: [],
+          },
+        });
+      }
     }
   }
 

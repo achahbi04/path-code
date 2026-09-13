@@ -1,0 +1,25 @@
+{
+  "label": "repair-live",
+  "outcome": "VERIFIED",
+  "classification": "VERIFIED",
+  "exitCode": 0,
+  "eventCount": 40,
+  "capabilityEvents": [
+    {
+      "type": "session.capability.discovered",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null,
+      "enabled": 0,
+      "denied": 0,
+      "servers": []
+    }
+  ],
+  "repairActivities": 0,
+  "mcpActivities": 0,
+  "handoff": "I have fixed `src/add.js` to correctly return the sum of `a` and `b`. The `add` function now returns `a + b`. I am submitting the fix as requested.",
+  "primaryUntouched": true,
+  "commitSha": "9e61017b2fcb653ec44b0a29cada2c218133eee9"
+}

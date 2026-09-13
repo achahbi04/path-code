@@ -1,0 +1,25 @@
+{
+  "label": "repair-live2",
+  "outcome": "VERIFIED",
+  "classification": "VERIFIED",
+  "exitCode": 0,
+  "eventCount": 62,
+  "capabilityEvents": [
+    {
+      "type": "session.capability.discovered",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null,
+      "enabled": 0,
+      "denied": 0,
+      "servers": []
+    }
+  ],
+  "repairActivities": 2,
+  "mcpActivities": 0,
+  "handoff": "I have edited [src/add.js](file:///private/tmp/pathcode-g8-live/runtime/ag1-tasks/a96f9f04-ff50-45b4-9b0c-28ee8a1902f5/src/add.js) to change the `add` function to `return a * b;`. I'm now done with the task.",
+  "primaryUntouched": true,
+  "commitSha": "d7e162612a29e406c58e0500790e2a3118731a57"
+}

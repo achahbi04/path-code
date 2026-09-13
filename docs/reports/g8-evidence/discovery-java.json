@@ -1,0 +1,50 @@
+{
+  "family": "java",
+  "fixtureRoot": "/tmp/pathcode-g8-polyglot/java",
+  "capturedAt": "2026-09-13T21:51:49.480Z",
+  "hostNotes": "mvn_available=no\nHost note: mvn not on PATH; fixture is metadata-only (pom.xml + surefire-shaped test source).",
+  "languages": [
+    {
+      "id": "java",
+      "status": "ready",
+      "evidence": [
+        "pom.xml"
+      ]
+    }
+  ],
+  "toolchains": [
+    {
+      "id": "mvn",
+      "status": "unavailable",
+      "executable": null,
+      "evidence": [
+        "pom.xml",
+        "mvn not on PATH"
+      ]
+    }
+  ],
+  "languageIntelligence": [
+    {
+      "id": "java",
+      "status": "unavailable",
+      "serverBinary": null,
+      "evidence": [
+        "pom.xml",
+        "jdtls not on PATH",
+        "java-language-server not on PATH"
+      ]
+    }
+  ],
+  "validationHints": [],
+  "validationCandidates": [],
+  "briefForEngine": "Languages: java. No host toolchains ready. No language servers ready. Copilot CLI: unavailable.",
+  "specialist": {
+    "copilot": {
+      "status": "unavailable",
+      "executable": null,
+      "evidence": [
+        "copilot not on PATH"
+      ]
+    }
+  }
+}

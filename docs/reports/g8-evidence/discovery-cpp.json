@@ -1,0 +1,70 @@
+{
+  "family": "cpp",
+  "fixtureRoot": "/tmp/pathcode-g8-polyglot/cpp",
+  "capturedAt": "2026-09-13T21:51:49.462Z",
+  "hostNotes": null,
+  "languages": [
+    {
+      "id": "c_cpp",
+      "status": "ready",
+      "evidence": [
+        "Makefile"
+      ]
+    }
+  ],
+  "toolchains": [
+    {
+      "id": "make",
+      "status": "ready",
+      "executable": "/usr/bin/make",
+      "evidence": [
+        "Makefile",
+        "make → /usr/bin/make"
+      ]
+    },
+    {
+      "id": "clangd",
+      "status": "ready",
+      "executable": "/usr/bin/clangd",
+      "evidence": [
+        "Makefile",
+        "clangd → /usr/bin/clangd"
+      ]
+    }
+  ],
+  "languageIntelligence": [
+    {
+      "id": "c_cpp",
+      "status": "ready",
+      "serverBinary": "/usr/bin/clangd",
+      "evidence": [
+        "Makefile",
+        "clangd → /usr/bin/clangd"
+      ]
+    }
+  ],
+  "validationHints": [],
+  "validationCandidates": [
+    {
+      "id": "make-test",
+      "label": "make test",
+      "source": "MAKE_TEST",
+      "kind": "TARGETED_TEST",
+      "executable": "/usr/bin/make",
+      "argv": [
+        "test"
+      ],
+      "disclosureCommand": "make test"
+    }
+  ],
+  "briefForEngine": "Languages: c_cpp. Toolchains ready: make, clangd. LSP ready: c_cpp. Copilot CLI: unavailable.",
+  "specialist": {
+    "copilot": {
+      "status": "unavailable",
+      "executable": null,
+      "evidence": [
+        "copilot not on PATH"
+      ]
+    }
+  }
+}

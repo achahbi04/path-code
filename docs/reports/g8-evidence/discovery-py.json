@@ -1,0 +1,94 @@
+{
+  "family": "python",
+  "fixtureRoot": "/tmp/pathcode-g8-polyglot/python",
+  "capturedAt": "2026-09-13T21:51:49.416Z",
+  "hostNotes": null,
+  "languages": [
+    {
+      "id": "python",
+      "status": "ready",
+      "evidence": [
+        "pyproject.toml",
+        ".venv"
+      ]
+    }
+  ],
+  "toolchains": [
+    {
+      "id": "uv",
+      "status": "ready",
+      "executable": "/opt/homebrew/bin/uv",
+      "evidence": [
+        "pyproject.toml",
+        ".venv",
+        "uv → /opt/homebrew/bin/uv"
+      ]
+    },
+    {
+      "id": "pip",
+      "status": "ready",
+      "executable": "/tmp/pathcode-g8-polyglot/python/.venv/bin/pip",
+      "evidence": [
+        "pyproject.toml",
+        ".venv",
+        "pip → /tmp/pathcode-g8-polyglot/python/.venv/bin/pip"
+      ]
+    },
+    {
+      "id": "pytest",
+      "status": "ready",
+      "executable": "/tmp/pathcode-g8-polyglot/python/.venv/bin/pytest",
+      "evidence": [
+        "pyproject.toml",
+        ".venv",
+        "pytest → /tmp/pathcode-g8-polyglot/python/.venv/bin/pytest"
+      ]
+    }
+  ],
+  "languageIntelligence": [
+    {
+      "id": "python",
+      "status": "unavailable",
+      "serverBinary": null,
+      "evidence": [
+        "pyproject.toml",
+        ".venv",
+        "basedpyright not on PATH",
+        "pyright not on PATH",
+        "pylsp not on PATH"
+      ]
+    }
+  ],
+  "validationHints": [
+    {
+      "id": "python-pytest",
+      "kind": "TARGETED_TEST",
+      "label": "pytest",
+      "source": "PYTHON_PYTEST",
+      "evidence": [
+        "Python metadata + pytest available"
+      ]
+    }
+  ],
+  "validationCandidates": [
+    {
+      "id": "python-pytest",
+      "label": "pytest",
+      "source": "PYTHON_PYTEST",
+      "kind": "TARGETED_TEST",
+      "executable": "/tmp/pathcode-g8-polyglot/python/.venv/bin/pytest",
+      "argv": [],
+      "disclosureCommand": "pytest"
+    }
+  ],
+  "briefForEngine": "Languages: python. Toolchains ready: uv, pip, pytest. No language servers ready. Copilot CLI: unavailable. Validation hints: pytest.",
+  "specialist": {
+    "copilot": {
+      "status": "unavailable",
+      "executable": null,
+      "evidence": [
+        "copilot not on PATH"
+      ]
+    }
+  }
+}

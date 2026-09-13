@@ -1,0 +1,73 @@
+{
+  "family": "go",
+  "fixtureRoot": "/tmp/pathcode-g8-polyglot/go",
+  "capturedAt": "2026-09-13T21:51:49.428Z",
+  "hostNotes": null,
+  "languages": [
+    {
+      "id": "go",
+      "status": "ready",
+      "evidence": [
+        "go.mod"
+      ]
+    }
+  ],
+  "toolchains": [
+    {
+      "id": "go",
+      "status": "ready",
+      "executable": "/opt/homebrew/bin/go",
+      "evidence": [
+        "go.mod",
+        "go → /opt/homebrew/bin/go"
+      ]
+    }
+  ],
+  "languageIntelligence": [
+    {
+      "id": "go",
+      "status": "unavailable",
+      "serverBinary": null,
+      "evidence": [
+        "go.mod",
+        "gopls not on PATH"
+      ]
+    }
+  ],
+  "validationHints": [
+    {
+      "id": "go-test",
+      "kind": "TARGETED_TEST",
+      "label": "go test ./...",
+      "source": "GO_TEST",
+      "evidence": [
+        "go.mod",
+        "go available"
+      ]
+    }
+  ],
+  "validationCandidates": [
+    {
+      "id": "go-test",
+      "label": "go test ./...",
+      "source": "GO_TEST",
+      "kind": "TARGETED_TEST",
+      "executable": "/opt/homebrew/bin/go",
+      "argv": [
+        "test",
+        "./..."
+      ],
+      "disclosureCommand": "go test ./..."
+    }
+  ],
+  "briefForEngine": "Languages: go. Toolchains ready: go. No language servers ready. Copilot CLI: unavailable. Validation hints: go test ./....",
+  "specialist": {
+    "copilot": {
+      "status": "unavailable",
+      "executable": null,
+      "evidence": [
+        "copilot not on PATH"
+      ]
+    }
+  }
+}

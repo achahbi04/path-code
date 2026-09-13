@@ -1,0 +1,49 @@
+{
+  "family": "rust",
+  "fixtureRoot": "/tmp/pathcode-g8-polyglot/rust",
+  "capturedAt": "2026-09-13T21:51:49.442Z",
+  "hostNotes": "cargo_available=no\nHost note: cargo not on PATH; fixture is metadata-only (Cargo.toml + src).",
+  "languages": [
+    {
+      "id": "rust",
+      "status": "ready",
+      "evidence": [
+        "Cargo.toml"
+      ]
+    }
+  ],
+  "toolchains": [
+    {
+      "id": "cargo",
+      "status": "unavailable",
+      "executable": null,
+      "evidence": [
+        "Cargo.toml",
+        "cargo not on PATH"
+      ]
+    }
+  ],
+  "languageIntelligence": [
+    {
+      "id": "rust",
+      "status": "unavailable",
+      "serverBinary": null,
+      "evidence": [
+        "Cargo.toml",
+        "rust-analyzer not on PATH"
+      ]
+    }
+  ],
+  "validationHints": [],
+  "validationCandidates": [],
+  "briefForEngine": "Languages: rust. No host toolchains ready. No language servers ready. Copilot CLI: unavailable.",
+  "specialist": {
+    "copilot": {
+      "status": "unavailable",
+      "executable": null,
+      "evidence": [
+        "copilot not on PATH"
+      ]
+    }
+  }
+}

@@ -38,6 +38,8 @@ import { sanitizeProjectCommandEnv } from "../ag5/project-env.mjs";
  *   },
  *   allowShell?: boolean,
  *   defaultCwd?: string,
+ *   mcpServers?: object[],
+ *   capabilityBrief?: string,
  * }} StartTaskInput
  */
 
@@ -132,17 +134,33 @@ export function createAntigravityEngineeringAgent(options = {}) {
   function ensureStarted() {
     if (child) return { ok: true, pythonPath: options.pythonPath, reused: true };
 
-    const guard = assertAg1VenvReady({
-      checkoutRoot,
-      ...(options.pythonPath ? { pythonPath: options.pythonPath } : {}),
-    });
-    if (!guard.ok) {
-      noteDiagnostic("venv_guard_failed", guard.message);
-      return guard;
-    }
+    // Explicit interpreter + script pair (tests / fakes): skip AG1 SDK venv probe.
+    const customBridge =
+      typeof options.pythonPath === "string" &&
+      options.pythonPath.trim() !== "" &&
+      typeof options.bridgeScript === "string" &&
+      options.bridgeScript.trim() !== "";
 
-    const pythonPath = options.pythonPath ?? guard.pythonPath;
-    const bridgeScript = options.bridgeScript ?? resolveAg1BridgeScript(checkoutRoot);
+    /** @type {string} */
+    let pythonPath;
+    /** @type {string} */
+    let bridgeScript;
+
+    if (customBridge) {
+      pythonPath = options.pythonPath;
+      bridgeScript = options.bridgeScript;
+    } else {
+      const guard = assertAg1VenvReady({
+        checkoutRoot,
+        ...(options.pythonPath ? { pythonPath: options.pythonPath } : {}),
+      });
+      if (!guard.ok) {
+        noteDiagnostic("venv_guard_failed", guard.message);
+        return guard;
+      }
+      pythonPath = options.pythonPath ?? guard.pythonPath;
+      bridgeScript = options.bridgeScript ?? resolveAg1BridgeScript(checkoutRoot);
+    }
 
     if (
       pythonPath === "python" ||
@@ -268,6 +286,13 @@ export function createAntigravityEngineeringAgent(options = {}) {
       ...(typeof input.defaultCwd === "string" && input.defaultCwd.trim()
         ? { defaultCwd: input.defaultCwd.trim() }
         : {}),
+      ...(Array.isArray(input.mcpServers) && input.mcpServers.length > 0
+        ? { mcpServers: input.mcpServers }
+        : {}),
+      ...(typeof input.capabilityBrief === "string" &&
+      input.capabilityBrief.trim()
+        ? { capabilityBrief: input.capabilityBrief.trim() }
+        : {}),
     };
     noteDiagnostic("stdin_start", JSON.stringify({ taskId: input.taskId, workspace: input.workspace }));
     writeCommand(cmd);
@@ -278,6 +303,28 @@ export function createAntigravityEngineeringAgent(options = {}) {
       pid: child?.pid ?? started.pid ?? null,
       diagFile,
     };
+  }
+
+  /**
+   * Feed repair/advisory text into the SAME Antigravity conversation.
+   * Does not kill or respawn the bridge process.
+   * @param {{ text: string }} input
+   */
+  function continueTask(input) {
+    const text =
+      input && typeof input.text === "string" ? input.text : String(input?.text ?? "");
+    noteDiagnostic("stdin_continue", JSON.stringify({ chars: text.length }));
+    writeCommand({ type: "continue", text });
+    return { ok: true };
+  }
+
+  /**
+   * Tell the bridge no further continues are needed (validation done / exhausted).
+   */
+  function signalDone() {
+    noteDiagnostic("stdin_done", "ack");
+    writeCommand({ type: "done" });
+    return { ok: true };
   }
 
   function cancel() {
@@ -364,6 +411,8 @@ export function createAntigravityEngineeringAgent(options = {}) {
 
   return {
     startTask,
+    continueTask,
+    signalDone,
     cancel,
     close,
     getDiagnostics: () => diagnostics.slice(),

@@ -760,6 +760,27 @@ export function buildLivingProductLines(state, viewport) {
         columns,
       ),
     );
+    const handoff =
+      typeof product.engineeringHandoff === "string"
+        ? product.engineeringHandoff.trim()
+        : "";
+    if (handoff) {
+      lines.push(
+        fitLine(
+          `│${padVisible(` ${style.dim("Engineering")}`, inner)}│`,
+          columns,
+        ),
+      );
+      lines.push(
+        fitLine(
+          `│${padVisible(
+            ` ${safeDisplay(handoff).slice(0, Math.max(12, inner - 4))}`,
+            inner,
+          )}│`,
+          columns,
+        ),
+      );
+    }
     const preview = Array.isArray(product.diffPreviewLines)
       ? product.diffPreviewLines.filter((l) => typeof l === "string").slice(0, 8)
       : [];
@@ -1004,6 +1025,27 @@ export function buildCompactAg1Lines(state, viewport) {
     if (bits) {
       lines.push(
         fitLine(`│${padVisible(` ${style.dim(safeDisplay(bits))}`, inner)}│`, columns),
+      );
+    }
+    const handoffCompact =
+      typeof product.engineeringHandoff === "string"
+        ? product.engineeringHandoff.trim()
+        : "";
+    if (handoffCompact) {
+      lines.push(
+        fitLine(
+          `│${padVisible(` ${style.dim("Engineering")}`, inner)}│`,
+          columns,
+        ),
+      );
+      lines.push(
+        fitLine(
+          `│${padVisible(
+            ` ${safeDisplay(handoffCompact).slice(0, Math.max(12, inner - 4))}`,
+            inner,
+          )}│`,
+          columns,
+        ),
       );
     }
     const preview = Array.isArray(product.diffPreviewLines)

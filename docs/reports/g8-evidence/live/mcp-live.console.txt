@@ -1,0 +1,31 @@
+{
+  "label": "mcp-live",
+  "outcome": "VERIFIED",
+  "classification": "VERIFIED",
+  "exitCode": 0,
+  "eventCount": 55,
+  "capabilityEvents": [
+    {
+      "type": "session.capability.discovered",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null,
+      "enabled": 1,
+      "denied": 1,
+      "servers": [
+        {
+          "name": "docs",
+          "type": "stdio",
+          "trustClass": "read_only"
+        }
+      ]
+    }
+  ],
+  "repairActivities": 0,
+  "mcpActivities": 0,
+  "handoff": "Denied by policy \"deny_all\". (\"denied by pre-tool hook: Denied by policy \\\"deny_all\\\".\")Denied by policy \"deny_all\". (\"denied by pre-tool hook: Denied by policy \\\"deny_all\\\".\")Denied by policy \"deny_all\". (\"denied by pre-tool hook: Denied by policy \\\"deny_all\\\".\")I have successfully completed the ta",
+  "primaryUntouched": true,
+  "commitSha": "ed5ec991b211cd4e9bf683ffb03c651e1b0296d2"
+}

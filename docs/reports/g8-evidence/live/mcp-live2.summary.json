@@ -1,0 +1,31 @@
+{
+  "label": "mcp-live2",
+  "outcome": "VERIFIED",
+  "classification": "VERIFIED",
+  "exitCode": 0,
+  "eventCount": 56,
+  "capabilityEvents": [
+    {
+      "type": "session.capability.discovered",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null,
+      "enabled": 1,
+      "denied": 1,
+      "servers": [
+        {
+          "name": "docs",
+          "type": "stdio",
+          "trustClass": "read_only"
+        }
+      ]
+    }
+  ],
+  "repairActivities": 0,
+  "mcpActivities": 1,
+  "handoff": "Command Cwd is outside the task workspace and was refused. (\"denied by pre-tool hook: Command Cwd is outside the task workspace and was refused.\")Command Cwd is outside the task workspace and was refused. (\"denied by pre-tool hook: Command Cwd is outside the task workspace and was refused.\")The `MAG",
+  "primaryUntouched": true,
+  "commitSha": "62c8ed471bf797cbc8c5a4f90d3c72631fac7cb7"
+}

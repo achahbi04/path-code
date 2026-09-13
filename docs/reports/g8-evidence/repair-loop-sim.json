@@ -1,0 +1,51 @@
+{
+  "capturedAt": "2026-09-13T21:55:06.247Z",
+  "sourceFiles": [
+    "scripts/pathcode-cli/ag1/session.mjs",
+    "scripts/pathcode-cli/ag8/repair.mjs"
+  ],
+  "controlFlowFromCode": [
+    "1. Engine emits finished (terminalMsg.type === 'finished') inside the repair-capable loop in session.mjs",
+    "2. session.mjs calls runSessionValidation(...) → independent final validation",
+    "3. On failure, shouldAttemptSameSessionRepair({ classification, attempts: repairAttempts, maxAttempts: AG8_MAX_REPAIR_ATTEMPTS, aborted, hasFailingChecks, wallBudgetRemainingMs })",
+    "4. If true: emit session.engineering.activity repairing; optionally runCopilotAdvisory after repeated TYPECHECK failures",
+    "5. feedback = buildValidationRepairPrompt(validation, { advisoryText? })",
+    "6. agent.continueTask({ text: feedback }) — SAME Antigravity conversation",
+    "7. await waitForTerminal; repairAttempts += 1; loop re-validates on next finished",
+    "8. When validation passes (or budget/attempts exhausted / aborted), shouldAttemptSameSessionRepair returns false → break"
+  ],
+  "functionCitationsPresentInSessionMjs": {
+    "shouldAttemptSameSessionRepair": true,
+    "buildValidationRepairPrompt": true,
+    "continueTask": true,
+    "runSessionValidation": true,
+    "repairAttempts": true,
+    "AG8_MAX_REPAIR_ATTEMPTS": true
+  },
+  "unitSimulation": {
+    "note": "Pure function simulation only — no Antigravity / no live engine",
+    "failThenContinueGate": {
+      "input": {
+        "classification": "FAILED",
+        "attempts": 0,
+        "maxAttempts": 2,
+        "hasFailingChecks": true
+      },
+      "shouldAttemptSameSessionRepair": true
+    },
+    "repairPromptExcerpt": "Independent final validation failed. Continue repairing the original task in this workspace.\nInspect the failures below, fix the code, re-run the project's relevant checks, then finish again.\nDo not ask clarifying questions. Stay inside the workspace.\nClassification: FAILED\nReason: simulated typecheck failure\nFailed check id: npm-typecheck\nCategory: TYPECHECK\nCommand: npm run typecheck\nExit code: 2\nStderr (bounded):\nerror TS2322: Type 'string' is not assignable to type 'number'.\n---",
+    "afterPassStopGate": {
+      "input": {
+        "classification": "VERIFIED",
+        "attempts": 1,
+        "hasFailingChecks": false
+      },
+      "shouldAttemptSameSessionRepair": false
+    },
+    "expectedSequenceProvenByUnits": [
+      "finished → validate FAIL → shouldAttemptSameSessionRepair=true → continue prompt built",
+      "finished → validate PASS → shouldAttemptSameSessionRepair=false → stop repair loop"
+    ],
+    "liveAntigravityIntegration": "PENDING — requires parent live AG session"
+  }
+}

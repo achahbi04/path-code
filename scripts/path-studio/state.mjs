@@ -133,6 +133,8 @@ export function createEmptyStudioState() {
       diffPreviewShownFiles: 0,
       inspectCommand: null,
       preservedArtifact: null,
+      /** Engineering handoff (engine-derived; distinct from PATH evidence). */
+      engineeringHandoff: null,
       /** Compact multi-task history inside the session-long cockpit. */
       sessionHistory: /** @type {Array<{ preview: string, classification: string }>} */ ([]),
       /** Idle prompt text rendered inside the cockpit frame. */
@@ -907,6 +909,71 @@ export function applyStudioEvent(state, event, opts = {}) {
       });
       if (state.product.recentOps.length > 8) {
         state.product.recentOps = state.product.recentOps.slice(-8);
+      }
+      break;
+    }
+    case "session.capability.discovered": {
+      state.product.ag1 = true;
+      const matrix =
+        event.matrix && typeof event.matrix === "object" ? event.matrix : null;
+      const langs = Array.isArray(matrix?.languages)
+        ? matrix.languages
+            .filter((l) => l?.status === "ready")
+            .map((l) => l.id)
+        : [];
+      const tools = Array.isArray(matrix?.toolchains)
+        ? matrix.toolchains
+            .filter((t) => t?.status === "ready")
+            .map((t) => t.id)
+        : [];
+      const noteParts = [];
+      if (langs.length) noteParts.push(langs.slice(0, 3).join(","));
+      if (tools.length) noteParts.push(tools.slice(0, 3).join(","));
+      const detail = noteParts.length
+        ? `capability ${noteParts.join(" · ")}`.slice(0, 96)
+        : "capability plane";
+      if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
+      state.product.recentOps.push({ label: "Capability", detail });
+      if (state.product.recentOps.length > 8) {
+        state.product.recentOps = state.product.recentOps.slice(-8);
+      }
+      break;
+    }
+    case "session.capability.mcp": {
+      state.product.ag1 = true;
+      const enabled = typeof event.enabled === "number" ? event.enabled : 0;
+      const denied = typeof event.denied === "number" ? event.denied : 0;
+      if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
+      state.product.recentOps.push({
+        label: "MCP",
+        detail: `enabled ${enabled} · denied ${denied}`,
+      });
+      if (state.product.recentOps.length > 8) {
+        state.product.recentOps = state.product.recentOps.slice(-8);
+      }
+      break;
+    }
+    case "session.capability.advisory": {
+      state.product.ag1 = true;
+      const label =
+        typeof event.label === "string" && event.label.trim()
+          ? event.label.trim()
+          : "Engineering review";
+      const detail =
+        typeof event.detail === "string" ? event.detail.slice(0, 96) : "";
+      setPathPhase(state, label);
+      if (detail) state.product.currentDetail = detail;
+      if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
+      state.product.recentOps.push({ label, detail });
+      if (state.product.recentOps.length > 8) {
+        state.product.recentOps = state.product.recentOps.slice(-8);
+      }
+      break;
+    }
+    case "session.engineering.handoff": {
+      state.product.ag1 = true;
+      if (typeof event.summary === "string" && event.summary.trim()) {
+        state.product.engineeringHandoff = event.summary.trim().slice(0, 400);
       }
       break;
     }

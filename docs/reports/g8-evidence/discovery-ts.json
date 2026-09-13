@@ -1,0 +1,89 @@
+{
+  "family": "typescript",
+  "fixtureRoot": "/tmp/pathcode-g8-polyglot/typescript",
+  "capturedAt": "2026-09-13T21:51:49.383Z",
+  "hostNotes": null,
+  "languages": [
+    {
+      "id": "typescript",
+      "status": "ready",
+      "evidence": [
+        "package.json",
+        "tsconfig.json"
+      ]
+    }
+  ],
+  "toolchains": [
+    {
+      "id": "npm",
+      "status": "ready",
+      "executable": "/opt/homebrew/bin/npm",
+      "evidence": [
+        "lockfile evidence for npm",
+        "npm → /opt/homebrew/bin/npm"
+      ]
+    }
+  ],
+  "languageIntelligence": [
+    {
+      "id": "typescript",
+      "status": "unavailable",
+      "serverBinary": null,
+      "evidence": [
+        "project tsconfig/jsconfig present",
+        "typescript-language-server not on PATH"
+      ]
+    }
+  ],
+  "validationHints": [
+    {
+      "id": "npm-scripts",
+      "kind": "PACKAGE_SCRIPTS",
+      "label": "npm run <admitted-script>",
+      "source": "PACKAGE_JSON",
+      "evidence": [
+        "package.json scripts (host decides admission)"
+      ]
+    }
+  ],
+  "validationCandidates": [],
+  "packageValidationCandidates": [
+    {
+      "id": "npm-test",
+      "label": "npm run test",
+      "source": "NPM_SCRIPT",
+      "kind": "TARGETED_TEST",
+      "executable": "/opt/homebrew/Cellar/node/26.5.0/bin/node",
+      "argv": [
+        "/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "test"
+      ],
+      "disclosureCommand": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run test"
+    },
+    {
+      "id": "npm-typecheck",
+      "label": "npm run typecheck",
+      "source": "NPM_SCRIPT",
+      "kind": "TYPECHECK",
+      "executable": "/opt/homebrew/Cellar/node/26.5.0/bin/node",
+      "argv": [
+        "/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "typecheck"
+      ],
+      "disclosureCommand": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run typecheck"
+    }
+  ],
+  "briefForEngine": "Languages: typescript. Toolchains ready: npm. No language servers ready. Copilot CLI: unavailable. Validation hints: npm run <admitted-script>.",
+  "specialist": {
+    "copilot": {
+      "status": "unavailable",
+      "executable": null,
+      "evidence": [
+        "copilot not on PATH"
+      ]
+    }
+  },
+  "packageValidationRefused": []
+}

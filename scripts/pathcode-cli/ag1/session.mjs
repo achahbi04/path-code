@@ -31,6 +31,18 @@ import {
   buildBoundedDiffPreview,
   buildFullResultInspectCommand,
 } from "../ag7/diff-preview.mjs";
+import {
+  AG8_MAX_REPAIR_ATTEMPTS,
+  buildValidationRepairPrompt,
+  discoverCapabilityPlane,
+  discoverProjectMcpConfigs,
+  applyMcpTrustPolicy,
+  toAntigravityMcpServers,
+  extractEngineeringHandoff,
+  shouldAttemptSameSessionRepair,
+  shouldTriggerAdvisory,
+  runCopilotAdvisory,
+} from "../ag8/index.mjs";
 
 /** Default wall clock — finite, not a 5-call micro-budget. */
 export const AG1_DEFAULT_WALL_CLOCK_MS = 1_200_000;
@@ -47,10 +59,83 @@ const ACTIVITY_LABELS = Object.freeze({
   diagnosing: "Diagnosing",
   correcting: "Correcting",
   verifying: "Verifying",
+  repairing: "Repairing",
+  mcp: "MCP",
   complete: "Complete",
   failed: "Failed",
   cancelled: "Cancelled",
 });
+
+/**
+ * Compact capability matrix for session events (no secrets / no env values).
+ * @param {any} plane
+ */
+function compactCapabilityMatrix(plane) {
+  if (!plane || typeof plane !== "object") {
+    return { languages: [], toolchains: [], languageIntelligence: [] };
+  }
+  const mapStatus = (arr) =>
+    Array.isArray(arr)
+      ? arr.map((x) => ({
+          id: typeof x?.id === "string" ? x.id : "",
+          status: typeof x?.status === "string" ? x.status : "unavailable",
+        }))
+      : [];
+  return {
+    languages: mapStatus(plane.languages),
+    toolchains: mapStatus(plane.toolchains),
+    languageIntelligence: mapStatus(plane.languageIntelligence),
+    specialist: {
+      copilot: {
+        status:
+          typeof plane.specialist?.copilot?.status === "string"
+            ? plane.specialist.copilot.status
+            : "unavailable",
+      },
+    },
+  };
+}
+
+/**
+ * @param {any} validation
+ */
+async function runSessionValidation(emit, worktree, engineeringCwd, projectRoot, signal) {
+  emit("session.engineering.activity", {
+    activity: "verifying",
+    label: "Verifying",
+  });
+  emit("session.validation.plan", {
+    summary: "independent final validation",
+  });
+  setFinalValidationProgressHook((check) => {
+    emit("session.validation.running", {
+      id: check.id,
+      kind: check.kind,
+      check: check.id,
+    });
+  });
+  try {
+    const validation = await runIndependentFinalValidation({
+      worktreePath: worktree.worktreePath,
+      engineeringCwd,
+      primaryRoot: projectRoot,
+      signal,
+    });
+    for (const check of validation.checks) {
+      emit("session.validation.result", {
+        id: check.id,
+        check: check.id,
+        kind: check.kind,
+        ok: check.ok,
+        status: check.ok ? "PASSED" : "FAILED",
+        exitCode: check.exitCode,
+      });
+    }
+    return validation;
+  } finally {
+    setFinalValidationProgressHook(null);
+  }
+}
 
 /**
  * @param {string} activity
@@ -250,6 +335,35 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     kind: "task-worktree-baseline",
   });
 
+  const capabilityPlane = discoverCapabilityPlane(worktree.worktreePath, {
+    toolRoots: [worktree.worktreePath, projectRoot],
+    primaryRoot: projectRoot,
+  });
+  emit("session.capability.discovered", {
+    matrix: compactCapabilityMatrix(capabilityPlane),
+  });
+
+  const discoveredMcp = discoverProjectMcpConfigs(worktree.worktreePath);
+  const policyMcp = (Array.isArray(discoveredMcp) ? discoveredMcp : []).map(
+    (server) => applyMcpTrustPolicy(server),
+  );
+  const enabledMcp = policyMcp.filter((s) => s && s.enabled === true);
+  const deniedMcp = policyMcp.filter((s) => !s || s.enabled !== true);
+  const mcpServers = toAntigravityMcpServers(enabledMcp);
+  emit("session.capability.mcp", {
+    enabled: enabledMcp.length,
+    denied: deniedMcp.length,
+    servers: enabledMcp.map((s) => ({
+      name: typeof s?.name === "string" ? s.name : "",
+      type: typeof s?.type === "string" ? s.type : "stdio",
+      trustClass: typeof s?.trustClass === "string" ? s.trustClass : "",
+    })),
+  });
+  const capabilityBrief =
+    typeof capabilityPlane?.briefForEngine === "string"
+      ? capabilityPlane.briefForEngine
+      : "";
+
   const sandbox = proveLocalSandboxConfinement({
     ...(options.checkoutRoot ? { checkoutRoot: options.checkoutRoot } : {}),
   });
@@ -294,14 +408,23 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   let engineActivityCount = 0;
   /** @type {(value: Record<string, unknown>) => void} */
   let resolveTerminal = () => {};
-  const waitForTerminal = new Promise((resolveWait) => {
+  /** @type {Promise<Record<string, unknown>>} */
+  let waitForTerminal = new Promise((resolveWait) => {
     resolveTerminal = resolveWait;
   });
+  function armTerminalWait() {
+    agentFinished = false;
+    waitForTerminal = new Promise((resolveWait) => {
+      resolveTerminal = resolveWait;
+    });
+    return waitForTerminal;
+  }
 
+  const wallMs = options.wallClockMs ?? AG1_DEFAULT_WALL_CLOCK_MS;
   const wallTimer = setTimeout(() => {
     agent.cancel();
     resolveTerminal({ type: "failed", code: "BUDGET_WALL_CLOCK" });
-  }, options.wallClockMs ?? AG1_DEFAULT_WALL_CLOCK_MS);
+  }, wallMs);
   if (typeof wallTimer.unref === "function") wallTimer.unref();
 
   const agent = createAntigravityEngineeringAgent({
@@ -327,6 +450,12 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
           activity,
           label: labelActivity(activity),
           tool: typeof msg.tool === "string" ? msg.tool : undefined,
+          detail:
+            typeof msg.detail === "string"
+              ? msg.detail
+              : typeof msg.tool === "string"
+                ? msg.tool
+                : undefined,
         });
         if (activity === "editing") {
           emit("session.applying", { summary: "editing in task workspace" });
@@ -414,8 +543,10 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     budget: {
       maxModelCalls: AG1_DEFAULT_MAX_MODEL_CALLS,
       maxToolCalls: AG1_DEFAULT_MAX_TOOL_CALLS,
-      wallClockMs: options.wallClockMs ?? AG1_DEFAULT_WALL_CLOCK_MS,
+      wallClockMs: wallMs,
     },
+    ...(mcpServers.length > 0 ? { mcpServers } : {}),
+    ...(capabilityBrief ? { capabilityBrief } : {}),
   });
   if (!startResult.ok) {
     clearTimeout(wallTimer);
@@ -450,9 +581,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     detail: `pid=${startResult.pid ?? "?"} python=ok`,
   });
 
-  const terminalMsg = await waitForTerminal;
-  clearTimeout(wallTimer);
-  clearInterval(pollCancel);
+  let terminalMsg = await waitForTerminal;
 
   if (terminalMsg?.type === "cancelled" || ac.signal.aborted) {
     agentCancelled = true;
@@ -460,44 +589,126 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
 
   /** @type {Awaited<ReturnType<typeof runIndependentFinalValidation>> | null} */
   let validation = null;
-  if (!agentCancelled && (agentFinished || terminalMsg?.type === "finished")) {
-    emit("session.engineering.activity", {
-      activity: "verifying",
-      label: "Verifying",
-    });
-    emit("session.validation.plan", {
-      summary: "independent final validation",
-    });
-    setFinalValidationProgressHook((check) => {
-      emit("session.validation.running", {
-        id: check.id,
-        kind: check.kind,
-        check: check.id,
-      });
-    });
-    try {
-      validation = await runIndependentFinalValidation({
-        worktreePath: worktree.worktreePath,
-        engineeringCwd,
-        primaryRoot: projectRoot,
-        signal: ac.signal,
-      });
-      for (const check of validation.checks) {
-        emit("session.validation.result", {
-          id: check.id,
-          check: check.id,
-          kind: check.kind,
-          ok: check.ok,
-          status: check.ok ? "PASSED" : "FAILED",
-          exitCode: check.exitCode,
+  /** @type {string} */
+  let engineeringHandoffSummary = "";
+  let repairAttempts = 0;
+
+  while (
+    !agentCancelled &&
+    !agentFailed &&
+    (agentFinished || terminalMsg?.type === "finished")
+  ) {
+    const finishedSummary =
+      typeof terminalMsg?.summary === "string" ? terminalMsg.summary : "";
+    if (finishedSummary) {
+      const handoff = extractEngineeringHandoff(finishedSummary);
+      if (handoff?.summary) {
+        engineeringHandoffSummary = handoff.summary;
+        emit("session.engineering.handoff", {
+          summary: engineeringHandoffSummary,
         });
       }
-    } finally {
-      setFinalValidationProgressHook(null);
     }
-  } else if (agentCancelled) {
+
+    validation = await runSessionValidation(
+      emit,
+      worktree,
+      engineeringCwd,
+      projectRoot,
+      ac.signal,
+    );
+
+    const hasFailingChecks =
+      Array.isArray(validation?.checks) &&
+      validation.checks.some((c) => c && c.ok !== true);
+    const wallBudgetRemainingMs = wallMs - (Date.now() - startedAt);
+    const attemptRepair = shouldAttemptSameSessionRepair({
+      classification: validation?.classification,
+      attempts: repairAttempts,
+      maxAttempts: AG8_MAX_REPAIR_ATTEMPTS,
+      aborted: ac.signal.aborted || agentCancelled,
+      hasFailingChecks,
+      wallBudgetRemainingMs,
+    });
+
+    if (!attemptRepair) {
+      break;
+    }
+
+    emit("session.engineering.activity", {
+      activity: "repairing",
+      label: "Repairing",
+      detail: "final validation failure",
+    });
+
+    /** @type {string | null} */
+    let advisoryText = null;
+    const typeFailures = (validation?.checks || []).filter(
+      (c) =>
+        c &&
+        c.ok !== true &&
+        (c.kind === "TYPECHECK" || /type|tsc|mypy|cargo check/i.test(String(c.id || ""))),
+    );
+    if (
+      repairAttempts >= 1 &&
+      typeFailures.length > 0 &&
+      shouldTriggerAdvisory({ reason: "repeated_type_failure" })
+    ) {
+      emit("session.capability.advisory", {
+        label: "Engineering review",
+        detail: "analyzing compiler diagnostic",
+      });
+      try {
+        const advisory = await runCopilotAdvisory({
+          question: buildValidationRepairPrompt(validation).slice(0, 2_500),
+          cwd: engineeringCwd,
+          timeoutMs: 90_000,
+        });
+        if (advisory?.ok && typeof advisory.text === "string" && advisory.text.trim()) {
+          advisoryText = advisory.text.trim();
+          emit("session.capability.advisory", {
+            label: "Engineering review",
+            detail: "advisory returned",
+          });
+        }
+      } catch {
+        // Advisory is optional; never block repair.
+      }
+    }
+
+    const feedback = buildValidationRepairPrompt(validation, {
+      ...(advisoryText ? { advisoryText } : {}),
+    });
+    armTerminalWait();
+    agent.continueTask({ text: feedback });
+    repairAttempts += 1;
+    terminalMsg = await waitForTerminal;
+
+    if (terminalMsg?.type === "cancelled" || ac.signal.aborted) {
+      agentCancelled = true;
+      break;
+    }
+    if (terminalMsg?.type === "failed") {
+      agentFailed = true;
+      break;
+    }
+    if (!(agentFinished || terminalMsg?.type === "finished")) {
+      break;
+    }
+  }
+
+  try {
+    agent.signalDone();
+  } catch {
+    // ignore
+  }
+
+  clearTimeout(wallTimer);
+  clearInterval(pollCancel);
+
+  if (agentCancelled) {
     emit("session.validation.skipped", { reason: "cancelled" });
-  } else if (agentFailed) {
+  } else if (agentFailed && !validation) {
     emit("session.validation.skipped", {
       reason: String(terminalMsg?.code ?? "engine_failed"),
     });
@@ -696,6 +907,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     cleanup,
     inspectCommand,
     diffPreview: preview,
+    engineeringHandoff: engineeringHandoffSummary,
   });
   // When the living TUI owns stdout, defer the durable summary until after
   // alternate-screen exit (pathcode prints durableSummary).
@@ -783,7 +995,16 @@ function formatAg2ResultBanner(r) {
               : "— NOT VERIFIED";
   lines.push(`Result: ${label}`);
   lines.push(`Files changed: ${r.changedFiles?.length ?? 0}`);
+  const handoff =
+    typeof r.engineeringHandoff === "string" ? r.engineeringHandoff.trim() : "";
+  if (handoff) {
+    lines.push("");
+    lines.push("Engineering handoff:");
+    lines.push(handoff);
+  }
   if (Array.isArray(r.validation?.checks)) {
+    if (handoff) lines.push("");
+    lines.push("Evidence:");
     for (const c of r.validation.checks) {
       const mark = c.ok ? "✓" : "✕";
       const kind =
