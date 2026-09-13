@@ -11,12 +11,22 @@ import { spawnSync } from "node:child_process";
 const NATIVE_TIMEOUT_MS = 300_000;
 
 /**
+ * Resolve a host/toolchain binary. Prefer project-local venvs under any of the
+ * search roots (task worktree first, then primary checkout — `.venv` is almost
+ * never present inside a linked worktree).
+ *
  * @param {string} bin
- * @param {string} [projectRoot]
+ * @param {string | string[] | null | undefined} searchRoots
  * @returns {string | null}
  */
-function resolveHostBinary(bin, projectRoot) {
-  if (projectRoot) {
+function resolveHostBinary(bin, searchRoots) {
+  const roots = Array.isArray(searchRoots)
+    ? searchRoots
+    : searchRoots
+      ? [searchRoots]
+      : [];
+  for (const projectRoot of roots) {
+    if (typeof projectRoot !== "string" || !projectRoot) continue;
     const localCandidates = [
       join(projectRoot, ".venv", "bin", bin),
       join(projectRoot, "venv", "bin", bin),
@@ -55,13 +65,28 @@ function pythonCanImportPytest(pythonPath) {
 }
 
 /**
- * @param {string} projectRoot
+ * @param {string} projectRoot Validation cwd (usually the task worktree).
+ * @param {{
+ *   toolRoots?: string[],
+ *   primaryRoot?: string,
+ * }} [options]
  * @returns {Array<object>}
  */
-export function discoverNativeValidationCandidates(projectRoot) {
+export function discoverNativeValidationCandidates(projectRoot, options = {}) {
   /** @type {Array<object>} */
   const candidates = [];
   const root = projectRoot;
+  /** @type {string[]} */
+  const toolRoots = [];
+  const pushRoot = (p) => {
+    if (typeof p !== "string" || !p) return;
+    if (!toolRoots.includes(p)) toolRoots.push(p);
+  };
+  pushRoot(root);
+  if (Array.isArray(options.toolRoots)) {
+    for (const p of options.toolRoots) pushRoot(p);
+  }
+  pushRoot(options.primaryRoot);
 
   // Python — pytest when configured or unittest discovery when tests/ exists.
   const pyproject = join(root, "pyproject.toml");
@@ -92,10 +117,10 @@ export function discoverNativeValidationCandidates(projectRoot) {
         existsSync(join(root, "tests")) || existsSync(join(root, "test"));
     }
     if (preferPytest) {
-      const pytest = resolveHostBinary("pytest", root);
+      const pytest = resolveHostBinary("pytest", toolRoots);
       const python =
-        resolveHostBinary("python3", root) ||
-        resolveHostBinary("python", root) ||
+        resolveHostBinary("python3", toolRoots) ||
+        resolveHostBinary("python", toolRoots) ||
         resolveHostBinary("python3") ||
         resolveHostBinary("python");
       if (pytest) {
@@ -138,7 +163,7 @@ export function discoverNativeValidationCandidates(projectRoot) {
 
   // Go
   if (existsSync(join(root, "go.mod"))) {
-    const goBin = resolveHostBinary("go", root);
+    const goBin = resolveHostBinary("go", toolRoots);
     if (goBin) {
       candidates.push({
         id: "go-test",
@@ -162,7 +187,7 @@ export function discoverNativeValidationCandidates(projectRoot) {
 
   // Rust
   if (existsSync(join(root, "Cargo.toml"))) {
-    const cargo = resolveHostBinary("cargo", root);
+    const cargo = resolveHostBinary("cargo", toolRoots);
     if (cargo) {
       candidates.push({
         id: "cargo-test",
@@ -186,7 +211,7 @@ export function discoverNativeValidationCandidates(projectRoot) {
 
   // Java — Maven
   if (existsSync(join(root, "pom.xml"))) {
-    const mvn = resolveHostBinary("mvn", root);
+    const mvn = resolveHostBinary("mvn", toolRoots);
     if (mvn) {
       candidates.push({
         id: "maven-test",
@@ -215,7 +240,7 @@ export function discoverNativeValidationCandidates(projectRoot) {
     const wrapper = existsSync(join(root, "gradlew"))
       ? join(root, "gradlew")
       : null;
-    const gradle = wrapper || resolveHostBinary("gradle", root);
+    const gradle = wrapper || resolveHostBinary("gradle", toolRoots);
     if (gradle) {
       candidates.push({
         id: "gradle-test",

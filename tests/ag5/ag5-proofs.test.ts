@@ -292,6 +292,51 @@ describe("AG5 native validation discovery", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("discovers primary-checkout .venv pytest for a worktree without .venv", async () => {
+    const { discoverNativeValidationCandidates } = await load(
+      "ag5/native-validation.mjs",
+    );
+    const scratch = mkdtempSync(join(tmpdir(), "ag6-py-primary-venv-"));
+    const primary = join(scratch, "primary");
+    const worktree = join(scratch, "worktree");
+    try {
+      mkdirSync(primary, { recursive: true });
+      mkdirSync(worktree, { recursive: true });
+      writeFileSync(
+        join(primary, "pyproject.toml"),
+        '[project]\nname="x"\nversion="0.1.0"\n\n[tool.pytest.ini_options]\ntestpaths=["tests"]\n',
+      );
+      writeFileSync(
+        join(worktree, "pyproject.toml"),
+        '[project]\nname="x"\nversion="0.1.0"\n\n[tool.pytest.ini_options]\ntestpaths=["tests"]\n',
+      );
+      mkdirSync(join(worktree, "tests"), { recursive: true });
+      writeFileSync(
+        join(worktree, "tests", "test_x.py"),
+        "def test_x():\n  assert True\n",
+      );
+      mkdirSync(join(primary, ".venv", "bin"), { recursive: true });
+      writeFileSync(join(primary, ".venv", "bin", "pytest"), "#!/bin/sh\nexit 0\n", {
+        mode: 0o755,
+      });
+      const withoutPrimary = discoverNativeValidationCandidates(worktree);
+      expect(withoutPrimary.some((c: { id: string }) => c.id === "python-pytest")).toBe(
+        false,
+      );
+      const withPrimary = discoverNativeValidationCandidates(worktree, {
+        primaryRoot: primary,
+      });
+      const hit = withPrimary.find((c: { id: string }) => c.id === "python-pytest");
+      expect(hit).toBeTruthy();
+      expect(String((hit as { request: { executable: string } }).request.executable)).toContain(
+        join(primary, ".venv", "bin", "pytest"),
+      );
+      expect(String((hit as { request: { cwd: string } }).request.cwd)).toBe(worktree);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("AG5 runtime self-repair", () => {

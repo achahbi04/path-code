@@ -4,7 +4,7 @@
 
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 import {
   discoverValidationCandidates,
@@ -117,6 +117,7 @@ function runPreparedRequest(request, signal) {
  * @param {{
  *   worktreePath: string,
  *   engineeringCwd?: string,
+ *   primaryRoot?: string,
  *   signal?: AbortSignal,
  * }} input
  */
@@ -156,8 +157,31 @@ export async function runIndependentFinalValidation(input) {
   }
 
   // AG5: when npm/tsc discovery is empty, admit native metadata-backed checks.
+  // AG6: also search the primary checkout for project-local toolchains (.venv),
+  // because linked task worktrees do not include untracked local environments.
   if (candidates.length === 0) {
-    candidates = discoverNativeValidationCandidates(validationRoot);
+    /** @type {string[]} */
+    const toolRoots = [validationRoot];
+    const primary =
+      typeof input.primaryRoot === "string" && input.primaryRoot.trim()
+        ? resolve(input.primaryRoot)
+        : null;
+    if (primary) {
+      if (
+        typeof input.engineeringCwd === "string" &&
+        input.engineeringCwd.trim()
+      ) {
+        const rel = relative(worktreePath, resolve(input.engineeringCwd));
+        if (rel && !rel.startsWith("..") && !rel.startsWith("/")) {
+          toolRoots.push(join(primary, rel));
+        }
+      }
+      toolRoots.push(primary);
+    }
+    candidates = discoverNativeValidationCandidates(validationRoot, {
+      toolRoots,
+      primaryRoot: primary || undefined,
+    });
   }
 
   const selection = selectPlannedChecks(candidates);

@@ -475,6 +475,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       validation = await runIndependentFinalValidation({
         worktreePath: worktree.worktreePath,
         engineeringCwd,
+        primaryRoot: projectRoot,
         signal: ac.signal,
       });
       for (const check of validation.checks) {
