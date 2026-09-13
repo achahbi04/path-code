@@ -226,7 +226,10 @@ describe("AG3 package bin", () => {
       );
       expect(r.status).toBe(0);
       expect(r.stdout).toMatch(/PATH/);
-      expect(r.stdout).toMatch(/1\.0\.0/);
+      const pkgVersion = JSON.parse(
+        readFileSync(join(CHECKOUT_ROOT, "package.json"), "utf8"),
+      ).version as string;
+      expect(r.stdout).toContain(pkgVersion);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }

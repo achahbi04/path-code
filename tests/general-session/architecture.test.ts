@@ -79,7 +79,7 @@ describe("5G-E: the scope profile is provider-neutral", () => {
     const pkg = JSON.parse(
       readFileSync(join(CHECKOUT_ROOT, "package.json"), "utf8"),
     ) as Record<string, any>;
-    expect(pkg.private).toBe(true);
+    expect(pkg.private).not.toBe(true);
     expect(pkg.bin).toEqual({ pathcode: "./scripts/pathcode.mjs" });
     expect(pkg.dependencies ?? {}).toEqual({});
     expect(pkg.exports).toEqual({

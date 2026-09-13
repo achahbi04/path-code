@@ -121,11 +121,18 @@ export function auditUnpackedPackage(packageDir, opts = {}) {
   }
 
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  if (pkg.version !== "1.0.0") {
+  if (typeof pkg.version !== "string" || !/^\d+\.\d+\.\d+$/.test(pkg.version)) {
     findings.push({
       file: "package.json",
       category: "VERSION",
-      detail: `expected version 1.0.0, found ${pkg.version}`,
+      detail: `expected semver x.y.z, found ${String(pkg.version)}`,
+    });
+  }
+  if (pkg.private === true) {
+    findings.push({
+      file: "package.json",
+      category: "METADATA",
+      detail: "package marked private; cannot publish to the public registry",
     });
   }
 

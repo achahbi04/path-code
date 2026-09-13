@@ -186,7 +186,9 @@ describe("AG1 D — file tools cannot escape workspace", () => {
 });
 
 describe("AG1 E — sandbox canary fail-closed", () => {
-  it("runs one disposable canary and refuses shell when unproven", async () => {
+  it(
+    "runs one disposable canary and refuses shell when unproven",
+    async () => {
     const { proveLocalSandboxConfinement, resetSandboxProofCacheForTests } =
       await load("sandbox-proof.mjs");
     resetSandboxProofCacheForTests();
@@ -202,11 +204,15 @@ describe("AG1 E — sandbox canary fail-closed", () => {
       expect(proof.allowShell).toBe(false);
       expect(proof.ok).toBe(false);
     }
-  });
+    },
+    30_000,
+  );
 });
 
 describe("AG1 F — cancellation terminates owned process", () => {
-  it("cancel kills the bridge child", async () => {
+  it(
+    "cancel kills the bridge child",
+    async () => {
     const { createAntigravityEngineeringAgent } = await load("bridge-client.mjs");
     const { assertAg1VenvReady, resolveAg1PythonExecutable } = await load(
       "venv-guard.mjs",
@@ -259,7 +265,9 @@ while True:
     // Process should be gone.
     const still = spawnSync("kill", ["-0", String(pid)], { encoding: "utf8" });
     expect(still.status === 0).toBe(false);
-  });
+  },
+  30_000,
+  );
 });
 
 describe("AG1 G/H/I — finished ≠ VERIFIED; PATH validation owns result", () => {

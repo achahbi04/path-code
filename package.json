@@ -1,7 +1,6 @@
 {
   "name": "path-code",
-  "version": "1.0.0",
-  "private": true,
+  "version": "1.0.1",
   "description": "PATH Code — local autonomous software engineering with independent verification",
   "type": "module",
   "engines": {

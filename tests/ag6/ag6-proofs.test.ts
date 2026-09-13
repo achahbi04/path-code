@@ -78,16 +78,18 @@ describe("AG6 release audit", () => {
     }
   });
 
-  it("package.json is 1.0.0 with darwin/arm64 and node engines", () => {
+  it("package.json is 1.0.1, publishable, with darwin/arm64 and node engines", () => {
     const pkg = JSON.parse(
       readFileSync(join(CHECKOUT_ROOT, "package.json"), "utf8"),
     ) as {
       version: string;
+      private?: boolean;
       engines?: { node?: string };
       os?: string[];
       cpu?: string[];
     };
-    expect(pkg.version).toBe("1.0.0");
+    expect(pkg.version).toBe("1.0.1");
+    expect(pkg.private).not.toBe(true);
     expect(pkg.engines?.node).toMatch(/>=\s*22/);
     expect(pkg.os).toEqual(["darwin"]);
     expect(pkg.cpu).toEqual(["arm64"]);

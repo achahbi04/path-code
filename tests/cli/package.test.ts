@@ -13,8 +13,8 @@ const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
 const entrySource = readFileSync(join(root, "src/cli/entry.ts"), "utf8");
 
 describe("CLI package and entry foundation", () => {
-  it("registers a fixed pathcode bin path and remains private", () => {
-    expect(packageJson.private).toBe(true);
+  it("registers a fixed pathcode bin path and is publishable", () => {
+    expect(packageJson.private).not.toBe(true);
     expect(packageJson.bin).toEqual({
       pathcode: "./scripts/pathcode.mjs",
     });

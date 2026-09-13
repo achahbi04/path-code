@@ -14,23 +14,22 @@ You describe a change. PATH engineers in an isolated task workspace, independent
 | Engineering auth | Google Vertex Application Default Credentials |
 | GitHub CLI (`gh`) | optional; required only for `pathcode --issue` |
 
-## Install from the V1 release tarball
-
-Public registry publication is separate. Until then, install from the release artifact:
+## Install
 
 ```bash
-npm install -g ./path-code-1.0.0.tgz
-# or: npm install -g /absolute/path/to/path-code-1.0.0.tgz
+npm install -g path-code
+# or from a release tarball:
+# npm install -g ./path-code-1.0.1.tgz
 ```
 
 Verify:
 
 ```bash
-pathcode --version   # PATH ● Code 1.0.0
+pathcode --version   # PATH ● Code 1.0.1
 pathcode doctor
 ```
 
-First run creates a private runtime under `~/.path-code/runtime/v1.0.0/`
+First run creates a private runtime under `~/.path-code/runtime/v1.0.1/`
 (engine venv, diagnostics, disposable task worktrees). Override with
 `PATHCODE_RUNTIME_ROOT` if needed.
 
