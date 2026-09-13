@@ -1,0 +1,15 @@
+PATH * Code
+repo · main · clean
+
+PATH * Code > Add divide(a,b) in src/sum.js returning a/b and a node:test divide(8,2)===4. Keep sum.
+Add divide(a,b) in src/sum.js returning a/b and a node:test divide(8,2)===4. Keep sum.
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ PATH ● Code                                                                                                                              │
+├─────────────────────────────────────────────┬─────────────────────────────────────────────┬──────────────────────────────────────────────┤
+│ PROJECT                                     │  PATH                                        │  EVIDENCE                                   │
+│                                             │                                              │                                             │
+│ (engineering…)                              │  ◆ Understanding                             │  Workspace       —                          │
+│                                             │                                              │  Mutation        —                          │
+│                                             │                                              │  Final validate  —                          │
+│                                             │                                              │  Result          —                          │
+├───────────────────────────�

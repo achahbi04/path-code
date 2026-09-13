@@ -1,0 +1,9 @@
+{
+  "altEnteredBeforeSigterm": true,
+  "exitAltEmitted": true,
+  "showCursorEmitted": true,
+  "childExitCode": 143,
+  "expectExit143": true,
+  "bytes": 6076,
+  "durationSec": 7.634
+}

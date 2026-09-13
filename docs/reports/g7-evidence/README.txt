@@ -7,3 +7,6 @@ live-result.json Live engineering session result (G7 candidate, not npm 1.0.1).
 live-events.json Live session event types/activity/summary trail.
 live-inspect-out.txt Output of the SHA-qualified git diff inspect command.
 live-meta.txt    Candidate executable identity.
+
+live-pty/        ACTUAL live terminal PTY recording (not reconstructed).
+                 See live-pty/README.txt — resize, cancel, restore, second task.

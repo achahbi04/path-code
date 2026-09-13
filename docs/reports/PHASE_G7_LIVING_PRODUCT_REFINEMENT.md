@@ -68,6 +68,9 @@ Evidence directory: `docs/reports/g7-evidence/`
   of the live task’s SHAs/events for presentation; labeled controlled)
 - `live-result.json` / `live-events.json` / `live-inspect-out.txt` — **live**
   engineering loop artifacts
+- `live-pty/` — **actual running TUI** PTY recording (in-place updates, resize,
+  Ctrl-C cancel, prompt recovery, second VERIFIED task, quit restore; plus
+  separate active-TUI SIGTERM → exit 143). See `live-pty/README.txt`.
 
 ## Focused checks
 

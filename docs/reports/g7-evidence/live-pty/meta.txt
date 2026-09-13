@@ -1,0 +1,7 @@
+PRIMARY=b774f1530563af85e13849f633c6784db17217aa
+CANDIDATE=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+PACKAGE_ROOT=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
+PROJECT_ROOT=/tmp/pathcode-g7-live-pty/repo
+PUBLIC_PATHCODE=/private/tmp/pathcode-v101-public-verify/prefix/lib/node_modules/path-code/scripts/pathcode.mjs
+PATH * Code 1.0.1
+resolvePathPackageRoot=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1

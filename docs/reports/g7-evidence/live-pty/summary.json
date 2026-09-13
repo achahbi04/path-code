@@ -1,0 +1,261 @@
+{
+  "candidate": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs",
+  "packageRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+  "projectRoot": "/tmp/pathcode-g7-live-pty/repo",
+  "runtimeRoot": "/tmp/pathcode-g7-live-pty/runtime",
+  "promptSeen": true,
+  "altEntered": true,
+  "activitySeen": true,
+  "resizeOk": true,
+  "cancelRequested": true,
+  "promptAfterCancel": true,
+  "altExitedAfterCancel": true,
+  "secondTaskVerified": true,
+  "promptAfterSecond": true,
+  "exitAltOnQuit": true,
+  "showCursorOnQuit": true,
+  "childExitCode": 0,
+  "primaryUntouched": true,
+  "defects": [],
+  "bytesCaptured": 34257,
+  "events": [
+    {
+      "t": 0.0,
+      "kind": "note",
+      "msg": "spawned pathcode in PTY"
+    },
+    {
+      "t": 21.949,
+      "kind": "note",
+      "msg": "MATCH initial prompt"
+    },
+    {
+      "t": 21.95,
+      "kind": "frame",
+      "name": "01-initial-prompt",
+      "bytes": 52
+    },
+    {
+      "t": 21.95,
+      "kind": "note",
+      "msg": "FRAME 01-initial-prompt plain_chars=47"
+    },
+    {
+      "t": 21.95,
+      "kind": "input",
+      "label": "task-cancel",
+      "n": 87
+    },
+    {
+      "t": 21.95,
+      "kind": "note",
+      "msg": "INPUT 'task-cancel' (87 bytes)"
+    },
+    {
+      "t": 21.976,
+      "kind": "note",
+      "msg": "MATCH alt-screen enter"
+    },
+    {
+      "t": 21.977,
+      "kind": "frame",
+      "name": "02-after-task1-start",
+      "bytes": 246
+    },
+    {
+      "t": 21.977,
+      "kind": "note",
+      "msg": "FRAME 02-after-task1-start plain_chars=221"
+    },
+    {
+      "t": 21.977,
+      "kind": "note",
+      "msg": "MATCH live activity"
+    },
+    {
+      "t": 21.978,
+      "kind": "frame",
+      "name": "03-live-activity-wide",
+      "bytes": 2294
+    },
+    {
+      "t": 21.978,
+      "kind": "note",
+      "msg": "FRAME 03-live-activity-wide plain_chars=1519"
+    },
+    {
+      "t": 22.781,
+      "kind": "note",
+      "msg": "MATCH drain-resize-narrow"
+    },
+    {
+      "t": 22.781,
+      "kind": "frame",
+      "name": "04-resize-narrow",
+      "bytes": 3212
+    },
+    {
+      "t": 22.781,
+      "kind": "note",
+      "msg": "FRAME 04-resize-narrow plain_chars=1913"
+    },
+    {
+      "t": 23.842,
+      "kind": "note",
+      "msg": "MATCH drain-resize-mid (buffered)"
+    },
+    {
+      "t": 23.842,
+      "kind": "frame",
+      "name": "04-resize-mid",
+      "bytes": 3212
+    },
+    {
+      "t": 23.842,
+      "kind": "note",
+      "msg": "FRAME 04-resize-mid plain_chars=1913"
+    },
+    {
+      "t": 24.902,
+      "kind": "note",
+      "msg": "MATCH drain-resize-wide (buffered)"
+    },
+    {
+      "t": 24.903,
+      "kind": "frame",
+      "name": "04-resize-wide",
+      "bytes": 3212
+    },
+    {
+      "t": 24.903,
+      "kind": "note",
+      "msg": "FRAME 04-resize-wide plain_chars=1913"
+    },
+    {
+      "t": 24.903,
+      "kind": "note",
+      "msg": "resizeOk=True"
+    },
+    {
+      "t": 24.903,
+      "kind": "input",
+      "label": "ctrl-c-cancel",
+      "n": 1
+    },
+    {
+      "t": 24.903,
+      "kind": "note",
+      "msg": "INPUT 'ctrl-c-cancel' (1 bytes)"
+    },
+    {
+      "t": 31.256,
+      "kind": "note",
+      "msg": "MATCH exit alt after cancel"
+    },
+    {
+      "t": 31.257,
+      "kind": "note",
+      "msg": "MATCH prompt after cancel"
+    },
+    {
+      "t": 31.257,
+      "kind": "frame",
+      "name": "05-after-cancel-prompt",
+      "bytes": 6765
+    },
+    {
+      "t": 31.258,
+      "kind": "note",
+      "msg": "FRAME 05-after-cancel-prompt plain_chars=4538"
+    },
+    {
+      "t": 31.258,
+      "kind": "input",
+      "label": "task-ok",
+      "n": 92
+    },
+    {
+      "t": 31.258,
+      "kind": "note",
+      "msg": "INPUT 'task-ok' (92 bytes)"
+    },
+    {
+      "t": 31.258,
+      "kind": "note",
+      "msg": "MATCH alt for task2"
+    },
+    {
+      "t": 31.258,
+      "kind": "frame",
+      "name": "06-task2-mid",
+      "bytes": 6766
+    },
+    {
+      "t": 31.259,
+      "kind": "note",
+      "msg": "FRAME 06-task2-mid plain_chars=4539"
+    },
+    {
+      "t": 77.309,
+      "kind": "note",
+      "msg": "MATCH verified result"
+    },
+    {
+      "t": 77.311,
+      "kind": "frame",
+      "name": "07-task2-verified",
+      "bytes": 30817
+    },
+    {
+      "t": 77.311,
+      "kind": "note",
+      "msg": "FRAME 07-task2-verified plain_chars=23438"
+    },
+    {
+      "t": 77.607,
+      "kind": "note",
+      "msg": "MATCH prompt after second"
+    },
+    {
+      "t": 77.608,
+      "kind": "frame",
+      "name": "08-after-second-prompt",
+      "bytes": 34203
+    },
+    {
+      "t": 77.608,
+      "kind": "note",
+      "msg": "FRAME 08-after-second-prompt plain_chars=26041"
+    },
+    {
+      "t": 77.608,
+      "kind": "input",
+      "label": "quit",
+      "n": 6
+    },
+    {
+      "t": 77.608,
+      "kind": "note",
+      "msg": "INPUT 'quit' (6 bytes)"
+    },
+    {
+      "t": 77.629,
+      "kind": "note",
+      "msg": "empty read during wait for drain-quit"
+    },
+    {
+      "t": 77.81,
+      "kind": "frame",
+      "name": "09-final",
+      "bytes": 34257
+    },
+    {
+      "t": 77.81,
+      "kind": "note",
+      "msg": "FRAME 09-final plain_chars=26056"
+    }
+  ],
+  "primaryHead": "b774f1530563af85e13849f633c6784db17217aa",
+  "primaryBranch": "main",
+  "primaryDirty": ""
+}
