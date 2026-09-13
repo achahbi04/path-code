@@ -1,5 +1,5 @@
 /**
- * AG5 — concise readiness diagnostics (no secrets, no engineering).
+ * AG5/AG6 — concise readiness diagnostics (no secrets, no engineering).
  */
 
 import { existsSync } from "node:fs";
@@ -14,6 +14,10 @@ import {
 import { isRuntimeMarkerHealthy } from "../ag1/runtime-bootstrap.mjs";
 import { assertAg1VenvReady } from "../ag1/venv-guard.mjs";
 import { detectAg1Auth } from "../ag1/auth-detect.mjs";
+import {
+  assertSupportedNode,
+  assertSupportedPlatform,
+} from "../ag6/platform.mjs";
 
 /**
  * @param {{ cwd?: string, env?: NodeJS.ProcessEnv, packageRoot?: string }} [opts]
@@ -28,12 +32,41 @@ export function runPathcodeDoctor(opts = {}) {
   const rows = [];
 
   const pkg = assertPathPackagePresent(packageRoot);
+  const version = readPathPackageVersion(packageRoot);
   rows.push({
     name: "PATH Code",
     ok: pkg.ok,
-    detail: pkg.ok
-      ? `v${readPathPackageVersion(packageRoot)} @ ${packageRoot}`
-      : pkg.message,
+    detail: pkg.ok ? version : pkg.message,
+  });
+
+  const platform = assertSupportedPlatform();
+  rows.push({
+    name: "Platform",
+    ok: platform.ok,
+    detail: platform.ok
+      ? platform.platform.label
+      : platform.message,
+  });
+
+  const node = assertSupportedNode();
+  rows.push({
+    name: "Node",
+    ok: node.ok,
+    detail: node.ok ? node.message : node.message,
+  });
+
+  const git = spawnSync("git", ["--version"], {
+    encoding: "utf8",
+    timeout: 5_000,
+    env: { ...env, GIT_TERMINAL_PROMPT: "0" },
+  });
+  rows.push({
+    name: "Git",
+    ok: git.status === 0,
+    detail:
+      git.status === 0
+        ? (git.stdout || "").trim()
+        : "git not found on PATH",
   });
 
   const markerOk = isRuntimeMarkerHealthy(runtimeRoot, packageRoot);
@@ -59,26 +92,12 @@ export function runPathcodeDoctor(opts = {}) {
     detail: markerOk && venvOk ? runtimeRoot : venvDetail,
   });
 
-  const git = spawnSync("git", ["--version"], {
-    encoding: "utf8",
-    timeout: 5_000,
-    env: { ...env, GIT_TERMINAL_PROMPT: "0" },
-  });
-  rows.push({
-    name: "Git",
-    ok: git.status === 0,
-    detail:
-      git.status === 0
-        ? (git.stdout || "").trim()
-        : "git not found on PATH",
-  });
-
   const auth = detectAg1Auth(env);
   rows.push({
-    name: "Engineering auth",
+    name: "Engineering",
     ok: auth.ok,
     detail: auth.ok
-      ? "Google / Vertex credentials detected"
+      ? auth.message
       : auth.message,
   });
 
@@ -104,7 +123,7 @@ export function runPathcodeDoctor(opts = {}) {
         name: "GitHub",
         ok: false,
         optional: true,
-        detail: "gh not installed (optional for local PATH)",
+        detail: "gh not installed (optional for local engineering)",
       });
     } else {
       const authStatus = spawnSync("gh", ["auth", "status"], {
@@ -121,7 +140,7 @@ export function runPathcodeDoctor(opts = {}) {
         detail:
           authStatus.status === 0
             ? "gh authenticated"
-            : "GitHub CLI is not authenticated. Run: gh auth login",
+            : "Not authenticated — run: gh auth login",
       });
     }
   } else {
@@ -143,7 +162,7 @@ export function runPathcodeDoctor(opts = {}) {
   for (const row of rows) {
     const suffix = row.optional && !row.ok ? " (optional)" : "";
     lines.push(
-      `  ${mark(row.ok)} ${row.name.padEnd(18)} ${row.detail}${suffix}`,
+      `  ${mark(row.ok)} ${row.name.padEnd(14)} ${row.detail}${suffix}`,
     );
   }
   lines.push("");

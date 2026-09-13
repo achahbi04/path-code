@@ -1,12 +1,18 @@
 {
   "name": "path-code",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "Path Code — coherent local software-engineering system",
+  "description": "PATH Code — local autonomous software engineering with independent verification",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
   "bin": {
     "pathcode": "./scripts/pathcode.mjs"
   },
@@ -20,9 +26,14 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
+    "README.md",
     "scripts/pathcode.mjs",
-    "scripts/pathcode-cli",
-    "scripts/path-studio"
+    "scripts/path-studio",
+    "scripts/pathcode-cli/*.mjs",
+    "scripts/pathcode-cli/ag1/**",
+    "scripts/pathcode-cli/ag4/**",
+    "scripts/pathcode-cli/ag5/**",
+    "scripts/pathcode-cli/ag6/**"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -35,6 +46,7 @@
     "recovery:smoke": "node scripts/recovery-smoke.mjs",
     "general-session:smoke": "node scripts/general-session-smoke.mjs",
     "bounded-session:smoke": "node scripts/bounded-session-smoke.mjs",
+    "audit:release": "node scripts/audit-release.mjs",
     "check": "npm run typecheck && npm run build && npm run test && npm run cli:smoke && npm run ledger:verify"
   },
   "devDependencies": {

@@ -1,180 +1,126 @@
-# Path Code
+# PATH Code 1.0
 
-**Path Code is the coherent engineering system connecting intelligence, awareness, authority, action, evidence, and responsibility.**
+PATH Code is local autonomous software engineering for a Git project.
 
-The model supplies intelligence. Path Code supplies engineering conduct.
+You describe a change. PATH engineers in an isolated task workspace, independently validates the result, and leaves your primary checkout untouched. Verified work is handed off on a `path/task-*` branch for you to merge when ready.
 
-Path Code does not merely possess capabilities. It gives capabilities engineering conduct.
+## Supported environment (V1)
 
-## Engineering Principle
+| Requirement | V1 |
+| --- | --- |
+| Platform | macOS Apple Silicon (`darwin` / `arm64`) |
+| Node.js | 22+ |
+| Git | required |
+| Engineering auth | Google Vertex Application Default Credentials |
+| GitHub CLI (`gh`) | optional; required only for `pathcode --issue` |
 
-Reliability precedes capability. Capability precedes optimization.
+## Install from the V1 release tarball
 
-Path Code is built through small, bounded engineering phases. Each phase must be implemented, tested, challenged, reviewed, and frozen before the next capability layer begins.
+Public registry publication is separate. Until then, install from the release artifact:
 
-## Source of Truth
+```bash
+npm install -g ./path-code-1.0.0.tgz
+# or: npm install -g /absolute/path/to/path-code-1.0.0.tgz
+```
 
-The governing architecture, Engineering Constitution, capability model, and engineering roadmap are defined in:
+Verify:
 
-[`docs/PATH_CODE_MASTER_V1.md`](docs/PATH_CODE_MASTER_V1.md)
+```bash
+pathcode --version   # PATH ● Code 1.0.0
+pathcode doctor
+```
 
-Production implementation must remain consistent with that document.
+First run creates a private runtime under `~/.path-code/runtime/v1.0.0/`
+(engine venv, diagnostics, disposable task worktrees). Override with
+`PATHCODE_RUNTIME_ROOT` if needed.
 
-## Current Status
+## Commands
 
-**Phase 0 — FROZEN**
+| Command | Purpose |
+| --- | --- |
+| `pathcode` | Living engineering session in the current Git project |
+| `pathcode --issue <n>` | Load GitHub issue `#n`, engineer, verify, then offer push + PR |
+| `pathcode doctor` | Readiness (install, platform, Node, Git, runtime, auth; GitHub optional) |
+| `pathcode --help` | Help |
+| `pathcode --version` | Version |
 
-**Phase 1 — Foundation Kernel: COMPLETE / FROZEN**
+## First engineering run
 
-Closure evidence:
+```bash
+cd your-git-project
+pathcode
+```
 
-[`docs/PHASE_1_FOUNDATION_CLOSURE.md`](docs/PHASE_1_FOUNDATION_CLOSURE.md)
+At the prompt, describe an engineering task. PATH:
 
-Preserved Phase 1 sub-pass history:
+1. Creates an isolated task branch and worktree
+2. Runs bounded autonomous engineering
+3. Independently validates using project-defined checks
+4. Leaves the primary checkout untouched
 
-**Phase 1A — Project + TypeScript Foundation: FROZEN**
+Adopt verified work when you choose:
 
-**Phase 1B — Core Domain Contracts: FROZEN**
+```bash
+git merge path/task-<id>
+```
 
-**Phase 1B WorkspaceBoundary Amendment: FROZEN**
+## GitHub issues → pull requests
 
-**Phase 1C — Workspace + Canonical Path Foundation: FROZEN**
+```bash
+cd your-github-backed-project
+pathcode --issue 42
+```
 
-**Phase 1C CanonicalPath Encapsulation Hardening: FROZEN**
+After local **VERIFIED**, PATH asks once to publish. Approve with `y` to push the exact verified branch and open a PR with PATH-owned evidence. Decline leaves remotes unchanged.
 
-**Phase 1D — Git + Workspace Discovery: FROZEN**
+If GitHub CLI is not authenticated: `gh auth login`. Local engineering works without GitHub.
 
-**Phase 1E — PATHCODE.md + Configuration: FROZEN**
+## Engineering authentication
 
-**Phase 1E ConfigFailure Surface Correction: FROZEN**
+PATH uses Google Vertex ADC for engineering. Typical setup:
 
-**Phase 1F — CLI + Platform Foundation Closure: FROZEN**
+```bash
+gcloud auth application-default login
+export GOOGLE_CLOUD_PROJECT=<your-project>
+```
 
-Next:
+`pathcode doctor` reports whether engineering auth appears present. PATH does not store Google credentials.
 
-**Phase 2 — Repository Intelligence**
+## Task isolation model
 
-Master contract:
+- **Package root** — installed PATH assets (relocatable)
+- **Runtime root** — private venv, diagnostics, task worktrees
+- **Project root** — your Git repository (`git rev-parse --show-toplevel`)
 
-[`docs/PHASE_2_REPOSITORY_INTELLIGENCE_MASTER.md`](docs/PHASE_2_REPOSITORY_INTELLIGENCE_MASTER.md)
+Launching from a monorepo package subdirectory keeps Git operations at the repository root and starts engineering/validation in that subdirectory.
 
-**MASTER CONTRACT FROZEN**
+## Validation honesty
 
-**Phase 2 Pre-2A — Resolved Configuration Provenance Hardening: FROZEN**
+PATH never invents a **VERIFIED** result. Classifications:
 
-**Phase 2A — Inventory + Traversal Safety: FROZEN**
+- **VERIFIED** — configured checks passed
+- **PARTIALLY VERIFIED** — mixed results
+- **FAILED** — configured checks failed
+- **NOT VERIFIED** — no admissible validation, or cancelled
 
-**Phase 2B — Bounded Reader + Content Fingerprints: FROZEN**
+## Cancellation and recovery
 
-**Phase 2C — Git State Baseline + Ignore / Provenance Annotation: FROZEN**
+Cancel with Ctrl-C. PATH restores the terminal and cleans disposable PATH-owned worktrees when safe. Stale PATH-owned task worktrees are recovered on next launch without pruning unrelated user worktrees.
 
-**Phase 2C-H1 — execFile-only Git Runner Hardening: FROZEN**
+## Troubleshooting
 
-**Phase 2D — Project Metadata + Evidence-Backed Repository Map: FROZEN**
+```bash
+pathcode doctor
+```
 
-**Phase 2E — Search + Candidate Retrieval: FROZEN**
+Common cases:
 
-**Engineering Self-Observation Architecture: FROZEN**
+- Unsupported platform/Node → upgrade or use a supported machine
+- Not a Git repo → `cd` into the project
+- Dirty tree / detached HEAD → clean up Git state first
+- Engineering auth → configure Vertex ADC as above
+- GitHub (optional) → `gh auth login`
 
-[`docs/ENGINEERING_SELF_OBSERVATION.md`](docs/ENGINEERING_SELF_OBSERVATION.md)
+## What V1 does not include
 
-**Gap Ledger: V1 ACTIVE**
-
-[`docs/GAP_LEDGER.md`](docs/GAP_LEDGER.md)
-
-**Phase 2F — Freshness + In-Memory Snapshot Integrity: FROZEN**
-
-[`docs/reports/PHASE_2F_REPORT.md`](docs/reports/PHASE_2F_REPORT.md)
-
-**Phase 2G-H1 — Canonical Cross-Component RepositoryEntry Membership: FROZEN**
-
-[`docs/reports/PHASE_2G_H1_REPORT.md`](docs/reports/PHASE_2G_H1_REPORT.md)
-
-**Phase 2G — Repository Intelligence Integration Audit: COMPLETE**
-
-[`docs/reports/PHASE_2G_AUDIT_REPORT.md`](docs/reports/PHASE_2G_AUDIT_REPORT.md)
-
-**Phase 2 — Repository Intelligence: COMPLETE / FROZEN**
-
-[`docs/PHASE_2_CLOSURE.md`](docs/PHASE_2_CLOSURE.md)
-
-**Engineering Self-Observation: RUNTIME FOUNDATION FROZEN**
-
-[`docs/reports/SELF_OBSERVATION_V1_REPORT.md`](docs/reports/SELF_OBSERVATION_V1_REPORT.md)
-
-**Capability Ledger: V1 ACTIVE**
-
-**ledger:verify: ACTIVE IN npm run check**
-
-**Phase 3 Safe Editing Master Contract: FROZEN**
-
-[`docs/PHASE_3_SAFE_EDITING_MASTER.md`](docs/PHASE_3_SAFE_EDITING_MASTER.md)
-
-**Phase 3A — Edit Contracts / Preparation / Authorization: PASS_FROZEN**
-
-**Phase 3B — Existing-File Atomic Replacement: PASS_FROZEN**
-
-**Phase 3B-H1 — Corrective pass: PASS_FROZEN**
-
-**Phase 3C — Safe Creation: PASS_FROZEN** (contract-corrected via Phase 3C-H1)
-
-**Phase 3C-H1 — Contract Correction: COMPLETE**
-
-[`docs/reports/PHASE_3C_H1_REPORT.md`](docs/reports/PHASE_3C_H1_REPORT.md)
-
-**Foundation Extensibility Constitution V1: FROZEN**
-
-[`docs/FOUNDATION_EXTENSIBILITY_CONSTITUTION_V1.md`](docs/FOUNDATION_EXTENSIBILITY_CONSTITUTION_V1.md)
-
-**Foundation Extensibility Constitution V1 Amendment 1 — Public Authority Surfaces: FROZEN**
-
-[`docs/FOUNDATION_EXTENSIBILITY_CONSTITUTION_V1_AMENDMENT_1_PUBLIC_AUTHORITY_SURFACE.md`](docs/FOUNDATION_EXTENSIBILITY_CONSTITUTION_V1_AMENDMENT_1_PUBLIC_AUTHORITY_SURFACE.md)
-
-**Phase 3D — Multi-File Coordination Master Contract: FROZEN**
-
-[`docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md`](docs/PHASE_3D_MULTI_FILE_COORDINATION_MASTER.md)
-
-**Phase 3D — Multi-File Coordination: PASS_FROZEN**
-
-[`docs/reports/PHASE_3D_REPORT.md`](docs/reports/PHASE_3D_REPORT.md)
-
-**Capabilities:**
-
-- `edit-contracts` PASS_FROZEN
-- `existing-file-replacement` PASS_FROZEN
-- `safe-file-creation` PASS_FROZEN
-- `multi-file-coordination` PASS_FROZEN
-- `safe-editing` PHASE_VERIFIED
-
-Existing-file replacement is available as a bounded internal capability through the Phase 3B mechanism.
-
-Safe-file-creation is available as a bounded internal capability through the Phase 3C mechanism (CREATE_FILE ActionClass + operation-bound post-creation verification).
-
-Multi-file coordination is available as a bounded internal capability through the Phase 3D mechanism (opaque plan, read-only preflight, sequential 3B/3C execution, honest partial results).
-
-**Phase 3 — Safe Editing Engine: COMPLETE / FROZEN**
-
-[`docs/PHASE_3_CLOSURE.md`](docs/PHASE_3_CLOSURE.md)
-
-[`docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md`](docs/reports/PHASE_3_INTEGRATION_REAUDIT_REPORT.md)
-
-Path Code may:
-
-- replace the content of an existing authorized regular file through the bounded 3B mechanism
-- create one new authorized regular file under an admitted parent through the bounded 3C mechanism
-- coordinate a bounded sequence of already-prepared, separately authorized 3B/3C mutations in one workspace through the Phase 3D mechanism
-
-It still cannot:
-
-- delete files
-- create directories
-- roll back a partially applied multi-file plan
-- claim plan-level atomicity
-- mutate Git state
-- execute models or edit autonomously
-
-Next permitted operation:
-
-**ONE bounded Closed-Vocabulary & Foundation Extensibility Audit combined with preparation of the Phase 4 Master Contract.**
-
-No Phase 4 implementation yet.
+Multi-engine routing, cloud workstation execution, automatic PR merge, and collaborative studio features are out of scope for 1.0.

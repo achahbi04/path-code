@@ -333,10 +333,11 @@ describe("AG5 packaging surface", () => {
       expect.arrayContaining([
         "dist",
         "scripts/pathcode.mjs",
-        "scripts/pathcode-cli",
         "scripts/path-studio",
+        "README.md",
       ]),
     );
+    expect(pkg.files?.some((f: string) => f.includes("pathcode-cli"))).toBe(true);
   });
 
   it("unknown args on incomplete install do not demand checkout restore", async () => {

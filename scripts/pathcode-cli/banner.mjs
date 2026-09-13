@@ -84,55 +84,35 @@ function centerLine(text, columns) {
  */
 export function renderHelpText(opts = {}) {
   const name = opts.unicode !== false && opts.plain !== true ? COMPACT_NAME : ASCII_NAME;
-  return `${name} — CLI scope
+  return `${name}
+
+Local autonomous engineering for a Git project. PATH works in an isolated
+task workspace, independently validates the result, and leaves your primary
+checkout untouched.
+
+Usage:
+  pathcode
+  pathcode --issue <number>
+  pathcode doctor
+  pathcode --help
+  pathcode --version
 
 At the prompt:
-  <task>              Any line that does not start with '/' is an engineering task
-                      for the Git project in the current directory
-  /recover <id>       Restore the files captured by an earlier checkpoint
-  /model <id>         Change the model for subsequent tasks (not a cycle in flight)
-  /autonomy <mode>    review | bounded — for subsequent tasks only
-  /trial              Run Trial 1 (multiply-01) in a new synthetic workspace
-  /help               Show this help
-  /exit               Leave
+  <task>         Describe an engineering change in plain language
+  /help          Show commands
+  /exit          Leave
 
 Flags:
-  --help, -h              Show help and exit
-  --version               Show package version and exit
-  doctor                  Concise readiness check (install, runtime, Git, auth)
-  --issue <number>        Load a GitHub issue as task context, then offer
-                          publication (push + PR) only after local VERIFIED
-  --model <id>            Select the OpenAI model (else PATHCODE_OPENAI_MODEL, else prompt)
-  --autonomy review|bounded
-                          Session consent mode (default: review). review keeps
-                          START/SCOPE/APPLY/CHECK; bounded requires one RUN
-                          disclosure then host-minted authority inside that envelope.
-  --execution local|cloud
-                          Where admitted project effects run (default: local).
-                          cloud uses pinned GC1 constants (pathcode-gc1b-config-v4
-                          Engineering Image) via a disposable workstation; primary
-                          project bytes are never written. Trusted host config only —
-                          the model cannot select the backend.
-  --events ndjson         Emit the structured session event stream as NDJSON
-                          (same events the live terminal is driven by)
-  --events-out <path>     With --events ndjson: write NDJSON to a named file
-                          or pipe (fresh truncate on launch; flushed per event).
-                          Keeps machine events off the human terminal.
+  --issue <n>    Load GitHub issue #n as task context; after VERIFIED,
+                 offer one publication approval (push + pull request)
+  --help, -h     Show this help
+  --version      Show version
+  doctor         Readiness check (install, platform, Node, Git, runtime,
+                 engineering auth; GitHub is optional)
 
-Environment:
-  PATHCODE_STATE_DIR   Where recovery checkpoints are stored. Must be outside the
-                       project. Defaults to the platform state directory.
-  GC1_LIVE_SMOKE=1     Required (with live transport) for real GCP workstations;
-                       canonical/cloud tests use the mock transport ($0).
-
-A living PATH engineering session (local default):
-  - the prompt stays open across tasks; each task is a fresh isolated workspace
-  - PATH creates a unique task branch and worktree from the session baseline
-  - Antigravity engineers inside that envelope; PATH independently validates
-  - VERIFIED tasks advance the session baseline; failed work does not
-  - primary checkout stays untouched; merge the task branch when you choose
-  - cloud execution (--execution cloud) retains the historical Gate-1 OpenAI path
-
-Opening this screen does not read a key, scan a project, or call a provider.
+Notes:
+  - Verified work lands on a path/task-* branch for you to merge when ready
+  - GitHub CLI auth is required only for --issue publication
+  - First run bootstraps a private engine runtime automatically
 `;
 }

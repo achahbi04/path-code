@@ -1,0 +1,3 @@
+# Keep ensure-venv.sh out of the published package (Node bootstrap owns first-run).
+scripts/pathcode-cli/ag1/ensure-venv.sh
+**/.DS_Store

@@ -48,6 +48,10 @@ import { admitPrimaryCheckout } from "./pathcode-cli/ag1/admission.mjs";
 import { basename } from "node:path";
 import { recoverPathOwnedStaleWorktrees } from "./pathcode-cli/ag5/orphan-recovery.mjs";
 import { runPathcodeDoctor } from "./pathcode-cli/ag5/doctor.mjs";
+import {
+  assertSupportedNode,
+  assertSupportedPlatform,
+} from "./pathcode-cli/ag6/platform.mjs";
 
 const root = resolvePathPackageRoot();
 
@@ -305,6 +309,17 @@ export async function runPathcodeMain(argv, testIo = {}) {
   const plain = detectPlain();
   const unicode = detectUnicode() && !plain;
   const columns = stdout.columns ?? 80;
+
+  const platformGate = assertSupportedPlatform();
+  if (!platformGate.ok) {
+    stderr.write(`${platformGate.message}\n`);
+    return 2;
+  }
+  const nodeGate = assertSupportedNode();
+  if (!nodeGate.ok) {
+    stderr.write(`${nodeGate.message}\n`);
+    return 2;
+  }
 
   if (args.version) {
     stdout.write(`${unicode ? COMPACT_NAME : ASCII_NAME} ${packageVersion()}\n`);

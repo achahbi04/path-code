@@ -142,17 +142,13 @@ describe("5G-M / 5G-AF: help and welcome describe what the prompt accepts", () =
   it("5G-M: help lists natural-language tasks alongside the commands", async () => {
     const { renderHelpText } = await importHost("banner.mjs");
     const help = renderHelpText({ unicode: true, plain: false });
-    expect(help).toContain("engineering task");
-    expect(help).toContain("/recover <id>");
-    expect(help).toContain("/model <id>");
-    expect(help).toContain("/autonomy <mode>");
-    expect(help).toContain("/trial");
+    expect(help).toMatch(/engineering/i);
+    expect(help).toContain("pathcode --issue");
+    expect(help).toContain("pathcode doctor");
     expect(help).toContain("/help");
     expect(help).toContain("/exit");
-    expect(help).toContain("PATHCODE_STATE_DIR");
-    expect(help).toContain("isolated workspace");
-    expect(help).toContain("--events ndjson");
-    expect(help).toContain("--events-out");
+    expect(help).toContain("path/task-");
+    expect(help).not.toMatch(/GC1|Antigravity|AG3|AG4/i);
   });
 
   it("5G-AF: the welcome screen describes isolated engineering + independent validation", async () => {

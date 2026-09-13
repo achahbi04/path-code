@@ -226,7 +226,7 @@ describe("AG3 package bin", () => {
       );
       expect(r.status).toBe(0);
       expect(r.stdout).toMatch(/PATH/);
-      expect(r.stdout).toMatch(/0\.1\.0/);
+      expect(r.stdout).toMatch(/1\.0\.0/);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
