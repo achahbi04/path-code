@@ -2,7 +2,9 @@
 
 **Result:** PASS  
 **Baseline:** PATH Code 1.0.1 · `5a1784d8f033251caf9c0c3be102c9eb2f0cd345`  
+**Implementation commit:** `9170adf3a2c834ba9c11e4292700d44a2ed8315d`  
 **Branch:** `cursor/pathcode-antigravity-v1`  
+**Working tree:** clean after G7 commit (ahead of origin by G7)  
 **Published releases:** UNCHANGED · Publication performed: NO
 
 ## Purpose
