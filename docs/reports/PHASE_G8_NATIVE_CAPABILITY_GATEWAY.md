@@ -4,7 +4,7 @@
 **Baseline:** G7 Living Cockpit Completion · `eacd7638b9df4e82085b01d77ff5e483744aa51a`  
 **Implementation commit:** `b6dd2f0502bafa7fd5dc685003ce21699e92f363`  
 **Branch:** `cursor/pathcode-antigravity-v1`  
-**Working tree:** clean after G8 commit  
+**Working tree:** clean after G8 advisory acceptance commit  
 **Published releases:** UNCHANGED · Publication performed: NO
 
 ## Purpose
@@ -48,12 +48,12 @@ Fixtures under `/tmp/pathcode-g8-polyglot/` + evidence JSON in
 
 | Family | This host |
 | --- | --- |
-| JavaScript/TypeScript | ready · npm · validation scripts admitted |
-| Python | ready · project `.venv` pytest |
-| Go | ready · `go test ./...` |
-| Rust | metadata ready · **cargo unavailable** · no invented candidates |
+| JavaScript/TypeScript | ready · npm · validation scripts admitted · live engineering accepted |
+| Python | ready · project `.venv` pytest · live-capable |
+| Go | ready · `go test ./...` · live-capable |
+| Rust | **metadata discovery only** · cargo unavailable · **not** full live engineering acceptance |
 | C/C++ | ready · make · clangd · `make test` |
-| Java | metadata ready · **mvn unavailable** · no invented candidates |
+| Java | **metadata discovery only** · mvn unavailable · **not** full live engineering acceptance |
 
 ## Language intelligence
 
@@ -86,12 +86,17 @@ Bridge fix: filtered MCP tools must be `policy.allow`’d or `deny_all` blocks t
 
 | Field | Status |
 | --- | --- |
-| CLI install | local `/tmp/pathcode-g8-tools` · v1.0.84-4 |
-| Auth | **OPERATOR ACTION** — `gh` keyring token invalid; network validation failed |
-| Advisory case | not executed with valid auth |
-| Advisory value | `COPILOT_ADVISORY_NO_VALUE_IN_TEST` (auth-blocked; not faked) |
+| CLI install | `/Users/achahbi/.local/bin/copilot` · v1.0.84-4 (also `/tmp/pathcode-g8-tools`) |
+| Auth | **PASS** — programmatic `copilot -p "reply with exactly OK" --silent` → `OK` |
+| Probe | `docs/reports/g8-evidence/copilot-probe.json` · status `ready` |
+| Advisory case | **PASS** — overloaded `resolveRef` type ambiguity (`catalog.ts` / `user-key`) |
+| Trigger | first TYPECHECK repair via `symbol_ambiguity` (session.mjs) |
+| Path | analyzing → advisory returned → continue (2034 chars vs ~676 without) → VERIFIED |
+| Advisory value | **helped** |
+| Live evidence | `docs/reports/g8-evidence/live/copilot-advisory.json` + `.summary.json` |
 
-Normal PATH engineering continues without Copilot.
+Read-only prompt prefix keeps Copilot from hanging on denied write/edit tools.
+Normal PATH engineering still continues if advisory is unavailable.
 
 ## Same-session repair
 
@@ -99,8 +104,7 @@ Normal PATH engineering continues without Copilot.
 | --- | --- |
 | Bridge continue protocol (fake AG) | PASS · `tests/g8/g8-bridge-continue.test.ts` |
 | Live: finish → PATH test FAIL → Repairing → finish → VERIFIED | **PASS** · `live/repair-live2.*` |
-
-Trace: typecheck ✓ · test ✕ → Repairing → typecheck ✓ · test ✓ → VERIFIED.
+| Live: TYPECHECK FAIL → advisory → Repairing → VERIFIED | **PASS** · `live/copilot-advisory.*` |
 
 ## Engineering handoff
 
@@ -114,16 +118,16 @@ provider branding in normal UI. G7 cockpit architecture not reopened.
 
 ## Focused tests
 
-`npx vitest run tests/g7 tests/g8` — 30/30 PASS
+`npx vitest run tests/g7 tests/g8` — see acceptance commit.
 
 ## Canonical validation
 
-`npm run check` — see freeze commit.
+`npm run check` — see freeze / acceptance commit.
 
 ## Credential isolation / primary checkout
 
-Live MCP + repair: primary checkout untouched; MCP secrets stripped from env;
-evil_deploy never enabled.
+Live MCP + repair + Copilot advisory: primary checkout untouched; MCP secrets
+stripped from env; evil_deploy never enabled; Copilot advisory read-only.
 
 ## Published releases
 

@@ -1,0 +1,76 @@
+{
+  "label": "copilot-advisory",
+  "outcome": "VERIFIED",
+  "classification": "VERIFIED",
+  "exitCode": 0,
+  "eventCount": 124,
+  "capabilityEvents": [
+    {
+      "type": "session.capability.discovered",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null,
+      "enabled": 0,
+      "denied": 0,
+      "servers": []
+    },
+    {
+      "type": "session.capability.advisory",
+      "detail": "analyzing compiler diagnostic"
+    },
+    {
+      "type": "session.capability.advisory",
+      "detail": "advisory returned"
+    }
+  ],
+  "advisoryEvents": [
+    {
+      "detail": "analyzing compiler diagnostic",
+      "label": "Engineering review",
+      "at": 1789361279950
+    },
+    {
+      "detail": "advisory returned",
+      "label": "Engineering review",
+      "at": 1789361298514
+    }
+  ],
+  "advisoryAnalyzing": true,
+  "advisoryReturned": true,
+  "repairActivities": 2,
+  "continueOrRepair": 2,
+  "feedbackHadAdvisoryMarker": true,
+  "diagAdvisoryHits": 0,
+  "mcpActivities": 0,
+  "handoff": "The npm test suite now passes after modifying `src/user-key.js`. The `userKey` implementation correctly uses the numeric `resolveRef` overload without passing a namespace for numeric IDs, and `userKeyFromSlug` remains unchanged. All tests passed: `userKey uses numeric resolveRef overload` `userKeyFr",
+  "primaryUntouched": true,
+  "commitSha": "bcfc564e392967959a038c8a067ae768c66276df",
+  "checks": [
+    {
+      "id": "npm-typecheck",
+      "name": "npm-typecheck",
+      "kind": "TYPECHECK",
+      "command": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run typecheck",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 655,
+      "ok": true,
+      "stdoutTail": "\n> typecheck\n> node ./scripts/typecheck.mjs\n\n",
+      "stderrTail": ""
+    },
+    {
+      "id": "npm-test",
+      "name": "npm-test",
+      "kind": "TARGETED_TEST",
+      "command": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run test",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 600,
+      "ok": true,
+      "stdoutTail": "\n> test\n> node --test test/user-key.test.js\n\n✔ userKey uses numeric resolveRef overload (1.399625ms)\n✔ userKeyFromSlug uses namespaced overload (0.63925ms)\nℹ tests 2\nℹ suites 0\nℹ pass 2\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 213.65325\n",
+      "stderrTail": ""
+    }
+  ]
+}

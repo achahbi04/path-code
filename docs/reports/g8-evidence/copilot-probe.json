@@ -1,19 +1,19 @@
 {
   "detectOnPath": {
     "status": "ready",
-    "executable": "/tmp/pathcode-g8-tools/node_modules/.bin/copilot",
+    "executable": "/Users/achahbi/.local/bin/copilot",
     "version": "GitHub Copilot CLI 1.0.84-4.",
     "evidence": [
-      "copilot → /tmp/pathcode-g8-tools/node_modules/.bin/copilot",
+      "copilot → /Users/achahbi/.local/bin/copilot",
       "version GitHub Copilot CLI 1.0.84-4."
     ]
   },
   "localAdvisory": {
-    "ok": false,
-    "value": "no_value",
-    "code": 1,
-    "text": "Error: Authentication token found but could not be validated.\n\n  Failed to fetch GitHub CLI user login: network fetch failed: request failed: error sending request for url (https://api.github.com/copilot_internal/user)\n\nYour token may still be valid. Check your network connection and try again.\n\nTo "
+    "ok": true,
+    "value": "helped",
+    "code": 0,
+    "text": "OK"
   },
-  "advisoryCaseNote": "COPILOT_AUTH_INVALID_OPERATOR_ACTION; COPILOT_ADVISORY_NO_VALUE_IN_TEST",
-  "status": "unavailable_auth"
+  "advisoryCaseNote": "programmatic copilot -p --silent authenticated; reply OK",
+  "status": "ready"
 }

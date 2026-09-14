@@ -649,10 +649,12 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         c.ok !== true &&
         (c.kind === "TYPECHECK" || /type|tsc|mypy|cargo check/i.test(String(c.id || ""))),
     );
+    // First type-failure repair: symbol_ambiguity (mandate). Repeat: repeated_type_failure.
+    const advisoryReason =
+      repairAttempts >= 1 ? "repeated_type_failure" : "symbol_ambiguity";
     if (
-      repairAttempts >= 1 &&
       typeFailures.length > 0 &&
-      shouldTriggerAdvisory({ reason: "repeated_type_failure" })
+      shouldTriggerAdvisory({ reason: advisoryReason })
     ) {
       emit("session.capability.advisory", {
         label: "Engineering review",
@@ -660,9 +662,15 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       });
       try {
         const advisory = await runCopilotAdvisory({
-          question: buildValidationRepairPrompt(validation).slice(0, 2_500),
+          question: [
+            "READ-ONLY specialist advisory. Reply with plain text only.",
+            "Do not edit files, do not run shell, and do not use write/edit/git tools.",
+            "Explain the TypeScript overload/symbol error and the correct call-site fix in under 200 words.",
+            "",
+            buildValidationRepairPrompt(validation).slice(0, 2_000),
+          ].join("\n"),
           cwd: engineeringCwd,
-          timeoutMs: 90_000,
+          timeoutMs: 120_000,
         });
         if (advisory?.ok && typeof advisory.text === "string" && advisory.text.trim()) {
           advisoryText = advisory.text.trim();
