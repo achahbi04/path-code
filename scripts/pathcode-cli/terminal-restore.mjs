@@ -2,6 +2,11 @@
  * AG3 — absolute terminal restoration (idempotent, synchronous).
  */
 
+import {
+  restoreTerminalTitle,
+} from "./terminal-title.mjs";
+import { DISABLE_BRACKETED_PASTE } from "./composer.mjs";
+
 const SHOW_CURSOR = "\u001b[?25h";
 const EXIT_ALT = "\u001b[?1049l";
 const RESET_GRAPHICS = "\u001b[0m";
@@ -40,8 +45,16 @@ export function restoreTerminal(opts = {}) {
 
   try {
     if (stdout && typeof stdout.write === "function") {
-      stdout.write(`${SHOW_CURSOR}${EXIT_ALT}${RESET_GRAPHICS}`);
+      stdout.write(
+        `${SHOW_CURSOR}${EXIT_ALT}${RESET_GRAPHICS}${DISABLE_BRACKETED_PASTE}`,
+      );
     }
+  } catch {
+    // ignore
+  }
+
+  try {
+    restoreTerminalTitle({ stdout });
   } catch {
     // ignore
   }

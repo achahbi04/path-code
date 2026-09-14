@@ -58,11 +58,22 @@ function createReplTty(lines: string[]) {
     setImmediate(() => stdin.push(`${next}\n`));
   };
 
+  let feedArmed = true;
   const stdout = new Writable({
     write(chunk, _encoding, callback) {
       const text = String(chunk);
       chunks.push(text);
-      if (text.endsWith("> ")) feedNext();
+      if (text.includes("\u001b[?2004l")) {
+        feedArmed = true;
+      }
+      if (feedArmed && text.includes("\u001b]7878;path-idle-composer\u0007")) {
+        feedArmed = false;
+        setImmediate(() => feedNext());
+      } else if (feedArmed && text.endsWith("> ")) {
+        // Legacy non-living readline prompt.
+        feedArmed = false;
+        setImmediate(() => feedNext());
+      }
       callback();
     },
   }) as Writable & { isTTY: boolean; columns: number };
@@ -113,7 +124,8 @@ describe("R2 living session loop (shell)", { timeout: 20_000 }, () => {
     expect(seen).toHaveLength(2);
     expect(seen[0]!.taskText).toBe("first task please");
     expect(seen[1]!.taskText).toBe("second task please");
-    expect(output).toMatch(/PATH [●*] Code >/);
+    expect(output).toMatch(/PATH [●*] Code/);
+    expect(output).toMatch(/│ > |path-idle-composer/);
     expect(output).toContain("Goodbye.");
     // Session-long cockpit: continuity stays in-frame (no scrollback session dump).
     expect(output).toMatch(/\u001b\[\?1049h/);
@@ -136,7 +148,8 @@ describe("R2 living session loop (shell)", { timeout: 20_000 }, () => {
     );
     expect(exitCode).toBe(0);
     expect(outcomes).toEqual(["declined", "ran"]);
-    expect(output).toMatch(/PATH [●*] Code >/);
+    expect(output).toMatch(/PATH [●*] Code/);
+    expect(output).toMatch(/│ > |path-idle-composer/);
     expect(output).toContain("Goodbye.");
   });
 
@@ -212,7 +225,8 @@ describe("R2 living session loop (shell)", { timeout: 20_000 }, () => {
     expect(exitCode).toBe(0);
     expect(n).toBe(2);
     expect(output).toContain("Internal error (session continues): forced internal fault");
-    expect(output).toMatch(/PATH [●*] Code >/);
+    expect(output).toMatch(/PATH [●*] Code/);
+    expect(output).toMatch(/│ > |path-idle-composer/);
     expect(output).toContain("Goodbye.");
   });
 

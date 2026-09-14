@@ -477,6 +477,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
     stdout: streams.stdout,
     enabled: ttyInline,
     alternateScreen: true,
+    projectName,
   });
 
   // Non-cockpit TTY (e.g. NDJSON on stdout): traditional scrollback prompt.
@@ -532,6 +533,15 @@ export async function runPathcodeMain(argv, testIo = {}) {
   });
 
   const prompt = createPromptSession(streams);
+  if (ttyInline && typeof prompt.enableLivingComposer === "function") {
+    prompt.enableLivingComposer({
+      onChange: (composerState) => {
+        if (typeof inlineStudio.setComposerState === "function") {
+          inlineStudio.setComposerState(composerState);
+        }
+      },
+    });
+  }
   const uninstallCollisionGuard = ttyInline
     ? installCollisionGuard(prompt, inlineStudio)
     : () => {};

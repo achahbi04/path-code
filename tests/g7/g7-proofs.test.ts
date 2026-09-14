@@ -133,9 +133,9 @@ describe("G7 D — large result bounded preview", () => {
     expect(buildFullResultInspectCommand({})).toBeNull();
   });
 
-  it("renders truncation disclosure and inspect command in the living frame", async () => {
+  it("renders compact VERIFIED result in the minimal living frame", async () => {
     const { createEmptyStudioState, applyStudioEvent } = await load(STUDIO);
-    const { buildInlineCardLines } = await load(INLINE);
+    const { buildInlineCardLines, buildLivingProductLines } = await load(INLINE);
     const sid = "g7d";
     const state = createEmptyStudioState();
     const many = Array.from({ length: 9 }, (_, i) => `pkg/file-${i}.ts`);
@@ -161,18 +161,21 @@ describe("G7 D — large result bounded preview", () => {
       checks: [{ id: "test", kind: "TARGETED_TEST", ok: true }],
     });
     const wide = buildInlineCardLines(state, { rows: 50, columns: 140 }).join("\n");
-    expect(wide).toMatch(/5 of 9 changed files shown/);
-    expect(wide).toMatch(/primary\s+main/);
-    expect(wide).toMatch(/task\s+path\/task-big/);
-    expect(wide).toMatch(/git diff --no-ext-diff --no-textconv/);
-    expect(wide).toMatch(/1111111aaaa/);
-    expect(wide).toMatch(/2222222bbbb/);
+    expect(wide).toMatch(/VERIFIED/);
+    expect(wide).toMatch(/9 files/);
+    expect(wide).toMatch(/path\/task-big/);
+    expect(wide).toMatch(/2222222b/);
+    // Primary surface must not dump raw inspect commands.
+    expect(wide).not.toMatch(/git diff --no-ext-diff/);
     const narrow = buildInlineCardLines(state, { rows: 40, columns: 72 }).join("\n");
-    expect(narrow).toMatch(/primary/);
-    expect(narrow).toMatch(/task/);
-    expect(narrow).toMatch(/RESULT/);
-    expect(narrow).toMatch(/git diff --no-ext-diff --no-textconv/);
-    expect(narrow).toMatch(/PATH ● Code >/);
+    expect(narrow).toMatch(/VERIFIED/);
+    expect(narrow).toMatch(/PATH ● Code/);
+    expect(narrow).toMatch(/Branch: path\/task-big/);
+    // Legacy three-column still discloses inspect command when asked explicitly.
+    const legacy = buildLivingProductLines(state, { rows: 50, columns: 140 }).join(
+      "\n",
+    );
+    expect(legacy).toMatch(/git diff --no-ext-diff --no-textconv/);
   });
 });
 
@@ -336,8 +339,9 @@ describe("G7 F — final ANSI write boundary", () => {
     expect(mid).not.toContain("\\u001b");
     renderer.setIdlePrompt("PATH ● Code > ");
     const idle = stdout.chunks.join("");
-    expect(idle).toMatch(/RESULT/);
-    expect(idle).toMatch(/PATH ● Code >/);
+    expect(idle).toMatch(/VERIFIED/);
+    expect(idle).toMatch(/PATH ● Code/);
+    expect(idle).toMatch(/> /);
     // Second task must not exit alt screen.
     const beforeExit = (idle.match(/\u001b\[\?1049l/g) || []).length;
     renderer.startTask();

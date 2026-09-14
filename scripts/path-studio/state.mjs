@@ -140,6 +140,10 @@ export function createEmptyStudioState() {
       /** Idle prompt text rendered inside the cockpit frame. */
       cockpitPrompt: null,
       awaitingInput: false,
+      /** PATH-owned composer buffer (never echoed via terminal). */
+      composerText: "",
+      composerScroll: 0,
+      composerPasteActive: false,
       /** Last task preview for session history. */
       taskPreview: null,
       /** AG4 GitHub delivery projection. */

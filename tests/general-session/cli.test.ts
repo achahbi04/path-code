@@ -34,6 +34,7 @@ function createReplTty(lines: string[]) {
     return this;
   };
 
+  let feedArmed = true;
   const feedNext = () => {
     const next = queue.shift();
     if (next === undefined) {
@@ -47,7 +48,16 @@ function createReplTty(lines: string[]) {
     write(chunk, _encoding, callback) {
       const text = String(chunk);
       chunks.push(text);
-      if (text.endsWith("> ")) feedNext();
+      if (text.includes("\u001b[?2004l")) {
+        feedArmed = true;
+      }
+      if (feedArmed && text.includes("\u001b]7878;path-idle-composer\u0007")) {
+        feedArmed = false;
+        setImmediate(() => feedNext());
+      } else if (feedArmed && text.endsWith("> ")) {
+        feedArmed = false;
+        setImmediate(() => feedNext());
+      }
       callback();
     },
   }) as Writable & { isTTY: boolean; columns: number };

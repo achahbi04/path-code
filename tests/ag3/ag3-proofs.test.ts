@@ -237,7 +237,7 @@ describe("AG3 package bin", () => {
 });
 
 describe("AG3 narrow + non-TTY + cancel wiring", () => {
-  it("narrow AG1 layout stays PROJECT|PATH|EVIDENCE framed cockpit", async () => {
+  it("narrow AG1 layout uses minimal living cockpit", async () => {
     const { createEmptyStudioState, applyStudioEvent } = await import(
       `${pathToFileURL(join(CHECKOUT_ROOT, "scripts/path-studio/state.mjs")).href}?n=${randomUUID()}`
     );
@@ -255,11 +255,11 @@ describe("AG3 narrow + non-TTY + cancel wiring", () => {
     const narrow = buildInlineCardLines(state, { rows: 24, columns: 40 });
     const text = narrow.join("\n");
     expect(text).toContain("PATH ● Code");
-    expect(text).toContain("PROJECT");
-    expect(text).toContain("PATH");
-    expect(text).toContain("EVIDENCE");
+    expect(text).toMatch(/Inspecting|◆/);
     expect(text).toContain("╭");
     expect(text).not.toContain("PATH STUDIO");
+    // Default is no longer a permanent three-column dashboard.
+    expect(text).not.toMatch(/^\s*PROJECT\s*$/m);
   });
 
   it("non-TTY renderer emits plain lifecycle text without alt-screen", async () => {

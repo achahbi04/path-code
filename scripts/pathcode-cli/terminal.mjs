@@ -4,9 +4,17 @@
  */
 
 import { createInterface } from "node:readline";
+import { EventEmitter } from "node:events";
 import { randomBytes } from "node:crypto";
 import { escapeForTerminalDisplay } from "./escape.mjs";
 import { classifyPublicationKey } from "./ag4/approval-keys.mjs";
+import {
+  applyComposerInput,
+  createComposerState,
+  ENABLE_BRACKETED_PASTE,
+  DISABLE_BRACKETED_PASTE,
+  IDLE_COMPOSER_READY,
+} from "./composer.mjs";
 
 /**
  * @typedef {{
@@ -116,9 +124,43 @@ export function createPromptSession(streams, options = {}) {
   let steeringQueue = [];
   const stderr = streams.stderr ?? streams.stdout;
 
+  /** Living TUI owns echo — PATH composer paints via renderer. */
+  let livingComposerEnabled = false;
+  /** @type {((state: import("./composer.mjs").ComposerState) => void) | null} */
+  let onComposerChange = null;
+  /** @type {import("./composer.mjs").ComposerState} */
+  let composer = createComposerState();
+  /** @type {((line: string | null) => void) | null} */
+  let composerResolve = null;
+  let composerRawActive = false;
+  let composerWasRaw = false;
+  /** @type {((buf: Buffer|string) => void) | null} */
+  let composerOnData = null;
+
+  // Proxy output so enabling the living composer later mutes readline echo.
+  // Must be an EventEmitter — Node readline calls output.on("resize", …).
+  const rlOutput = Object.assign(new EventEmitter(), {
+    write(chunk, encoding, cb) {
+      if (livingComposerEnabled) {
+        if (typeof encoding === "function") encoding();
+        else if (typeof cb === "function") cb();
+        return true;
+      }
+      return streams.stdout.write(chunk, encoding, cb);
+    },
+    get isTTY() {
+      return streams.stdout.isTTY === true;
+    },
+    get columns() {
+      return streams.stdout.columns;
+    },
+  });
+
   const rl = createInterface({
     input: streams.stdin,
-    output: streams.stdout,
+    // Mute readline echo when living TUI owns the screen; askLine fallback
+    // still writes explicit promptText via write() on streams.stdout.
+    output: /** @type {any} */ (rlOutput),
     terminal: streams.stdin.isTTY === true,
     historySize: 0,
     crlfDelay: Infinity,
@@ -140,14 +182,176 @@ export function createPromptSession(streams, options = {}) {
     stopRequested = false;
   }
 
-  function onCycleSteeringLine(value) {
-    if (!cycleActive || mode !== "idle") return;
-    const text = typeof value === "string" ? value.trim() : "";
-    if (!text) return;
-    steeringQueue.push(text.slice(0, 4_000));
+  function notifyComposer() {
+    if (typeof onComposerChange === "function") {
+      try {
+        onComposerChange({ ...composer });
+      } catch {
+        // ignore UI failures
+      }
+    }
+  }
+
+  function pushSteering(text) {
+    const trimmed = typeof text === "string" ? text.trim() : "";
+    if (!trimmed) return;
+    steeringQueue.push(trimmed.slice(0, 4_000));
     if (steeringQueue.length > 16) {
       steeringQueue = steeringQueue.slice(-16);
     }
+  }
+
+  /**
+   * Enable PATH-owned composer for living TUI (no terminal echo into frame).
+   * @param {{
+   *   onChange?: (state: import("./composer.mjs").ComposerState) => void,
+   * }} [opts]
+   */
+  function enableLivingComposer(opts = {}) {
+    livingComposerEnabled = true;
+    onComposerChange =
+      typeof opts.onChange === "function" ? opts.onChange : null;
+    composer = createComposerState();
+    notifyComposer();
+  }
+
+  function getComposerState() {
+    return { ...composer };
+  }
+
+  function clearComposer() {
+    composer = createComposerState();
+    notifyComposer();
+  }
+
+  function stopComposerRaw() {
+    if (!composerRawActive) return;
+    composerRawActive = false;
+    if (composerOnData) {
+      try {
+        streams.stdin.removeListener("data", composerOnData);
+      } catch {
+        // ignore
+      }
+      composerOnData = null;
+    }
+    try {
+      streams.stdin.setRawMode(composerWasRaw);
+    } catch {
+      // ignore
+    }
+    try {
+      write(DISABLE_BRACKETED_PASTE);
+    } catch {
+      // ignore
+    }
+    try {
+      rl.resume();
+    } catch {
+      // ignore
+    }
+  }
+
+  /**
+   * Start raw-mode composer capture. When awaitSubmit is true, Enter resolves
+   * askLine. When false (mid-cycle), Enter queues steering.
+   * @param {{ awaitSubmit: boolean }} opts
+   */
+  function startComposerRaw(opts) {
+    if (
+      streams.stdin.isTTY !== true ||
+      typeof streams.stdin.setRawMode !== "function"
+    ) {
+      return false;
+    }
+    stopComposerRaw();
+    composerWasRaw = streams.stdin.isRaw === true;
+    try {
+      rl.pause();
+    } catch {
+      // ignore
+    }
+    try {
+      streams.stdin.setRawMode(true);
+    } catch {
+      return false;
+    }
+    try {
+      write(ENABLE_BRACKETED_PASTE);
+      if (opts.awaitSubmit) {
+        // Distinct from mid-cycle steering arm — harnesses feed on this mark.
+        write(IDLE_COMPOSER_READY);
+      }
+    } catch {
+      // ignore
+    }
+    composerRawActive = true;
+
+    const onData = (buf) => {
+      const result = applyComposerInput(composer, buf);
+      composer = result.state;
+      notifyComposer();
+
+      if (result.cancel) {
+        if (!cycleActive) {
+          requestStop();
+        } else {
+          cycleCancelInProgress = true;
+        }
+        if (opts.awaitSubmit && composerResolve) {
+          const resolve = composerResolve;
+          composerResolve = null;
+          stopComposerRaw();
+          resolve(null);
+        }
+        return;
+      }
+      if (result.eof) {
+        if (opts.awaitSubmit && composerResolve) {
+          const resolve = composerResolve;
+          composerResolve = null;
+          stopComposerRaw();
+          resolve(null);
+        }
+        return;
+      }
+      if (result.submit != null) {
+        const line = result.submit;
+        composer = createComposerState();
+        notifyComposer();
+        if (opts.awaitSubmit && composerResolve) {
+          const resolve = composerResolve;
+          composerResolve = null;
+          stopComposerRaw();
+          resolve(line);
+        } else if (cycleActive && mode === "idle") {
+          pushSteering(line);
+        }
+      }
+    };
+    composerOnData = onData;
+    streams.stdin.on("data", onData);
+    try {
+      // rl.pause() pauses stdin; resume so the composer data listener receives bytes.
+      streams.stdin.resume();
+    } catch {
+      // ignore
+    }
+    try {
+      streams.stdin.ref();
+    } catch {
+      // ignore
+    }
+    return true;
+  }
+
+  function onCycleSteeringLine(value) {
+    // Legacy readline path — only when living composer is off.
+    if (livingComposerEnabled) return;
+    if (!cycleActive || mode !== "idle") return;
+    const text = typeof value === "string" ? value.trim() : "";
+    if (!text) return;
+    pushSteering(text);
   }
 
   function beginCycle() {
@@ -156,8 +360,12 @@ export function createPromptSession(streams, options = {}) {
     steeringQueue = [];
     // Mid-cycle SIGINT must cancel engineering even when askLine is not waiting.
     rl.on("SIGINT", onCycleSigint);
-    // G10: accept operator steering lines without ending the cycle.
-    rl.on("line", onCycleSteeringLine);
+    if (livingComposerEnabled) {
+      // Same composer for live steering — no readline echo into the frame.
+      startComposerRaw({ awaitSubmit: false });
+    } else {
+      rl.on("line", onCycleSteeringLine);
+    }
   }
 
   function endCycle() {
@@ -170,6 +378,11 @@ export function createPromptSession(streams, options = {}) {
       rl.off("line", onCycleSteeringLine);
     } catch {
       // ignore
+    }
+    if (livingComposerEnabled) {
+      stopComposerRaw();
+      composer = createComposerState();
+      notifyComposer();
     }
     cycleActive = false;
     cycleCancelInProgress = false;
@@ -248,6 +461,38 @@ export function createPromptSession(streams, options = {}) {
     }
     mode = "awaiting";
     activePromptId = promptId;
+
+    // Living TUI: PATH-owned composer (no readline echo into the frame).
+    if (livingComposerEnabled && streams.stdin.isTTY === true) {
+      try {
+        rl.off("SIGINT", onCycleSigint);
+      } catch {
+        // ignore
+      }
+      composer = createComposerState();
+      notifyComposer();
+      const line = await new Promise((resolve) => {
+        composerResolve = resolve;
+        const ok = startComposerRaw({ awaitSubmit: true });
+        if (!ok) {
+          composerResolve = null;
+          // Fallback: non-raw environment (tests without setRawMode).
+          resolve(null);
+        }
+      });
+      mode = "idle";
+      activePromptId = null;
+      if (cycleActive) {
+        rl.on("SIGINT", onCycleSigint);
+        // Resume mid-cycle steering composer.
+        startComposerRaw({ awaitSubmit: false });
+      }
+      if (isStopped() && !cycleActive) return null;
+      if (cycleCancelInProgress) return null;
+      if (isStopped()) return null;
+      return line;
+    }
+
     write(promptText);
     // askLine owns SIGINT while awaiting; detach the mid-cycle listener.
     try {
@@ -552,6 +797,7 @@ export function createPromptSession(streams, options = {}) {
   function close() {
     if (mode === "closed") return;
     mode = "closed";
+    stopComposerRaw();
     try {
       rl.close();
     } catch {
@@ -575,6 +821,9 @@ export function createPromptSession(streams, options = {}) {
     requestCycleCancel,
     isStopped,
     close,
+    enableLivingComposer,
+    getComposerState,
+    clearComposer,
     getActivePromptId: () => activePromptId,
     getMode: () => mode,
     escape: escapeForTerminalDisplay,

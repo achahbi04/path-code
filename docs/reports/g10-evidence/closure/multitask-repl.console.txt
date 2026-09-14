@@ -1,2 +1,2 @@
-{"verdict":"PASS","exitCode":0,"tasks":[{"n":1,"classification":"VERIFIED","taskId":"41439f17-0a9f-4ad5-b28d-34cb24c9c506"},{"n":2,"classification":"VERIFIED","taskId":"484ce562-0c0a-46a7-8f0a-68ce5fd4ce9b"},{"n":3,"classification":"VERIFIED","taskId":"d69d29e1-5a97-4d71-8331-343d1582fa7c"}]}
-[?25h[?1049l[0m
+{"verdict":"PASS","exitCode":0,"tasks":[{"n":1,"classification":"VERIFIED","taskId":"9052f46a-a76b-4873-8590-97564aa188c4"},{"n":2,"classification":"VERIFIED","taskId":"cdc79e78-490d-4b1d-be26-b56a46dafbdf"},{"n":3,"classification":"VERIFIED","taskId":"6294d53c-7952-41f3-b2ce-938d9cd11002"}]}
+[?25h[?1049l[0m[?2004lEXIT:0

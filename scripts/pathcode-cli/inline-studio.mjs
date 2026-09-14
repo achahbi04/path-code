@@ -18,6 +18,15 @@ import {
 } from "../path-studio/state.mjs";
 import { escapeForTerminalDisplay } from "./escape.mjs";
 import { renderSessionEventHuman } from "./session-events.mjs";
+import {
+  COMPOSER_MAX_ROWS,
+  composerVisibleLines,
+  DISABLE_BRACKETED_PASTE,
+} from "./composer.mjs";
+import {
+  setStablePathTitle,
+  restoreTerminalTitle,
+} from "./terminal-title.mjs";
 
 const ANSI_RE = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)|\u001b./g;
 
@@ -394,9 +403,242 @@ function padVisible(text, width) {
 }
 
 /**
+ * Required PATH branding: PATH white, ● yellow, Code white.
+ * @returns {string}
+ */
+export function brandPathCode() {
+  return `${style.bold(style.white("PATH"))} ${style.yellow("●")} ${style.bold(style.white("Code"))}`;
+}
+
+/**
+ * Map product pathPhase to a calm primary activity label.
+ * @param {string} phase
+ */
+function activityLabel(phase) {
+  const p = String(phase || "Idle");
+  if (p === "Verified") return "Verified";
+  if (p === "Failed" || p === "Not verified") return p;
+  if (p === "Idle") return "Ready";
+  if (/prepar/i.test(p)) return "Preparing environment";
+  if (/language intelligence|lsp/i.test(p)) return "Language intelligence";
+  if (/index/i.test(p)) return "Indexing";
+  if (/code intelligence|scip/i.test(p)) return "Code intelligence";
+  if (/inspect|read|research/i.test(p)) return "Inspecting";
+  if (/implement|apply|edit|writ/i.test(p)) return "Implementing";
+  if (/build/i.test(p)) return "Building";
+  if (/test/i.test(p)) return "Testing";
+  if (/collaborat/i.test(p)) return "Collaborating";
+  if (/repair|correct/i.test(p)) return "Correcting";
+  if (/verif/i.test(p)) return "Verifying";
+  if (/steer/i.test(p)) return p;
+  return p;
+}
+
+/**
+ * G10 minimal living surface — one activity line + compact status + composer.
+ * Default product view (all widths).
+ *
+ * @param {ReturnType<typeof createEmptyStudioState>} state
+ * @param {{ rows: number, columns: number }} viewport
+ * @returns {string[]}
+ */
+export function buildMinimalLivingLines(state, viewport) {
+  const columns =
+    typeof viewport.columns === "number" && viewport.columns > 0
+      ? Math.floor(viewport.columns)
+      : 80;
+  const rows =
+    typeof viewport.rows === "number" && viewport.rows > 0
+      ? Math.floor(viewport.rows)
+      : 24;
+  const maxHeight = Math.max(8, rows - 2);
+  const inner = Math.max(16, columns - 2);
+  const product = state.product || {};
+  const pathPhase = projectAuthoritativePathPhase(state);
+  const projectName =
+    typeof product.projectName === "string" && product.projectName
+      ? product.projectName
+      : "";
+  const taskBranch =
+    typeof product.taskBranch === "string" && product.taskBranch
+      ? product.taskBranch
+      : typeof product.branch === "string"
+        ? String(product.branch).replace(/\s+@\s+\S+/, "")
+        : "";
+  const headerRight = style.dim(
+    safeDisplay([projectName, taskBranch].filter(Boolean).join(" · ")),
+  );
+  const headerLeft = brandPathCode();
+  const headerGap = Math.max(
+    1,
+    inner - visibleWidth(headerLeft) - visibleWidth(headerRight) - 2,
+  );
+  const headerInner = ` ${headerLeft}${" ".repeat(headerGap)}${headerRight} `;
+
+  const mark = pathGlyph(pathPhase);
+  const label = activityLabel(pathPhase);
+  const detailRaw =
+    typeof product.currentDetail === "string" && product.currentDetail
+      ? product.currentDetail
+      : typeof product.pathDetail === "string" && product.pathDetail
+        ? product.pathDetail
+        : "";
+  const detail = detailRaw
+    ? `  ${safeDisplay(detailRaw).slice(0, Math.max(8, inner - visibleWidth(`${mark} ${label}`) - 6))}`
+    : "";
+  const phaseTone =
+    pathPhase === "Verified"
+      ? style.green
+      : pathPhase === "Failed" || pathPhase === "Not verified"
+        ? style.red
+        : pathPhase === "Partially verified"
+          ? style.yellow
+          : style.white;
+  const activity = phaseTone(`${mark} ${safeDisplay(label)}${detail}`);
+
+  const fileN =
+    typeof product.changedFileTotal === "number" && product.changedFileTotal > 0
+      ? product.changedFileTotal
+      : Array.isArray(product.projectFiles)
+        ? product.projectFiles.length
+        : 0;
+  const feedback =
+    typeof product.engineCheckFeedback === "string" &&
+    product.engineCheckFeedback
+      ? product.engineCheckFeedback
+      : null;
+  let testsBit = "Tests —";
+  if (feedback) {
+    testsBit = safeDisplay(feedback).slice(0, 24);
+  } else if (state.cards?.validationRunning?.arrived) {
+    testsBit = "Tests running";
+  } else if (state.cards?.validationResult?.arrived) {
+    testsBit = "Tests done";
+  }
+  let finalBit = "Final —";
+  if (pathPhase === "Verified") finalBit = "Final VERIFIED";
+  else if (pathPhase === "Failed") finalBit = "Final FAILED";
+  else if (pathPhase === "Partially verified") finalBit = "Final partial";
+  else if (product.finalValidationStarted && !product.finalValidationComplete) {
+    finalBit = "Final running";
+  }
+  const status = style.dim(
+    `${fileN} file${fileN === 1 ? "" : "s"} changed · ${testsBit} · ${finalBit}`,
+  );
+
+  /** @type {string[]} */
+  const lines = [];
+  lines.push(fitLine(`╭${"─".repeat(inner)}╮`, columns));
+  lines.push(fitLine(`│${padVisible(headerInner.trimEnd(), inner)}│`, columns));
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+  lines.push(fitLine(`│${padVisible(` ${activity}`, inner)}│`, columns));
+  lines.push(fitLine(`│${padVisible("", inner)}│`, columns));
+  lines.push(fitLine(`│${padVisible(` ${status}`, inner)}│`, columns));
+
+  const ops = Array.isArray(product.recentOps) ? product.recentOps.slice(-2) : [];
+  if (ops.length > 0 && !state.cards?.terminal?.arrived) {
+    lines.push(fitLine(`│${padVisible("", inner)}│`, columns));
+    for (const op of ops) {
+      const bit = style.dim(
+        safeDisplay(
+          `${op.label || ""}${op.detail ? ` · ${op.detail}` : ""}`,
+        ).slice(0, Math.max(8, inner - 4)),
+      );
+      lines.push(fitLine(`│${padVisible(` ${bit}`, inner)}│`, columns));
+    }
+  }
+
+  if (state.cards?.terminal?.arrived) {
+    lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+    const sha =
+      typeof product.resultSha === "string" ? product.resultSha.slice(0, 8) : "";
+    const classLabel =
+      pathPhase === "Verified"
+        ? "VERIFIED"
+        : pathPhase === "Failed"
+          ? "FAILED"
+          : pathPhase === "Partially verified"
+            ? "PARTIAL"
+            : String(pathPhase || "DONE");
+    const tone =
+      pathPhase === "Verified"
+        ? style.green
+        : pathPhase === "Failed" || pathPhase === "Not verified"
+          ? style.red
+          : style.yellow;
+    const resultLine = tone(
+      `✓ ${classLabel} · ${fileN} files${sha ? ` · ${sha}` : ""}`,
+    );
+    lines.push(fitLine(`│${padVisible(` ${resultLine}`, inner)}│`, columns));
+    if (taskBranch) {
+      lines.push(
+        fitLine(
+          `│${padVisible(
+            ` ${style.dim(`Branch: ${safeDisplay(taskBranch)}`)}`,
+            inner,
+          )}│`,
+          columns,
+        ),
+      );
+    }
+    if (sha) {
+      lines.push(
+        fitLine(
+          `│${padVisible(` ${style.dim(`Commit: ${sha}`)}`, inner)}│`,
+          columns,
+        ),
+      );
+    }
+  }
+
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+
+  const composerWidth = Math.max(8, inner - 4);
+  const composerState = {
+    text: typeof product.composerText === "string" ? product.composerText : "",
+    cursor: 0,
+    pasteActive: product.composerPasteActive === true,
+    scroll:
+      typeof product.composerScroll === "number" ? product.composerScroll : 0,
+  };
+  const vis = composerVisibleLines(
+    composerState,
+    composerWidth,
+    COMPOSER_MAX_ROWS,
+  );
+  const showPrompt =
+    product.awaitingInput === true ||
+    (typeof product.composerText === "string" &&
+      product.composerText.length > 0);
+  const promptPrefix = showPrompt ? "> " : "  ";
+  if (vis.lines.length === 0) {
+    lines.push(fitLine(`│${padVisible(` ${promptPrefix}`, inner)}│`, columns));
+  } else {
+    for (let i = 0; i < vis.lines.length; i += 1) {
+      const prefix = i === 0 ? promptPrefix : "  ";
+      const row = `${prefix}${safeDisplay(vis.lines[i])}`;
+      lines.push(fitLine(`│${padVisible(` ${row}`, inner)}│`, columns));
+    }
+  }
+  if (vis.total > vis.lines.length) {
+    lines.push(
+      fitLine(
+        `│${padVisible(
+          ` ${style.dim(`… ${vis.total - vis.lines.length} more`)}`,
+          inner,
+        )}│`,
+        columns,
+      ),
+    );
+  }
+
+  lines.push(fitLine(`╰${"─".repeat(inner)}╯`, columns));
+  return lines.slice(0, maxHeight);
+}
+
+/**
  * Wide living product surface: PROJECT | PATH | EVIDENCE.
- * Visual north star: framed cockpit, calm hierarchy, dense but anchored.
- * Truth rules unchanged — real events only; no provider branding on AG1.
+ * Legacy / explicit test surface — not the default product view.
  *
  * @param {ReturnType<typeof createEmptyStudioState>} state
  * @param {{ rows: number, columns: number }} viewport
@@ -675,7 +917,7 @@ export function buildLivingProductLines(state, viewport) {
     bodyRows.push(padVisible(row, inner));
   }
 
-  const headerLeft = style.bold(style.cyan("PATH ● Code"));
+  const headerLeft = brandPathCode();
   const headerRightParts = [];
   if (projectName) headerRightParts.push(projectName);
   if (branchRaw) headerRightParts.push(branchRaw);
@@ -894,7 +1136,7 @@ export function buildCompactAg1Lines(state, viewport) {
   const lines = [];
   lines.push(fitLine(`╭${"─".repeat(inner)}╮`, columns));
   const head = [
-    style.bold(style.cyan("PATH ● Code")),
+    brandPathCode(),
     style.dim([projectName, branch, dirty].filter(Boolean).join(" · ")),
   ]
     .filter((p) => visibleWidth(p) > 0)
@@ -1103,13 +1345,13 @@ export function buildCompactAg1Lines(state, viewport) {
   return lines.slice(0, maxHeight);
 }
 
-/** Wide-TTY threshold for three-column living product surface. */
+/** Wide-TTY threshold for legacy three-column living product surface. */
 export const LIVING_PRODUCT_MIN_COLUMNS = 120;
 
 /**
  * Build the visible card block, clamped to rows-2 (1a).
- * Non-active stages collapse to single-line summaries when needed.
- * Wide TTY (≥120 cols): three-column living product surface.
+ * Default: minimal living surface (G10 product correction).
+ * Set PATHCODE_LEGACY_THREE_COLUMN=1 to force legacy PROJECT|PATH|EVIDENCE.
  *
  * @param {ReturnType<typeof createEmptyStudioState>} state
  * @param {{ rows: number, columns: number }} viewport
@@ -1120,6 +1362,15 @@ export function buildInlineCardLines(state, viewport) {
     typeof viewport.columns === "number" && viewport.columns > 0
       ? Math.floor(viewport.columns)
       : 80;
+
+  // G10: AG1 / local engineering product uses the minimal living surface.
+  if (
+    process.env.PATHCODE_LEGACY_THREE_COLUMN !== "1" &&
+    state.product?.ag1 === true
+  ) {
+    return buildMinimalLivingLines(state, viewport);
+  }
+
   if (columns >= LIVING_PRODUCT_MIN_COLUMNS) {
     return buildLivingProductLines(state, viewport);
   }
@@ -1139,7 +1390,7 @@ export function buildInlineCardLines(state, viewport) {
 
   /** @type {string[]} */
   const header = [];
-  header.push(fitLine(style.bold(style.cyan("PATH ● Code")), columns));
+  header.push(fitLine(brandPathCode(), columns));
   header.push(
     fitLine(
       state.sessionId
@@ -1426,6 +1677,20 @@ export function createInlineStudioRenderer(options = {}) {
     clearPending();
     detachResize();
     exitAltScreen();
+    try {
+      if (enabled && useAltScreen) {
+        stdout.write(DISABLE_BRACKETED_PASTE);
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      if (enabled && useAltScreen) {
+        restoreTerminalTitle({ stdout });
+      }
+    } catch {
+      // ignore
+    }
     if (cursorHidden) restoreCursor();
     prevLines = [];
     prevHeight = 0;
@@ -1532,6 +1797,19 @@ export function createInlineStudioRenderer(options = {}) {
     frames.length = 0;
     lastFrameAt = 0;
     state.product.awaitingInput = false;
+    try {
+      if (enabled && useAltScreen) {
+        setStablePathTitle({
+          stdout,
+          projectName:
+            typeof options.projectName === "string"
+              ? options.projectName
+              : state.product?.projectName || "",
+        });
+      }
+    } catch {
+      // ignore
+    }
     if (enabled && typeof stdout.on === "function" && resizeListener === null) {
       resizeListener = () => {
         if (!active) return;
@@ -1583,6 +1861,8 @@ export function createInlineStudioRenderer(options = {}) {
 
   /**
    * Show the in-cockpit idle prompt without leaving alternate screen.
+   * Composer pixels are painted inside the frame — never teleport the cursor
+   * into the body (that caused paste to corrupt PROJECT/PATH).
    * @param {string} promptText
    */
   function setIdlePrompt(promptText) {
@@ -1597,14 +1877,37 @@ export function createInlineStudioRenderer(options = {}) {
     forceFull = true;
     clearPending();
     paintNow();
-    // Place the live readline cursor on the cockpit prompt row. Writing the
-    // prompt text (ending in "> ") also keeps scripted TTY harnesses feeding.
+    // Keep cursor hidden; PATH renderer owns the composer row.
     try {
-      const row = Math.max(1, prevLines.length || 1);
-      stdout.write(`${SHOW_CURSOR}\u001b[${row};3H${state.product.cockpitPrompt}`);
-      cursorHidden = false;
+      stdout.write(HIDE_CURSOR);
+      cursorHidden = true;
     } catch {
       // ignore
+    }
+  }
+
+  /**
+   * Update PATH-owned composer buffer from the input model.
+   * @param {{
+   *   text?: string,
+   *   scroll?: number,
+   *   pasteActive?: boolean,
+   * }} next
+   */
+  function setComposerState(next) {
+    if (!state.product) return;
+    if (typeof next.text === "string") {
+      state.product.composerText = next.text;
+    }
+    if (typeof next.scroll === "number") {
+      state.product.composerScroll = next.scroll;
+    }
+    if (typeof next.pasteActive === "boolean") {
+      state.product.composerPasteActive = next.pasteActive;
+    }
+    if (sessionOwned && active) {
+      dirty = true;
+      scheduleFrame();
     }
   }
 
@@ -1623,6 +1926,20 @@ export function createInlineStudioRenderer(options = {}) {
     }
     detachResize();
     exitAltScreen();
+    try {
+      if (enabled && useAltScreen) {
+        stdout.write(DISABLE_BRACKETED_PASTE);
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      if (enabled && useAltScreen) {
+        restoreTerminalTitle({ stdout });
+      }
+    } catch {
+      // ignore
+    }
     if (cursorHidden) restoreCursor();
     active = false;
     sessionOwned = false;
@@ -1702,6 +2019,7 @@ export function createInlineStudioRenderer(options = {}) {
     begin,
     startTask,
     setIdlePrompt,
+    setComposerState,
     onEvent,
     noteExternalWrite,
     noteDiagnostic,

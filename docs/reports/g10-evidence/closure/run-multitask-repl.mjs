@@ -78,13 +78,25 @@ function createReplTty(lines) {
   };
 
   let out = "";
+  /**
+   * Feed when the idle REPL composer arms (private OSC), not on mid-cycle
+   * steering paste-enable and not on painted `> ` alone.
+   */
+  let feedArmed = true;
   const stdout = new PassThrough();
   /** @type {any} */ (stdout).isTTY = true;
   /** @type {any} */ (stdout).columns = 120;
   stdout.on("data", (d) => {
     const text = d.toString("utf8");
     out += text;
-    if (text.endsWith("> ") || /Code >\s*$/.test(text)) feedNext();
+    if (feedArmed && text.includes("\u001b]7878;path-idle-composer\u0007")) {
+      feedArmed = false;
+      setImmediate(() => feedNext());
+    }
+    // Re-arm after a line is accepted so the next idle askLine can feed.
+    if (text.includes("\u001b[?2004l")) {
+      feedArmed = true;
+    }
   });
   const stderr = new PassThrough();
   stderr.on("data", (d) => {

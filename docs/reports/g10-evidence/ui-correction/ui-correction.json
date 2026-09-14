@@ -1,0 +1,57 @@
+{
+  "schema": "pathcode.g10.ui-correction.v1",
+  "at": "2026-09-14T20:33:59.075Z",
+  "cases": {
+    "shortPaste": {
+      "text": "Keep backward compatibility.",
+      "submitNull": true,
+      "ok": true,
+      "submitAfterEnter": "Keep backward compatibility."
+    },
+    "longPaste": {
+      "len": 350,
+      "wrapRows": 9,
+      "submitNull": true,
+      "ok": true
+    },
+    "multilinePaste": {
+      "text": "line one\nline two\nline three",
+      "submitNull": true,
+      "ok": true
+    },
+    "pasteInFrame": {
+      "composerVisible": true,
+      "notInActivityAlone": true,
+      "ok": true
+    },
+    "branding": {
+      "hasWhitePath": true,
+      "hasYellowDot": true,
+      "hasWhiteCode": true,
+      "noCyan": true,
+      "ok": true
+    },
+    "title": {
+      "title": "pathcode-g10-operator-demo — PATH Code",
+      "expected": "pathcode-g10-operator-demo — PATH Code",
+      "wroteOsc": true,
+      "ok": true
+    },
+    "compactResult": {
+      "hasVerified": true,
+      "hasSha": true,
+      "noHandoffProse": true,
+      "noInspectCmd": true,
+      "ok": true
+    },
+    "viewport": {
+      "wideLines": 10,
+      "narrowLines": 12,
+      "hasComposerWide": true,
+      "hasComposerNarrow": true,
+      "noLiteralEscapes": true,
+      "ok": true
+    }
+  },
+  "verdict": "PASS"
+}
