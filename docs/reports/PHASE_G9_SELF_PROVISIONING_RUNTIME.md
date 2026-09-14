@@ -3,7 +3,7 @@ SELF-PROVISIONING POLYGLOT + COLLABORATIVE ENGINEERING RUNTIME
 
 **Result:** PASS  
 **Baseline:** G8 freeze `3ca50e0acf04739b647624c840ca86530944e8f4`  
-**Implementation commit:** (recorded mechanically after this freeze lands)  
+**Implementation commit:**   
 **Report/freeze commit:** (recorded mechanically after SHA writeback)  
 **Branch:** `cursor/pathcode-antigravity-v1`  
 **Working tree:** clean after freeze  
