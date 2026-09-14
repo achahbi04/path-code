@@ -1,0 +1,48 @@
+{
+  "schema": "pathcode.g10.closure.scip-live.v1",
+  "at": "2026-09-14T18:22:49.890Z",
+  "repository": "scip-mono",
+  "index": {
+    "ok": true,
+    "indexDir": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/caches/scip/aa8005b66daa2583c9ee1dde67a62aa2",
+    "fingerprint": "aa8005b66daa2583c9ee1dde67a62aa2",
+    "cached": true,
+    "evidence": [
+      "scip-typescript → /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/indexers/npm/scip-typescript/node_modules/.bin/scip-typescript",
+      "cache hit aa8005b66daa2583c9ee1dde67a62aa2"
+    ]
+  },
+  "query": {
+    "symbol": "tokenPrefix",
+    "kind": "definition",
+    "ok": true,
+    "hits": [
+      {
+        "name": "tokenPrefix",
+        "path": "packages/a/index.ts",
+        "kind": "definition"
+      }
+    ],
+    "reason": null,
+    "fingerprint": "aa8005b66daa2583c9ee1dde67a62aa2"
+  },
+  "engine": "antigravity",
+  "session": {
+    "classification": "VERIFIED",
+    "outcome": "VERIFIED",
+    "repairAttempts": 1
+  },
+  "cockpit": {
+    "pathPhase": "Verified",
+    "hadCodeIntelligence": true,
+    "hadIndexing": true
+  },
+  "mutation": {
+    "fixed": false,
+    "preview": "/** Shared token helper — intentionally returns wrong prefix for SCIP live engineering. */\nexport function tokenPrefix(name: string): string {\n  return \"bad:\" + name;\n}\nexport function helloA(): strin",
+    "note": "Primary checkout intentionally untouched; mutation lived in task worktree (VERIFIED).",
+    "primaryUntouchedExpected": true,
+    "verifiedViaSession": true
+  },
+  "verdict": "PASS"
+}

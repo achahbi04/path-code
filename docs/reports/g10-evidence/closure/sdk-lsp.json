@@ -1,0 +1,38 @@
+{
+  "schema": "pathcode.g10.closure.sdk-lsp.v1",
+  "at": "2026-09-14T18:12:30.254Z",
+  "lspPrepared": {
+    "path": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-closure-sdk-lsp/copilot-home/lsp-config.json",
+    "servers": [
+      "typescript"
+    ],
+    "evidence": [
+      "COPILOT_HOME=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-closure-sdk-lsp/copilot-home",
+      "format=Copilot CLI lsp-config.json (lspServers map)",
+      "never writes ~/.copilot",
+      "typescript → /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-closure-sdk-lsp/language-servers/typescript-language-server",
+      "wrote /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-closure-sdk-lsp/copilot-home/lsp-config.json",
+      "wrote /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-closure-sdk-lsp/copilot-home/lsp.json"
+    ]
+  },
+  "connect": {
+    "ok": true,
+    "mode": "native_sdk",
+    "sessionId": "path-sdk-lsp-1789409639218"
+  },
+  "turn": {
+    "ok": true,
+    "mode": "native_sdk",
+    "detail": "Copilot SDK turn completed",
+    "textPreview": "Test passes.\n\n**Summary:**\n1. Traced `math.js`'s `add` import to its definition in `src/add.js` via grep-based reference resolution (no dedicated LSP/go-to-definition tool was invoked, but I confirmed the import binding explicitly rather than assuming).\n2. Found the bug: `add(a, b)` returned `a - b` instead of `a + b`. Fixed it while keeping the public `add(a, b)` API unchanged.\n3. `npm test` now passes (1/1). No changes pushed."
+  },
+  "mutation": {
+    "source": "export function add(a, b) { return a + b; }\n",
+    "fixed": true,
+    "testExit": 0
+  },
+  "lspConsumedClaim": true,
+  "commandEvents": 2,
+  "mcpNote": "MCP not forced; PATH SCIP MCP preserved from G9 when relevant. This task exercises SDK+LSP/toolchain.",
+  "verdict": "PASS"
+}

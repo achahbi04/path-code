@@ -137,6 +137,18 @@ function runCompose({ docker, args, cwd, timeoutMs = 300_000 }) {
   /** Prefer a Docker config without Desktop credsStore (Colima / Homebrew). */
   /** @type {Record<string, string | undefined>} */
   const env = { ...process.env };
+  // G9 Colima backend: when the host uses Colima, empty DOCKER_CONFIG would
+  // drop `currentContext` and fall back to /var/run/docker.sock. Pin the
+  // socket explicitly so PATH-owned compose uses the established backend.
+  const colimaSock = join(
+    process.env.HOME || "",
+    ".colima",
+    "default",
+    "docker.sock",
+  );
+  if (!env.DOCKER_HOST && existsSync(colimaSock)) {
+    env.DOCKER_HOST = `unix://${colimaSock}`;
+  }
   if (!env.DOCKER_CONFIG) {
     try {
       const dirs = ensureAg9RuntimeDirs(
@@ -144,10 +156,12 @@ function runCompose({ docker, args, cwd, timeoutMs = 300_000 }) {
       );
       const cfgDir = join(dirs.metadata, "docker-config");
       mkdirSync(cfgDir, { recursive: true });
-      writeFileSync(
-        join(cfgDir, "config.json"),
-        `${JSON.stringify({ auths: {} }, null, 2)}\n`,
-      );
+      /** @type {Record<string, unknown>} */
+      const cfg = { auths: {} };
+      if (existsSync(colimaSock)) {
+        cfg.currentContext = "colima";
+      }
+      writeFileSync(join(cfgDir, "config.json"), `${JSON.stringify(cfg, null, 2)}\n`);
       env.DOCKER_CONFIG = cfgDir;
     } catch {
       /* keep host DOCKER_CONFIG */

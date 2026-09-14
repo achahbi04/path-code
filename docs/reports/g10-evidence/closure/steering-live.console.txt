@@ -1,1 +1,1 @@
-{"verdict":"PARTIAL","pending":{"status":"PENDING","deferred":true,"appliedCount":0},"applied":1,"validation":"FAILED"}
+{"verdict":"PASS","pending":{"status":"PENDING","deferred":true,"appliedCount":0},"applied":1,"validation":"VERIFIED"}

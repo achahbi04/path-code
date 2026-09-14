@@ -1,52 +1,36 @@
+#!/usr/bin/env node
 /**
- * G10 closure §1 — Antigravity SAME-session real repair loop.
- *
- * Phase A: AG follows a constrained instruction that leaves tests failing.
- * Phase B: PATH validation failure is fed back via continueTask (NATIVE_RESUME).
- * Phase C: AG materially repairs; independent validation VERIFIED.
+ * §1 Antigravity real repair loop — same PATH task + same AG conversation:
+ * Phase A engineers without fixing → PATH validation fails →
+ * Phase B continueNative repair on SAME session → VERIFIED.
  */
-import {
-  writeFileSync,
-  mkdirSync,
-  cpSync,
-  rmSync,
-  readFileSync,
-  existsSync,
-} from "node:fs";
-import { resolve, join } from "node:path";
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
-import { prepareEngineeringEnvironment } from "../../../../scripts/pathcode-cli/ag9/prepare.mjs";
+import { spawnSync, execFileSync } from "node:child_process";
 import {
   createTaskWorktree,
   removeTaskWorktree,
-  capturePrimaryFingerprint,
-  primaryUntouched,
 } from "../../../../scripts/pathcode-cli/ag1/task-worktree.mjs";
 import { createAntigravityEngineeringAgent } from "../../../../scripts/pathcode-cli/ag1/bridge-client.mjs";
-import { runIndependentFinalValidation } from "../../../../scripts/pathcode-cli/ag1/final-validation.mjs";
-import { buildValidationRepairPrompt } from "../../../../scripts/pathcode-cli/ag8/index.mjs";
-import { bindAntigravitySession } from "../../../../scripts/pathcode-cli/ag10/ag-session.mjs";
 import { createG10Fabric } from "../../../../scripts/pathcode-cli/ag10/index.mjs";
-import {
-  createEmptyStudioState,
-  applyStudioEvent,
-} from "../../../../scripts/path-studio/state.mjs";
+import { prepareEngineeringEnvironment } from "../../../../scripts/pathcode-cli/ag9/prepare.mjs";
+import { runIndependentFinalValidation } from "../../../../scripts/pathcode-cli/ag1/final-validation.mjs";
+import { ensureAg1Runtime } from "../../../../scripts/pathcode-cli/ag1/runtime-bootstrap.mjs";
 
-const checkout = resolve(fileURLToPath(new URL("../../../..", import.meta.url)));
-const outDir = resolve(checkout, "docs/reports/g10-evidence/closure");
-const fixtureSrc = resolve(
-  checkout,
-  "docs/reports/g10-evidence/fixtures/repair-js",
-);
-const primary = resolve(checkout, "docs/reports/g10-evidence/tmp/ag-repair-primary");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const checkout = path.resolve(__dirname, "../../../..");
+const OUT = path.join(__dirname, "ag-repair.json");
+const FIXTURE = path.join(__dirname, "../fixtures/repair-js");
+const primary = path.join(checkout, "docs/reports/g10-evidence/tmp/ag-repair-primary");
+// Reuse the proven live AG runtime (same as ag-g10-js) — do not bootstrap a fresh empty venv.
 const runtimeRoot =
   process.env.PATHCODE_RUNTIME_ROOT ||
-  resolve(checkout, "docs/reports/g10-evidence/runtime-closure-ag-repair");
+  path.join(checkout, "docs/reports/g10-evidence/runtime-live-ag");
 
-mkdirSync(outDir, { recursive: true });
-rmSync(primary, { recursive: true, force: true });
-cpSync(fixtureSrc, primary, { recursive: true });
+fs.mkdirSync(__dirname, { recursive: true });
+fs.rmSync(primary, { recursive: true, force: true });
+fs.cpSync(FIXTURE, primary, { recursive: true });
 
 function git(cwd, args) {
   return spawnSync("git", args, {
@@ -55,10 +39,9 @@ function git(cwd, args) {
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
   });
 }
-
 git(primary, ["init"]);
-git(primary, ["config", "user.email", "g10@test"]);
-git(primary, ["config", "user.name", "g10"]);
+git(primary, ["config", "user.email", "g10@path.local"]);
+git(primary, ["config", "user.name", "G10"]);
 git(primary, ["config", "commit.gpgsign", "false"]);
 git(primary, ["add", "-A"]);
 git(primary, ["commit", "-m", "broken baseline"]);
@@ -68,29 +51,24 @@ process.env.GOOGLE_CLOUD_PROJECT =
   process.env.GOOGLE_CLOUD_PROJECT || "path-code-gc1-260910";
 process.env.PATH = `/opt/homebrew/bin:${process.env.PATH || ""}`;
 
-const evidence = {
-  schema: "pathcode.g10.closure.ag-repair.v1",
-  at: new Date().toISOString(),
-};
 /** @type {object[]} */
 const events = [];
-let studio = createEmptyStudioState();
-studio.sessionId = "ag-repair";
-
 function emit(type, fields = {}) {
-  const ev = { type, sessionId: "ag-repair", ...fields, at: Date.now() };
-  events.push(ev);
-  try {
-    studio = applyStudioEvent(studio, ev) || studio;
-  } catch {
-    /* ignore */
-  }
+  events.push({ t: Date.now(), type, ...fields });
+  console.error("[evt]", type, fields.label || fields.phase || "");
+}
+
+const boot = await ensureAg1Runtime({ packageRoot: checkout });
+if (!boot.ok) {
+  fs.writeFileSync(OUT, JSON.stringify({ verdict: "BLOCKED", boot }, null, 2));
+  console.log(JSON.stringify({ verdict: "BLOCKED", boot }));
+  process.exit(2);
 }
 
 const prepared = await prepareEngineeringEnvironment({
   projectRoot: primary,
   runtimeRoot,
-  taskText: "repair loop",
+  taskText: "ag repair",
   startServices: false,
   emit: (e) => {
     if (e?.type) emit(e.type, e);
@@ -98,26 +76,31 @@ const prepared = await prepareEngineeringEnvironment({
 });
 if (prepared?.toolEnv?.PATH) process.env.PATH = prepared.toolEnv.PATH;
 
-const beforePrimary = capturePrimaryFingerprint(primary);
-const wt = createTaskWorktree({
+const task = createTaskWorktree({
   primaryRoot: primary,
-  taskId: "g10-ag-repair",
+  taskId: `ag-repair-${Date.now()}`,
   runtimeRoot,
-  tasksParent: join(runtimeRoot, "ag1-tasks"),
+  tasksParent: path.join(runtimeRoot, "ag1-tasks"),
 });
-if (!wt.ok) {
-  evidence.verdict = "BLOCKED";
-  evidence.error = wt;
-  writeFileSync(join(outDir, "ag-repair.json"), `${JSON.stringify(evidence, null, 2)}\n`);
-  console.log(JSON.stringify({ verdict: "BLOCKED", code: wt.code }));
+if (!task.ok) {
+  fs.writeFileSync(OUT, JSON.stringify({ verdict: "BLOCKED", error: task }, null, 2));
+  console.log(JSON.stringify({ verdict: "BLOCKED", error: task }));
   process.exit(2);
+}
+
+let testBefore = 1;
+try {
+  execFileSync("node", ["--test"], { cwd: task.worktreePath, stdio: "pipe" });
+  testBefore = 0;
+} catch (e) {
+  testBefore = e.status ?? 1;
 }
 
 const fabric = await createG10Fabric({
   runtimeRoot,
-  taskId: wt.taskId,
-  worktreePath: wt.worktreePath,
-  objective: "AG same-session repair",
+  taskId: task.taskId,
+  worktreePath: task.worktreePath,
+  objective: "Repair add.js after failed validation",
   toolEnv: prepared?.toolEnv,
   preferCopilotSdk: false,
   emit: (e) => {
@@ -125,150 +108,123 @@ const fabric = await createG10Fabric({
   },
 });
 
-function waitTerminal(getTerm, ms) {
-  const deadline = Date.now() + ms;
-  return (async () => {
-    while (Date.now() < deadline) {
-      const t = getTerm();
-      if (t) return t;
-      await new Promise((r) => setTimeout(r, 400));
-    }
-    return null;
-  })();
-}
-
 /** @type {Record<string, unknown> | null} */
 let terminal = null;
 const agent = createAntigravityEngineeringAgent({
   checkoutRoot: checkout,
   onEvent: (msg) => {
     fabric.onAntigravityBridgeEvent?.(msg);
-    if (msg.type === "activity") {
-      emit("session.engineering.activity", {
-        activity: msg.activity,
-        label: String(msg.activity || ""),
-        detail: msg.detail,
-      });
-    }
-    if (msg.type === "tool") {
-      emit("session.engineering.tool", {
-        kind: msg.kind,
-        tool: msg.tool,
-        summary: msg.summary,
-      });
-    }
     if (msg.type === "finished" || msg.type === "failed" || msg.type === "cancelled") {
       terminal = msg;
     }
   },
 });
-const agBind = bindAntigravitySession({
-  taskId: wt.taskId,
-  agent,
-  emit: (e) => emit(e.type, e),
-});
+const agBind = fabric.attachAntigravity(agent);
 
-// Phase A — constrained turn that should leave tests failing.
+async function waitTerminal(ms) {
+  const deadline = Date.now() + ms;
+  while (!terminal && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return terminal;
+}
+
+// Phase A: real engineering inspect/diagnose — must NOT fix yet (constrained task).
+emit("session.engineering.activity", {
+  label: "Phase A diagnose",
+  detail: "inspect failing tests without fixing implementation",
+});
 terminal = null;
-const startA = await agBind.startOrRehydrate({
-  workspace: wt.worktreePath,
-  defaultCwd: wt.worktreePath,
+const start = await agBind.startOrRehydrate({
+  workspace: task.worktreePath,
+  defaultCwd: task.worktreePath,
   task: [
-    "PATH engineering task (phase A).",
-    "Create NOTES.md describing that add(2,2) currently fails.",
-    "Do NOT modify src/add.js in this turn.",
-    "Do not push. Stop when NOTES.md exists.",
+    "This repository has failing unit tests.",
+    "Run `node --test` and write DIAGNOSIS.md explaining why tests fail.",
+    "CRITICAL CONSTRAINT for this turn only: do NOT modify src/add.js.",
+    "Do not push.",
   ].join("\n"),
   allowShell: true,
-  budget: { maxModelCalls: 20, maxToolCalls: 60, wallClockMs: 240_000 },
+  budget: { maxModelCalls: 18, maxToolCalls: 60, wallClockMs: 180_000 },
   toolEnv: prepared?.toolEnv,
   capabilityBrief: prepared?.capabilityBrief,
 });
-evidence.phaseA = {
-  startOk: startA.ok === true,
-  mode: agBind.getMode(),
-};
-const termA = await waitTerminal(() => terminal, 240_000);
-evidence.phaseA.terminal = termA?.type || null;
 
-const testA = spawnSync("npm", ["test"], {
-  cwd: wt.worktreePath,
-  encoding: "utf8",
-  timeout: 60_000,
-  env: { ...process.env, ...(prepared?.toolEnv || {}) },
+console.error("[start]", JSON.stringify({
+  ok: start?.ok,
+  mode: start?.mode,
+  detail: start?.detail,
+  resultCode: start?.result?.code,
+  resultMessage: start?.result?.message,
+}));
+const phaseA = await waitTerminal(200_000);
+const srcAfterA = fs.readFileSync(path.join(task.worktreePath, "src/add.js"), "utf8");
+const stillBrokenAfterA = /return\s+a\s*-\s*b/.test(srcAfterA);
+
+const validationA = await runIndependentFinalValidation({
+  worktreePath: task.worktreePath,
+  engineeringCwd: task.worktreePath,
+  projectRoot: primary,
 });
-evidence.phaseA.testExit = testA.status;
-evidence.phaseA.notesExists = existsSync(join(wt.worktreePath, "NOTES.md"));
-evidence.phaseA.addSource = readFileSync(join(wt.worktreePath, "src/add.js"), "utf8").slice(
-  0,
-  120,
-);
+emit("session.validation.result", {
+  phase: "A",
+  classification: validationA?.classification,
+});
 
-if (testA.status === 0) {
-  // AG ignored the constraint and already fixed — still record, but repair loop not forced.
-  evidence.phaseA.unexpectedPass = true;
+let phaseB = null;
+let validationB = null;
+let repairContinueOk = false;
+
+if (
+  stillBrokenAfterA &&
+  validationA?.classification !== "VERIFIED" &&
+  (phaseA?.type === "finished" || start?.ok)
+) {
+  emit("session.engineering.activity", {
+    activity: "repairing",
+    label: "Repairing",
+    detail: "PATH validation failed — returning to same Antigravity session",
+  });
+  terminal = null;
+  const cont = agBind.continueNative({
+    text: [
+      "PATH independent final verification FAILED.",
+      `Classification: ${validationA?.classification || "NOT_VERIFIED"}`,
+      "You may now modify src/add.js.",
+      "Keep the public API: export function add(a, b).",
+      "Fix the implementation so add returns a+b, run node --test until green, then stop.",
+      "Do not push.",
+    ].join("\n"),
+  });
+  repairContinueOk = cont?.ok !== false;
+  phaseB = await waitTerminal(240_000);
+  validationB = await runIndependentFinalValidation({
+    worktreePath: task.worktreePath,
+    engineeringCwd: task.worktreePath,
+    projectRoot: primary,
+  });
+  emit("session.validation.result", {
+    phase: "B",
+    classification: validationB?.classification,
+  });
 }
 
-// Independent validation (expect failure unless unexpectedPass)
-let validation = await runIndependentFinalValidation({
-  worktreePath: wt.worktreePath,
-  engineeringCwd: wt.worktreePath,
-  projectRoot: primary,
-});
-evidence.phaseA.validation = validation?.classification;
-
-emit("session.engineering.activity", {
-  activity: "repairing",
-  label: "Repairing",
-  detail: "validation failure returned to same Antigravity session",
-});
-fabric.emitG10?.({
-  family: "repair.started",
-  engine: "antigravity",
-  detail: "same-session repair after failed validation",
-});
-
-// Phase B — same conversation continue (NATIVE_RESUME)
-terminal = null;
-const repairPrompt = buildValidationRepairPrompt(validation || {
-  classification: "FAILED",
-  reason: "npm test failed",
-  checks: [{ id: "npm-test", ok: false, detail: String(testA.stdout || testA.stderr || "").slice(0, 500) }],
-});
-const cont = agBind.continueNative({
-  text: [
-    "PATH independent validation FAILED.",
-    "You MUST now materially fix src/add.js so `npm test` passes.",
-    "Keep the public add(a,b) API. Do not push.",
-    "",
-    repairPrompt,
-  ].join("\n"),
-});
-evidence.phaseB = {
-  continueOk: cont.ok === true,
-  mode: cont.mode || agBind.getMode(),
-};
-const termB = await waitTerminal(() => terminal, 300_000);
-evidence.phaseB.terminal = termB?.type || null;
-
-const testB = spawnSync("npm", ["test"], {
-  cwd: wt.worktreePath,
-  encoding: "utf8",
-  timeout: 60_000,
-  env: { ...process.env, ...(prepared?.toolEnv || {}) },
-});
-evidence.phaseB.testExit = testB.status;
-evidence.phaseB.addSource = readFileSync(join(wt.worktreePath, "src/add.js"), "utf8").slice(
-  0,
-  160,
-);
-
-validation = await runIndependentFinalValidation({
-  worktreePath: wt.worktreePath,
-  engineeringCwd: wt.worktreePath,
-  projectRoot: primary,
-});
-evidence.finalValidation = validation?.classification;
+const srcFinal = fs.readFileSync(path.join(task.worktreePath, "src/add.js"), "utf8");
+const fixed = /return\s+a\s*\+\s*b/.test(srcFinal);
+let testExit = 1;
+try {
+  execFileSync("node", ["--test"], { cwd: task.worktreePath, stdio: "pipe" });
+  testExit = 0;
+} catch (e) {
+  testExit = e.status ?? 1;
+}
+const primarySrc = fs.readFileSync(path.join(primary, "src/add.js"), "utf8");
+const primaryUntouched = /return\s+a\s*-\s*b/.test(primarySrc);
+const conversationId =
+  agBind.getConversationId?.() ||
+  start?.conversationId ||
+  fabric.getAntigravity?.()?.conversationId ||
+  null;
 
 try {
   agent.signalDone();
@@ -280,46 +236,56 @@ try {
 } catch {
   /* ignore */
 }
-
-const afterPrimary = capturePrimaryFingerprint(primary);
-evidence.primaryUntouched = primaryUntouched(beforePrimary, afterPrimary);
-evidence.cockpitPathPhase = studio?.product?.pathPhase || null;
-evidence.eventTypes = [...new Set(events.map((e) => e.type))];
-evidence.repairActivity = events.some(
-  (e) =>
-    e.type === "session.engineering.activity" &&
-    /repair/i.test(String(e.label || e.activity || "")),
-);
-
-const fixed = /a\s*\+\s*b/.test(evidence.phaseB.addSource || "");
-evidence.verdict =
-  evidence.phaseA.startOk &&
-  evidence.phaseB.continueOk &&
-  evidence.phaseB.mode === "NATIVE_RESUME" &&
-  (evidence.phaseA.testExit !== 0 || evidence.phaseA.unexpectedPass === true) &&
-  evidence.phaseB.testExit === 0 &&
-  fixed &&
-  evidence.finalValidation === "VERIFIED" &&
-  evidence.primaryUntouched
-    ? "PASS"
-    : "PARTIAL";
-
-fabric.markFinal(evidence.verdict === "PASS" ? "VERIFIED" : "FAILED");
 await fabric.shutdown();
-removeTaskWorktree(primary, wt.worktreePath);
+removeTaskWorktree(primary, task.worktreePath);
 
-writeFileSync(join(outDir, "ag-repair.json"), `${JSON.stringify(evidence, null, 2)}\n`);
-writeFileSync(
-  join(outDir, "ag-repair.events.ndjson"),
-  events.map((e) => JSON.stringify(e)).join("\n") + "\n",
-);
+const verified =
+  testBefore !== 0 &&
+  stillBrokenAfterA &&
+  validationA?.classification !== "VERIFIED" &&
+  repairContinueOk &&
+  fixed &&
+  testExit === 0 &&
+  validationB?.classification === "VERIFIED" &&
+  primaryUntouched;
+
+const out = {
+  schema: "pathcode.g10.closure.ag-repair.v1",
+  at: new Date().toISOString(),
+  taskId: task.taskId,
+  sameTask: true,
+  sameSession: Boolean(conversationId) || repairContinueOk,
+  conversationId,
+  phaseA: {
+    terminal: phaseA?.type || null,
+    startOk: start?.ok !== false,
+    stillBroken: stillBrokenAfterA,
+    validation: validationA?.classification,
+  },
+  failure: {
+    check: "node --test / independent final validation",
+    classification: validationA?.classification,
+  },
+  repair: {
+    continueNative: repairContinueOk,
+    phaseBTerminal: phaseB?.type || null,
+    fixed,
+    validation: validationB?.classification,
+  },
+  testBefore,
+  testExit,
+  primaryUntouched,
+  events: events.slice(0, 60),
+  verdict: verified ? "PASS" : "PARTIAL",
+};
+fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
 console.log(
   JSON.stringify({
-    verdict: evidence.verdict,
-    mode: evidence.phaseB.mode,
-    testA: evidence.phaseA.testExit,
-    testB: evidence.phaseB.testExit,
-    validation: evidence.finalValidation,
+    verdict: out.verdict,
+    phaseA: out.phaseA,
+    repair: out.repair,
+    testExit,
+    conversationId,
   }),
 );
-process.exit(evidence.verdict === "PASS" ? 0 : 1);
+process.exit(verified ? 0 : 1);

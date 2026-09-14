@@ -14,7 +14,7 @@ const outDir = resolve(checkout, "docs/reports/g10-evidence/closure");
 const primary = resolve(checkout, "docs/reports/g10-evidence/tmp/repl-multi-primary");
 const runtimeRoot =
   process.env.PATHCODE_RUNTIME_ROOT ||
-  resolve(checkout, "docs/reports/g10-evidence/runtime-closure-repl");
+  resolve(checkout, "docs/reports/g10-evidence/runtime-live-ag");
 
 mkdirSync(outDir, { recursive: true });
 rmSync(primary, { recursive: true, force: true });
@@ -53,36 +53,51 @@ const evidence = {
 };
 
 /**
- * Minimal TTY-ish stdin that feeds lines sequentially.
+ * Minimal TTY that feeds the next line when the cockpit prompt appears.
  * @param {string[]} lines
  */
-function createLineStdin(lines) {
-  const chunks = lines.map((l) => `${l}\n`);
-  let i = 0;
-  const stream = new Readable({
-    read() {
-      if (i < chunks.length) {
-        this.push(chunks[i++]);
-      } else {
-        // keep open until /exit processed; then end
-        setTimeout(() => this.push(null), 50);
-      }
-    },
+function createReplTty(lines) {
+  const queue = [...lines];
+  const stdin = new Readable({
+    read() {},
   });
-  /** @type {any} */ (stream).isTTY = true;
-  /** @type {any} */ (stream).setRawMode = () => {};
-  return stream;
-}
+  /** @type {any} */ (stdin).isTTY = true;
+  /** @type {any} */ (stdin).isRaw = false;
+  /** @type {any} */ (stdin).setRawMode = function setRawMode(mode) {
+    this.isRaw = mode;
+    return this;
+  };
 
-const stdout = new PassThrough();
-const stderr = new PassThrough();
-let out = "";
-stdout.on("data", (d) => {
-  out += d.toString("utf8");
-});
-stderr.on("data", (d) => {
-  out += d.toString("utf8");
-});
+  const feedNext = () => {
+    const next = queue.shift();
+    if (next === undefined) {
+      stdin.push(null);
+      return;
+    }
+    setImmediate(() => stdin.push(`${next}\n`));
+  };
+
+  let out = "";
+  const stdout = new PassThrough();
+  /** @type {any} */ (stdout).isTTY = true;
+  /** @type {any} */ (stdout).columns = 120;
+  stdout.on("data", (d) => {
+    const text = d.toString("utf8");
+    out += text;
+    if (text.endsWith("> ") || /Code >\s*$/.test(text)) feedNext();
+  });
+  const stderr = new PassThrough();
+  stderr.on("data", (d) => {
+    out += d.toString("utf8");
+  });
+
+  return {
+    stdin,
+    stdout,
+    stderr,
+    getOut: () => out,
+  };
+}
 
 const taskTexts = [
   "Fix src/add.js so npm test passes. Keep public add(a,b). Do not push.",
@@ -90,31 +105,20 @@ const taskTexts = [
   "Add src/mul.js exporting mul(a,b) returning a*b and a node:test proving mul(3,4)===12. Do not push.",
 ];
 
-/** @type {Array<Record<string, unknown>>} */
-const seenOptions = [];
+const tty = createReplTty([...taskTexts, "/exit"]);
+const prevCwd = process.cwd();
+process.chdir(primary);
 
-const stdin = createLineStdin([...taskTexts, "/exit"]);
-
-const exitCode = await runPathcodeMain(
-  [
-    "node",
-    "pathcode",
-    "--project",
-    primary,
-    "--execution",
-    "local",
-  ],
-  {
-    stdin,
-    stdout,
-    stderr,
+let exitCode = 1;
+try {
+  exitCode = await runPathcodeMain(["--execution", "local"], {
+    stdin: tty.stdin,
+    stdout: tty.stdout,
+    stderr: tty.stderr,
     runAg1Session: async (prompt, options) => {
-      seenOptions.push({
-        taskText: options.taskText,
-        sessionBaseCommit: options.sessionBaseCommit,
-      });
       const result = await runAntigravityEngineeringSession(prompt, {
         ...options,
+        projectRoot: primary,
         checkoutRoot: checkout,
         cardsOwnProgress: true,
         wallClockMs: 480_000,
@@ -131,9 +135,12 @@ const exitCode = await runPathcodeMain(
       });
       return result;
     },
-  },
-);
+  });
+} finally {
+  process.chdir(prevCwd);
+}
 
+const out = tty.getOut();
 evidence.exitCode = exitCode;
 evidence.singleProcess = true;
 evidence.taskCount = evidence.tasks.length;
@@ -152,10 +159,11 @@ evidence.verdict =
     : "PARTIAL";
 
 writeFileSync(join(outDir, "multitask-repl.json"), `${JSON.stringify(evidence, null, 2)}\n`);
-writeFileSync(join(outDir, "multitask-repl.console.txt"), out.slice(-8000));
+writeFileSync(join(outDir, "multitask-repl.out.txt"), out.slice(-12000));
 console.log(
   JSON.stringify({
     verdict: evidence.verdict,
+    exitCode,
     tasks: evidence.tasks.map((t) => ({
       n: t.n,
       classification: t.classification,

@@ -1,0 +1,52 @@
+{
+  "schema": "pathcode.g10.closure.resume-e2e.v1",
+  "at": "2026-09-14T18:30:58.824Z",
+  "preRestart": {
+    "taskId": "g10-resume-e2e",
+    "worktree": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/ag1-tasks/g10-resume-e2e",
+    "copilotMode": "native_sdk",
+    "copilotSessionId": "path-g10-resume-e2e",
+    "copilotTurnOk": true,
+    "addAfterCopilot": "/** Broken on purpose for G10 Antigravity repair-loop acceptance. */\nexport function add(a, b) {\n  return a + b;\n}\n",
+    "agMode": "ACTIVE",
+    "agTerminal": "finished",
+    "checkpoint": {
+      "taskId": "g10-resume-e2e",
+      "headSha": "28814e954c44361e0d4382af671d12e9c8b80f41",
+      "copilotSessionId": "path-g10-resume-e2e",
+      "agSessionMode": "ACTIVE"
+    },
+    "simulatedProcessExit": true
+  },
+  "reopen": {
+    "foundTaskId": "g10-resume-e2e",
+    "reopenOk": true,
+    "resumed": true
+  },
+  "reconcile": {
+    "status": "aligned",
+    "resumeBriefPreview": "PATH task reality (filesystem/Git authoritative):\nworktree=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/ag1-tasks/g10-resume-e2e\nexists=true\nHEAD=28814e954c44361e0d4382af671d12e9c8b80f41\nbranch=path/task-g10-resume-e2e\ndiffFinge"
+  },
+  "postRestart": {
+    "copilotMode": "native_sdk",
+    "copilotSessionId": "path-g10-resume-e2e",
+    "copilotResumeDetail": {
+      "ok": true,
+      "mode": "native_sdk",
+      "sessionId": "path-g10-resume-e2e"
+    },
+    "agRestoreMode": "REHYDRATED_SESSION",
+    "agRestoreOk": true,
+    "agTerminal": "finished"
+  },
+  "final": {
+    "wipPreserved": true,
+    "source": "/** Broken on purpose for G10 Antigravity repair-loop acceptance. */\nexport function add(a, b) {\n  return a + b;\n}\n",
+    "fixed": true,
+    "testExit": 0,
+    "validation": "VERIFIED",
+    "sameTask": true,
+    "noDuplicateTask": true
+  },
+  "verdict": "PASS"
+}

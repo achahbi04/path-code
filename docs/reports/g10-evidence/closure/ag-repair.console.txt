@@ -1,0 +1,25 @@
+[evt] session.capability.preparing 
+[evt] session.capability.provisioning toolchains
+[evt] session.capability.provisioning 
+[evt] session.capability.provisioned 
+[evt] session.capability.provisioning lsp
+[evt] session.capability.provisioning 
+[evt] session.capability.affected 
+[evt] session.capability.ready 
+[evt] session.task.received 
+[evt] session.engineering.activity Phase A diagnose
+[evt] session.engineering.bridge 
+[start] {"ok":true,"mode":"ACTIVE"}
+[evt] session.engineering.activity Testing
+[evt] session.applying 
+[evt] session.applying 
+[evt] session.validation.result A
+[evt] session.engineering.activity Repairing
+[evt] session.engineering.bridge 
+[evt] session.engineering.activity Inspecting
+[evt] session.engineering.activity Inspecting
+[evt] session.applying 
+[evt] session.applying 
+[evt] session.engineering.activity Testing
+[evt] session.validation.result B
+{"verdict":"PASS","phaseA":{"terminal":"finished","startOk":true,"stillBroken":true,"validation":"FAILED"},"repair":{"continueNative":true,"phaseBTerminal":"finished","fixed":true,"validation":"VERIFIED"},"testExit":0,"conversationId":null}

@@ -1,34 +1,168 @@
 {
   "schema": "pathcode.g10.closure.ag-repair.v1",
-  "at": "2026-09-14T18:03:46.881Z",
+  "at": "2026-09-14T18:22:37.246Z",
+  "taskId": "ag-repair-1789410087618",
+  "sameTask": true,
+  "sameSession": true,
+  "conversationId": null,
   "phaseA": {
-    "startOk": false,
-    "mode": "NONE",
-    "terminal": "failed",
-    "testExit": 1,
-    "notesExists": false,
-    "addSource": "/** Broken on purpose for G10 Antigravity repair-loop acceptance. */\nexport function add(a, b) {\n  return a - b;\n}\n",
+    "terminal": "finished",
+    "startOk": true,
+    "stillBroken": true,
     "validation": "FAILED"
   },
-  "phaseB": {
-    "continueOk": false,
-    "mode": "NONE",
-    "terminal": null,
-    "testExit": 1,
-    "addSource": "/** Broken on purpose for G10 Antigravity repair-loop acceptance. */\nexport function add(a, b) {\n  return a - b;\n}\n"
+  "failure": {
+    "check": "node --test / independent final validation",
+    "classification": "FAILED"
   },
-  "finalValidation": "FAILED",
+  "repair": {
+    "continueNative": true,
+    "phaseBTerminal": "finished",
+    "fixed": true,
+    "validation": "VERIFIED"
+  },
+  "testBefore": 1,
+  "testExit": 0,
   "primaryUntouched": true,
-  "cockpitPathPhase": "Repairing",
-  "eventTypes": [
-    "session.capability.preparing",
-    "session.capability.provisioning",
-    "session.capability.provisioned",
-    "session.capability.affected",
-    "session.capability.ready",
-    "session.task.received",
-    "session.engineering.activity"
+  "events": [
+    {
+      "t": 1789410082988,
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/ag-repair-primary",
+      "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag"
+    },
+    {
+      "t": 1789410084058,
+      "type": "session.capability.provisioning",
+      "phase": "toolchains"
+    },
+    {
+      "t": 1789410084060,
+      "type": "session.capability.provisioning",
+      "id": "lsp:typescript"
+    },
+    {
+      "t": 1789410087189,
+      "type": "session.capability.provisioned",
+      "id": "lsp:typescript"
+    },
+    {
+      "t": 1789410087189,
+      "type": "session.capability.provisioning",
+      "phase": "lsp"
+    },
+    {
+      "t": 1789410087207,
+      "type": "session.capability.provisioning",
+      "tool": "lsp:javascript"
+    },
+    {
+      "t": 1789410087614,
+      "type": "session.capability.affected",
+      "classification": "CONSERVATIVE",
+      "source": "npm-test"
+    },
+    {
+      "t": 1789410087618,
+      "type": "session.capability.ready",
+      "lspReady": [
+        "javascript"
+      ],
+      "scip": false,
+      "affected": "CONSERVATIVE"
+    },
+    {
+      "t": 1789410088377,
+      "type": "session.task.received",
+      "summary": "Repair add.js after failed validation"
+    },
+    {
+      "t": 1789410088377,
+      "type": "session.engineering.activity",
+      "label": "Phase A diagnose",
+      "detail": "inspect failing tests without fixing implementation"
+    },
+    {
+      "t": 1789410089703,
+      "type": "session.engineering.bridge",
+      "stage": "ag_session",
+      "detail": "Antigravity session ACTIVE",
+      "mode": "ACTIVE"
+    },
+    {
+      "t": 1789410098788,
+      "type": "session.engineering.activity",
+      "activity": "testing",
+      "label": "Testing",
+      "detail": "test.started"
+    },
+    {
+      "t": 1789410103413,
+      "type": "session.applying",
+      "summary": "edit_file"
+    },
+    {
+      "t": 1789410103427,
+      "type": "session.applying",
+      "summary": "create_file"
+    },
+    {
+      "t": 1789410127177,
+      "type": "session.validation.result",
+      "phase": "A",
+      "classification": "FAILED"
+    },
+    {
+      "t": 1789410127177,
+      "type": "session.engineering.activity",
+      "activity": "repairing",
+      "label": "Repairing",
+      "detail": "PATH validation failed — returning to same Antigravity session"
+    },
+    {
+      "t": 1789410127178,
+      "type": "session.engineering.bridge",
+      "stage": "ag_continue",
+      "detail": "Antigravity NATIVE_RESUME",
+      "mode": "NATIVE_RESUME"
+    },
+    {
+      "t": 1789410145302,
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789410145305,
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789410149175,
+      "type": "session.applying",
+      "summary": "edit_file"
+    },
+    {
+      "t": 1789410149182,
+      "type": "session.applying",
+      "summary": "edit_file"
+    },
+    {
+      "t": 1789410152190,
+      "type": "session.engineering.activity",
+      "activity": "testing",
+      "label": "Testing",
+      "detail": "test.started"
+    },
+    {
+      "t": 1789410156676,
+      "type": "session.validation.result",
+      "phase": "B",
+      "classification": "VERIFIED"
+    }
   ],
-  "repairActivity": true,
-  "verdict": "PARTIAL"
+  "verdict": "PASS"
 }

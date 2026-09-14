@@ -22,7 +22,7 @@ const outDir = resolve(checkout, "docs/reports/g10-evidence/closure");
 const primary = resolve(checkout, "docs/reports/g10-evidence/tmp/svc-live-primary");
 const runtimeRoot =
   process.env.PATHCODE_RUNTIME_ROOT ||
-  resolve(checkout, "docs/reports/g10-evidence/runtime-closure-svc");
+  resolve(checkout, "docs/reports/g10-evidence/runtime-live-ag");
 
 mkdirSync(outDir, { recursive: true });
 rmSync(primary, { recursive: true, force: true });

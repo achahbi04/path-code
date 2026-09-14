@@ -1,0 +1,40 @@
+{
+  "schema": "pathcode.g10.closure.service.v1",
+  "at": "2026-09-14T18:27:12.164Z",
+  "detected": {
+    "composeFile": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/svc-live-primary/compose.yaml",
+    "devcontainer": false,
+    "evidence": [
+      "compose.yaml"
+    ]
+  },
+  "started": {
+    "status": "STARTED",
+    "projectKey": "fc1c3ca643d1",
+    "services": null
+  },
+  "cleanup": {
+    "status": "STOPPED",
+    "composeProject": "pathcode-g9-fc1c3ca643d1",
+    "evidence": [
+      "docker=/opt/homebrew/bin/docker",
+      "composeMode=docker-compose-standalone",
+      "compose -p pathcode-g9-fc1c3ca643d1 down status=0",
+      " Container pathcode-g9-fc1c3ca643d1-redis-1 Stopping \n Container pathcode-g9-fc1c3ca643d1-redis-1 Stopped \n Container pathcode-g9-fc1c3ca643d1-redis-1 Removing \n Container pathcode-g9-fc1c3ca643d1-redis-1 Removed \n Network pathcode-g9-fc1c3ca643d1_default Removing \n Network pathcode-g9-fc1c3ca643d1_"
+    ]
+  },
+  "session": {
+    "classification": "VERIFIED",
+    "outcome": "VERIFIED"
+  },
+  "cockpit": {
+    "pathPhase": "Verified",
+    "preparing": true,
+    "ready": true
+  },
+  "mutation": {
+    "fixed": false,
+    "preview": "/** Intentionally returns PONGX so engineering must fix after redis is up. */\nexport function expectedPong() {\n  return \"PONGX\";\n}\n"
+  },
+  "verdict": "PASS"
+}

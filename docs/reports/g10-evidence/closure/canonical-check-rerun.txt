@@ -1,0 +1,77 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+ RUN  v3.2.7 /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
+
+ ✓ |default| tests/selfobs/derivation.test.ts > selfobs derivation > returns UNVERIFIED_DERIVATION without verification 5ms
+ ✓ |default| tests/selfobs/derivation.test.ts > selfobs derivation > never returns VERIFIED_CAPABILITY_STATE without verification 3ms
+ ✓ |default| tests/selfobs/derivation.test.ts > selfobs derivation > derives safe-editing as candidate IMPLEMENTED without verification 8ms
+ ✓ |default| tests/selfobs/derivation.test.ts > selfobs derivation > rejects verification bound to a different ledger object 1ms
+ ✓ |default| tests/selfobs/derivation.test.ts > selfobs derivation > lowers to IMPLEMENTED when freeze evidence is unresolved 7ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-M / 5G-N: consent and budget precede every provider call > 5G-M: declining START makes no provider call and reads nothing 10236ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-M / 5G-N: consent and budget precede every provider call > 5G-M: a near-miss phrase is not consent 5214ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: the budget is disclosed before START is solicited 2254ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: a complete run spends exactly three calls, at the declared ceilings 3401ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: the declared ceiling is the brain's hard cap, not a larger number 22ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: a failed scope call is reported, never retried 818ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: a plan naming a sensitive path is refused without a second call 715ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-O / 5G-P: the scope round trip > 5G-O: the scope call carries metadata only, and withholds sensitive paths 853ms
+ ✓ |default| tests/selfobs/derivation.test.ts > selfobs derivation > derives Phase 3 editing capabilities after public authority-surface relink 23130ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-O / 5G-P: the scope round trip > 5G-P: declining SCOPE stops before any file is read for the model 713ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-O / 5G-P: the scope round trip > 5G-P: the scope review shows exactly the paths that were admitted 753ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-Q: currentness is rechecked after the scope approval > 5G-Q: a moved HEAD after scope approval refuses before any file is read 3042ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-Q: currentness is rechecked after the scope approval > 5G-Q: a branch switch after scope approval is refused too 1514ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-R: the edit call is grounded in the approved paths only 1299ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-S: the edit review shows both sides, and declining writes nothing 1322ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-S: a target id the host never minted is refused, with no APPLY prompt 1849ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-S: an ungrounded claim subject is refused by Gate 1, not written 1434ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-T: post-mutation disclosure and the CHECK gate > 5G-T: the validation review discloses argv, cwd, timeout, env and hooks 2865ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-T: post-mutation disclosure and the CHECK gate > 5G-T: an accepted run reports Gate 2, the checkpoint, and no Git commit 3342ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-U / 5G-V: recovery protection is REQUIRED, with no downgrade > 5G-U: the host opens mutation with the literal REQUIRED and a store 4ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-U / 5G-V: recovery protection is REQUIRED, with no downgrade > 5G-U: a successful run leaves exactly one durable checkpoint 5483ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-U / 5G-V: recovery protection is REQUIRED, with no downgrade > 5G-V: a store that cannot persist refuses the write rather than skipping it 4013ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AI: drift between the review and the write means zero writes 2712ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AJ: a stale review mints no checkpoint at all 1514ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AI: a Git move between the review and the write is refused as well 3436ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AJ: the checkpoint that is minted carries the bytes present just before the write 5243ms
+ ✓ |default| tests/general-session/session-flow.test.ts > 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AI: the ordering is stated in the host, with the write last 7ms
+ ✓ |default| tests/general-session/session-flow.test.ts > mission 5G-I SCOPE_STALE — approved file drifts after SCOPE > 5G-I: capture + drift + recheck refuses with SCOPE_STALE 2340ms
+ ✓ |default| tests/general-session/session-flow.test.ts > mission 5G-I SCOPE_STALE — approved file drifts after SCOPE > 5G-I: an approved scoped file changed after SCOPE refuses before the edit call 1899ms
+ ✓ |default| tests/general-session/session-flow.test.ts > mission 5G-T post-edit claim score from selected checks > 5G-T: Call #3 carries POST_EDIT_EXECUTION_CLAIM_REQUIREMENTS derived from the plan 6492ms
+ ✓ |default| tests/selfobs/derivation.test.ts > selfobs derivation > phase-promotion falsification — removing phaseAuditEvidence lowers safe-editing to DECLARED/IMPLEMENTED 55987ms
+ ✓ |default| tests/general-session/session-flow.test.ts > mission 5G-W validation failure retains mutation and surfaces recovery > 5G-W: a failing check does not auto-recover; checkpoint is offered 5213ms
+ ✓ |default| tests/ledger/gap-closure-diagnostics.test.ts > gap closure commit diagnostics > accepts a CLOSED gap whose closedByCommit resolves to a real ancestor commit 19458ms
+ ✓ |default| tests/ledger/gap-closure-diagnostics.test.ts > gap closure commit diagnostics > reports schema failure when closedByCommit is absent on a CLOSED gap 14326ms
+ ✓ |default| tests/ledger/gap-closure-diagnostics.test.ts > gap closure commit diagnostics > reports commit-resolution failure when closedByCommit is present but unresolvable 14301ms
+ ✓ |default| tests/ag2/ag2-proofs.test.ts > AG2 A — dirty primary refused > DIRTY_PRIMARY_TREE and no worktree created 1905ms
+ ✓ |default| tests/ag2/ag2-proofs.test.ts > AG2 B — detached HEAD blocked > DETACHED_HEAD_BLOCKED 2022ms
+ ✓ |default| tests/ag2/ag2-proofs.test.ts > AG2 C — verified cleanup > task branch + commit remain; worktree removed 5676ms
+ ✓ |default| tests/ag2/ag2-proofs.test.ts > AG2 D — failed partial work preserved > UNVERIFIED WIP commit; baseline does not advance conceptually 3790ms
+ ✓ |default| tests/selfobs/derivation.test.ts > selfobs derivation > relink falsification — removing freezeEvidence lowers trio to IMPLEMENTED 73721ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > two-commit freeze productionScopes > T6 — rejects unsafe production scope input 6ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > two-commit freeze productionScopes > T5 — rejects implementation modules outside declared scopes 1ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > two-commit freeze productionScopes > T1 — allows unrelated src changes outside declared productionScopes 150ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > two-commit freeze productionScopes > T2 — rejects in-scope modification between implementation and evidence 72ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > two-commit freeze productionScopes > T3/T4 — rejects any path change under declared production scope 126ms
+ ✓ |default| tests/ag2/ag2-proofs.test.ts > AG2 E/F — session success chain + failure isolation > task2 starts from task1 verified commit; failed task2 does not move baseline 6538ms
+ ✓ |default| tests/ag2/ag2-proofs.test.ts > AG2 G — no worktree leak > repeated create/remove leaves no orphan task paths 2843ms
+ ✓ |default| tests/ag2/ag2-proofs.test.ts > AG2 H — primary untouched > agent edits stay in worktree 1665ms
+ ✓ |default| tests/ag2/ag2-proofs.test.ts > AG2 I — final validation independence > engine finished alone cannot establish VERIFIED 69ms
+ ✓ |default| tests/ag2/ag2-proofs.test.ts > AG2 J — cancellation cleanup path exists > removeTaskWorktree works after cancel-style WIP preserve 1749ms
+ ✓ |default| tests/general-session/recover.test.ts > 5G-AF: /recover is a separate, human-authorized act > 5G-AF: parses the command and refuses anything path-like 59ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > two-commit freeze productionScopes > T7 — canonical Phase 2F and repository-intelligence still verify 11217ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > two-commit freeze productionScopes > covers Phase 3B implementation modules under src/editing/ 1ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > H2 live falsifications > H2-F1 — restored global src/** rule rejects valid unrelated-src scenario 137ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > H2 live falsifications > H2-F2 — ignoring in-scope changes would accept invalid freeze pair 83ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > H2 live falsifications > H2-F3 — bypassing module/scope consistency must fail validation 1ms
+ ✓ |default| tests/general-session/recover.test.ts > 5G-AF: /recover is a separate, human-authorized act > 5G-AF: shows dispositions, requires RESTORE, and restores the exact bytes 5152ms
+ ✓ |default| tests/general-session/recover.test.ts > 5G-AF: /recover is a separate, human-authorized act > 5G-AF: reports a checkpoint that is not in this store, and restores nothing 275ms
+ ✓ |default| tests/general-session/recover.test.ts > 5G-AF: /recover is a separate, human-authorized act > 5G-AF: a file changed since the checkpoint is reported, not silently overwritten 3073ms
+ ✓ |default| tests/general-session/recover.test.ts > 5G-AF: /recover is a separate, human-authorized act > 5G-AF: the module contacts no provider and runs no Git command 3ms
+ ✓ |default| tests/general-session/recover.test.ts > 5G-AG: the checkpoint survives the process that made it > 5G-AG: a fresh process restores from the id alone 4172ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts > Phase 3B relink probe > accepts TWO_COMMIT_FREEZE with src/editing/ scope for ad85c9f → 2b63531 13714ms
+
+ Test Files  6 passed (6)
+      Tests  67 passed (67)
+   Start at  21:31:10
+   Duration  182.68s (transform 57.18s, setup 0ms, collect 2.45s, tests 348.67s, environment 8ms, prepare 2.81s)
+

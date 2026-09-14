@@ -1,33 +1,99 @@
 {
   "schema": "pathcode.g10.closure.steering.v1",
-  "at": "2026-09-14T18:10:53.014Z",
+  "at": "2026-09-14T18:28:33.881Z",
   "sequence": [
     {
-      "t": 1789409541601,
+      "t": 1789410517248,
       "type": "session.task.received"
     },
     {
-      "t": 1789409541603,
+      "t": 1789410517250,
       "type": "session.engineering.activity",
       "label": "Steering pending",
       "detail": "Keep backward compatibility and do not change the public API."
     },
     {
-      "t": 1789409541735,
+      "t": 1789410517370,
       "type": "steering.accept",
       "status": "PENDING",
       "text": "Keep backward compatibility and do not change the public API."
     },
     {
-      "t": 1789409541737,
+      "t": 1789410518404,
+      "type": "session.engineering.bridge",
+      "detail": "Antigravity session ACTIVE"
+    },
+    {
+      "t": 1789410518404,
       "type": "session.engineering.activity",
       "label": "Steering applied",
       "detail": "Keep backward compatibility and do not change the public API."
     },
     {
-      "t": 1789409541860,
+      "t": 1789410518520,
       "type": "steering.applied",
       "text": "Keep backward compatibility and do not change the public API."
+    },
+    {
+      "t": 1789410518520,
+      "type": "session.engineering.bridge",
+      "detail": "Antigravity NATIVE_RESUME"
+    },
+    {
+      "t": 1789410522809,
+      "type": "session.engineering.activity",
+      "label": "Inspecting",
+      "detail": "list_directory"
+    },
+    {
+      "t": 1789410522815,
+      "type": "session.engineering.activity",
+      "label": "Inspecting",
+      "detail": "list_directory"
+    },
+    {
+      "t": 1789410525618,
+      "type": "session.engineering.activity",
+      "label": "Inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789410525623,
+      "type": "session.engineering.activity",
+      "label": "Inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789410535610,
+      "type": "session.engineering.activity",
+      "label": "Inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789410535616,
+      "type": "session.engineering.activity",
+      "label": "Inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789410549917,
+      "type": "session.engineering.activity",
+      "label": "Testing",
+      "detail": "test.started"
+    },
+    {
+      "t": 1789410591131,
+      "type": "session.applying"
+    },
+    {
+      "t": 1789410591142,
+      "type": "session.applying"
+    },
+    {
+      "t": 1789410597265,
+      "type": "session.engineering.activity",
+      "label": "Testing",
+      "detail": "test.started"
     }
   ],
   "pendingWhileMutating": {
@@ -40,17 +106,17 @@
     "count": 1,
     "text": "Keep backward compatibility and do not change the public API."
   },
-  "terminal": "failed",
+  "terminal": "finished",
   "engineering": {
     "exportStillAdd": true,
-    "fixed": false,
-    "testExit": 1,
-    "validation": "FAILED",
-    "source": "/** Broken on purpose for G10 Antigravity repair-loop acceptance. */\nexport function add(a, b) {\n  return a - b;\n}\n"
+    "fixed": true,
+    "testExit": 0,
+    "validation": "VERIFIED",
+    "source": "/** Broken on purpose for G10 Antigravity repair-loop acceptance. */\nexport function add(a, b) {\n  return a + b;\n}\n"
   },
   "events": {
     "pending": true,
     "applied": true
   },
-  "verdict": "PARTIAL"
+  "verdict": "PASS"
 }

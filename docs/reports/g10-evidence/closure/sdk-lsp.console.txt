@@ -1,0 +1,1 @@
+{"verdict":"PASS","mode":"native_sdk","lspServers":["typescript"],"lspClaim":true,"testExit":0}

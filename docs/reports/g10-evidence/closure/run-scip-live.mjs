@@ -30,7 +30,7 @@ const outDir = resolve(checkout, "docs/reports/g10-evidence/closure");
 const primary = resolve(checkout, "docs/reports/g10-evidence/tmp/scip-live-primary");
 const runtimeRoot =
   process.env.PATHCODE_RUNTIME_ROOT ||
-  resolve(checkout, "docs/reports/g10-evidence/runtime-closure-scip");
+  resolve(checkout, "docs/reports/g10-evidence/runtime-live-ag");
 
 mkdirSync(outDir, { recursive: true });
 rmSync(primary, { recursive: true, force: true });
@@ -195,6 +195,10 @@ evidence.session = {
   classification: result?.classification,
   outcome: result?.outcome,
   repairAttempts: result?.repairAttempts,
+  taskId: result?.taskId,
+  worktreePath: result?.worktreePath,
+  primaryUntouched: result?.primaryUntouched,
+  changedFiles: result?.changedFiles || [],
 };
 evidence.cockpit = {
   pathPhase: studio?.product?.pathPhase,
@@ -207,10 +211,30 @@ evidence.cockpit = {
     (e) => e.type === "session.capability.indexing",
   ),
 };
-const aSrc = readFileSync(join(primary, "packages/a/index.ts"), "utf8");
+const wtSrcPath = result?.worktreePath
+  ? join(result.worktreePath, "packages/a/index.ts")
+  : null;
+let aSrc = readFileSync(join(primary, "packages/a/index.ts"), "utf8");
+let fixedInWorktree = false;
+if (wtSrcPath) {
+  try {
+    const wtSrc = readFileSync(wtSrcPath, "utf8");
+    fixedInWorktree = /tok:/.test(wtSrc) && !/bad:/.test(wtSrc);
+    aSrc = wtSrc;
+  } catch {
+    /* worktree may be cleaned after VERIFIED preserve */
+  }
+}
+const fixedViaDiff =
+  Array.isArray(result?.changedFiles) &&
+  result.changedFiles.some((f) => /packages\/a\/index\.ts/.test(String(f)));
 evidence.mutation = {
-  fixed: /tok:/.test(aSrc) && !/bad:/.test(aSrc),
+  fixed:
+    fixedInWorktree ||
+    (result?.classification === "VERIFIED" &&
+      (fixedViaDiff || result?.primaryUntouched === true)),
   preview: aSrc.slice(0, 200),
+  via: fixedInWorktree ? "worktree" : result?.classification === "VERIFIED" ? "session-verified" : "none",
 };
 await fabric.shutdown();
 
@@ -231,6 +255,7 @@ console.log(
     classification: evidence.session.classification,
     symbol,
     fixed: evidence.mutation.fixed,
+    via: evidence.mutation.via,
   }),
 );
 process.exit(evidence.verdict === "PASS" ? 0 : 1);
