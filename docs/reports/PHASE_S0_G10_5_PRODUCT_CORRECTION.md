@@ -189,9 +189,9 @@ Explicitly:
 
 Filled at freeze:
 
-- **Implementation commit:** 
-- **Report commit:** 
-- **Current HEAD:** 
+- **Implementation commit:** `fcd6e831dc9c346f5c131e0442ecfe60916d555f`
+- **Report commit:** `b2c896f0b29ba09c2b14ed69a9207be87981e7a3`
+- **Current HEAD:** `a8792e8554c37d79f609dcc7e15b39ad1469cfd9`
 - **Branch:** `cursor/pathcode-antigravity-v1`
 - **Working tree:** clean after freeze
 
