@@ -4,7 +4,7 @@
 **Baseline:** G7 Living Cockpit Completion · `eacd7638b9df4e82085b01d77ff5e483744aa51a`  
 **Implementation commit:** `b6dd2f0502bafa7fd5dc685003ce21699e92f363`  
 **Advisory acceptance commit:** `b7d1e2aff03fdeb531531595aaddd63b57c81c60`  
-**Freeze commit:** (recorded in follow-up SHA note)  
+**Freeze commit:** `3ca50e0acf04739b647624c840ca86530944e8f4`  
 **Branch:** `cursor/pathcode-antigravity-v1`  
 **Working tree:** clean after G8 freeze  
 **Canonical validation:** `npm run check` PASS (typecheck · build · 147 files / 1376 tests · cli:smoke · ledger:verify)  
