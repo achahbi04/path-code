@@ -11,10 +11,11 @@
 **Closure report commit:** `dfab83946d77b8750a8db971daa68d8f8c03a5d0`  
 **UI correction implementation commit:** `9965e411769ba9d37ab9d387da748c87881c5bed`  
 **S0 implementation commit:**   
+**S0 report commit:**   
 **UI correction report commit:** `2da3c30145ca684283422ec1b2ceaeb7001ea19d`  
-**Current HEAD:**  (pre-report; updated on report freeze)`3f598404495de5c872d14462d09deee6c844569f`  
+**Current HEAD:** `3f598404495de5c872d14462d09deee6c844569f`  
 **Branch:** `cursor/pathcode-antigravity-v1`  
-**Working tree:** clean after freeze
+**Working tree:** clean after S0 freeze
 
 G10 inherits the complete G9 engineering foundation. Closure drive closed the
 remaining live product acceptance gaps. This UI-correction drive fixes
