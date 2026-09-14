@@ -2,7 +2,8 @@
 
 **Result:** PASS  
 **Baseline:** G7 Living Cockpit Completion · `eacd7638b9df4e82085b01d77ff5e483744aa51a`  
-**Implementation commit:** `b6dd2f0502bafa7fd5dc685003ce21699e92f363`  
+**Implementation commit:**   
+**Advisory acceptance commit:** `b6dd2f0502bafa7fd5dc685003ce21699e92f363`  
 **Branch:** `cursor/pathcode-antigravity-v1`  
 **Working tree:** clean after G8 advisory acceptance commit  
 **Published releases:** UNCHANGED · Publication performed: NO
