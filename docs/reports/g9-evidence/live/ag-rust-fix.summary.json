@@ -1,0 +1,46 @@
+{
+  "label": "ag-rust-fix",
+  "outcome": "VERIFIED",
+  "classification": "VERIFIED",
+  "exitCode": 0,
+  "primaryUntouched": true,
+  "commitSha": "0f79e36091f8b6c4112b65b1846a67af91f978cf",
+  "engineActivityCount": 30,
+  "collaborateEvents": [],
+  "capabilityEvents": [
+    {
+      "type": "session.capability.discovered",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null
+    },
+    {
+      "type": "session.capability.preparing",
+      "detail": null
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null,
+      "phase": "toolchains"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null,
+      "phase": "lsp"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null
+    },
+    {
+      "type": "session.capability.affected",
+      "detail": null
+    },
+    {
+      "type": "session.capability.ready",
+      "detail": null
+    }
+  ]
+}

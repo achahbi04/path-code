@@ -1,0 +1,77 @@
+{
+  "label": "ag-rust-fix",
+  "projectRoot": "/tmp/pathcode-g9-ag-accept/repo",
+  "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag",
+  "prepared": {
+    "brief": "## PATH G9 engineering environment\nLanguages: rust\nToolchains:\n- rust: HOST_READY\n- cargo: HOST_READY\n- lsp:rust: HOST_READY\nLanguage servers:\n- rust: ready (/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag/language-servers/rust-analyzer)\nCode intelligence (SCIP): skipped (not indicated)\nCopilot LSP home: /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag/copilot-home (servers: rust)\nAffected checks: CONSERVATIVE via cargo\n- /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/cargo test\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+    "provision": [
+      "rust: HOST_READY",
+      "cargo: HOST_READY",
+      "lsp:rust: HOST_READY"
+    ],
+    "lsp": [
+      {
+        "id": "rust",
+        "status": "ready",
+        "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag/language-servers/rust-analyzer",
+        "evidence": [
+          "bins=rust-analyzer",
+          "host rust-analyzer → /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rust-analyzer",
+          "health: --version → status=1 info: `rust-analyzer` is unavailable for the active toolchain\ninfo: falling back to \"/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/",
+          "health: version → status=1 info: `rust-analyzer` is unavailable for the active toolchain\ninfo: falling back to \"/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/",
+          "health: --help → status=1 info: `rust-analyzer` is unavailable for the active toolchain\ninfo: falling back to \"/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/",
+          "health: help → status=1 info: `rust-analyzer` is unavailable for the active toolchain\ninfo: falling back to \"/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/",
+          "health: stdio probe status=1 (short timeout expected)"
+        ]
+      }
+    ],
+    "pathPrepend": [
+      "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin",
+      "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag/tool-manager/mise/bin",
+      "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag/language-servers/bin",
+      "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag/language-servers/npm/bin",
+      "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag/toolchains/cargo-home/bin",
+      "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag/language-servers",
+      "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag/language-servers/npm",
+      "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag/indexers/npm"
+    ]
+  },
+  "prepEvents": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/tmp/pathcode-g9-ag-accept/repo",
+      "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-live-ag",
+      "at": 1789377806555
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789377808843
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789377808844
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:rust",
+      "at": 1789377808859
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "CONSERVATIVE",
+      "source": "cargo",
+      "at": 1789377814500
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [
+        "rust"
+      ],
+      "scip": false,
+      "affected": "CONSERVATIVE",
+      "at": 1789377814504
+    }
+  ]
+}

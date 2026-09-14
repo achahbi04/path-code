@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-09-14T10:02:00Z",
+  "worktreeId": "g9-live-d734b2ae",
+  "worktreePath": "/Users/achahbi/.cursor/worktrees/g9-live-d734b2ae/cursor-pathcode-antigravity-v1-3e0a5996e7d6",
+  "repoRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+  "outcomes": {
+    "copilot": {
+      "label": "cp-rust-fix",
+      "projectRoot": "/tmp/pathcode-g9-cp-accept",
+      "classification": "VERIFIED",
+      "commitSha": "5be55b9a2e1a60cb6d0156fd847d74a0d907b91c",
+      "primaryUntouched": true,
+      "sourceMutation": "src/lib.rs mul: a+b -> a*b",
+      "commitShaNote": "Harness initially reported null (read committed.sha vs commitSha); durable commit recovered from accept repo object store.",
+      "runtimeRoot": "/tmp/pathcode-g9-runtime-cp",
+      "taskWorktree": "/tmp/pathcode-g9-runtime-cp/ag1-tasks/g9cp-ec17a9ea"
+    },
+    "collaborative": {
+      "label": "collab-dual",
+      "projectRoot": "/tmp/pathcode-g9-collab-accept",
+      "classification": "VERIFIED",
+      "commitSha": "701f038238d2972f2d78b5e0cbf8ddef4e606c5d",
+      "primaryUntouched": true,
+      "materialCollaboration": true,
+      "sameWorktree": "/tmp/pathcode-g9-runtime-collab/ag1-tasks/g9cl-fa911165",
+      "antigravity": { "addFixed": true, "mulFixed": false },
+      "copilot": { "addFixed": true, "mulFixed": true },
+      "runtimeRoot": "/tmp/pathcode-g9-runtime-collab"
+    }
+  },
+  "blockers": [],
+  "notes": [
+    "Both live acceptances classified VERIFIED with primaryUntouched=true.",
+    "Copilot-only: summary commitSha field bug (committed.sha vs commitSha) — commit object exists.",
+    "Collab: AG fixed add only; Copilot fixed mul; mid validation PARTIALLY_VERIFIED as expected."
+  ]
+}

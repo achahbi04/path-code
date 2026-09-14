@@ -1,60 +1,186 @@
-# PATH CODE — G9 SELF-PROVISIONING POLYGLOT ENGINEERING RUNTIME
+# PATH CODE — G9
+SELF-PROVISIONING POLYGLOT + COLLABORATIVE ENGINEERING RUNTIME
 
-**Result:** ACCEPTED  
-**Baseline:** G8 Native Capability Gateway · freeze `3ca50e0acf04739b647624c840ca86530944e8f4`  
-**Acceptance commit:** `985e6c4086cd9f40bf71b86bd4612e09deb912d2`  
-**Branch:** `cursor/pathcode-antigravity-v1`  
-**Canonical validation:** `npm run check` PASS (typecheck · build · 154 files / 1412 tests · cli:smoke · ledger:verify)  
-**Published releases:** UNCHANGED · Publication performed: NO
+**Result:** PARTIAL  
+**Baseline:** G8 freeze `3ca50e0acf04739b647624c840ca86530944e8f4`  
+**Implementation commit:** (recorded immediately after this acceptance lands)  
+**Working tree:** `cursor/pathcode-antigravity-v1`  
+**Canonical validation:** `npm run check` PASS (154 files / 1412 tests)  
+**Published releases:** UNCHANGED  
+**Publication:** NO  
 
-## Architecture (corrected)
+This report follows the **G9 AUTHORITATIVE CONSOLIDATED PLAN** (supersedes earlier
+G9 wording that cast Antigravity as sole engineer / Copilot as advisory-only).
 
-PATH owns one task / session / worktree / living cockpit / independent final
-verification / durable Git result.
+## Verdict (truthful)
 
-**Antigravity and GitHub Copilot are full collaborating engineering engines**
-in that same session (no permanent primary/secondary). Both may inspect, mutate,
-execute, build, test, debug, repair, provision missing capability, and continue
-each other’s work under exclusive turn leases + a shared journal.
+Core collaborative + self-provisioning architecture is implemented and
+**live-proven** for Antigravity full engine, Copilot full engine, and dual-engine
+collaboration on disposable Rust tasks. Rust/Java cold toolchain+LSP acquisition
+and cargo/mvn validation are proven. SCIP prepare + affected briefing exist;
+Docker live start is **not** proven on this host (`docker_missing`). Not every
+polyglot family has a live VERIFIED engineering task. Therefore **PARTIAL**, not PASS.
 
-Self-provisioning under `PATH_RUNTIME_ROOT` via PATH-pinned **mise** supplies
-toolchains, LSP, SCIP, Copilot home, and (when Docker is present) disposable
-services — without editing user global tool configs and without duplicating
-mature engine capabilities.
+---
 
-## Proven
+## SELF-PROVISIONING
 
-| Area | Evidence |
+| Field | Status |
 | --- | --- |
-| Runtime layout + pinned mise | `tests/g9/g9-mise-layout.test.ts`; cold runtimes under `docs/reports/g9-evidence/runtime-*` (gitignored) |
-| Resolve / provision / env envelope | `tests/g9/g9-resolve.test.ts`, `g9-envelope.test.ts`; session hook in `ag1/session.mjs` |
-| Collaborative engines | `ag9/collaborate.mjs`, `ag9/copilot-engine.mjs`; `tests/g9/g9-collaborate.test.ts`; cockpit `session.capability.collaborate` |
-| Rust cold-start | `docs/reports/g9-evidence/cold/rust-prepare.json` — rust/cargo/lsp:rust `PATH_RUNTIME_READY`; `cold/rust-cargo-test.txt` PASS |
-| Java cold-start | `docs/reports/g9-evidence/cold/java-prepare.json` — java/mvn/lsp:java `PATH_RUNTIME_READY` (macOS `/usr/bin/java` stub rejected); `cold/java-mvn-test.txt` BUILD SUCCESS |
-| SCIP monorepo | `docs/reports/g9-evidence/scip/scip-mono-prepare.json` — fingerprint cache + read-only SCIP MCP config |
-| Services detection | `docs/reports/g9-evidence/docker/compose-prepare.json` — compose detected; runtime `UNAVAILABLE (docker_missing)` on this host |
-| Failure recovery APIs | `tests/g9/g9-failure-matrix.test.ts` |
-| G7 / G8 preservation | `npx vitest run tests/g7 tests/g8 tests/g9` → **66/66 PASS** |
+| Capability resolution | PASS — `ag9/resolve.mjs` + prepare brief |
+| Runtime/tool acquisition | PASS — PATH-pinned mise under `PATH_RUNTIME_ROOT` |
+| Version resolution | PASS — project evidence (toolchain files, wrappers, engines) |
+| Cache | PASS — reusable toolchains/LSP/SCIP under runtime root (gitignored) |
+| Self-healing | PARTIAL — unit failure matrix + bootstrap python≥3.10 repair; not every live fault path exercised |
+| Zero-manual-setup proof | PASS for Rust/Java cold start (no operator install prompts) |
 
-## Declared limitations (honest)
+Evidence: `docs/reports/g9-evidence/cold/rust-prepare.json`, `cold/java-prepare.json`,
+`cold/rust-cargo-test.txt`, `cold/java-mvn-test.txt`.
 
-- **Docker / live disposable containers:** Docker CLI absent on the acceptance host → services start path not live-proven (detection + honest UNAVAILABLE recorded).
-- **Full dual-engine live task** (Antigravity turn + Copilot mutate turn in one operator session) is wired and unit-covered; a long interactive live capture is not required to accept provisioning + collaboration architecture.
-- **Windows / untested Linux:** not claimed.
-- SCIP for the monorepo fixture used a heuristic symbol map when `scip-typescript` lacked `tsconfig.json` (index still fingerprint-cached and MCP-exposed).
+## POLYGLOT
 
-## Non-goals kept
+| Family | Status |
+| --- | --- |
+| JS/TS | PARTIAL — host node/npm + TS LSP prepare (compose/scip fixtures) |
+| Python | PARTIAL — resolver/provision paths + tests; no live VERIFIED task this drive |
+| Go | PARTIAL — provision/LSP paths; no live VERIFIED task this drive |
+| Rust cold start | PASS — establish cargo/rust-analyzer; cargo test PASS |
+| Java cold start | PASS — JDK + mvn + Eclipse JDT LS; `mvn test` BUILD SUCCESS |
+| C/C++ | PARTIAL — clangd path retained; not reduced to Make-only, but live breadth not fully proven |
+| .NET/C# | UNAVAILABLE / unproven on this host |
 
-- No GC1 rebuild · no second PATH coding model · no PATH compilers/package managers  
-- No npm publish · G8 product freeze SHA unchanged as historical baseline  
+## LANGUAGE INTELLIGENCE
+
+| LSP | Status |
+| --- | --- |
+| TS/JS | PASS (prepare READY) |
+| Python | PARTIAL (wired; limited live) |
+| Go | PARTIAL (wired; limited live) |
+| Rust | PASS (cold + live AG/CP) |
+| C/C++ | PARTIAL (clangd) |
+| Java | PASS (Eclipse JDT LS READY) |
+| C# | UNAVAILABLE / unproven |
+
+Both engines share PATH-prepared capability via env envelope / Copilot home adapters
+(`ag9/copilot-lsp.mjs`) — no duplicate ideological installs.
+
+## SCIP
+
+| Field | Status |
+| --- | --- |
+| Indexers | PASS — mature indexer orchestration + fingerprint cache |
+| Large-repo case | PARTIAL — `docs/reports/g9-evidence/scip/` + `live-repos/scip-mono` prepare |
+| Index time | recorded in scip prepare JSON |
+| Query time | MCP-exposed; not a timed live engineering consumption proof |
+| Observed usefulness | PARTIAL — prepare/MCP ready; not proven as decisive input in a live multi-package VERIFIED task |
+
+## CHANGE IMPACT
+
+| Field | Status |
+| --- | --- |
+| Mechanism | project-native where detected (cargo/pnpm/…) + conservative fallback |
+| Selection classification | EXACT_BY_PROJECT_SYSTEM / CONSERVATIVE / UNAVAILABLE (truthful) |
+| Affected checks | PASS in prepare briefs (e.g. cargo CONSERVATIVE, pnpm PROJECT_EXACT on scip-mono) |
+| Final broader checks | PASS — independent PATH validation still runs at completion |
+| Observed reduction | PARTIAL — architecture proven; not quantified on a large live monorepo edit |
+
+## ANTIGRAVITY FULL ENGINE
+
+| Field | Evidence |
+| --- | --- |
+| Real mutation | PASS — `docs/reports/g9-evidence/live/ag-rust-fix.summary.json` |
+| Command execution | PASS |
+| Build/test | PASS — cargo validation |
+| Repair | PASS — fixed intentional `add` bug |
+| Verified result | **VERIFIED** commit `0f79e36091f8b6c4112b65b1846a67af91f978cf`; primaryUntouched |
+
+## COPILOT FULL ENGINE
+
+| Field | Evidence |
+| --- | --- |
+| Integration surface | Copilot CLI programmatic (`ag9/copilot-engine.mjs`, `--allow-all-tools`, deny push) |
+| Persistent session | PARTIAL — full turn harness; not a multi-hour ACP session |
+| Real mutation | PASS — `mul` `a+b`→`a*b` |
+| Command execution | PASS |
+| Build/test | PASS — independent cargo check/test |
+| Repair | PASS |
+| Verified result | **VERIFIED** commit `5be55b9a2e1a60cb6d0156fd847d74a0d907b91c`; primaryUntouched |
+
+Harness: `docs/reports/g9-evidence/run-live-copilot.mjs` · summary `live/cp-rust-fix.summary.json`.
+
+## COLLABORATIVE ENGINEERING
+
+| Field | Evidence |
+| --- | --- |
+| Same PATH task | PASS — `g9cl-fa911165` |
+| Same worktree | PASS |
+| Shared state | PASS — collab journal + mid validation handoff |
+| Antigravity contribution | PASS — fixed `add` only (`addFixed: true`, `mulFixed: false`) |
+| Copilot contribution | PASS — fixed `mul` (`mulFixed: true`) |
+| Handoff mechanism | exclusive `withCollabTurn` leases + journal |
+| Conflict protection | serialized turns; mid validation PARTIALLY_VERIFIED as expected |
+| Return-to-engine continuation | PARTIAL — session repair loop supports return; this live case was AG→Copilot |
+| Final verification | **VERIFIED** |
+| Durable result | commit `701f038238d2972f2d78b5e0cbf8ddef4e606c5d`; primaryUntouched |
+
+Evidence: `live/collab-dual.summary.json`, `live/runner-status.json`.
+
+## CONTAINERS / SERVICES
+
+| Field | Status |
+| --- | --- |
+| Environment case | compose fixture detected |
+| Automatic startup | **UNAVAILABLE** — `docker_missing` on acceptance host |
+| Engineering against environment | not live-proven |
+| Cleanup | N/A (no PATH-started containers) |
+
+Evidence: `docs/reports/g9-evidence/docker/compose-prepare.json`.
+
+## LIVING UI
+
+Provisioning / language-intelligence / SCIP / collaboration / affected / repair /
+final verification events are wired into the cockpit (`session.capability.*`,
+`path-studio/state.mjs`). Live harnesses exercised capability + collaborate event
+streams (AG summary lists preparing/provisioning/ready; collab uses leases).
+
+## SECURITY / PRODUCT INTEGRITY
+
+| Field | Status |
+| --- | --- |
+| Primary checkout | PASS — untouched on AG/CP/collab lives |
+| Credential isolation | PASS — PATH runtime / COPILOT_HOME / toolEnv envelope |
+| Worktree boundary | PASS |
+| Cancellation | preserved from G7/G8 (not re-broken in this drive) |
+| Cleanup | task worktrees removed after VERIFIED; runtimes gitignored |
+
+## FAILURE / RECOVERY
+
+| Field | Status |
+| --- | --- |
+| Tool acquisition | PASS APIs + cold reprovision |
+| Corrupt runtime | unit coverage (`tests/g9/g9-failure-matrix.test.ts`) |
+| LSP | health-check gate before READY |
+| SCIP | fingerprint cache; stale rebuild path |
+| Dependency failure | engine repair loops |
+| Cancellation | preserved session cancel path |
+
+## CANONICAL VALIDATION
+
+Published releases: **UNCHANGED**  
+Publication: **NO**
+
+---
 
 ## Key modules
 
 - `scripts/pathcode-cli/ag9/` — layout, mise, resolve, provision, envelope, lsp, scip, services, collaborate, copilot-engine, prepare, seam  
-- Session: `scripts/pathcode-cli/ag1/session.mjs` collaborative repair loop  
-- Bridge `toolEnv` merge: `bridge-client.mjs` + `bridge_main.py`  
-- Cockpit: `scripts/path-studio/state.mjs` preparing/provisioning/collaborate events  
+- Session collaborative repair: `ag1/session.mjs`  
+- AG1 bootstrap prefers Python ≥3.10: `ag1/runtime-bootstrap.mjs`  
+- Live harnesses: `docs/reports/g9-evidence/run-live-{ag,copilot,collab}.mjs`
 
-## Evidence root
+## Remaining for PASS
 
-`docs/reports/g9-evidence/` (fixtures + JSON/console proofs). Regenerable toolchains live under `docs/reports/g9-evidence/runtime-*/` and are gitignored.
+1. Live VERIFIED engineering for remaining polyglot families (JS/TS, Python, Go, C/C++, .NET where available) beyond prepare.  
+2. SCIP facts **consumed** during a real multi-package VERIFIED task with measured usefulness.  
+3. Disposable container/service live start + cleanup on a Docker-capable host.  
+4. Broader live failure/recovery matrix beyond unit APIs.

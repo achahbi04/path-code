@@ -1,0 +1,46 @@
+{
+  "label": "cp-rust-fix",
+  "engine": "copilot",
+  "classification": "VERIFIED",
+  "turnOk": true,
+  "turnDetail": "mutated 2 path(s)",
+  "changedFiles": [
+    "src/lib.rs",
+    "Cargo.lock"
+  ],
+  "validation": {
+    "classification": "VERIFIED",
+    "reason": "All configured final checks passed.",
+    "checks": [
+      {
+        "id": "cargo-check",
+        "name": "cargo-check",
+        "kind": "TYPECHECK",
+        "command": "cargo check",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 637,
+        "ok": true,
+        "stdoutTail": "",
+        "stderrTail": "    Checking g9_cp_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-cp/ag1-tasks/g9cp-ec17a9ea)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.59s\n"
+      },
+      {
+        "id": "cargo-test",
+        "name": "cargo-test",
+        "kind": "TARGETED_TEST",
+        "command": "cargo test",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 974,
+        "ok": true,
+        "stdoutTail": "\nrunning 1 test\ntest tests::muls ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderrTail": "   Compiling g9_cp_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-cp/ag1-tasks/g9cp-ec17a9ea)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s\n     Running unittests src/lib.rs (target/debug/deps/g9_cp_accept-295d35d8504e0b3f)\n   Doc-tests g9_cp_accept\n"
+      }
+    ]
+  },
+  "primaryUntouched": true,
+  "commitSha": "5be55b9a2e1a60cb6d0156fd847d74a0d907b91c",
+  "worktree": "/tmp/pathcode-g9-runtime-cp/ag1-tasks/g9cp-ec17a9ea",
+  "prepareBrief": "## PATH G9 engineering environment\nLanguages: rust\nToolchains:\n- rust: PATH_RUNTIME_READY\n- cargo: PATH_RUNTIME_READY (reused)\n- lsp:rust: PATH_RUNTIME_READY (reused)\nLanguage servers:\n- rust: ready (/tmp/pathcode-g9-runtime-cp/language-servers/rust-analyzer)\nCode intelligence (SCIP): skipped (not indicated)\nCopilot LSP home: /tmp/pathcode-g9-runtime-cp/copilot-home (servers: rust)\nAffected checks: UNAVAILABLE via none\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+  "commitShaRecovered": true
+}

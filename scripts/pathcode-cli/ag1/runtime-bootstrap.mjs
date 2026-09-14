@@ -28,6 +28,42 @@ const STALE_LOCK_MS = 15 * 60 * 1000;
 const WAIT_MS = 120_000;
 const POLL_MS = 250;
 
+/** Prefer modern Homebrew / mise Pythons over macOS /usr/bin/python3 (often 3.9). */
+const PYTHON_CANDIDATES = Object.freeze([
+  "python3.14",
+  "python3.13",
+  "python3.12",
+  "python3.11",
+  "python3.10",
+  "python3",
+]);
+
+/**
+ * Resolve a host Python interpreter that can install AG1 deps (Requires-Python >=3.10).
+ * @returns {{ executable: string, version: string } | null}
+ */
+export function resolveBootstrapPython() {
+  for (const name of PYTHON_CANDIDATES) {
+    const probe = spawnSync(name, ["-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"], {
+      encoding: "utf8",
+      timeout: 8_000,
+      env: process.env,
+    });
+    if (probe.status !== 0) continue;
+    const version = String(probe.stdout || "").trim();
+    const [maj, min] = version.split(".").map((n) => Number(n));
+    if (!(maj > 3 || (maj === 3 && min >= 10))) continue;
+    const which = spawnSync(name, ["-c", "import sys; print(sys.executable)"], {
+      encoding: "utf8",
+      timeout: 8_000,
+      env: process.env,
+    });
+    const executable = String(which.stdout || "").trim() || name;
+    return { executable, version };
+  }
+  return null;
+}
+
 /**
  * @param {string} runtimeRoot
  */
@@ -247,8 +283,18 @@ export async function ensureAg1Runtime(opts = {}) {
       rmSync(venvRoot, { recursive: true, force: true });
     }
 
+    const hostPy = resolveBootstrapPython();
+    if (!hostPy) {
+      return {
+        ok: false,
+        code: "RUNTIME_PYTHON_TOO_OLD",
+        message:
+          "PATH needs Python 3.10+ on PATH to bootstrap the engineering runtime (macOS /usr/bin/python3 is often too old).",
+      };
+    }
+
     if (!existsSync(pythonBin)) {
-      const create = spawnSync("python3", ["-m", "venv", venvRoot], {
+      const create = spawnSync(hostPy.executable, ["-m", "venv", venvRoot], {
         encoding: "utf8",
         env: process.env,
       });
@@ -276,7 +322,7 @@ export async function ensureAg1Runtime(opts = {}) {
       } catch {
         // ignore
       }
-      const recreate = spawnSync("python3", ["-m", "venv", venvRoot], {
+      const recreate = spawnSync(hostPy.executable, ["-m", "venv", venvRoot], {
         encoding: "utf8",
         env: process.env,
       });
