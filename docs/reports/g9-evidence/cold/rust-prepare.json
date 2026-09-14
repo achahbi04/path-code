@@ -1,0 +1,125 @@
+{
+  "label": "rust-cold",
+  "capturedAt": "2026-09-14T08:08:37.718Z",
+  "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/live-repos/rust-cold",
+  "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust",
+  "pathPrepend": [
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/tool-manager/mise/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/language-servers/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/language-servers/npm/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/mise-data/shims",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/language-servers",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/language-servers/npm",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/indexers/npm"
+  ],
+  "provision": {
+    "briefLines": [
+      "rust: PATH_RUNTIME_READY",
+      "cargo: PATH_RUNTIME_READY",
+      "lsp:rust: PATH_RUNTIME_READY"
+    ],
+    "ready": [
+      {
+        "id": "rust",
+        "status": "PATH_RUNTIME_READY",
+        "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/cargo"
+      },
+      {
+        "id": "cargo",
+        "status": "PATH_RUNTIME_READY",
+        "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/cargo"
+      },
+      {
+        "id": "lsp:rust",
+        "status": "PATH_RUNTIME_READY",
+        "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rust-analyzer"
+      }
+    ],
+    "failed": []
+  },
+  "languageServers": [
+    {
+      "id": "rust",
+      "status": "ready",
+      "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/language-servers/rust-analyzer",
+      "evidence": [
+        "bins=rust-analyzer",
+        "host rust-analyzer → /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/mise-data/shims/rust-analyzer",
+        "health: --version → status=0 rust-analyzer 0.3.3041-standalone (9074e9b4c6 2026-09-06)\ninfo: `rust-analyzer` is unavailable for the active toolchain\ninfo: falling back to \"/Users/achahbi/Pr"
+      ]
+    }
+  ],
+  "scip": {
+    "ok": false,
+    "skipped": true,
+    "reason": "not_needed"
+  },
+  "mcpServersExtra": [],
+  "services": {
+    "detected": {
+      "composeFile": null,
+      "devcontainer": false,
+      "evidence": []
+    },
+    "runtime": {
+      "status": "UNAVAILABLE",
+      "reason": "no_service_evidence"
+    }
+  },
+  "acquired": {
+    "cargo": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/cargo",
+    "rustc": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rustc",
+    "rust-analyzer": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rust-analyzer",
+    "java": "/usr/bin/java",
+    "mvn": null,
+    "jdtls": null,
+    "go": "/opt/homebrew/bin/go",
+    "gopls": null,
+    "python3": "/opt/homebrew/bin/python3",
+    "pyright": null,
+    "node": "/opt/homebrew/bin/node",
+    "clangd": "/usr/bin/clangd",
+    "mise": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/tool-manager/mise/bin/mise"
+  },
+  "events": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/live-repos/rust-cold",
+      "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust",
+      "at": 1789373305115
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789373311566
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789373311571
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:rust",
+      "at": 1789373311622
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "CONSERVATIVE",
+      "source": "cargo",
+      "at": 1789373317403
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [
+        "rust"
+      ],
+      "scip": false,
+      "affected": "CONSERVATIVE",
+      "at": 1789373317408
+    }
+  ],
+  "capabilityBrief": "## PATH G9 engineering environment\nLanguages: rust\nToolchains:\n- rust: PATH_RUNTIME_READY\n- cargo: PATH_RUNTIME_READY\n- lsp:rust: PATH_RUNTIME_READY\nLanguage servers:\n- rust: ready (/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/language-servers/rust-analyzer)\nCode intelligence (SCIP): skipped (not indicated)\nCopilot LSP home: /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/copilot-home (servers: rust)\nAffected checks: CONSERVATIVE via cargo\n- /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/mise-data/shims/cargo test\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+  "copilotHome": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/copilot-home"
+}

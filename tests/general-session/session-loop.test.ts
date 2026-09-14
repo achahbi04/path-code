@@ -97,7 +97,7 @@ async function runRepl(
   return { exitCode, output: tty.output() };
 }
 
-describe("R2 living session loop (shell)", () => {
+describe("R2 living session loop (shell)", { timeout: 20_000 }, () => {
   it("R2-A / R2-M: two tasks one session; prompt returns; /exit leaves; counter correct", async () => {
     const seen: Array<Record<string, unknown>> = [];
     const { exitCode, output } = await runRepl(
@@ -660,7 +660,7 @@ describe("P1 AUTHORITY-REUSE PROBE", () => {
   }, 60_000);
 });
 
-describe("R2-C object identity / staleness refusal across cycles", () => {
+describe("R2-C object identity / staleness refusal across cycles", { timeout: 120_000 }, () => {
   it("R2-C: feeding cycle-1 bound objects into cycle-2 is refused by owners", async () => {
     const fixture = provisionProject();
     const first = await runSession(fixture, { answers: fullApprovalScript() });

@@ -40,6 +40,7 @@ import { sanitizeProjectCommandEnv } from "../ag5/project-env.mjs";
  *   defaultCwd?: string,
  *   mcpServers?: object[],
  *   capabilityBrief?: string,
+ *   toolEnv?: Record<string, string>,
  * }} StartTaskInput
  */
 
@@ -292,6 +293,11 @@ export function createAntigravityEngineeringAgent(options = {}) {
       ...(typeof input.capabilityBrief === "string" &&
       input.capabilityBrief.trim()
         ? { capabilityBrief: input.capabilityBrief.trim() }
+        : {}),
+      ...(input.toolEnv &&
+      typeof input.toolEnv === "object" &&
+      !Array.isArray(input.toolEnv)
+        ? { toolEnv: input.toolEnv }
         : {}),
     };
     noteDiagnostic("stdin_start", JSON.stringify({ taskId: input.taskId, workspace: input.workspace }));

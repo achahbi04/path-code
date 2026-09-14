@@ -970,6 +970,101 @@ export function applyStudioEvent(state, event, opts = {}) {
       }
       break;
     }
+    case "session.capability.collaborate": {
+      state.product.ag1 = true;
+      const engine =
+        typeof event.engine === "string" && event.engine.trim()
+          ? event.engine.trim()
+          : "peer";
+      const label =
+        typeof event.label === "string" && event.label.trim()
+          ? event.label.trim()
+          : "Collaborative engineering";
+      const detail =
+        typeof event.detail === "string"
+          ? event.detail.slice(0, 96)
+          : `${engine} turn`;
+      setPathPhase(state, label);
+      state.product.currentDetail = detail;
+      if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
+      state.product.recentOps.push({ label, detail });
+      if (state.product.recentOps.length > 8) {
+        state.product.recentOps = state.product.recentOps.slice(-8);
+      }
+      break;
+    }
+    case "session.capability.preparing": {
+      state.product.ag1 = true;
+      setPathPhase(state, "Preparing environment");
+      const detail =
+        typeof event.detail === "string"
+          ? event.detail.slice(0, 96)
+          : "resolving engineering environment";
+      state.product.currentDetail = detail;
+      if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
+      state.product.recentOps.push({
+        label: "Preparing environment",
+        detail,
+      });
+      if (state.product.recentOps.length > 8) {
+        state.product.recentOps = state.product.recentOps.slice(-8);
+      }
+      break;
+    }
+    case "session.capability.provisioning": {
+      state.product.ag1 = true;
+      const phase =
+        typeof event.phase === "string" ? event.phase : "toolchains";
+      const label =
+        phase === "language-servers"
+          ? "Preparing language intelligence"
+          : phase === "indexing"
+            ? "Indexing"
+            : "Preparing environment";
+      const detail =
+        typeof event.detail === "string"
+          ? event.detail.slice(0, 96)
+          : String(phase).slice(0, 96);
+      setPathPhase(state, label);
+      state.product.currentDetail = detail;
+      if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
+      state.product.recentOps.push({ label, detail });
+      if (state.product.recentOps.length > 8) {
+        state.product.recentOps = state.product.recentOps.slice(-8);
+      }
+      break;
+    }
+    case "session.capability.ready": {
+      state.product.ag1 = true;
+      const detail =
+        typeof event.detail === "string"
+          ? event.detail.slice(0, 96)
+          : "engineering environment ready";
+      if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
+      state.product.recentOps.push({
+        label: "Environment ready",
+        detail,
+      });
+      if (state.product.recentOps.length > 8) {
+        state.product.recentOps = state.product.recentOps.slice(-8);
+      }
+      break;
+    }
+    case "session.capability.indexing": {
+      state.product.ag1 = true;
+      setPathPhase(state, "Indexing");
+      const detail =
+        typeof event.detail === "string"
+          ? event.detail.slice(0, 96)
+          : "building code index";
+      state.product.currentDetail = detail;
+      if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
+      state.product.recentOps.push({ label: "Indexing", detail });
+      if (state.product.recentOps.length > 8) {
+        state.product.recentOps = state.product.recentOps.slice(-8);
+      }
+      break;
+    }
     case "session.engineering.handoff": {
       state.product.ag1 = true;
       if (typeof event.summary === "string" && event.summary.trim()) {

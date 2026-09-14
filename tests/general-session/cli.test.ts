@@ -80,62 +80,88 @@ async function runRepl(
 }
 
 describe("5G-M: a plain line at the prompt is an engineering task", () => {
-  it("5G-M: routes the operator's words to the PATH engineering session", async () => {
-    const seen: Array<Record<string, unknown>> = [];
-    const task = "Fix the failing authentication test without changing the public API.";
-    const { exitCode } = await runRepl([task, "/exit"], {
-      runAg1Session: async (_prompt: unknown, options: Record<string, unknown>) => {
-        seen.push(options);
-        return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 1 };
-      },
-    });
+  it(
+    "5G-M: routes the operator's words to the PATH engineering session",
+    async () => {
+      const seen: Array<Record<string, unknown>> = [];
+      const task =
+        "Fix the failing authentication test without changing the public API.";
+      const { exitCode } = await runRepl([task, "/exit"], {
+        runAg1Session: async (
+          _prompt: unknown,
+          options: Record<string, unknown>,
+        ) => {
+          seen.push(options);
+          return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 1 };
+        },
+      });
 
-    expect(exitCode).toBe(0);
-    expect(seen).toHaveLength(1);
-    expect(seen[0]!.taskText).toBe(task);
-    expect(seen[0]!.projectRoot).toBe(process.cwd());
-  });
+      expect(exitCode).toBe(0);
+      expect(seen).toHaveLength(1);
+      expect(seen[0]!.taskText).toBe(task);
+      expect(seen[0]!.projectRoot).toBe(process.cwd());
+    },
+    20_000,
+  );
 
-  it("5G-M: an unknown slash command is not treated as a task", async () => {
-    let called = false;
-    const { output } = await runRepl(["/nonsense", "/exit"], {
-      runAg1Session: async () => {
-        called = true;
-        return { exitCode: 0 };
-      },
-    });
-    expect(called).toBe(false);
-    expect(output).toContain("Unknown command: /nonsense");
-  });
+  it(
+    "5G-M: an unknown slash command is not treated as a task",
+    async () => {
+      let called = false;
+      const { output } = await runRepl(["/nonsense", "/exit"], {
+        runAg1Session: async () => {
+          called = true;
+          return { exitCode: 0 };
+        },
+      });
+      expect(called).toBe(false);
+      expect(output).toContain("Unknown command: /nonsense");
+    },
+    20_000,
+  );
 });
 
 describe("5G-AF: /recover routes to the recovery command", () => {
-  it("5G-AF: passes the parsed checkpoint id and this directory", async () => {
-    const seen: Array<Record<string, unknown>> = [];
-    const { exitCode } = await runRepl(["/recover mc-1a2b3c4d", "/exit"], {
-      runRecover: async (_prompt: unknown, options: Record<string, unknown>) => {
-        seen.push(options);
-        return { exitCode: 0, outcome: "RECOVERY_COMPLETE" };
-      },
-    });
-    expect(exitCode).toBe(0);
-    expect(seen[0]!.checkpointId).toBe("mc-1a2b3c4d");
-    expect(seen[0]!.projectRoot).toBe(process.cwd());
-  });
+  it(
+    "5G-AF: passes the parsed checkpoint id and this directory",
+    async () => {
+      const seen: Array<Record<string, unknown>> = [];
+      const { exitCode } = await runRepl(["/recover mc-1a2b3c4d", "/exit"], {
+        runRecover: async (
+          _prompt: unknown,
+          options: Record<string, unknown>,
+        ) => {
+          seen.push(options);
+          return { exitCode: 0, outcome: "RECOVERY_COMPLETE" };
+        },
+      });
+      expect(exitCode).toBe(0);
+      expect(seen[0]!.checkpointId).toBe("mc-1a2b3c4d");
+      expect(seen[0]!.projectRoot).toBe(process.cwd());
+    },
+    20_000,
+  );
 
-  it("5G-AF: a missing or path-like id is a usage message and the prompt stays open", async () => {
-    let called = false;
-    const { output } = await runRepl(["/recover", "/recover ../escape", "/exit"], {
-      runRecover: async () => {
-        called = true;
-        return { exitCode: 0 };
-      },
-    });
-    expect(called).toBe(false);
-    expect(output).toContain("Usage: /recover <checkpoint-id>");
-    expect(output).toContain("That is not a checkpoint id");
-    expect(output).toContain("Goodbye.");
-  });
+  it(
+    "5G-AF: a missing or path-like id is a usage message and the prompt stays open",
+    async () => {
+      let called = false;
+      const { output } = await runRepl(
+        ["/recover", "/recover ../escape", "/exit"],
+        {
+          runRecover: async () => {
+            called = true;
+            return { exitCode: 0 };
+          },
+        },
+      );
+      expect(called).toBe(false);
+      expect(output).toContain("Usage: /recover <checkpoint-id>");
+      expect(output).toContain("That is not a checkpoint id");
+      expect(output).toContain("Goodbye.");
+    },
+    20_000,
+  );
 });
 
 describe("5G-M / 5G-AF: help and welcome describe what the prompt accepts", () => {

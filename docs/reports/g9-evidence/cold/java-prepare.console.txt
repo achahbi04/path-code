@@ -1,0 +1,26 @@
+{
+  "label": "java-cold",
+  "ok": true,
+  "ready": [
+    "java",
+    "mvn",
+    "lsp:java"
+  ],
+  "failed": [],
+  "acquired": {
+    "cargo": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/cargo",
+    "rustc": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rustc",
+    "rust-analyzer": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rust-analyzer",
+    "java": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/toolchains/mise-data/shims/java",
+    "mvn": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/toolchains/mise-data/shims/mvn",
+    "jdtls": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/language-servers/bin/jdtls",
+    "go": "/opt/homebrew/bin/go",
+    "gopls": null,
+    "python3": "/usr/bin/python3",
+    "pyright": null,
+    "node": "/opt/homebrew/bin/node",
+    "clangd": "/usr/bin/clangd",
+    "mise": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/tool-manager/mise/bin/mise"
+  },
+  "outFile": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/cold/java-prepare.json"
+}

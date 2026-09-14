@@ -72,7 +72,7 @@ describe("G8 repair — buildValidationRepairPrompt", () => {
       },
       { advisoryText: "Check whether Foo is exported from src/types.ts" },
     );
-    expect(text).toContain("Specialist advisory (read-only):");
+    expect(text).toContain("Fallback specialist notes:");
     expect(text).toContain("Check whether Foo is exported from src/types.ts");
     expect(text).not.toMatch(/Copilot|Antigravity/i);
   });

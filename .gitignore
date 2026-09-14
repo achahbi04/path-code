@@ -30,3 +30,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.tsbuildinfo
+
+# G9 local provision runtimes (regenerable; do not commit toolchains)
+docs/reports/g9-evidence/runtime-*/
+docs/reports/g9-evidence/**/target/
+docs/reports/g9-evidence/**/Cargo.lock

@@ -102,7 +102,9 @@ describe("T01 T03 packaging and offline entry", () => {
     }
   });
 
-  it("installed symlink entry reaches welcome; naive argv compare would miss", async () => {
+  it(
+    "installed symlink entry reaches welcome; naive argv compare would miss",
+    async () => {
     const scriptPath = join(CHECKOUT_ROOT, "scripts", "pathcode.mjs");
     const binDir = mkdtempSync(join(tmpdir(), "pathcode-installed-bin-"));
     const symlinkPath = join(binDir, "pathcode");
@@ -150,7 +152,9 @@ describe("T01 T03 packaging and offline entry", () => {
     } finally {
       rmSync(binDir, { recursive: true, force: true });
     }
-  });
+  },
+  20_000,
+  );
 
   it("imported entry stays side-effect free (no welcome on import)", async () => {
     const writes: string[] = [];

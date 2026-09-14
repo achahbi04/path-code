@@ -274,6 +274,34 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                 continue
             cleaned.append(part)
         limited_env["PATH"] = os.pathsep.join(cleaned)
+    # G9: merge PATH-managed tool env (bin prepend already applied by parent).
+    tool_env = payload.get("toolEnv") or payload.get("tool_env")
+    if isinstance(tool_env, dict):
+        for key, val in tool_env.items():
+            if not isinstance(key, str) or not isinstance(val, str):
+                continue
+            if key in deny_keys:
+                continue
+            # Never let project env override auth isolation via empty wipe.
+            if key == "PATH" and val:
+                # Parent already composed PATH with prepends; prefer toolEnv PATH.
+                limited_env["PATH"] = val
+            elif key != "PATH" and val != "":
+                # Allow only safe non-secret tooling vars.
+                if key in (
+                    "MISE_DATA_DIR",
+                    "MISE_CONFIG_DIR",
+                    "MISE_CACHE_DIR",
+                    "COPILOT_HOME",
+                    "JAVA_HOME",
+                    "GOROOT",
+                    "GOPATH",
+                    "CARGO_HOME",
+                    "RUSTUP_HOME",
+                    "DOTNET_ROOT",
+                ):
+                    limited_env[key] = val
+        _diag(f"tool_env_keys={len([k for k in tool_env if isinstance(k, str)])}")
     # AG3 noninteractive engineering guards (never global CI=true).
     limited_env["GIT_TERMINAL_PROMPT"] = "0"
     limited_env["GCM_INTERACTIVE"] = "never"

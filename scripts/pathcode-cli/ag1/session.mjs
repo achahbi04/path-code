@@ -26,7 +26,7 @@ import {
   runIndependentFinalValidation,
   setFinalValidationProgressHook,
 } from "./final-validation.mjs";
-import { resolveEngineeringCwd } from "../paths.mjs";
+import { resolveEngineeringCwd, resolvePathRuntimeRoot } from "../paths.mjs";
 import {
   buildBoundedDiffPreview,
   buildFullResultInspectCommand,
@@ -40,7 +40,6 @@ import {
   toAntigravityMcpServers,
   extractEngineeringHandoff,
   shouldAttemptSameSessionRepair,
-  shouldTriggerAdvisory,
   runCopilotAdvisory,
 } from "../ag8/index.mjs";
 
@@ -349,7 +348,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   );
   const enabledMcp = policyMcp.filter((s) => s && s.enabled === true);
   const deniedMcp = policyMcp.filter((s) => !s || s.enabled !== true);
-  const mcpServers = toAntigravityMcpServers(enabledMcp);
+  let mcpServers = toAntigravityMcpServers(enabledMcp);
   emit("session.capability.mcp", {
     enabled: enabledMcp.length,
     denied: deniedMcp.length,
@@ -359,10 +358,87 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       trustClass: typeof s?.trustClass === "string" ? s.trustClass : "",
     })),
   });
-  const capabilityBrief =
+
+  const runtimeRoot = resolvePathRuntimeRoot({
+    ...(options.checkoutRoot ? { packageRoot: options.checkoutRoot } : {}),
+  });
+  /** @type {any} */
+  let preparedEnv = null;
+  /** @type {typeof import("../ag9/prepare.mjs") | null} */
+  let ag9Prepare = null;
+  /** @type {typeof import("../ag9/services.mjs") | null} */
+  let ag9Services = null;
+  /** @type {typeof import("../ag9/collaborate.mjs") | null} */
+  let ag9Collab = null;
+  /** @type {typeof import("../ag9/copilot-engine.mjs") | null} */
+  let ag9CopilotEngine = null;
+  try {
+    ag9Prepare = await import("../ag9/prepare.mjs");
+    ag9Services = await import("../ag9/services.mjs");
+    ag9Collab = await import("../ag9/collaborate.mjs");
+    ag9CopilotEngine = await import("../ag9/copilot-engine.mjs");
+    preparedEnv = await ag9Prepare.prepareEngineeringEnvironment({
+      projectRoot,
+      worktreePath: worktree.worktreePath,
+      runtimeRoot,
+      plane: capabilityPlane,
+      taskText,
+      signal: options.signal,
+      startServices: true,
+      emit: (event) => {
+        if (event && typeof event.type === "string") {
+          emit(event.type, event);
+        }
+      },
+    });
+  } catch (err) {
+    emit("session.capability.preparing", {
+      detail: "environment preparation failed; continuing with discovery-only",
+      error: scrubEngineIdentity(
+        err && typeof err === "object" && "message" in err
+          ? String(/** @type {{ message?: unknown }} */ (err).message)
+          : String(err),
+      ).slice(0, 160),
+    });
+  }
+
+  const g8Brief =
     typeof capabilityPlane?.briefForEngine === "string"
       ? capabilityPlane.briefForEngine
       : "";
+  const capabilityBrief = [
+    g8Brief,
+    preparedEnv?.capabilityBrief ? String(preparedEnv.capabilityBrief) : "",
+  ]
+    .filter((s) => s.trim())
+    .join("\n\n")
+    .slice(0, 8000);
+
+  if (preparedEnv && Array.isArray(preparedEnv.mcpServersExtra)) {
+    for (const extra of preparedEnv.mcpServersExtra) {
+      const trusted = applyMcpTrustPolicy({
+        ...extra,
+        tools: Array.isArray(extra?.enabled_tools)
+          ? extra.enabled_tools.map((name) => ({
+              name,
+              description: "read-only code intelligence",
+            }))
+          : [{ name: "code_search_symbol", description: "read-only symbol search" }],
+      });
+      if (trusted.enabled) {
+        mcpServers = [
+          ...mcpServers,
+          ...toAntigravityMcpServers([trusted]),
+        ];
+      }
+    }
+  }
+
+  /** @type {Record<string, string> | null} */
+  const toolEnv =
+    preparedEnv?.toolEnv && typeof preparedEnv.toolEnv === "object"
+      ? /** @type {Record<string, string>} */ (preparedEnv.toolEnv)
+      : null;
 
   const sandbox = proveLocalSandboxConfinement({
     ...(options.checkoutRoot ? { checkoutRoot: options.checkoutRoot } : {}),
@@ -547,6 +623,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     },
     ...(mcpServers.length > 0 ? { mcpServers } : {}),
     ...(capabilityBrief ? { capabilityBrief } : {}),
+    ...(toolEnv ? { toolEnv } : {}),
   });
   if (!startResult.ok) {
     clearTimeout(wallTimer);
@@ -641,56 +718,175 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       detail: "final validation failure",
     });
 
+    const copilotReady = Boolean(ag9CopilotEngine?.isCopilotEngineeringReady?.());
+    const engineChoice =
+      ag9Collab?.chooseCollabEngine?.({
+        attempt: repairAttempts,
+        copilotReady,
+      }) || "antigravity";
+    const journalEntries =
+      ag9Collab?.readCollabJournal?.({
+        runtimeRoot,
+        taskId: worktree.taskId,
+      }) || [];
+    const collabHandoff = ag9Collab?.formatCollabHandoff?.(journalEntries) || "";
+    const baseRepairPrompt = buildValidationRepairPrompt(validation, {
+      ...(collabHandoff ? { collabHandoff } : {}),
+    });
+
     /** @type {string | null} */
-    let advisoryText = null;
-    const typeFailures = (validation?.checks || []).filter(
-      (c) =>
-        c &&
-        c.ok !== true &&
-        (c.kind === "TYPECHECK" || /type|tsc|mypy|cargo check/i.test(String(c.id || ""))),
-    );
-    // First type-failure repair: symbol_ambiguity (mandate). Repeat: repeated_type_failure.
-    const advisoryReason =
-      repairAttempts >= 1 ? "repeated_type_failure" : "symbol_ambiguity";
-    if (
-      typeFailures.length > 0 &&
-      shouldTriggerAdvisory({ reason: advisoryReason })
-    ) {
-      emit("session.capability.advisory", {
-        label: "Engineering review",
-        detail: "analyzing compiler diagnostic",
+    let peerNotes = null;
+
+    if (engineChoice === "copilot" && ag9CopilotEngine?.runCopilotEngineeringTurn) {
+      emit("session.capability.collaborate", {
+        engine: "copilot",
+        phase: "turn",
+        label: "Collaborative engineering",
+        detail: "Copilot engineering turn",
       });
+      /** @type {boolean} */
+      let copilotTurnOk = false;
       try {
-        const advisory = await runCopilotAdvisory({
-          question: [
-            "READ-ONLY specialist advisory. Reply with plain text only.",
-            "Do not edit files, do not run shell, and do not use write/edit/git tools.",
-            "Explain the TypeScript overload/symbol error and the correct call-site fix in under 200 words.",
-            "",
-            buildValidationRepairPrompt(validation).slice(0, 2_000),
-          ].join("\n"),
-          cwd: engineeringCwd,
-          timeoutMs: 120_000,
-        });
-        if (advisory?.ok && typeof advisory.text === "string" && advisory.text.trim()) {
-          advisoryText = advisory.text.trim();
-          emit("session.capability.advisory", {
-            label: "Engineering review",
-            detail: "advisory returned",
+        const turnBudgetMs = Math.min(
+          180_000,
+          Math.max(45_000, wallBudgetRemainingMs - 20_000),
+        );
+        const turn = await (ag9Collab?.withCollabTurn
+          ? ag9Collab.withCollabTurn(
+              {
+                runtimeRoot,
+                taskId: worktree.taskId,
+                engine: "copilot",
+                timeoutMs: turnBudgetMs + 30_000,
+              },
+              async () =>
+                ag9CopilotEngine.runCopilotEngineeringTurn({
+                  prompt: [
+                    "You are a full collaborating engineering engine in this PATH task worktree.",
+                    "You may inspect, edit, build, test, and repair code inside this workspace.",
+                    "Do not push, open PRs, deploy, or leave the worktree.",
+                    "Fix the independent validation failures below, then stop.",
+                    "",
+                    baseRepairPrompt,
+                  ].join("\n"),
+                  cwd: engineeringCwd,
+                  toolEnv: preparedEnv?.toolEnv || undefined,
+                  timeoutMs: turnBudgetMs,
+                }),
+            )
+          : ag9CopilotEngine.runCopilotEngineeringTurn({
+              prompt: [
+                "You are a full collaborating engineering engine in this PATH task worktree.",
+                "You may inspect, edit, build, test, and repair code inside this workspace.",
+                "Do not push, open PRs, deploy, or leave the worktree.",
+                "Fix the independent validation failures below, then stop.",
+                "",
+                baseRepairPrompt,
+              ].join("\n"),
+              cwd: engineeringCwd,
+              toolEnv: preparedEnv?.toolEnv || undefined,
+              timeoutMs: turnBudgetMs,
+            }));
+        if (turn?.ok) {
+          copilotTurnOk = true;
+          peerNotes =
+            typeof turn.text === "string" && turn.text.trim()
+              ? turn.text.trim().slice(0, 2_000)
+              : turn.detail || "Copilot turn completed";
+          emit("session.capability.collaborate", {
+            engine: "copilot",
+            phase: "done",
+            label: "Collaborative engineering",
+            detail: turn.detail || "Copilot turn done",
           });
+        } else {
+          emit("session.capability.collaborate", {
+            engine: "copilot",
+            phase: "fallback",
+            label: "Collaborative engineering",
+            detail: turn?.detail || "Copilot unavailable; continuing with peer",
+          });
+          try {
+            const advisory = await runCopilotAdvisory({
+              question: [
+                "Provide concise engineering notes for a collaborating peer (plain text).",
+                "Focus on the concrete fix for the validation failures.",
+                "",
+                baseRepairPrompt.slice(0, 2_000),
+              ].join("\n"),
+              cwd: engineeringCwd,
+              timeoutMs: 60_000,
+            });
+            if (advisory?.ok && advisory.text?.trim()) {
+              peerNotes = advisory.text.trim();
+            }
+          } catch {
+            /* optional */
+          }
         }
       } catch {
-        // Advisory is optional; never block repair.
+        emit("session.capability.collaborate", {
+          engine: "copilot",
+          phase: "error",
+          label: "Collaborative engineering",
+          detail: "Copilot turn error; Antigravity continues",
+        });
       }
+
+      if (copilotTurnOk) {
+        // Re-validate after Copilot mutated the shared worktree.
+        repairAttempts += 1;
+        continue;
+      }
+      // Fall through to Antigravity with any peer notes.
     }
 
-    const feedback = buildValidationRepairPrompt(validation, {
-      ...(advisoryText ? { advisoryText } : {}),
+    // Antigravity collaborative repair turn (lease + continueTask).
+    emit("session.capability.collaborate", {
+      engine: "antigravity",
+      phase: "turn",
+      label: "Collaborative engineering",
+      detail: "Antigravity engineering turn",
     });
-    armTerminalWait();
-    agent.continueTask({ text: feedback });
+    const feedback = buildValidationRepairPrompt(validation, {
+      ...(peerNotes ? { peerNotes } : {}),
+      ...(collabHandoff ? { collabHandoff } : {}),
+    });
+    try {
+      const runAntigravityTurn = async () => {
+        armTerminalWait();
+        agent.continueTask({ text: feedback });
+        terminalMsg = await waitForTerminal;
+        return {
+          detail: String(terminalMsg?.type || "finished"),
+          changedFiles: [],
+        };
+      };
+      if (ag9Collab?.withCollabTurn) {
+        await ag9Collab.withCollabTurn(
+          {
+            runtimeRoot,
+            taskId: worktree.taskId,
+            engine: "antigravity",
+            timeoutMs: Math.min(wallBudgetRemainingMs, 240_000),
+          },
+          runAntigravityTurn,
+        );
+      } else {
+        await runAntigravityTurn();
+      }
+    } catch {
+      armTerminalWait();
+      agent.continueTask({ text: feedback });
+      terminalMsg = await waitForTerminal;
+    }
+    emit("session.capability.collaborate", {
+      engine: "antigravity",
+      phase: "done",
+      label: "Collaborative engineering",
+      detail: String(terminalMsg?.type || "done"),
+    });
     repairAttempts += 1;
-    terminalMsg = await waitForTerminal;
 
     if (terminalMsg?.type === "cancelled" || ac.signal.aborted) {
       agentCancelled = true;
@@ -934,6 +1130,18 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     taskBranch: worktree.taskBranch,
     commitSha,
   });
+
+  try {
+    if (preparedEnv?.services?.projectKey && ag9Services?.stopDisposableServices) {
+      ag9Services.stopDisposableServices({
+        runtimeRoot,
+        projectKey: String(preparedEnv.services.projectKey),
+        projectRoot: worktree.worktreePath,
+      });
+    }
+  } catch {
+    // Service cleanup must not crash the session.
+  }
 
   try {
     await agent.close();

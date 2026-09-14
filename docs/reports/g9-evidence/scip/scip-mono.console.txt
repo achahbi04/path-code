@@ -1,0 +1,26 @@
+{
+  "label": "scip-mono",
+  "ok": true,
+  "ready": [
+    "node",
+    "npm",
+    "lsp:typescript"
+  ],
+  "failed": [],
+  "acquired": {
+    "cargo": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/cargo",
+    "rustc": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rustc",
+    "rust-analyzer": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rust-analyzer",
+    "java": "/usr/bin/java",
+    "mvn": null,
+    "jdtls": null,
+    "go": "/opt/homebrew/bin/go",
+    "gopls": null,
+    "python3": "/opt/homebrew/bin/python3",
+    "pyright": null,
+    "node": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/toolchains/mise-data/shims/node",
+    "clangd": "/usr/bin/clangd",
+    "mise": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/tool-manager/mise/bin/mise"
+  },
+  "outFile": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/scip/scip-mono-prepare.json"
+}

@@ -341,6 +341,19 @@ describe("AG5 native validation discovery", () => {
 
 describe("AG5 runtime self-repair", () => {
   it("rebuilds a pip-less interrupted venv", async () => {
+    const py = spawnSync(
+      "python3",
+      ["-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"],
+      { encoding: "utf8" },
+    );
+    const ver = String(py.stdout || "").trim();
+    const parts = ver.split(".").map((n) => Number(n));
+    const maj = parts[0] ?? 0;
+    const min = parts[1] ?? 0;
+    if (!(maj > 3 || (maj === 3 && min >= 10))) {
+      // Host python too old for current AG1 dependency pins (>=3.10).
+      return;
+    }
     const { ensureAg1Runtime, isVenvPipReady } = await load(
       "ag1/runtime-bootstrap.mjs",
     );

@@ -25,6 +25,8 @@ export const AG8_REPAIR_STDERR_BOUND = 2_000;
  * @param {{
  *   stderrBound?: number,
  *   advisoryText?: string | null,
+ *   peerNotes?: string | null,
+ *   collabHandoff?: string | null,
  * }} [options]
  * @returns {string}
  */
@@ -40,6 +42,7 @@ export function buildValidationRepairPrompt(validation, options = {}) {
     "Independent final validation failed. Continue repairing the original task in this workspace.",
     "Inspect the failures below, fix the code, re-run the project's relevant checks, then finish again.",
     "Do not ask clarifying questions. Stay inside the workspace.",
+    "You are collaborating with another engineering engine in the same worktree; continue their unfinished work when relevant.",
   ];
 
   if (validation?.classification) {
@@ -78,11 +81,26 @@ export function buildValidationRepairPrompt(validation, options = {}) {
     }
   }
 
+  const peerNotes =
+    typeof options.peerNotes === "string" ? options.peerNotes.trim() : "";
+  if (peerNotes) {
+    lines.push("Peer engine notes (collaborative):");
+    lines.push(peerNotes.slice(0, 3_000));
+  }
+
   const advisory =
     typeof options.advisoryText === "string" ? options.advisoryText.trim() : "";
   if (advisory) {
-    lines.push("Specialist advisory (read-only):");
+    lines.push("Fallback specialist notes:");
     lines.push(advisory.slice(0, 3_000));
+  }
+
+  const handoff =
+    typeof options.collabHandoff === "string"
+      ? options.collabHandoff.trim()
+      : "";
+  if (handoff) {
+    lines.push(handoff.slice(0, 2_000));
   }
 
   return lines.join("\n");

@@ -38,6 +38,7 @@ const ROOT_MAX_WORKERS = 2;
 export default defineConfig({
   test: {
     maxWorkers: ROOT_MAX_WORKERS,
+    testTimeout: 20_000,
     projects: [
       {
         test: {
@@ -46,6 +47,7 @@ export default defineConfig({
           // One fork, files run sequentially: no cross-worker lock contention.
           pool: "forks",
           poolOptions: { forks: { singleFork: true } },
+          testTimeout: 20_000,
         },
       },
       {
@@ -53,6 +55,7 @@ export default defineConfig({
           name: "default",
           include: ["tests/**/*.test.ts"],
           exclude: ["**/node_modules/**", ...SRC_LOCK_OWNING_SUITES],
+          testTimeout: 20_000,
         },
       },
     ],

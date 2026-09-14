@@ -1,0 +1,436 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 check
+> npm run typecheck && npm run build && npm run test && npm run cli:smoke && npm run ledger:verify
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 typecheck
+> tsc -p tsconfig.json --noEmit
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 build
+> tsc -p tsconfig.build.json
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 test
+> vitest run
+
+
+ RUN  v3.2.7 /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
+
+ ✓ |default| tests/general-session/cli.test.ts (6 tests) 14638ms
+   ✓ 5G-M: a plain line at the prompt is an engineering task > 5G-M: routes the operator's words to the PATH engineering session  4199ms
+   ✓ 5G-M: a plain line at the prompt is an engineering task > 5G-M: an unknown slash command is not treated as a task  3678ms
+   ✓ 5G-AF: /recover routes to the recovery command > 5G-AF: passes the parsed checkpoint id and this directory  3194ms
+   ✓ 5G-AF: /recover routes to the recovery command > 5G-AF: a missing or path-like id is a usage message and the prompt stays open  3561ms
+[?25h[?1049l[0m[?25h[?1049l[0m[?25h[?1049l[0m ✓ |default| tests/general-session/session-flow.test.ts (30 tests) 25421ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-M: declining START makes no provider call and reads nothing  1542ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-M: a near-miss phrase is not consent  952ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: the budget is disclosed before START is solicited  329ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: a complete run spends exactly three calls, at the declared ceilings  1337ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: a failed scope call is reported, never retried  381ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: a plan naming a sensitive path is refused without a second call  408ms
+   ✓ 5G-O / 5G-P: the scope round trip > 5G-O: the scope call carries metadata only, and withholds sensitive paths  507ms
+   ✓ 5G-O / 5G-P: the scope round trip > 5G-P: declining SCOPE stops before any file is read for the model  453ms
+   ✓ 5G-O / 5G-P: the scope round trip > 5G-P: the scope review shows exactly the paths that were admitted  410ms
+   ✓ 5G-Q: currentness is rechecked after the scope approval > 5G-Q: a moved HEAD after scope approval refuses before any file is read  725ms
+   ✓ 5G-Q: currentness is rechecked after the scope approval > 5G-Q: a branch switch after scope approval is refused too  555ms
+   ✓ 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-R: the edit call is grounded in the approved paths only  828ms
+   ✓ 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-S: the edit review shows both sides, and declining writes nothing  548ms
+   ✓ 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-S: a target id the host never minted is refused, with no APPLY prompt  604ms
+   ✓ 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-S: an ungrounded claim subject is refused by Gate 1, not written  549ms
+   ✓ 5G-T: post-mutation disclosure and the CHECK gate > 5G-T: the validation review discloses argv, cwd, timeout, env and hooks  762ms
+   ✓ 5G-T: post-mutation disclosure and the CHECK gate > 5G-T: an accepted run reports Gate 2, the checkpoint, and no Git commit  1787ms
+   ✓ 5G-U / 5G-V: recovery protection is REQUIRED, with no downgrade > 5G-U: a successful run leaves exactly one durable checkpoint  1535ms
+   ✓ 5G-U / 5G-V: recovery protection is REQUIRED, with no downgrade > 5G-V: a store that cannot persist refuses the write rather than skipping it  1007ms
+   ✓ 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AI: drift between the review and the write means zero writes  1116ms
+   ✓ 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AJ: a stale review mints no checkpoint at all  976ms
+   ✓ 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AI: a Git move between the review and the write is refused as well  943ms
+   ✓ 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AJ: the checkpoint that is minted carries the bytes present just before the write  2223ms
+   ✓ mission 5G-I SCOPE_STALE — approved file drifts after SCOPE > 5G-I: capture + drift + recheck refuses with SCOPE_STALE  719ms
+   ✓ mission 5G-I SCOPE_STALE — approved file drifts after SCOPE > 5G-I: an approved scoped file changed after SCOPE refuses before the edit call  628ms
+   ✓ mission 5G-T post-edit claim score from selected checks > 5G-T: Call #3 carries POST_EDIT_EXECUTION_CLAIM_REQUIREMENTS derived from the plan  1562ms
+   ✓ mission 5G-W validation failure retains mutation and surfaces recovery > 5G-W: a failing check does not auto-recover; checkpoint is offered  1586ms
+ ✓ |default| tests/general-session/bounded-autonomy.test.ts (15 tests) 15530ms
+   ✓ R1-D: REVIEW mode still solicits the four gates > R1-D: successful REVIEW asks start-consent, scope, apply, check  2393ms
+   ✓ R1-E / R1-R / R1-S / R1-T: BOUNDED success path > R1-E: BOUNDED success asks only run-consent; source mutates; exit 0  2248ms
+   ✓ R1-F: declining RUN spends nothing > R1-F: empty RUN → zero adapter invocations  471ms
+   ✓ R1-G: host mints authority after RUN; model never authorizes > R1-G: architecture — authorize* follows RUN; model text never calls it  1675ms
+   ✓ R1-H / R1-I / R1-L: policy escalation unit surface > R1-H: evaluateScopeAgainstPolicy escalates oversize context  407ms
+   ✓ R1-J: recovery REQUIRED after bounded success > R1-J: GENERAL_SESSION_RECOVERY_PROTECTION + durable checkpoint  1614ms
+   ✓ R1-K: currentness drift before write under BOUNDED > R1-K: afterScopeApproval drift → SCOPE_STALE; zero further calls  603ms
+   ✓ R1-K: currentness drift before write under BOUNDED > R1-K: disk drift after edit review → MUTATION_STALE; zero writes of model text  938ms
+   ✓ R1-N: prepared env scrubbed under BOUNDED > R1-N: preparedEnvSnapshots never carry provider secrets  1706ms
+   ✓ R1-O: validation failure retains mutation + checkpoint > R1-O: failing check keeps edit, offers recover, no auto-restore  1531ms
+   ✓ R1-Q already covered with R1-E head oid identity > R1-Q: porcelain dirty, single commit remains  1754ms
+ ✓ |default| tests/ag1/ag1-proofs.test.ts (11 tests) 9296ms
+   ✓ AG1 C — task worktree leaves primary untouched > creates isolated worktree and does not mutate primary porcelain  1208ms
+   ✓ AG1 E — sandbox canary fail-closed > runs one disposable canary and refuses shell when unproven  3104ms
+   ✓ AG1 F — cancellation terminates owned process > cancel kills the bridge child  1483ms
+   ✓ AG1 G/H/I — finished ≠ VERIFIED; PATH validation owns result > H/I: independent validation determines VERIFIED / FAILED honestly  1634ms
+   ✓ AG1 venv guard — no silent global fallback > 3: rejects wrong/global interpreter; 4: accepts AG1 venv  1496ms
+ ✓ |default| tests/general-session/preflight.test.ts (16 tests) 6268ms
+   ✓ 5G-F: preflight composes the read-only owners > 5G-F: reports the project root, Git position, inventory and store root  625ms
+   ✓ 5G-G / 5G-H / 5G-I: Git states a session refuses > 5G-H: refuses a detached HEAD  506ms
+   ✓ 5G-G / 5G-H / 5G-I: Git states a session refuses > 5G-I: refuses every in-progress multi-step operation marker  3244ms
+   ✓ 5G-L: a dirty tree is disclosed and left alone > 5G-L: reports modified and untracked paths without touching them  506ms
+ ✓ |default| tests/general-session/session-loop.test.ts (18 tests) 46896ms
+   ✓ R2 living session loop (shell) > R2-A / R2-M: two tasks one session; prompt returns; /exit leaves; counter correct  5022ms
+   ✓ R2 living session loop (shell) > R2-F: declining keeps the session; next task runs  3418ms
+   ✓ R2 living session loop (shell) > R2-H: escalation keeps the session  3405ms
+   ✓ R2 living session loop (shell) > R2-I: /model and /autonomy still update shell settings between tasks  3301ms
+   ✓ R2 living session loop (shell) > R2-E: local AG1 path does not require OpenAI credential prompts  4406ms
+   ✓ R2 living session loop (shell) > R2-L: internal error in cycle 1 does not poison cycle 2  3800ms
+   ✓ R2 living session loop (shell) > R2-J: /recover between tasks returns to the prompt  3279ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-A / R2-B / R2-C: two full cycles; new challenges; no catalog/checkpoint reuse  5034ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-D: dirty-tree continuity — task 2 discloses dirty state; checkpoints differ  2955ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-N / R2-Q: accepted REVIEW cycle emits ordered live events; gate semantics hold  1540ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-N: refused cycle emits refusal and NOT later stages  385ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-O: no decoration — skipped validation emits skipped, not running/result  1140ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-P: ndjson mode emits identical event content to the live sink  1568ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-Q: bounded mode also renders live events and keeps R1 gate semantics  1424ms
+   ✓ R2-K clean interstitial + credential scrub in validation env > R2-E / R2-K: validation child env excludes secrets; cycle returns modelCalls  1572ms
+   ✓ P1 AUTHORITY-REUSE PROBE > P1: weakening challenge freshness makes R2-B fail open; restore by hash  1682ms
+   ✓ R2-C object identity / staleness refusal across cycles > R2-C: feeding cycle-1 bound objects into cycle-2 is refused by owners  2786ms
+[?25h[?1049l[0m[?25h[?1049l[0m[?25h[?1049l[0m ✓ |default| tests/selfobs/derivation.test.ts (8 tests) 52370ms
+   ✓ selfobs derivation > derives Phase 3 editing capabilities after public authority-surface relink  7976ms
+   ✓ selfobs derivation > phase-promotion falsification — removing phaseAuditEvidence lowers safe-editing to DECLARED/IMPLEMENTED  19219ms
+   ✓ selfobs derivation > relink falsification — removing freezeEvidence lowers trio to IMPLEMENTED  25165ms
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts (11 tests) 11816ms
+   ✓ two-commit freeze productionScopes > T7 — canonical Phase 2F and repository-intelligence still verify  5527ms
+   ✓ Phase 3B relink probe > accepts TWO_COMMIT_FREEZE with src/editing/ scope for ad85c9f → 2b63531  6052ms
+ ✓ |default| tests/ledger/gap-closure-diagnostics.test.ts (3 tests) 17313ms
+   ✓ gap closure commit diagnostics > accepts a CLOSED gap whose closedByCommit resolves to a real ancestor commit  5649ms
+   ✓ gap closure commit diagnostics > reports schema failure when closedByCommit is absent on a CLOSED gap  5568ms
+   ✓ gap closure commit diagnostics > reports commit-resolution failure when closedByCommit is present but unresolvable  6094ms
+ ✓ |default| tests/reasoning/gate2.test.ts (26 tests) 8498ms
+   ✓ gate2 evaluation > C08: copied run/IDs/JSON and wrong plan cannot authenticate  414ms
+   ✓ gate2 evaluation > C09: selected checks passed but another required plan check failed => not accepted  315ms
+   ✓ gate2 evaluation > C15: pre-edit reasoning with post-edit run refuses; rebind can assess  718ms
+   ✓ gate2 evaluation > C16: CONTAINS deferred and hypotheses unchanged when execution evidence accepted  372ms
+   ✓ gate2 evaluation > C18: catalog disposed before/during assessment cannot accept; later applicability refuses  525ms
+   ✓ gate2 e2e and diagnostics > C21: real tsc + targeted test -> Gate 2 accept -> byte change reuse refused  1022ms
+   ✓ gate2 bypass probes > bypass 1: weaken exact plan association — C04/C08 private seam fails open  1204ms
+   ✓ gate2 bypass probes > bypass 2: weaken inherited Validation success — C09/C10 private seam fails open  1497ms
+ ✓ |default| tests/terminal-trial/banner-entry.test.ts (6 tests) 10529ms
+   ✓ T01 T03 packaging and offline entry > T01: new entry resolves from foreign cwd; legacy smoke entry still works  403ms
+   ✓ T01 T03 packaging and offline entry > installed symlink entry reaches welcome; naive argv compare would miss  9966ms
+ ✓ |default| tests/selfobs/phase-audit-shape.test.ts (3 tests) 6942ms
+   ✓ phaseAuditEvidence shape consistency (ledger:verify helper) > accepts truthful matching observations from verified derivation  6937ms
+ ✓ |default| tests/ag2/ag2-proofs.test.ts (9 tests) 11072ms
+   ✓ AG2 A — dirty primary refused > DIRTY_PRIMARY_TREE and no worktree created  618ms
+   ✓ AG2 B — detached HEAD blocked > DETACHED_HEAD_BLOCKED  514ms
+   ✓ AG2 C — verified cleanup > task branch + commit remain; worktree removed  1365ms
+   ✓ AG2 D — failed partial work preserved > UNVERIFIED WIP commit; baseline does not advance conceptually  1434ms
+   ✓ AG2 E/F — session success chain + failure isolation > task2 starts from task1 verified commit; failed task2 does not move baseline  2563ms
+   ✓ AG2 G — no worktree leak > repeated create/remove leaves no orphan task paths  2313ms
+   ✓ AG2 H — primary untouched > agent edits stay in worktree  815ms
+   ✓ AG2 J — cancellation cleanup path exists > removeTaskWorktree works after cancel-style WIP preserve  1238ms
+ ✓ |default| tests/integration/phase3-reaudit-public-surface.test.ts (9 tests) 6820ms
+   ✓ Phase 3 re-audit — public authority surface P1–P14 > capability/gap ledger — affected caps PASS_FROZEN; GAP-048/049/050 CLOSED; GAP-051 OPEN; safe-editing IMPLEMENTED  6801ms
+ ✓ |default| tests/general-session/recover.test.ts (6 tests) 6078ms
+   ✓ 5G-AF: /recover is a separate, human-authorized act > 5G-AF: shows dispositions, requires RESTORE, and restores the exact bytes  2215ms
+   ✓ 5G-AF: /recover is a separate, human-authorized act > 5G-AF: a file changed since the checkpoint is reported, not silently overwritten  1664ms
+   ✓ 5G-AG: the checkpoint survives the process that made it > 5G-AG: a fresh process restores from the id alone  1969ms
+ ✓ |default| tests/ag3/ag3-proofs.test.ts (12 tests) 4399ms
+   ✓ AG3 runtime bootstrap lock > two concurrent ensureAg1Runtime calls share one healthy runtime  3577ms
+   ✓ AG3 package bin > pathcode --version works via node entry without cwd package root  385ms
+ ✓ |default| tests/terminal-trial/integration.test.ts (3 tests) 2055ms
+   ✓ Trial 1 owner composition integration > T08-T25: mocked provider fixes source through Gate 2; declined paths; env proof  2052ms
+ ✓ |default| tests/git/baseline.test.ts (20 tests) 8221ms
+   ✓ collectGitStateBaseline — tracked file states > reports a clean tracked file as TRACKED with CLEAN index and worktree  337ms
+   ✓ collectGitStateBaseline — tracked file states > reports an unstaged modification as index CLEAN and worktree MODIFIED  325ms
+   ✓ collectGitStateBaseline — tracked file states > reports a staged modification as index MODIFIED and worktree CLEAN  405ms
+   ✓ collectGitStateBaseline — tracked file states > reports staged plus further unstaged changes on both dimensions  351ms
+   ✓ collectGitStateBaseline — tracked file states > reports a staged new file as index ADDED  395ms
+   ✓ collectGitStateBaseline — untracked and ignored > reports an admitted untracked file as UNTRACKED  324ms
+   ✓ collectGitStateBaseline — untracked and ignored > reports an admitted ignored file as IGNORED when listed in .gitignore  413ms
+   ✓ collectGitStateBaseline — deletions, renames, and directories > surfaces an unstaged deletion as an unmapped visible observation without a RepositoryEntry  327ms
+   ✓ collectGitStateBaseline — deletions, renames, and directories > preserves the original path on a rename  360ms
+   ✓ collectGitStateBaseline — deletions, renames, and directories > labels directories as NOT_APPLICABLE_DIRECTORY rather than UNTRACKED  562ms
+   ✓ collectGitStateBaseline — repository availability > reports detached HEAD availability  473ms
+   ✓ collectGitStateBaseline — repository availability > reports a normal attached branch after the initial commit  349ms
+   ✓ collectGitStateBaseline — inventory coupling > maps annotation.entry to the same inventory entry by reference identity  402ms
+   ✓ collectGitStateBaseline — inventory coupling > uses PRE_EXISTING provenance throughout and never PATH_CODE_MODIFIED  472ms
+   ✓ collectGitStateBaseline — inventory coupling > records unmapped visible Git paths when inventory is PARTIAL  441ms
+   ✓ collectGitStateBaseline — deny-path visibility > excludes denied secrets descendants from annotations and unmapped observations  550ms
+   ✓ collectGitStateBaseline — deny-path visibility > does not deny secrets-public when only secrets is configured  836ms
+   ✓ collectGitStateBaseline — deny-path visibility > physically denies symlink aliases to configured deny roots  571ms
+ ✓ |default| tests/terminal-trial/h3-validation-admission.test.ts (5 tests) 3073ms
+   ✓ Phase 5F-H3 validation admission correction > H3-A/C/D/E/F/G/H: live-equivalent DEFINES+BEHAVES reaches strong success with ordered checks  1125ms
+   ✓ Phase 5F-H3 validation admission correction > H3-J: TYPECHECK FAIL blocks TARGETED_TEST; terminal distinguishes honestly  542ms
+   ✓ Phase 5F-H3 validation admission correction > H3-K/L: host authorizes validation; Gate 2 uses authentic EngineeringRun only  657ms
+   ✓ Phase 5F-H3 validation admission correction > H3 packet: post-edit Brain request carries provider-neutral claim requirements  670ms
+ ✓ |default| tests/execution/local-process.test.ts (23 tests) 5076ms
+   ✓ local process execution > times out and escalates when SIGTERM is ignored  3223ms
+ ✓ |default| tests/brain/brain.test.ts (18 tests) 2988ms
+   ✓ Phase 5D1 bounded falsification probes > budget-cap bypass opens D12 then exact restore  1503ms
+   ✓ Phase 5D1 bounded falsification probes > single-flight reservation reorder opens D11 then exact restore  1411ms
+ ✓ |default| tests/general-session/catalog.test.ts (6 tests) 3507ms
+   ✓ H1-A/B/R1-A: live Nordic shape catalogs exactly three approved paths > H1-A/B/R1-A: catalog + disclosedObservations are exactly the approved trio  898ms
+   ✓ H1-C/R1-B: siblings, descendants, unrelated, and node_modules stay out > H1-C/R1-B: approving the live three never catalogs ambient neighbors  557ms
+   ✓ H1-D: read-context stays read-only in permittedTargets > H1-D: context paths are not REPLACE/CREATE edit targets  478ms
+   ✓ H1-E/R1-C: oversized approved scope hits reference budget > H1-E/R1-C: synthetic approved context >64 files exceeds MAX_CATALOG_RECORDS  582ms
+   ✓ H1-F: sensitive paths still refused at admission > H1-F: .env and node_modules paths are sensitive / not admitted  366ms
+   ✓ H1-G: Gate 1 still receives ENTRY+CONTENT for approved files > H1-G: createReferenceCatalog selection carries both evidence kinds  466ms
+ ✓ |default| tests/architecture/public-authority-surface-matrix.test.ts (6 tests) 3103ms
+   ✓ public authority surface — R2-H2 generated falsification matrix (H2-F2) > H2-F2 group A — full DIM-1 x DIM-2 x DIM-3 cross-product (300 cells)  995ms
+   ✓ public authority surface — R2-H2 generated falsification matrix (H2-F2) > H2-F2 group B — every DIM-4 placement (128 cells)  567ms
+   ✓ public authority surface — R2-H2 generated falsification matrix (H2-F2) > H2-F2 group C — every DIM-7 root kind (12 cells)  400ms
+   ✓ public authority surface — R2-H2 generated falsification matrix (H2-F2) > H2-F2 group D — pairwise covering array over ALL seven dimensions  670ms
+   ✓ public authority surface — R2-H2 generated falsification matrix (H2-F2) > H2-F2 group E — non-callable controls MUST NOT be rejected (300 cells)  463ms
+ ✓ |default| tests/ag4/ag4-proofs.test.ts (17 tests) 3161ms
+   ✓ AG4 remote selection > prefers remote.pushDefault over origin  1439ms
+   ✓ AG4 remote selection > refuses ambiguous multiple GitHub remotes without pushDefault  477ms
+   ✓ AG4 publish idempotency helpers > detects remote branch conflict vs already-published  968ms
+ ✓ |default| tests/ag5/ag5-proofs.test.ts (13 tests) 2421ms
+   ✓ AG5 D — PATH-owned orphan recovery preserves user worktrees > recovers PATH stale worktree and leaves user linked worktree intact  619ms
+   ✓ AG5 packaging surface > pathcode doctor runs without secrets  1055ms
+ ✓ |default| tests/g9/g9-scip-fingerprint.test.ts (5 tests) 4147ms
+   ✓ G9 scipFingerprint + shouldBuildScipIndex > ensureScipIndex refuses stale fingerprint directory as current  3935ms
+ ✓ |default| tests/snapshot/git-snapshot-membership.test.ts (3 tests) 1696ms
+   ✓ Phase 2G-H1 cross-component membership > binds nested Git baseline into snapshot from the same inventory  450ms
+   ✓ Phase 2G-H1 cross-component membership > rejects Git baseline from a foreign inventory even with identical lexical paths  830ms
+   ✓ Phase 2G-H1 cross-component membership > uses canonical membership for Git annotations, map entries, and search corpus authority  414ms
+ ✓ |default| tests/git/check-ignore.test.ts (12 tests) 2656ms
+   ✓ check-ignore exit protocol > TEST A — exit 0: admitted ignored path is reported ignored  541ms
+   ✓ check-ignore exit protocol > TEST B — exit 1: no ignored paths yields successful empty set and successful baseline  385ms
+   ✓ check-ignore argv batching > later-batch parse failure fails closed  312ms
+   ✓ check-ignore argv batching > live multi-batch ignore observation covers every admitted candidate once  483ms
+NOT_INSTALLED expected_target=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+Installed:
+  /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-Ha3x89/.local/bin/pathcode -> /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+Development link to this worktree (not an immutable release).
+
+/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-Ha3x89/.local/bin is not on this shell's PATH.
+For this shell only:
+  export PATH="/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-Ha3x89/.local/bin:$PATH"
+Persistent PATH editing is your separate choice; this installer does not edit shell startup files.
+OK link=/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-Ha3x89/.local/bin/pathcode target=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+IDEMPOTENT already linked:
+  /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-Ha3x89/.local/bin/pathcode -> /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+Development link to this worktree (not an immutable release).
+
+/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-Ha3x89/.local/bin is not on this shell's PATH.
+For this shell only:
+  export PATH="/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-Ha3x89/.local/bin:$PATH"
+Persistent PATH editing is your separate choice; this installer does not edit shell startup files.
+Refusing to overwrite existing non-symlink at /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-collide-5I78zM/.local/bin/pathcode
+ ✓ |default| tests/terminal-trial/fixture-install.test.ts (5 tests) 1749ms
+   ✓ T21 offline seed fails regression > unchanged seed fails real tsc+regression; fixed source passes  1692ms
+ ✓ |default| tests/git/discovery.test.ts (11 tests) 2835ms
+   ✓ discoverGitRepository — normal > succeeds when workspace root equals Git worktree root  311ms
+   ✓ discoverGitRepository — normal > returns a CanonicalPath equal to the physical repository root  386ms
+   ✓ discoverGitRepository — normal > succeeds for a repository path containing spaces  307ms
+   ✓ discoverGitRepository — normal > succeeds for a repository path with safe shell metacharacters without shell interpretation  370ms
+   ✓ discoverGitRepository — failures > maps unexpected execution failure to GIT_DISCOVERY_FAILED  343ms
+   ✓ discoverGitRepository — authority > rejects parent Git root outside a subdirectory WorkspaceBoundary  317ms
+   ✓ discoverGitRepository — linked worktree > discovers a linked worktree where .git is a file  413ms
+ ✓ |default| tests/mutation/mutation-e2e.test.ts (4 tests) 1056ms
+   ✓ mutation E2E M28/M29 > M28: positive replace+create → host auth → apply → reobserve → validate accepted  951ms
+ ✓ |default| tests/gc1/gc1b-hydration.test.ts (9 tests) 1647ms
+   ✓ GC1B-A HYDRATION FILTERING > excludes junk caches/build artifacts; retains source, tests, manifests, lockfiles  498ms
+   ✓ GC1B-B DEFAULT WORKSPACE CWD > remote execution defaults to hydrated workspace; falsify by skipping cd  338ms
+   ✓ GC1B-C HYDRATION CONFINEMENT > rejects path traversal outside designated remoteRoot  327ms
+   ✓ GC1B linked-worktree .git pointer > hydrator never ships a gitdir pointer with absolute Mac paths  336ms
+ ✓ |default| tests/git/environment.test.ts (6 tests) 1929ms
+   ✓ ambient Git env hijack attempts > does not let GIT_DIR redirect discovery to an unrelated repository  454ms
+   ✓ ambient Git env hijack attempts > does not let GIT_WORK_TREE redirect discovery to an unrelated repository  425ms
+   ✓ ambient Git env hijack attempts > does not let GIT_CONFIG_COUNT injection redirect discovery  471ms
+ ✓ |default| tests/validation/evidence-gaps.test.ts (15 tests) 1397ms
+   ✓ validation evidence-map gap coverage > runs all four kinds preserving order and argv  449ms
+ ✓ |default| tests/snapshot/snapshot.test.ts (22 tests) 562ms
+   ✓ propagation and honesty > reports bound Git baseline as POINT_IN_TIME only  423ms
+ ✓ |default| tests/gc1/lifecycle.test.ts (22 tests) 1152ms
+ ✓ |default| tests/git/baseline-adversarial.test.ts (7 tests) 1792ms
+ ✓ |default| tests/g9/g9-resolve.test.ts (9 tests) 1892ms
+   ✓ G9 resolveCapabilityRequirements + classifyRequirement > prefers project gradlew as PROJECT_LOCAL  644ms
+   ✓ G9 resolveCapabilityRequirements + classifyRequirement > classifies missing cargo as MISSING for rust Cargo.toml projects  371ms
+   ✓ G9 resolveCapabilityRequirements + classifyRequirement > prefers .venv python as PROJECT_LOCAL  589ms
+ ✓ |default| tests/integration/phase3-safe-editing-audit.test.ts (21 tests) 1494ms
+   ✓ Phase 3 integration audit — B1 full read/write/re-observe pipeline > bridges Phase 3 after-state fingerprints to fresh Phase 2B observations  317ms
+   ✓ Phase 3 integration audit — B4 git point-in-time > keeps G0 immutable while G1 reports worktree modification  659ms
+ ✓ |default| tests/g9/g9-failure-matrix.test.ts (4 tests) 698ms
+   ✓ G9 failure matrix — corrupt / cancel recovery > prepareEngineeringEnvironment returns abortedResult when signal already aborted  573ms
+ ✓ |default| tests/integration/phase2-e2e.test.ts (5 tests) 1105ms
+   ✓ Phase 2G E2E — Repository Intelligence integration > composes config → inventory → git → reader → metadata → search → snapshot freshness  558ms
+   ✓ Phase 2G E2E — Repository Intelligence integration > binds Git baseline into snapshot for nested directory inventory entries  532ms
+ ✓ |default| tests/gc1/gc1c-execution-channel.test.ts (27 tests) 1624ms
+ ✓ |default| tests/gc1/gc1c-session-integration.test.ts (1 test) 1250ms
+   ✓ GC1C session integration (mock cloud, no network) > runs one cloud cycle: lifecycle events in order, primary unchanged  1238ms
+ ✓ |default| tests/run-evidence/run-evidence.test.ts (11 tests) 1467ms
+ ✓ |default| tests/mutation/grounding.test.ts (8 tests) 196ms
+ ✓ |default| tests/reasoning/gate.test.ts (18 tests) 295ms
+ ✓ |default| tests/gc1/gc1c-runtime-delivery.test.ts (18 tests) 1022ms
+ ✓ |default| tests/config/loader.test.ts (40 tests) 371ms
+ ✓ |default| tests/path-studio/path-studio.test.ts (15 tests) 1397ms
+ ✓ |default| tests/reasoning/architecture.test.ts (5 tests) 954ms
+   ✓ reasoning architecture > A03: earlier production layers do not import reasoning  398ms
+ ✓ |default| tests/general-session/validation-candidates.test.ts (18 tests) 1843ms
+   ✓ 5G-AE: no usable check means no session > 5G-AE: refuses with VALIDATION_PLAN_NOT_AVAILABLE and zero provider calls  1463ms
+ ✓ |default| tests/recovery/mutation-integration.test.ts (7 tests) 973ms
+   ✓ 6A-B recovery restores the observed pre-state, not Git HEAD > restores the uncommitted working-tree bytes without touching Git  610ms
+ ✓ |default| tests/engineering-run/engineering-run.test.ts (8 tests) 1130ms
+ ✓ |default| tests/recovery/review.test.ts (10 tests) 394ms
+ ✓ |default| tests/orchestrator/orchestrator-e13-e24.test.ts (12 tests) 1057ms
+   ✓ orchestrator E21–E24 end-to-end / stop / architecture hooks > E24: cooperative stop — pre-stop zero checks; stop during first prevents second  516ms
+ ✓ |default| tests/recovery/execute.test.ts (13 tests) 844ms
+ ✓ |default| tests/gc1/gc1c-backend.test.ts (4 tests) 436ms
+ ✓ |default| tests/g7/g7-proofs.test.ts (8 tests) 559ms
+ ✓ |default| tests/editing/create-file.test.ts (21 tests) 527ms
+ ✓ |default| tests/mutation/mutation.test.ts (13 tests) 379ms
+ ✓ |default| tests/validation/validation.test.ts (12 tests) 800ms
+ ✓ |default| tests/editing/multi-file-coordination.test.ts (27 tests) 665ms
+ ✓ |default| tests/metadata/metadata.test.ts (29 tests) 669ms
+   ✓ Git enrichment compatibility > attaches Git annotations by inventory entry reference identity  462ms
+ ✓ |default| tests/gc1/gc1c-credential-canary.test.ts (3 tests) 328ms
+ ✓ |default| tests/gc1/gc1c-lifecycle-terminal.test.ts (3 tests) 587ms
+ ✓ |default| tests/g8/g8-capability.test.ts (16 tests) 600ms
+ ✓ |default| tests/path-studio/inline-studio.test.ts (15 tests) 664ms
+ ✓ |default| tests/orchestrator/architecture.test.ts (2 tests) 202ms
+ ✓ |default| tests/terminal-trial/falsification.test.ts (3 tests) 500ms
+ ✓ |default| tests/mutation/architecture.test.ts (1 test) 283ms
+ ✓ |default| tests/gc1/gc1c-scope-snapshot.test.ts (3 tests) 606ms
+ ✓ |default| tests/reader/read.test.ts (20 tests) 122ms
+ ✓ |default| tests/orchestrator/orchestrator.test.ts (12 tests) 350ms
+ ✓ |default| tests/adapters/openai/handoff.test.ts (2 tests) 97ms
+ ✓ |default| tests/g9/g9-mise-layout.test.ts (6 tests) 260ms
+ ✓ |default| tests/gc1/gc1c-authority.test.ts (3 tests) 164ms
+ ✓ |default| tests/gc1/gc1b-image-contract.test.ts (8 tests) 154ms
+ ✓ |default| tests/recovery/architecture.test.ts (9 tests) 124ms
+ ✓ |default| tests/editing/public-authority-malicious.test.ts (3 tests) 109ms
+ ✓ |default| tests/editing/replace-existing-file.test.ts (19 tests) 401ms
+ ✓ |default| tests/gc1/gc1c-h-scope-audit.test.ts (2 tests) 283ms
+ ✓ |default| tests/recovery/checkpoint.test.ts (10 tests) 343ms
+ ✓ |default| tests/architecture/public-authority-src-lock.test.ts (7 tests) 167ms
+ ✓ |default| tests/g8/g8-bridge-continue.test.ts (1 test) 175ms
+ ✓ |default| tests/g8/g8-repair.test.ts (5 tests) 45ms
+ ✓ |default| tests/reader/adversarial.test.ts (11 tests) 154ms
+ ✓ |default| tests/gc1/gc1c-recovery.test.ts (2 tests) 173ms
+ ✓ |default| tests/gc1/gc1c-product-surface.test.ts (15 tests) 344ms
+ ✓ |default| tests/g9/g9-affected.test.ts (5 tests) 180ms
+ ✓ |default| tests/inventory/traverse.test.ts (32 tests) 229ms
+ ✓ |default| tests/search/search.test.ts (29 tests) 186ms
+ ✓ |default| tests/g9/g9-envelope.test.ts (3 tests) 116ms
+ ✓ |default| tests/g9/g9-collaborate.test.ts (4 tests) 127ms
+ ✓ |default| tests/execution/architecture.test.ts (7 tests) 74ms
+ ✓ |default| tests/engineering-run/architecture.test.ts (4 tests) 96ms
+ ✓ |default| tests/terminal-trial/architecture.test.ts (3 tests) 87ms
+ ✓ |default| tests/domain/import-side-effects.test.ts (1 test) 85ms
+ ✓ |default| tests/run-evidence/architecture.test.ts (4 tests) 74ms
+ ✓ |default| tests/brain/architecture.test.ts (3 tests) 95ms
+ ✓ |default| tests/git/baseline-architecture.test.ts (9 tests) 128ms
+ ✓ |default| tests/editing/creation-verification.test.ts (3 tests) 17ms
+ ✓ |default| tests/workspace/boundary.test.ts (23 tests) 63ms
+ ✓ |default| tests/editing/authorization.test.ts (8 tests) 52ms
+ ✓ |default| tests/gc1/gc1c-living-product.test.ts (4 tests) 71ms
+ ✓ |default| tests/search/architecture.test.ts (5 tests) 80ms
+ ✓ |default| tests/inventory/adversarial.test.ts (7 tests) 48ms
+ ✓ |default| tests/validation/architecture.test.ts (4 tests) 135ms
+ ✓ |default| tests/general-session/architecture.test.ts (11 tests) 109ms
+ ✓ |default| tests/adapters/openai/architecture.test.ts (1 test) 108ms
+ ✓ |default| tests/search/adversarial.test.ts (11 tests) 90ms
+ ✓ |default| tests/architecture/write-boundary.test.ts (6 tests) 74ms
+ ✓ |default| tests/gc1/gc1c-falsify.test.ts (4 tests) 91ms
+ ✓ |default| tests/workspace/brand-encapsulation.test.ts (1 test) 55ms
+ ✓ |default| tests/adapters/openai/adapter.test.ts (7 tests) 53ms
+ ✓ |default| tests/config/architecture.test.ts (7 tests) 87ms
+ ✓ |default| tests/snapshot/adversarial.test.ts (6 tests) 54ms
+ ✓ |default| tests/editing/preparation.test.ts (8 tests) 48ms
+ ✓ |default| tests/git/architecture.test.ts (4 tests) 40ms
+ ✓ |default| tests/selfobs/architecture.test.ts (3 tests) 17ms
+ ✓ |default| tests/editing/architecture.test.ts (9 tests) 31ms
+ ✓ |default| tests/ag6/ag6-proofs.test.ts (4 tests) 34ms
+ ✓ |default| tests/metadata/adversarial.test.ts (5 tests) 42ms
+ ✓ |default| tests/integration/phase2-architecture-audit.test.ts (24 tests) 46ms
+ ✓ |default| tests/snapshot/import-side-effects.test.ts (1 test) 37ms
+ ✓ |default| tests/general-session/scope-contract.test.ts (15 tests) 22ms
+ ✓ |default| tests/adapters/openai/transport.test.ts (7 tests) 37ms
+ ✓ |default| tests/metadata/architecture.test.ts (5 tests) 44ms
+ ✓ |default| tests/inventory/membership.test.ts (3 tests) 65ms
+ ✓ |default| tests/inventory/architecture.test.ts (6 tests) 40ms
+ ✓ |default| tests/architecture/boundaries.test.ts (11 tests) 33ms
+ ✓ |default| tests/reader/import-side-effects.test.ts (1 test) 28ms
+ ✓ |default| tests/inventory/import-side-effects.test.ts (1 test) 25ms
+ ✓ |default| tests/gc1/gc1c-evidence.test.ts (1 test) 14ms
+ ✓ |default| tests/adapters/openai/request.test.ts (7 tests) 17ms
+ ✓ |default| tests/cli/main.test.ts (12 tests) 10ms
+ ✓ |default| tests/platform/detect.test.ts (7 tests) 11ms
+ ✓ |default| tests/reasoning/parse.test.ts (11 tests) 10ms
+ ✓ |default| tests/cli/architecture.test.ts (5 tests) 12ms
+ ✓ |default| tests/snapshot/architecture.test.ts (3 tests) 11ms
+ ✓ |default| tests/adapters/openai/response.test.ts (6 tests) 11ms
+ ✓ |default| tests/domain/contracts.test.ts (10 tests) 11ms
+ ✓ |default| tests/cli/package.test.ts (4 tests) 5ms
+ ✓ |default| tests/domain/architecture-boundary.test.ts (1 test) 8ms
+ ✓ |default| tests/runtime.test.ts (6 tests) 7ms
+ ✓ |default| tests/workspace/path-semantics.test.ts (13 tests) 5ms
+ ✓ |default| tests/selfobs/bootstrap.test.ts (1 test) 4ms
+ ✓ |default| tests/editing/bounds.test.ts (4 tests) 5ms
+ ✓ |default| tests/selfobs/type-construction.test.ts (3 tests) 6ms
+ ✓ |default| tests/editing/import-side-effects.test.ts (1 test) 4ms
+ ✓ |default| tests/domain/adversarial.test.ts (1 test) 4ms
+ ✓ |src-lock-serial| tests/architecture/public-authority-surface-h2.test.ts (12 tests) 21254ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F1(a) — optional callable on the real AuthorizePreparedChangeOptions MUST fail  2420ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F1(b) — unique-symbol-keyed callable on the real options type MUST fail  1774ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F1(c) — object-valued export with a callable member MUST fail  1501ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F3 — restored `__@` skip and a dropped member both break per-node completeness  903ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F4 — restored export exclusion makes an object-valued export escape and fails export completeness  1531ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F5 — content-hash cache is fresh in both directions with size+mtime preserved and NO clear call  2196ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F6 — full manifest SHA-256 is identical from the repository root and from a temporary directory  3104ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F7(a) — restoring the un-unwrapped member check makes the optional callable escape  2138ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F7(b) — restoring the `__@` skip makes the symbol-keyed callable escape and breaks completeness  1751ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F7(c) — restoring the export exclusion makes the object-valued export escape  1686ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F9 — every prior probe is preserved and the historical escapes still reproduce  1971ms
+ ✓ |src-lock-serial| tests/architecture/public-authority-surface-h1.test.ts (7 tests) 13779ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F1 — adversarial name NovelPublishSettings/input is detected  1429ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F2 — name/container variety and unconstrained generic fail for same reason  5366ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F3 — disposition/root completeness, reuse, overload, cycle, suppression  1284ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F4 — prior R2 cases + generic-smuggling through external container  1399ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F5 — reviewed terminal registry removal and fail-closed identity rules  1869ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F6 — legitimate inputs pass for structural reasons; external boundary by ownership  1040ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F7 — exact R2 naming gate restored makes adversarial roots escape  1392ms
+ ✓ |src-lock-serial| tests/architecture/public-authority-surface-derived.test.ts (7 tests) 8290ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F1 — authorityOps on real AuthorizePreparedChangeOptions fails naming function/type/member  1613ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F2 — future public function with unlisted options type is auto-discovered  711ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F3 — named re-export of options type is followed across modules  562ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F4 — recursive project type graph reaches nested/alias/extends/union/intersection/generic  622ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F5 — false-positive boundary: legitimate data/context PASS; external callable noise fails when ownership corrupted  1641ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F6 — approved exception model: exact member permits; wildcard/broad/missing fields rejected  1766ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F7 — legacy enumerated discovery fails 2-F1, 2-F2, and completeness  1374ms
+ ✓ |src-lock-serial| tests/architecture/public-authority-surface.test.ts (5 tests) 549ms
+   ✓ public authority surface — Amendment 1 standing guard > derived walker covers complete public editing parameter/options surfaces  538ms
+
+ Test Files  154 passed (154)
+      Tests  1412 passed (1412)
+   Start at  11:07:22
+   Duration  251.16s (transform 12.73s, setup 0ms, collect 14.25s, tests 388.66s, environment 47ms, prepare 15.13s)
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 cli:smoke
+> node -e "import { readFileSync } from 'node:fs'; const t=readFileSync('dist/cli/entry.js','utf8'); if(!t.startsWith('#!/usr/bin/env node\n')) { console.error('missing shebang'); process.exit(1); }" && node dist/cli/entry.js --help && node dist/cli/entry.js && node -e "import { spawnSync } from 'node:child_process'; const r=spawnSync(process.execPath,['dist/cli/entry.js','build-something'],{encoding:'utf8'}); if(r.status===0){console.error('expected non-zero'); process.exit(1);} process.stdout.write(r.stderr);"
+
+Path Code
+
+Usage:
+  pathcode [--help]
+
+Path Code engineering task execution is not enabled in the Foundation Kernel.
+Path Code
+
+Usage:
+  pathcode [--help]
+
+Path Code engineering task execution is not enabled in the Foundation Kernel.
+Unknown argument: build-something
+Run "pathcode --help" for usage.
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 ledger:verify
+> tsx scripts/ledger-verify.ts
+
+ledger:verify PASS at 986fcf9d6537cee3c701dc4cdfd119378809bf02

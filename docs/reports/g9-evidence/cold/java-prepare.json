@@ -1,0 +1,133 @@
+{
+  "label": "java-cold",
+  "capturedAt": "2026-09-14T08:20:06.520Z",
+  "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/live-repos/java-cold",
+  "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2",
+  "pathPrepend": [
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/toolchains/mise-data/installs/java/21.0.2/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/toolchains/mise-data/installs/maven/3.9.9/apache-maven-3.9.9/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/language-servers/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/tool-manager/mise/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/language-servers/npm/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/toolchains/cargo-home/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/toolchains/mise-data/shims",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/language-servers",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/language-servers/npm",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/indexers/npm"
+  ],
+  "provision": {
+    "briefLines": [
+      "java: PATH_RUNTIME_READY",
+      "mvn: PATH_RUNTIME_READY",
+      "lsp:java: PATH_RUNTIME_READY"
+    ],
+    "ready": [
+      {
+        "id": "java",
+        "status": "PATH_RUNTIME_READY",
+        "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/toolchains/mise-data/installs/java/21.0.2/bin/java"
+      },
+      {
+        "id": "mvn",
+        "status": "PATH_RUNTIME_READY",
+        "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/toolchains/mise-data/installs/maven/3.9.9/apache-maven-3.9.9/bin/mvn"
+      },
+      {
+        "id": "lsp:java",
+        "status": "PATH_RUNTIME_READY",
+        "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/language-servers/bin/jdtls"
+      }
+    ],
+    "failed": []
+  },
+  "languageServers": [
+    {
+      "id": "java",
+      "status": "ready",
+      "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/language-servers/jdtls",
+      "evidence": [
+        "bins=jdtls,java-language-server",
+        "jdtls not found",
+        "java-language-server not found",
+        "reusing /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/language-servers/jdtls-dist/bin/jdtls",
+        "health: --version → status=143 WARNING: Using incubator modules: jdk.incubator.vector\nSep 14, 2026 10:19:49 AM org.apache.aries.spifly.BaseActivator log\nINFO: Registered provider ch.qos.logba",
+        "health: timeout",
+        "health: version → status=143 WARNING: Using incubator modules: jdk.incubator.vector\nSep 14, 2026 10:19:57 AM org.apache.aries.spifly.BaseActivator log\nINFO: Registered provider ch.qos.logba",
+        "health: timeout",
+        "health: --help → status=0 usage: jdtls [-h] [--validate-java-version] [--no-validate-java-version]\n             [--java-executable JAVA_EXECUTABLE] [--jvm-arg JVM_ARG]\n             [-dat"
+      ]
+    }
+  ],
+  "scip": {
+    "ok": false,
+    "skipped": true,
+    "reason": "not_needed"
+  },
+  "mcpServersExtra": [],
+  "services": {
+    "detected": {
+      "composeFile": null,
+      "devcontainer": false,
+      "evidence": []
+    },
+    "runtime": {
+      "status": "UNAVAILABLE",
+      "reason": "no_service_evidence"
+    }
+  },
+  "acquired": {
+    "cargo": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/cargo",
+    "rustc": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rustc",
+    "rust-analyzer": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rust-analyzer",
+    "java": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/toolchains/mise-data/shims/java",
+    "mvn": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/toolchains/mise-data/shims/mvn",
+    "jdtls": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/language-servers/bin/jdtls",
+    "go": "/opt/homebrew/bin/go",
+    "gopls": null,
+    "python3": "/usr/bin/python3",
+    "pyright": null,
+    "node": "/opt/homebrew/bin/node",
+    "clangd": "/usr/bin/clangd",
+    "mise": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/tool-manager/mise/bin/mise"
+  },
+  "events": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/live-repos/java-cold",
+      "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2",
+      "at": 1789373977034
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789373987544
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789373987548
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:java",
+      "at": 1789373987582
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "UNAVAILABLE",
+      "source": "none",
+      "at": 1789374006384
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [
+        "java"
+      ],
+      "scip": false,
+      "affected": "UNAVAILABLE",
+      "at": 1789374006390
+    }
+  ],
+  "capabilityBrief": "## PATH G9 engineering environment\nLanguages: java\nToolchains:\n- java: PATH_RUNTIME_READY\n- mvn: PATH_RUNTIME_READY\n- lsp:java: PATH_RUNTIME_READY\nLanguage servers:\n- java: ready (/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/language-servers/jdtls)\nCode intelligence (SCIP): skipped (not indicated)\nCopilot LSP home: /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/copilot-home (servers: java)\nAffected checks: UNAVAILABLE via none\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+  "copilotHome": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-java-v2/copilot-home"
+}

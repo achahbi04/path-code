@@ -1,0 +1,178 @@
+{
+  "label": "scip-mono",
+  "capturedAt": "2026-09-14T08:21:30.654Z",
+  "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/live-repos/scip-mono",
+  "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono",
+  "pathPrepend": [
+    "/opt/homebrew/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/language-servers/npm/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/tool-manager/mise/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/language-servers/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/toolchains/cargo-home/bin",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/toolchains/mise-data/shims",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/language-servers",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/language-servers/npm",
+    "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/indexers/npm"
+  ],
+  "provision": {
+    "briefLines": [
+      "node: HOST_READY",
+      "npm: HOST_READY",
+      "lsp:typescript: PATH_RUNTIME_READY"
+    ],
+    "ready": [
+      {
+        "id": "node",
+        "status": "HOST_READY",
+        "executable": "/opt/homebrew/bin/node"
+      },
+      {
+        "id": "npm",
+        "status": "HOST_READY",
+        "executable": "/opt/homebrew/bin/npm"
+      },
+      {
+        "id": "lsp:typescript",
+        "status": "PATH_RUNTIME_READY",
+        "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/language-servers/npm/bin/typescript-language-server"
+      }
+    ],
+    "failed": []
+  },
+  "languageServers": [
+    {
+      "id": "javascript",
+      "status": "ready",
+      "executable": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/language-servers/typescript-language-server",
+      "evidence": [
+        "bins=typescript-language-server",
+        "typescript-language-server not found",
+        "npm typescript-language-server → /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/language-servers/npm/typescript-language-server/node_modules/.bin/typescript-language-server",
+        "health: --version → status=0 6.0.0"
+      ]
+    }
+  ],
+  "scip": {
+    "ok": true,
+    "indexDir": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/caches/scip/873f4050ddd3ac4464d549608114373d",
+    "fingerprint": "873f4050ddd3ac4464d549608114373d",
+    "indexPath": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/caches/scip/873f4050ddd3ac4464d549608114373d/index.scip",
+    "symbolMapPath": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/caches/scip/873f4050ddd3ac4464d549608114373d/symbols.json",
+    "evidence": [
+      "npm install scip-typescript status=0",
+      "scip-typescript index status=1",
+      "- /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/live-repos/scip-mono (missing tsconfig.json)\n",
+      "heuristic symbol map (4 symbols)"
+    ],
+    "cached": false
+  },
+  "mcpServersExtra": [
+    {
+      "type": "stdio",
+      "name": "path-scip",
+      "command": "/opt/homebrew/Cellar/node/26.5.0/bin/node",
+      "args": [
+        "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode-cli/ag9/scip-mcp-server.mjs"
+      ],
+      "env": {
+        "PATHCODE_SCIP_INDEX_DIR": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/caches/scip/873f4050ddd3ac4464d549608114373d",
+        "PATHCODE_RUNTIME_ROOT": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono",
+        "PATHCODE_SCIP_TRUST_CLASS": "read_only"
+      },
+      "trustClass": "read_only",
+      "enabled_tools": [
+        "code_definition",
+        "code_references",
+        "code_search_symbol"
+      ]
+    }
+  ],
+  "services": {
+    "detected": {
+      "composeFile": null,
+      "devcontainer": false,
+      "evidence": []
+    },
+    "runtime": {
+      "status": "UNAVAILABLE",
+      "reason": "no_service_evidence"
+    }
+  },
+  "acquired": {
+    "cargo": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/cargo",
+    "rustc": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rustc",
+    "rust-analyzer": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-cold-rust/toolchains/cargo-home/bin/rust-analyzer",
+    "java": "/usr/bin/java",
+    "mvn": null,
+    "jdtls": null,
+    "go": "/opt/homebrew/bin/go",
+    "gopls": null,
+    "python3": "/opt/homebrew/bin/python3",
+    "pyright": null,
+    "node": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/toolchains/mise-data/shims/node",
+    "clangd": "/usr/bin/clangd",
+    "mise": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/tool-manager/mise/bin/mise"
+  },
+  "events": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/live-repos/scip-mono",
+      "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono",
+      "at": 1789374022345
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789374022985
+    },
+    {
+      "type": "session.capability.provisioning",
+      "id": "lsp:typescript",
+      "at": 1789374022987
+    },
+    {
+      "type": "session.capability.provisioned",
+      "id": "lsp:typescript",
+      "at": 1789374080641
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789374080641
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:javascript",
+      "at": 1789374080687
+    },
+    {
+      "type": "session.capability.indexing",
+      "phase": "scip",
+      "at": 1789374083607
+    },
+    {
+      "type": "session.capability.indexing",
+      "status": "building",
+      "fingerprint": "873f4050ddd3ac4464d549608114373d",
+      "language": "javascript",
+      "at": 1789374086872
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "PROJECT_EXACT",
+      "source": "pnpm",
+      "at": 1789374090560
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [
+        "javascript"
+      ],
+      "scip": true,
+      "affected": "PROJECT_EXACT",
+      "at": 1789374090565
+    }
+  ],
+  "capabilityBrief": "## PATH G9 engineering environment\nLanguages: javascript\nToolchains:\n- node: HOST_READY\n- npm: HOST_READY\n- lsp:typescript: PATH_RUNTIME_READY\nLanguage servers:\n- javascript: ready (/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/language-servers/typescript-language-server)\nCode intelligence (SCIP): ready fingerprint=873f4050ddd3ac4464d549608114373d\nCopilot LSP home: /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/copilot-home (servers: javascript)\nAffected checks: PROJECT_EXACT via pnpm\n- /opt/homebrew/bin/pnpm -r --filter=...[HEAD^1] test\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+  "copilotHome": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g9-evidence/runtime-scip-mono/copilot-home"
+}
