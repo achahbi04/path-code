@@ -1,0 +1,120 @@
+{
+  "label": "ag-csharp-lsp",
+  "capturedAt": "2026-09-14T14:19:26.093Z",
+  "projectRoot": "/Users/achahbi/.cursor/worktrees/csharp-lsp-6efd8459/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/csharp-accept",
+  "runtimeRoot": "/tmp/pathcode-g9-csharp-lsp",
+  "pathPrepend": [
+    "/tmp/pathcode-g9-csharp-lsp/toolchains/mise-data/dotnet-root",
+    "/tmp/pathcode-g9-csharp-lsp/language-servers/bin",
+    "/tmp/pathcode-g9-csharp-lsp/tool-manager/mise/bin",
+    "/tmp/pathcode-g9-csharp-lsp/language-servers/npm/bin",
+    "/tmp/pathcode-g9-csharp-lsp/toolchains/cargo-home/bin",
+    "/tmp/pathcode-g9-csharp-lsp/toolchains/mise-data/shims",
+    "/tmp/pathcode-g9-csharp-lsp/language-servers",
+    "/tmp/pathcode-g9-csharp-lsp/language-servers/npm",
+    "/tmp/pathcode-g9-csharp-lsp/indexers/npm"
+  ],
+  "provision": {
+    "briefLines": [
+      "dotnet: PATH_RUNTIME_READY",
+      "lsp:csharp: PATH_RUNTIME_READY"
+    ],
+    "ready": [
+      {
+        "id": "dotnet",
+        "status": "PATH_RUNTIME_READY",
+        "executable": "/tmp/pathcode-g9-csharp-lsp/toolchains/mise-data/dotnet-root/dotnet"
+      },
+      {
+        "id": "lsp:csharp",
+        "status": "PATH_RUNTIME_READY",
+        "executable": "/tmp/pathcode-g9-csharp-lsp/language-servers/bin/csharp-ls"
+      }
+    ],
+    "failed": []
+  },
+  "languageServers": [
+    {
+      "id": "csharp",
+      "status": "ready",
+      "executable": "/tmp/pathcode-g9-csharp-lsp/language-servers/csharp-ls",
+      "evidence": [
+        "bins=csharp-ls,OmniSharp",
+        "runtime csharp-ls → /tmp/pathcode-g9-csharp-lsp/language-servers/bin/csharp-ls",
+        "health: --version → status=0 csharp-ls, 0.28.0 (Klebiškis)+72671fc7fa810c158864e72485db68e8b9b25c3d"
+      ]
+    }
+  ],
+  "scip": {
+    "ok": false,
+    "skipped": true,
+    "reason": "not_needed"
+  },
+  "mcpServersExtra": [],
+  "services": {
+    "detected": {
+      "composeFile": null,
+      "devcontainer": false,
+      "evidence": []
+    },
+    "runtime": {
+      "status": "UNAVAILABLE",
+      "reason": "no_service_evidence"
+    }
+  },
+  "acquired": {
+    "cargo": null,
+    "rustc": null,
+    "rust-analyzer": null,
+    "java": "/usr/bin/java",
+    "mvn": null,
+    "jdtls": null,
+    "go": "/opt/homebrew/bin/go",
+    "gopls": null,
+    "python3": "/opt/homebrew/bin/python3",
+    "pyright": null,
+    "node": "/opt/homebrew/bin/node",
+    "clangd": "/usr/bin/clangd",
+    "mise": "/tmp/pathcode-g9-csharp-lsp/tool-manager/mise/bin/mise"
+  },
+  "events": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/.cursor/worktrees/csharp-lsp-6efd8459/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/csharp-accept",
+      "runtimeRoot": "/tmp/pathcode-g9-csharp-lsp",
+      "at": 1789395560155
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789395562367
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789395562370
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:csharp",
+      "at": 1789395562403
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "UNAVAILABLE",
+      "source": "none",
+      "at": 1789395565955
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [
+        "csharp"
+      ],
+      "scip": false,
+      "affected": "UNAVAILABLE",
+      "at": 1789395565961
+    }
+  ],
+  "capabilityBrief": "## PATH G9 engineering environment\nLanguages: csharp\nToolchains:\n- dotnet: PATH_RUNTIME_READY\n- lsp:csharp: PATH_RUNTIME_READY\nLanguage servers:\n- csharp: ready (/tmp/pathcode-g9-csharp-lsp/language-servers/csharp-ls)\nCode intelligence (SCIP): skipped (not indicated)\nCopilot LSP home: /tmp/pathcode-g9-csharp-lsp/copilot-home (servers: csharp)\nAffected checks: UNAVAILABLE via none\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+  "copilotHome": "/tmp/pathcode-g9-csharp-lsp/copilot-home"
+}

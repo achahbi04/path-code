@@ -1,0 +1,155 @@
+{
+  "generatedAt": "2026-09-14T13:13:29.921Z",
+  "worktreeId": "g9-gaps-2be29924",
+  "worktreePath": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6",
+  "repoRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+  "headCommit": "08f4c8d5e341b356937c26e1a1bfc557720a0399",
+  "worktreeStartRef": "HEAD",
+  "notes": [
+    "py-accept: first attempt NOT_VERIFIED (pytest missing / no mise mapping); retry VERIFIED after pytest on PATH",
+    "scip-mono-fix: first attempt FAILED (path-scip MCP Content-Length vs AG NDJSON); retry VERIFIED after NDJSON writeMessage",
+    "compose-redis: first attempt FAILED (docker-credential-desktop missing under colima); retry VERIFIED with DOCKER_CONFIG without credsStore + stub helper",
+    "No secrets/tokens included"
+  ],
+  "results": {
+    "ag-js-fix": {
+      "classification": "VERIFIED",
+      "commitSha": "006c8d35227f2f85cdb8ee87042020d7dd6f380e",
+      "primaryUntouched": true,
+      "blocker": null
+    },
+    "ag-py-fix": {
+      "classification": "VERIFIED",
+      "commitSha": "6b38e891ac4d31825efb99b38ef6aec32d82d94a",
+      "primaryUntouched": true,
+      "blocker": null,
+      "retries": 1,
+      "priorAttempt": "NOT_VERIFIED (pytest provision / discovery)"
+    },
+    "ag-go-fix": {
+      "classification": "VERIFIED",
+      "commitSha": "fcc606274a0503be50d0223f793b4ca286aaa3eb",
+      "primaryUntouched": true,
+      "blocker": null
+    },
+    "ag-c-fix": {
+      "classification": "VERIFIED",
+      "commitSha": "d554a493b487e36544cea33c39cfb36271aabe99",
+      "primaryUntouched": true,
+      "blocker": null
+    },
+    "ag-csharp-fix": {
+      "classification": "VERIFIED",
+      "commitSha": "4b4fa8ac9b9e1aef3d358b4ecb01bf88eb0ebfdc",
+      "primaryUntouched": true,
+      "blocker": null,
+      "provision": "dotnet PATH_RUNTIME_READY (lsp:csharp health failed but engineering VERIFIED)"
+    },
+    "scip-mono-fix": {
+      "classification": "VERIFIED",
+      "commitSha": "94b1e36fcde088afa943918533a6dc512a57099e",
+      "primaryUntouched": true,
+      "blocker": null,
+      "retries": 1,
+      "priorAttempt": "FAILED MCP path-scip initialize (invalid character C / Content-Length)",
+      "consume": {
+        "symbol": "tokenPrefix",
+        "indexOk": true,
+        "queryOk": true,
+        "resultCount": 1,
+        "indexMs": 45,
+        "queryMs": 14,
+        "engineEventsMentionScipOrCode": true
+      }
+    },
+    "roundtrip-dual": {
+      "classification": "VERIFIED",
+      "commitSha": "b74a1dfb5c21b3bf2bc32033a2becdc54978b4f0",
+      "primaryUntouched": true,
+      "blocker": null
+    },
+    "compose-redis": {
+      "classification": "VERIFIED",
+      "commitSha": "ddb94219e0afb5e5317e2c4350545ffc21635c71",
+      "primaryUntouched": true,
+      "liveServiceOk": true,
+      "engineeringOk": true,
+      "cleanupOk": true,
+      "started": "STARTED",
+      "stopped": "STOPPED",
+      "blocker": null,
+      "retries": 1,
+      "priorAttempt": "compose_up_failed (docker-credential-desktop missing)"
+    },
+    "failure-recovery": {
+      "classification": "PASS",
+      "cases": {
+        "corruptRuntime": {
+          "classifiedStatus": "BROKEN",
+          "repaired": false,
+          "detectedBroken": true,
+          "ready": null,
+          "healedAwayFromCorrupt": null,
+          "rebuilt": null,
+          "queryOk": null,
+          "aborted": null,
+          "sane": null
+        },
+        "lspFailure": {
+          "classifiedStatus": null,
+          "repaired": null,
+          "detectedBroken": null,
+          "ready": true,
+          "healedAwayFromCorrupt": true,
+          "rebuilt": null,
+          "queryOk": null,
+          "aborted": null,
+          "sane": null
+        },
+        "scipStale": {
+          "classifiedStatus": null,
+          "repaired": null,
+          "detectedBroken": null,
+          "ready": null,
+          "healedAwayFromCorrupt": null,
+          "rebuilt": true,
+          "queryOk": true,
+          "aborted": null,
+          "sane": null
+        },
+        "provisionCancel": {
+          "classifiedStatus": null,
+          "repaired": null,
+          "detectedBroken": null,
+          "ready": null,
+          "healedAwayFromCorrupt": null,
+          "rebuilt": null,
+          "queryOk": null,
+          "aborted": true,
+          "sane": true
+        }
+      },
+      "blocker": null,
+      "note": "corruptRuntime detected BROKEN; gopls mise mapping did not fully repair (honest failure path)"
+    },
+    "cockpit-js": {
+      "classification": "VERIFIED",
+      "commitSha": "9a8734ab9a497de87e45d1bf326d7b7a94fce296",
+      "primaryUntouched": true,
+      "eventCount": 78,
+      "visible": {
+        "preparing": true,
+        "lsp": true,
+        "indexing": true,
+        "inspecting": true,
+        "implementing": true,
+        "collaboration": false,
+        "affected": true,
+        "repair": false,
+        "verification": true,
+        "verified": true
+      },
+      "blocker": null
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "label": "scip-mono-fix",
+  "outcome": "FAILED",
+  "classification": "FAILED",
+  "exitCode": 1,
+  "primaryUntouched": true,
+  "commitSha": null,
+  "engineActivityCount": 3,
+  "collaborateEvents": [],
+  "capabilityEvents": [
+    {
+      "type": "session.capability.discovered",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null
+    },
+    {
+      "type": "session.capability.preparing",
+      "detail": null
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null,
+      "phase": "toolchains"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null,
+      "phase": "lsp"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null
+    },
+    {
+      "type": "session.capability.indexing",
+      "detail": null,
+      "phase": "scip"
+    },
+    {
+      "type": "session.capability.indexing",
+      "detail": null
+    },
+    {
+      "type": "session.capability.affected",
+      "detail": null
+    },
+    {
+      "type": "session.capability.ready",
+      "detail": null
+    }
+  ]
+}

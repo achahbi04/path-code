@@ -1,0 +1,41 @@
+{
+  "label": "scip-mono-fix",
+  "symbol": "tokenPrefix",
+  "index": {
+    "ok": true,
+    "indexDir": "/tmp/pathcode-g9-runtime-scip/caches/scip/0fb06d74da42598f9c5f57f9e9567241",
+    "fingerprint": "0fb06d74da42598f9c5f57f9e9567241",
+    "cached": true,
+    "evidence": [
+      "scip-typescript → /tmp/pathcode-g9-runtime-scip/indexers/npm/scip-typescript/node_modules/.bin/scip-typescript",
+      "cache hit 0fb06d74da42598f9c5f57f9e9567241"
+    ],
+    "indexMs": 45
+  },
+  "query": {
+    "op": "find_references",
+    "ok": true,
+    "reason": null,
+    "resultCount": 1,
+    "results": [
+      {
+        "name": "tokenPrefix",
+        "path": "packages/a/index.ts",
+        "kind": "definition"
+      }
+    ],
+    "queryMs": 14
+  },
+  "engineEventsMentionScipOrCode": true,
+  "scipOrCodeEventCount": 7,
+  "scipOrCodeEventTypes": [
+    "session.task.received",
+    "session.preflight",
+    "session.engineering.workspace",
+    "session.capability.preparing",
+    "session.capability.indexing",
+    "session.capability.ready",
+    "session.engineering.result"
+  ],
+  "retryNote": "MCP NDJSON framing fix applied before retry"
+}

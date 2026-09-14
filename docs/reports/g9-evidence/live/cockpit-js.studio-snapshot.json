@@ -1,0 +1,137 @@
+{
+  "cards": {
+    "task": {
+      "id": "task",
+      "title": "Task",
+      "status": "done",
+      "detail": "Fix add so npm test passes. Do not push.",
+      "arrived": true
+    },
+    "preflight": {
+      "id": "preflight",
+      "title": "Preflight",
+      "status": "done",
+      "detail": "main; clean",
+      "arrived": true
+    },
+    "disclosure": {
+      "id": "disclosure",
+      "title": "Disclosure / Policy",
+      "status": "pending",
+      "detail": "not yet",
+      "arrived": false
+    },
+    "authority": {
+      "id": "authority",
+      "title": "Authority",
+      "status": "pending",
+      "detail": "not yet",
+      "arrived": false
+    },
+    "scope": {
+      "id": "scope",
+      "title": "Scope",
+      "status": "pending",
+      "detail": "not yet",
+      "arrived": false
+    },
+    "reading": {
+      "id": "reading",
+      "title": "Reading",
+      "status": "done",
+      "detail": "reading",
+      "arrived": true
+    },
+    "reasoning": {
+      "id": "reasoning",
+      "title": "Reasoning",
+      "status": "pending",
+      "detail": "not yet",
+      "arrived": false
+    },
+    "gate1": {
+      "id": "gate1",
+      "title": "Gate 1",
+      "status": "pending",
+      "detail": "not yet",
+      "arrived": false
+    },
+    "edit": {
+      "id": "edit",
+      "title": "Edit summary",
+      "status": "done",
+      "detail": "edit · Fix add function; edit_file Fix add function 0→0 bytes",
+      "arrived": true
+    },
+    "recovery": {
+      "id": "recovery",
+      "title": "Recovery checkpoint",
+      "status": "done",
+      "detail": "id ag1-baseline:0f900c6dff69ad8e73e09b5a0d7dfc0b818b1fc1 — READY",
+      "arrived": true
+    },
+    "applying": {
+      "id": "applying",
+      "title": "Applying",
+      "status": "done",
+      "detail": "edit · Fix add function",
+      "arrived": true
+    },
+    "reobserved": {
+      "id": "reobserved",
+      "title": "Re-observed",
+      "status": "pending",
+      "detail": "not yet",
+      "arrived": false
+    },
+    "validationPlan": {
+      "id": "validationPlan",
+      "title": "Validation plan",
+      "status": "done",
+      "detail": "0 check(s)",
+      "arrived": true
+    },
+    "validationRunning": {
+      "id": "validationRunning",
+      "title": "Validation running",
+      "status": "done",
+      "detail": "npm-test",
+      "arrived": true
+    },
+    "validationResult": {
+      "id": "validationResult",
+      "title": "Validation result",
+      "status": "done",
+      "detail": "npm-test — PASSED",
+      "arrived": true
+    },
+    "validationSkipped": {
+      "id": "validationSkipped",
+      "title": "Validation skipped",
+      "status": "pending",
+      "detail": "not yet",
+      "arrived": false
+    },
+    "gate2": {
+      "id": "gate2",
+      "title": "Gate 2",
+      "status": "pending",
+      "detail": "not yet",
+      "arrived": false
+    },
+    "terminal": {
+      "id": "terminal",
+      "title": "Terminal disposition",
+      "status": "done",
+      "detail": "VERIFIED — All configured final checks passed.",
+      "arrived": true
+    },
+    "findings": {
+      "id": "findings",
+      "title": "Findings",
+      "status": "pending",
+      "detail": "not yet",
+      "arrived": false
+    }
+  }
+}

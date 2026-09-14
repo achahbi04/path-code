@@ -1,0 +1,82 @@
+{
+  "label": "ag-go-fix",
+  "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/go-accept",
+  "runtimeRoot": "/tmp/pathcode-g9-runtime-go",
+  "prepared": {
+    "brief": "## PATH G9 engineering environment\nLanguages: go\nToolchains:\n- go: HOST_READY\n- lsp:go: FAILED (mise ERROR Failed to install gopls@latest: gopls not found in mise tool registry\n\nDid you mean?\n  gopass\n  go\n  golines\n  go:golang.org/x/tools/gopls\n  aqua:sivchari/gopls-lazy\nmise ERROR Version: 2026.9.7 macos-arm64 (2026-09-13)\nmise ERROR Run with --verbose or MISE_VERBOSE=1 for more information\n)\nLanguage servers:\n- go: unavailable\nCode intelligence (SCIP): skipped (not indicated)\nAffected checks: CONSERVATIVE via go\n- /opt/homebrew/bin/go test ./...\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+    "provision": [
+      "go: HOST_READY",
+      "lsp:go: FAILED (mise ERROR Failed to install gopls@latest: gopls not found in mise tool registry\n\nDid you mean?\n  gopass\n  go\n  golines\n  go:golang.org/x/tools/gopls\n  aqua:sivchari/gopls-lazy\nmise ERROR Version: 2026.9.7 macos-arm64 (2026-09-13)\nmise ERROR Run with --verbose or MISE_VERBOSE=1 for more information\n)"
+    ],
+    "lsp": [
+      {
+        "id": "go",
+        "status": "unavailable",
+        "executable": null,
+        "evidence": [
+          "bins=gopls",
+          "gopls not found",
+          "mise install gopls ok=false status=1",
+          "mise ERROR Failed to install gopls@latest: gopls not found in mise tool registry\n\nDid you mean?\n  gopass\n  go\n  golines\n  go:golang.org/x/tools/gopls\n  aqua:sivchari/gopls-lazy\nmise ERROR Version: 202"
+        ]
+      }
+    ],
+    "pathPrepend": [
+      "/opt/homebrew/bin",
+      "/tmp/pathcode-g9-runtime-go/tool-manager/mise/bin",
+      "/tmp/pathcode-g9-runtime-go/language-servers/bin",
+      "/tmp/pathcode-g9-runtime-go/language-servers/npm/bin",
+      "/tmp/pathcode-g9-runtime-go/toolchains/cargo-home/bin",
+      "/tmp/pathcode-g9-runtime-go/language-servers",
+      "/tmp/pathcode-g9-runtime-go/language-servers/npm",
+      "/tmp/pathcode-g9-runtime-go/indexers/npm"
+    ]
+  },
+  "prepEvents": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/go-accept",
+      "runtimeRoot": "/tmp/pathcode-g9-runtime-go",
+      "at": 1789386754462
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789386755359
+    },
+    {
+      "type": "session.capability.provisioning",
+      "id": "lsp:go",
+      "at": 1789386755365
+    },
+    {
+      "type": "session.capability.provision_failed",
+      "id": "lsp:go",
+      "reason": "mise ERROR Failed to install gopls@latest: gopls not found in mise tool registry\n\nDid you mean?\n  gopass\n  go\n  golines\n  go:golang.org/x/tools/gopls\n  aqua:sivchari/gopls-lazy\nmise ERROR Version: 2026.9.7 macos-arm64 (2026-09-13)\nmise ERROR Run with --verbose or MISE_VERBOSE=1 for more information\n",
+      "at": 1789386775411
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789386775412
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:go",
+      "at": 1789386775551
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "CONSERVATIVE",
+      "source": "go",
+      "at": 1789386776261
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [],
+      "scip": false,
+      "affected": "CONSERVATIVE",
+      "at": 1789386776270
+    }
+  ]
+}

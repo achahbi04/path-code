@@ -409,12 +409,17 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   const capabilityBrief = [
     g8Brief,
     preparedEnv?.capabilityBrief ? String(preparedEnv.capabilityBrief) : "",
+    preparedEnv?.mcpServersExtra?.length
+      ? "PATH code intelligence MCP (path-scip) is available: use code_search_symbol / code_definition / code_references for cross-package navigation before editing."
+      : "",
   ]
     .filter((s) => s.trim())
     .join("\n\n")
     .slice(0, 8000);
 
   if (preparedEnv && Array.isArray(preparedEnv.mcpServersExtra)) {
+    /** @type {object[]} */
+    const pathOwnedEnabled = [];
     for (const extra of preparedEnv.mcpServersExtra) {
       const trusted = applyMcpTrustPolicy({
         ...extra,
@@ -426,11 +431,24 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
           : [{ name: "code_search_symbol", description: "read-only symbol search" }],
       });
       if (trusted.enabled) {
+        pathOwnedEnabled.push(trusted);
         mcpServers = [
           ...mcpServers,
           ...toAntigravityMcpServers([trusted]),
         ];
       }
+    }
+    if (pathOwnedEnabled.length > 0) {
+      emit("session.capability.mcp", {
+        enabled: pathOwnedEnabled.length,
+        denied: 0,
+        source: "path_runtime",
+        servers: pathOwnedEnabled.map((s) => ({
+          name: typeof s?.name === "string" ? s.name : "",
+          type: typeof s?.type === "string" ? s.type : "stdio",
+          trustClass: typeof s?.trustClass === "string" ? s.trustClass : "",
+        })),
+      });
     }
   }
 

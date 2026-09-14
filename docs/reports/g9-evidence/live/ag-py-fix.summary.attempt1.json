@@ -1,0 +1,54 @@
+{
+  "label": "ag-py-fix",
+  "outcome": "NOT_VERIFIED",
+  "classification": "NOT_VERIFIED",
+  "exitCode": 1,
+  "primaryUntouched": true,
+  "commitSha": "3656e671e15d58516fe2634884bc492b700c26f3",
+  "engineActivityCount": 60,
+  "collaborateEvents": [],
+  "capabilityEvents": [
+    {
+      "type": "session.capability.discovered",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null
+    },
+    {
+      "type": "session.capability.preparing",
+      "detail": null
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null,
+      "phase": "toolchains"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null
+    },
+    {
+      "type": "session.capability.provision_failed",
+      "detail": null
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null,
+      "phase": "lsp"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null
+    },
+    {
+      "type": "session.capability.affected",
+      "detail": null
+    },
+    {
+      "type": "session.capability.ready",
+      "detail": null
+    }
+  ]
+}

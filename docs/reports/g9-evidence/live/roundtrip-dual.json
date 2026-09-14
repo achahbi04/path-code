@@ -1,0 +1,735 @@
+{
+  "summary": {
+    "label": "roundtrip-dual",
+    "engine": "roundtrip",
+    "classification": "VERIFIED",
+    "sameWorktree": "/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858",
+    "phases": {
+      "ag1": {
+        "ok": true,
+        "contribution": {
+          "addFixed": true,
+          "mulFixed": false,
+          "comment": false
+        },
+        "mid": "PARTIALLY_VERIFIED"
+      },
+      "copilot": {
+        "ok": true,
+        "contribution": {
+          "addFixed": true,
+          "mulFixed": true,
+          "comment": false
+        },
+        "mid": "VERIFIED"
+      },
+      "ag2": {
+        "ok": true,
+        "contribution": {
+          "addFixed": true,
+          "mulFixed": true,
+          "comment": true
+        }
+      }
+    },
+    "materialRoundTrip": true,
+    "conflictProtection": "exclusive withCollabTurn leases",
+    "primaryUntouched": true,
+    "commitSha": "b74a1dfb5c21b3bf2bc32033a2becdc54978b4f0",
+    "validation": {
+      "classification": "VERIFIED",
+      "reason": "All configured final checks passed.",
+      "checks": [
+        {
+          "id": "cargo-check",
+          "name": "cargo-check",
+          "kind": "TYPECHECK",
+          "command": "cargo check",
+          "exitCode": 0,
+          "timedOut": false,
+          "durationMs": 1180,
+          "ok": true,
+          "stdoutTail": "",
+          "stderrTail": "    Checking g9_collab_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.90s\n"
+        },
+        {
+          "id": "cargo-test",
+          "name": "cargo-test",
+          "kind": "TARGETED_TEST",
+          "command": "cargo test",
+          "exitCode": 0,
+          "timedOut": false,
+          "durationMs": 2146,
+          "ok": true,
+          "stdoutTail": "\nrunning 2 tests\ntest tests::add_works ... ok\ntest tests::mul_works ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+          "stderrTail": "   Compiling g9_collab_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.17s\n     Running unittests src/lib.rs (target/debug/deps/g9_collab_accept-73c12fe167720dd6)\n   Doc-tests g9_collab_accept\n"
+        }
+      ]
+    },
+    "changedFiles": [
+      "Cargo.lock",
+      "src/lib.rs",
+      "target/.rustc_info.json",
+      "target/CACHEDIR.TAG",
+      "target/debug/.cargo-artifact-lock",
+      "target/debug/.cargo-build-lock",
+      "target/debug/.cargo-lock",
+      "target/debug/.fingerprint/g9_collab_accept-0326b0beee568fa2/dep-lib-g9_collab_accept",
+      "target/debug/.fingerprint/g9_collab_accept-0326b0beee568fa2/invoked.timestamp",
+      "target/debug/.fingerprint/g9_collab_accept-0326b0beee568fa2/lib-g9_collab_accept",
+      "target/debug/.fingerprint/g9_collab_accept-0326b0beee568fa2/lib-g9_collab_accept.json",
+      "target/debug/.fingerprint/g9_collab_accept-73c12fe167720dd6/dep-test-lib-g9_collab_accept",
+      "target/debug/.fingerprint/g9_collab_accept-73c12fe167720dd6/invoked.timestamp",
+      "target/debug/.fingerprint/g9_collab_accept-73c12fe167720dd6/test-lib-g9_collab_accept",
+      "target/debug/.fingerprint/g9_collab_accept-73c12fe167720dd6/test-lib-g9_collab_accept.json",
+      "target/debug/.fingerprint/g9_collab_accept-86c4b98a6da69024/dep-lib-g9_collab_accept",
+      "target/debug/.fingerprint/g9_collab_accept-86c4b98a6da69024/invoked.timestamp",
+      "target/debug/.fingerprint/g9_collab_accept-86c4b98a6da69024/lib-g9_collab_accept",
+      "target/debug/.fingerprint/g9_collab_accept-86c4b98a6da69024/lib-g9_collab_accept.json",
+      "target/debug/deps/g9_collab_accept-0326b0beee568fa2.1qvavb04coh1krzbmc8o28mkb.0ow961i.rcgu.o",
+      "target/debug/deps/g9_collab_accept-0326b0beee568fa2.1qvavb04coh1krzbmc8o28mkb.0z4ya7z.rcgu.o",
+      "target/debug/deps/g9_collab_accept-0326b0beee568fa2.1qvavb04coh1krzbmc8o28mkb.1u4m4z6.rcgu.o",
+      "target/debug/deps/g9_collab_accept-0326b0beee568fa2.d",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.0quswgo2ivx7nvadn0djarxur.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.0quswgo2ivx7nvadn0djarxur.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.0quswgo2ivx7nvadn0djarxur.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.0ymo3dh302v3cycvosigeg1ti.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.0ymo3dh302v3cycvosigeg1ti.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.0ymo3dh302v3cycvosigeg1ti.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.1zgl3j8ot07xnehba0032lou2.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.1zgl3j8ot07xnehba0032lou2.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.1zgl3j8ot07xnehba0032lou2.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.1zjpglt3871s8weku35vb2zgg.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.1zjpglt3871s8weku35vb2zgg.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.1zjpglt3871s8weku35vb2zgg.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.3z6425ar36xbmrsymw8z1zsi9.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.3z6425ar36xbmrsymw8z1zsi9.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.3z6425ar36xbmrsymw8z1zsi9.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.62k6iqx46hzzp61mdfd4hq3md.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.62k6iqx46hzzp61mdfd4hq3md.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.62k6iqx46hzzp61mdfd4hq3md.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.69vqsk58zrrrw0pns06xjxivz.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.69vqsk58zrrrw0pns06xjxivz.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.69vqsk58zrrrw0pns06xjxivz.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.6cymecbt8tptq93h5lwppm5y9.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.6cymecbt8tptq93h5lwppm5y9.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.6cymecbt8tptq93h5lwppm5y9.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.783qh3i80n329q5dhmg0axmm8.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.783qh3i80n329q5dhmg0axmm8.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.783qh3i80n329q5dhmg0axmm8.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.7b0tplzr1w70jgio4u2bdtqm0.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.7b0tplzr1w70jgio4u2bdtqm0.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.7b0tplzr1w70jgio4u2bdtqm0.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.7svaq8guif1trnakf1wdafp2z.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.7svaq8guif1trnakf1wdafp2z.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.7svaq8guif1trnakf1wdafp2z.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.7vsakax73rijihtxtac0d6mp0.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.7vsakax73rijihtxtac0d6mp0.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.7vsakax73rijihtxtac0d6mp0.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.8h92n16sc3ug3cmmznyexjg2l.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.8h92n16sc3ug3cmmznyexjg2l.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.8h92n16sc3ug3cmmznyexjg2l.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.akcimbse8bxatw38hbwaf5ntc.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.akcimbse8bxatw38hbwaf5ntc.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.akcimbse8bxatw38hbwaf5ntc.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.akvl4e57o587ucd0v5jpwff55.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.akvl4e57o587ucd0v5jpwff55.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.akvl4e57o587ucd0v5jpwff55.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.c44j8qme0dpmonycg9ieimjtn.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.c44j8qme0dpmonycg9ieimjtn.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.c44j8qme0dpmonycg9ieimjtn.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.c7rd43uxa22wnsodu5kk1d0x7.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.c7rd43uxa22wnsodu5kk1d0x7.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.c7rd43uxa22wnsodu5kk1d0x7.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.d",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.d2ro89wek85kr50knsbsyleqi.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.d2ro89wek85kr50knsbsyleqi.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.d2ro89wek85kr50knsbsyleqi.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.dds6a223r95o5kr6isfyyunxa.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.dds6a223r95o5kr6isfyyunxa.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.dds6a223r95o5kr6isfyyunxa.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.dlxf6b83tjixge89aqrtag9k9.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.dlxf6b83tjixge89aqrtag9k9.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.dlxf6b83tjixge89aqrtag9k9.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.elfpraxcqsml4rdexw244pta7.09giwu9.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.elfpraxcqsml4rdexw244pta7.1nn13ja.rcgu.o",
+      "target/debug/deps/g9_collab_accept-73c12fe167720dd6.elfpraxcqsml4rdexw244pta7.1y250s0.rcgu.o",
+      "target/debug/deps/g9_collab_accept-86c4b98a6da69024.d",
+      "target/debug/deps/libg9_collab_accept-0326b0beee568fa2.rlib",
+      "target/debug/deps/libg9_collab_accept-0326b0beee568fa2.rmeta",
+      "target/debug/deps/libg9_collab_accept-86c4b98a6da69024.rmeta",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/0quswgo2ivx7nvadn0djarxur.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/0ymo3dh302v3cycvosigeg1ti.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/1zgl3j8ot07xnehba0032lou2.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/1zjpglt3871s8weku35vb2zgg.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/3z6425ar36xbmrsymw8z1zsi9.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/62k6iqx46hzzp61mdfd4hq3md.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/69vqsk58zrrrw0pns06xjxivz.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/6cymecbt8tptq93h5lwppm5y9.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/783qh3i80n329q5dhmg0axmm8.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/7b0tplzr1w70jgio4u2bdtqm0.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/7svaq8guif1trnakf1wdafp2z.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/7vsakax73rijihtxtac0d6mp0.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/8h92n16sc3ug3cmmznyexjg2l.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/akcimbse8bxatw38hbwaf5ntc.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/akvl4e57o587ucd0v5jpwff55.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/c44j8qme0dpmonycg9ieimjtn.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/c7rd43uxa22wnsodu5kk1d0x7.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/d2ro89wek85kr50knsbsyleqi.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/dds6a223r95o5kr6isfyyunxa.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/dep-graph.bin",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/dlxf6b83tjixge89aqrtag9k9.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/elfpraxcqsml4rdexw244pta7.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/query-cache.bin",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc-66kagklcw9qamy8lp2aeu1w9b/work-products.bin",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaasket3r-14bmloc.lock",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/0quswgo2ivx7nvadn0djarxur.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/0ymo3dh302v3cycvosigeg1ti.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/1zgl3j8ot07xnehba0032lou2.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/1zjpglt3871s8weku35vb2zgg.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/3z6425ar36xbmrsymw8z1zsi9.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/62k6iqx46hzzp61mdfd4hq3md.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/69vqsk58zrrrw0pns06xjxivz.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/6cymecbt8tptq93h5lwppm5y9.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/783qh3i80n329q5dhmg0axmm8.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/7b0tplzr1w70jgio4u2bdtqm0.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/7svaq8guif1trnakf1wdafp2z.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/7vsakax73rijihtxtac0d6mp0.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/8h92n16sc3ug3cmmznyexjg2l.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/akcimbse8bxatw38hbwaf5ntc.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/akvl4e57o587ucd0v5jpwff55.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/c44j8qme0dpmonycg9ieimjtn.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/c7rd43uxa22wnsodu5kk1d0x7.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/d2ro89wek85kr50knsbsyleqi.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/dds6a223r95o5kr6isfyyunxa.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/dep-graph.bin",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/dlxf6b83tjixge89aqrtag9k9.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/elfpraxcqsml4rdexw244pta7.o",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/query-cache.bin",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb-5wf45krk82l09659kyc5j1wfh/work-products.bin",
+      "target/debug/incremental/g9_collab_accept-0edyke31uwufm/s-hmaay0s59n-1m8ebgb.lock",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaaskes6d-0axmq30-5uxucyn2pbhryvvlc0jjzmtqy/1qvavb04coh1krzbmc8o28mkb.o",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaaskes6d-0axmq30-5uxucyn2pbhryvvlc0jjzmtqy/dep-graph.bin",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaaskes6d-0axmq30-5uxucyn2pbhryvvlc0jjzmtqy/metadata.rmeta",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaaskes6d-0axmq30-5uxucyn2pbhryvvlc0jjzmtqy/query-cache.bin",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaaskes6d-0axmq30-5uxucyn2pbhryvvlc0jjzmtqy/work-products.bin",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaaskes6d-0axmq30.lock",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaay0s59n-1m7iqjq-9xrjt4noeu5imvh3di5hwr3de/1qvavb04coh1krzbmc8o28mkb.o",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaay0s59n-1m7iqjq-9xrjt4noeu5imvh3di5hwr3de/dep-graph.bin",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaay0s59n-1m7iqjq-9xrjt4noeu5imvh3di5hwr3de/metadata.rmeta",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaay0s59n-1m7iqjq-9xrjt4noeu5imvh3di5hwr3de/query-cache.bin",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaay0s59n-1m7iqjq-9xrjt4noeu5imvh3di5hwr3de/work-products.bin",
+      "target/debug/incremental/g9_collab_accept-28ckrqh3vmwbw/s-hmaay0s59n-1m7iqjq.lock",
+      "target/debug/incremental/g9_collab_accept-36iqff2c3xr4v/s-hmaask7wda-1s4t6rg-9qroz8mpfunmnqzp100n5tqtz/dep-graph.bin",
+      "target/debug/incremental/g9_collab_accept-36iqff2c3xr4v/s-hmaask7wda-1s4t6rg-9qroz8mpfunmnqzp100n5tqtz/metadata.rmeta",
+      "target/debug/incremental/g9_collab_accept-36iqff2c3xr4v/s-hmaask7wda-1s4t6rg-9qroz8mpfunmnqzp100n5tqtz/query-cache.bin",
+      "target/debug/incremental/g9_collab_accept-36iqff2c3xr4v/s-hmaask7wda-1s4t6rg-9qroz8mpfunmnqzp100n5tqtz/work-products.bin",
+      "target/debug/incremental/g9_collab_accept-36iqff2c3xr4v/s-hmaask7wda-1s4t6rg.lock",
+      "target/debug/incremental/g9_collab_accept-36iqff2c3xr4v/s-hmaay0jvhd-1fufe9v-bveeamb41ppwlbgug2h9m991f/dep-graph.bin",
+      "target/debug/incremental/g9_collab_accept-36iqff2c3xr4v/s-hmaay0jvhd-1fufe9v-bveeamb41ppwlbgug2h9m991f/metadata.rmeta",
+      "target/debug/incremental/g9_collab_accept-36iqff2c3xr4v/s-hmaay0jvhd-1fufe9v-bveeamb41ppwlbgug2h9m991f/query-cache.bin",
+      "target/debug/incremental/g9_collab_accept-36iqff2c3xr4v/s-hmaay0jvhd-1fufe9v-bveeamb41ppwlbgug2h9m991f/work-products.bin",
+      "target/debug/incremental/g9_collab_accept-36iqff2c3xr4v/s-hmaay0jvhd-1fufe9v.lock"
+    ],
+    "journalTail": [
+      {
+        "ts": "2026-09-14T12:58:45.196Z",
+        "engine": "antigravity",
+        "phase": "lease_acquire",
+        "detail": "engine=antigravity",
+        "changedFiles": [],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T12:58:45.199Z",
+        "engine": "antigravity",
+        "phase": "turn_start",
+        "detail": "",
+        "changedFiles": [],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T12:59:49.228Z",
+        "engine": "antigravity",
+        "phase": "turn_end",
+        "detail": "finished",
+        "changedFiles": [],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T12:59:49.233Z",
+        "engine": "antigravity",
+        "phase": "turn_end",
+        "detail": "ag1 ok=true",
+        "changedFiles": [],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T12:59:51.936Z",
+        "engine": "copilot",
+        "phase": "lease_acquire",
+        "detail": "engine=copilot",
+        "changedFiles": [],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T12:59:51.938Z",
+        "engine": "copilot",
+        "phase": "turn_start",
+        "detail": "",
+        "changedFiles": [],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T13:00:17.393Z",
+        "engine": "copilot",
+        "phase": "turn_end",
+        "detail": "mutated 3 path(s)",
+        "changedFiles": [
+          "src/lib.rs",
+          "Cargo.lock",
+          "target/"
+        ],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T13:00:17.396Z",
+        "engine": "copilot",
+        "phase": "turn_end",
+        "detail": "cp ok=true",
+        "changedFiles": [],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T13:00:19.401Z",
+        "engine": "antigravity",
+        "phase": "lease_acquire",
+        "detail": "engine=antigravity",
+        "changedFiles": [],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T13:00:19.404Z",
+        "engine": "antigravity",
+        "phase": "turn_start",
+        "detail": "",
+        "changedFiles": [],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T13:05:46.526Z",
+        "engine": "antigravity",
+        "phase": "turn_end",
+        "detail": "finished",
+        "changedFiles": [],
+        "ok": true
+      },
+      {
+        "ts": "2026-09-14T13:05:46.575Z",
+        "engine": "antigravity",
+        "phase": "turn_end",
+        "detail": "ag2 ok=true",
+        "changedFiles": [],
+        "ok": true
+      }
+    ]
+  },
+  "ag1": {
+    "ok": true,
+    "detail": "finished",
+    "events": [
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "understanding"
+      },
+      {
+        "type": "started",
+        "taskId": "g9rt-ef63a858-ag1",
+        "workspace": "/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "inspecting",
+        "tool": "list_directory"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "inspecting",
+        "tool": "list_directory"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag1",
+        "kind": "inspect",
+        "tool": "list_directory",
+        "summary": "list_directory .git (181 bytes)\nCargo.toml (71 bytes)\nsrc/ (dir)"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "inspecting",
+        "tool": "list_directory"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "inspecting",
+        "tool": "list_directory"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag1",
+        "kind": "inspect",
+        "tool": "list_directory",
+        "summary": "list_directory lib.rs (291 bytes)"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "inspecting",
+        "tool": "view_file"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "inspecting",
+        "tool": "view_file"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag1",
+        "kind": "inspect",
+        "tool": "view_file",
+        "summary": "view_file View lib.rs"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "editing",
+        "tool": "edit_file"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "editing",
+        "tool": "edit_file"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag1",
+        "kind": "file_edit",
+        "tool": "edit_file",
+        "summary": "edit_file Tool execution"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag1",
+        "kind": "command",
+        "tool": "run_command",
+        "summary": "run_command zsh:1: operation not permitted: cargo"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag1",
+        "kind": "command",
+        "tool": "run_command",
+        "summary": "run_command error: could not read settings file: '/tmp/pathcode-g9-runtime-roundtrip/toolchains/rustup-home/settings.toml': Operation not permitted (os error 1)"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag1",
+        "activity": "testing",
+        "tool": "run_command"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag1",
+        "kind": "test",
+        "tool": "run_command",
+        "summary": "run_command    Compiling g9_collab_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.31s\n     Running unittests src/lib.rs (/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/18b59d66ce5873779fea11803dd7173c/cargo-target/debug/deps/g9_collab_accept-73c12fe167720dd6)\n\nrunning 2 t"
+      },
+      {
+        "type": "finished",
+        "taskId": "g9rt-ef63a858-ag1",
+        "summary": "The `add` function has been fixed, and the tests confirm that `add_works` passes while `mul_works` (which was intentionally left broken) fails. I have completed the task as requested.\nI am done with the task."
+      }
+    ]
+  },
+  "cp": {
+    "ok": true,
+    "text": "Fixed `mul` (was `a + b`, now `a * b`). Both `add_works` and `mul_works` tests pass. Not pushed.",
+    "code": 0,
+    "value": "helped",
+    "changedFiles": [
+      "src/lib.rs",
+      "Cargo.lock",
+      "target/"
+    ],
+    "detail": "mutated 3 path(s)"
+  },
+  "ag2": {
+    "ok": true,
+    "detail": "finished",
+    "events": [
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "understanding"
+      },
+      {
+        "type": "started",
+        "taskId": "g9rt-ef63a858-ag2",
+        "workspace": "/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "inspecting",
+        "tool": "search_directory"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "inspecting",
+        "tool": "search_directory"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag2",
+        "kind": "inspect",
+        "tool": "search_directory",
+        "summary": "search_directory 1 results"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "inspecting",
+        "tool": "view_file"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "inspecting",
+        "tool": "view_file"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag2",
+        "kind": "inspect",
+        "tool": "view_file",
+        "summary": "view_file View file"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "editing",
+        "tool": "edit_file"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "editing",
+        "tool": "edit_file"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag2",
+        "kind": "file_edit",
+        "tool": "edit_file",
+        "summary": "edit_file Tool execution"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag2",
+        "kind": "command",
+        "tool": "run_command",
+        "summary": "run_command zsh:1: operation not permitted: cargo"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag2",
+        "kind": "command",
+        "tool": "run_command",
+        "summary": "run_command cargo not found"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "running_command",
+        "tool": "run_command"
+      },
+      {
+        "type": "activity",
+        "taskId": "g9rt-ef63a858-ag2",
+        "activity": "testing",
+        "tool": "run_command"
+      },
+      {
+        "type": "tool",
+        "taskId": "g9rt-ef63a858-ag2",
+        "kind": "test",
+        "tool": "run_command",
+        "summary": "run_command    Compiling g9_collab_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.62s\n     Running unittests src/lib.rs (/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/18b59d66ce5873779fea11803dd7173c/cargo-target/debug/deps/g9_collab_accept-73c12fe167720dd6)\n\nrunning 2 t"
+      },
+      {
+        "type": "finished",
+        "taskId": "g9rt-ef63a858-ag2",
+        "summary": "Access to path \"/Users/achahbi/.cargo/bin\" is denied. It is outside the allowed workspace directories: [/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858 /Users/achahbi/.gemini/antigravity] (\"denied by pre-tool hook: Access to path \\\"/Users/achahbi/.cargo/bin\\\" is denied. It is outside the allowed workspace directories: [/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858 /Users/achahbi/.gemini/antigravity]\")The rustdoc comment `/// ROUNDTRIP_OK` has been added above the `pub fn add` function in `/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858/src/lib.rs`. All tests passed with `cargo test`.\n\nThe task is complete.\nCommand timed out after 300.0sThe task is complete. The rustdoc comment `/// ROUNDTRIP_OK` has been added above the `pub fn add` function in `src/lib.rs` and `cargo test` ran successfully."
+      }
+    ]
+  },
+  "mid1": {
+    "classification": "PARTIALLY_VERIFIED",
+    "reason": "Some configured final checks passed; others failed.",
+    "checks": [
+      {
+        "id": "cargo-check",
+        "name": "cargo-check",
+        "kind": "TYPECHECK",
+        "command": "cargo check",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 1099,
+        "ok": true,
+        "stdoutTail": "",
+        "stderrTail": "    Checking g9_collab_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.00s\n"
+      },
+      {
+        "id": "cargo-test",
+        "name": "cargo-test",
+        "kind": "TARGETED_TEST",
+        "command": "cargo test",
+        "exitCode": 101,
+        "timedOut": false,
+        "durationMs": 1588,
+        "ok": false,
+        "stdoutTail": "\nrunning 2 tests\ntest tests::add_works ... ok\ntest tests::mul_works ... FAILED\n\nfailures:\n\n---- tests::mul_works stdout ----\n\nthread 'tests::mul_works' (37839500) panicked at src/lib.rs:20:9:\nassertion `left == right` failed\n  left: 5\n right: 6\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    tests::mul_works\n\ntest result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderrTail": "   Compiling g9_collab_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.84s\n     Running unittests src/lib.rs (target/debug/deps/g9_collab_accept-73c12fe167720dd6)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ]
+  },
+  "mid2": {
+    "classification": "VERIFIED",
+    "reason": "All configured final checks passed.",
+    "checks": [
+      {
+        "id": "cargo-check",
+        "name": "cargo-check",
+        "kind": "TYPECHECK",
+        "command": "cargo check",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 608,
+        "ok": true,
+        "stdoutTail": "",
+        "stderrTail": "    Checking g9_collab_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.52s\n"
+      },
+      {
+        "id": "cargo-test",
+        "name": "cargo-test",
+        "kind": "TARGETED_TEST",
+        "command": "cargo test",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 1379,
+        "ok": true,
+        "stdoutTail": "\nrunning 2 tests\ntest tests::add_works ... ok\ntest tests::mul_works ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderrTail": "   Compiling g9_collab_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.55s\n     Running unittests src/lib.rs (target/debug/deps/g9_collab_accept-73c12fe167720dd6)\n   Doc-tests g9_collab_accept\n"
+      }
+    ]
+  },
+  "validation": {
+    "classification": "VERIFIED",
+    "reason": "All configured final checks passed.",
+    "checks": [
+      {
+        "id": "cargo-check",
+        "name": "cargo-check",
+        "kind": "TYPECHECK",
+        "command": "cargo check",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 1180,
+        "ok": true,
+        "stdoutTail": "",
+        "stderrTail": "    Checking g9_collab_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.90s\n"
+      },
+      {
+        "id": "cargo-test",
+        "name": "cargo-test",
+        "kind": "TARGETED_TEST",
+        "command": "cargo test",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 2146,
+        "ok": true,
+        "stdoutTail": "\nrunning 2 tests\ntest tests::add_works ... ok\ntest tests::mul_works ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderrTail": "   Compiling g9_collab_accept v0.1.0 (/private/tmp/pathcode-g9-runtime-roundtrip/ag1-tasks/g9rt-ef63a858)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.17s\n     Running unittests src/lib.rs (target/debug/deps/g9_collab_accept-73c12fe167720dd6)\n   Doc-tests g9_collab_accept\n"
+      }
+    ]
+  }
+}

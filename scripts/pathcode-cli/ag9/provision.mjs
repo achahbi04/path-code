@@ -387,6 +387,47 @@ export async function provisionRequirements(reqs, opts) {
         };
       }
 
+      // csharp-ls via `dotnet tool install --tool-path` (mise provides dotnet only).
+      if (req.id === "lsp:csharp") {
+        miseInstall(runtimeRoot, "dotnet@latest");
+        const { installDotnetToolLsp, healthCheckLsp } = await import("./lsp.mjs");
+        const installed = installDotnetToolLsp(runtimeRoot, "csharp-ls");
+        if (!installed) {
+          return {
+            ok: false,
+            req,
+            error:
+              "dotnet tool install --tool-path <runtime>/language-servers/bin csharp-ls failed or dotnet missing",
+          };
+        }
+        const health = healthCheckLsp(installed);
+        appendProvenance(provenancePath, {
+          tool: req.id,
+          version: "csharp-ls",
+          requestedBy: "g9-provision",
+          source: "dotnet-tool",
+          executable: installed,
+          health: health.ok ? "ok" : "broken",
+        });
+        if (!health.ok) {
+          return {
+            ok: false,
+            req,
+            error:
+              (health.evidence || []).join("; ") || "csharp-ls health check failed",
+          };
+        }
+        return {
+          ok: true,
+          req: {
+            ...req,
+            status: "PATH_RUNTIME_READY",
+            executable: installed,
+            evidence: [...(req.evidence || []), ...health.evidence],
+          },
+        };
+      }
+
       const spec = requirementToMiseSpec(req);
       if (!spec) {
         return {

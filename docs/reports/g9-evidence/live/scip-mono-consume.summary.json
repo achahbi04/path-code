@@ -1,0 +1,88 @@
+{
+  "label": "scip-mono-consume",
+  "outcome": "VERIFIED",
+  "classification": "VERIFIED",
+  "exitCode": 0,
+  "primaryUntouched": true,
+  "commitSha": "a7d82d813c55e3fcf333cc66c819b07c1dfee3a0",
+  "engineActivityCount": 45,
+  "collaborateEvents": [
+    {
+      "type": "session.capability.collaborate",
+      "engine": "copilot",
+      "phase": "turn",
+      "label": "Collaborative engineering",
+      "detail": "Copilot engineering turn",
+      "at": 1789394799360
+    },
+    {
+      "type": "session.capability.collaborate",
+      "engine": "copilot",
+      "phase": "done",
+      "label": "Collaborative engineering",
+      "detail": "mutated 5 path(s)",
+      "at": 1789394890156
+    }
+  ],
+  "capabilityEvents": [
+    {
+      "type": "session.capability.discovered",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null
+    },
+    {
+      "type": "session.capability.preparing",
+      "detail": null
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null,
+      "phase": "toolchains"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null,
+      "phase": "lsp"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null
+    },
+    {
+      "type": "session.capability.indexing",
+      "detail": null,
+      "phase": "scip"
+    },
+    {
+      "type": "session.capability.indexing",
+      "detail": null
+    },
+    {
+      "type": "session.capability.affected",
+      "detail": null
+    },
+    {
+      "type": "session.capability.ready",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null
+    },
+    {
+      "type": "session.capability.collaborate",
+      "detail": "Copilot engineering turn",
+      "phase": "turn",
+      "engine": "copilot"
+    },
+    {
+      "type": "session.capability.collaborate",
+      "detail": "mutated 5 path(s)",
+      "phase": "done",
+      "engine": "copilot"
+    }
+  ]
+}

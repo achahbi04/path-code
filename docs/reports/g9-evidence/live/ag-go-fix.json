@@ -1,0 +1,549 @@
+{
+  "summary": {
+    "label": "ag-go-fix",
+    "outcome": "VERIFIED",
+    "classification": "VERIFIED",
+    "exitCode": 0,
+    "primaryUntouched": true,
+    "commitSha": "fcc606274a0503be50d0223f793b4ca286aaa3eb",
+    "engineActivityCount": 18,
+    "collaborateEvents": [],
+    "capabilityEvents": [
+      {
+        "type": "session.capability.discovered",
+        "detail": null
+      },
+      {
+        "type": "session.capability.mcp",
+        "detail": null
+      },
+      {
+        "type": "session.capability.preparing",
+        "detail": null
+      },
+      {
+        "type": "session.capability.provisioning",
+        "detail": null,
+        "phase": "toolchains"
+      },
+      {
+        "type": "session.capability.provisioning",
+        "detail": null
+      },
+      {
+        "type": "session.capability.provision_failed",
+        "detail": null
+      },
+      {
+        "type": "session.capability.provisioning",
+        "detail": null,
+        "phase": "lsp"
+      },
+      {
+        "type": "session.capability.provisioning",
+        "detail": null
+      },
+      {
+        "type": "session.capability.affected",
+        "detail": null
+      },
+      {
+        "type": "session.capability.ready",
+        "detail": null
+      }
+    ]
+  },
+  "result": {
+    "exitCode": 0,
+    "outcome": "VERIFIED",
+    "classification": "VERIFIED",
+    "taskId": "4b2e81e5-aab2-47e4-9bc0-7b70068f3028",
+    "taskBranch": "path/task-4b2e81e5-aab2-47e4-9bc0-7b70068f3028",
+    "commitSha": "fcc606274a0503be50d0223f793b4ca286aaa3eb",
+    "commitStatus": "VERIFIED",
+    "advancesSession": true,
+    "durableSummary": "Result: ✓ VERIFIED\nFiles changed: 1\n\nEngineering handoff:\nThe `Add` function has been fixed, and all tests are passing.\n\nEvidence:\nTests: ✓\nTask branch: path/task-4b2e81e5-aab2-47e4-9bc0-7b70068f3028\nBaseline: 7aff2293acda7e8c8cb647cd2a0b71a349833325\nCommit: fcc606274a0503be50d0223f793b4ca286aaa3eb\nPrimary checkout untouched: yes\n\nInspect full result:\ngit diff --no-ext-diff --no-textconv 7aff2293acda7e8c8cb647cd2a0b71a349833325 fcc606274a0503be50d0223f793b4ca286aaa3eb --\n\nTo merge this work:\ngit merge path/task-4b2e81e5-aab2-47e4-9bc0-7b70068f3028\n\nChanged files:\n  - add.go\n\nDiff preview:\ndiff --git a/add.go b/add.go\nindex 37c158a..8e4f653 100644\n--- a/add.go\n+++ b/add.go\n@@ -2,5 +2,5 @@ package accept\n \n // Add is intentionally wrong for Go live acceptance.\n func Add(a, b int) int {\n-\treturn a - b\n+\treturn a + b\n }\n",
+    "sessionBaseCommit": "fcc606274a0503be50d0223f793b4ca286aaa3eb",
+    "baselineCommit": "7aff2293acda7e8c8cb647cd2a0b71a349833325",
+    "worktreePath": null,
+    "cleanup": {
+      "ok": true,
+      "code": "CLEANED",
+      "primaryUntouched": true,
+      "worktreePath": "/tmp/pathcode-g9-runtime-go/ag1-tasks/4b2e81e5-aab2-47e4-9bc0-7b70068f3028"
+    },
+    "changedFiles": [
+      "add.go"
+    ],
+    "diff": "diff --git a/add.go b/add.go\nindex 37c158a..8e4f653 100644\n--- a/add.go\n+++ b/add.go\n@@ -2,5 +2,5 @@ package accept\n \n // Add is intentionally wrong for Go live acceptance.\n func Add(a, b int) int {\n-\treturn a - b\n+\treturn a + b\n }",
+    "validation": {
+      "classification": "VERIFIED",
+      "reason": "All configured final checks passed.",
+      "checks": [
+        {
+          "id": "go-test",
+          "name": "go-test",
+          "kind": "TARGETED_TEST",
+          "command": "go test ./...",
+          "exitCode": 0,
+          "timedOut": false,
+          "durationMs": 2687,
+          "ok": true,
+          "stdoutTail": "ok  \tg9.go.accept\t0.586s\n",
+          "stderrTail": ""
+        }
+      ]
+    },
+    "primaryUntouched": true,
+    "allowShell": true,
+    "durationMs": 219199,
+    "engineActivityCount": 18,
+    "modelCalls": 0,
+    "diagFile": "/tmp/pathcode-g9-runtime-go/diag/bridge-4b2e81e5-aab2-47e4-9bc0-7b70068f3028.log"
+  },
+  "events": [
+    {
+      "type": "session.task.received",
+      "taskId": "4b2e81e5-aab2-47e4-9bc0-7b70068f3028",
+      "preview": "Fix Add so tests pass. Run go test. Do not push.",
+      "mode": "ag1",
+      "at": 1789386776294
+    },
+    {
+      "type": "session.preflight",
+      "branch": "main",
+      "head": "7aff2293acda7e8c8cb647cd2a0b71a349833325",
+      "sessionBaseCommit": "7aff2293acda7e8c8cb647cd2a0b71a349833325",
+      "dirtySummary": "clean",
+      "projectName": "go-accept",
+      "at": 1789386938847
+    },
+    {
+      "type": "session.engineering.workspace",
+      "taskId": "4b2e81e5-aab2-47e4-9bc0-7b70068f3028",
+      "taskBranch": "path/task-4b2e81e5-aab2-47e4-9bc0-7b70068f3028",
+      "workspace": "/tmp/pathcode-g9-runtime-go/ag1-tasks/4b2e81e5-aab2-47e4-9bc0-7b70068f3028",
+      "workingSubdir": "",
+      "engineeringCwd": "/tmp/pathcode-g9-runtime-go/ag1-tasks/4b2e81e5-aab2-47e4-9bc0-7b70068f3028",
+      "baselineHead": "7aff2293acda7e8c8cb647cd2a0b71a349833325",
+      "status": "ready",
+      "at": 1789386939901
+    },
+    {
+      "type": "session.recovery.checkpoint",
+      "id": "ag1-baseline:7aff2293acda7e8c8cb647cd2a0b71a349833325",
+      "kind": "task-worktree-baseline",
+      "at": 1789386939901
+    },
+    {
+      "type": "session.capability.discovered",
+      "matrix": {
+        "languages": [
+          {
+            "id": "go",
+            "status": "ready"
+          }
+        ],
+        "toolchains": [
+          {
+            "id": "go",
+            "status": "ready"
+          }
+        ],
+        "languageIntelligence": [
+          {
+            "id": "go",
+            "status": "unavailable"
+          }
+        ],
+        "specialist": {
+          "copilot": {
+            "status": "ready"
+          }
+        }
+      },
+      "at": 1789386940015
+    },
+    {
+      "type": "session.capability.mcp",
+      "enabled": 0,
+      "denied": 0,
+      "servers": [],
+      "at": 1789386940015
+    },
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/tmp/pathcode-g9-runtime-go/ag1-tasks/4b2e81e5-aab2-47e4-9bc0-7b70068f3028",
+      "runtimeRoot": "/tmp/pathcode-g9-runtime-go",
+      "at": 1789386940035
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789386940600
+    },
+    {
+      "type": "session.capability.provisioning",
+      "id": "lsp:go",
+      "at": 1789386940601
+    },
+    {
+      "type": "session.capability.provision_failed",
+      "id": "lsp:go",
+      "reason": "mise ERROR Failed to install gopls@latest: gopls not found in mise tool registry\n\nDid you mean?\n  gopass\n  go\n  golines\n  go:golang.org/x/tools/gopls\n  aqua:sivchari/gopls-lazy\nmise ERROR Version: 2026.9.7 macos-arm64 (2026-09-13)\nmise ERROR Run with --verbose or MISE_VERBOSE=1 for more information\n",
+      "at": 1789386941020
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789386941020
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:go",
+      "at": 1789386941054
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "CONSERVATIVE",
+      "source": "go",
+      "at": 1789386941255
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [],
+      "scip": false,
+      "affected": "CONSERVATIVE",
+      "at": 1789386941259
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "understanding",
+      "label": "Understanding",
+      "at": 1789386948878
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "spawn",
+      "detail": "starting engineering bridge",
+      "at": 1789386948878
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "start_written",
+      "detail": "pid=37105 python=ok",
+      "at": 1789386954767
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "protocol stdin isolated from fd0",
+      "at": 1789386955362
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "tool_env_keys=88",
+      "at": 1789386962193
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "auth_mode=vertex project=path-code-gc1-260910 location=us-central1 model=model-2.5-flash",
+      "at": 1789386962194
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "understanding",
+      "label": "Understanding",
+      "at": 1789386962200
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "sdk_session",
+      "detail": "engineering session started",
+      "at": 1789386970654
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "understanding",
+      "label": "Understanding",
+      "at": 1789386970654
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "list_directory",
+      "detail": "list_directory",
+      "at": 1789386973300
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789386973300
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "list_directory",
+      "detail": "list_directory",
+      "at": 1789386973314
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789386973314
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "list_directory",
+      "summary": "list_directory .git (200 bytes)\nadd.go (111 bytes)\nadd_test.go (133 bytes)\ngo.mod (29 bytes)",
+      "at": 1789386973314
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789386975418
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789386975418
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789386975428
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789386975428
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "view_file",
+      "summary": "view_file Examine Add function",
+      "at": 1789386975428
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789386977911
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789386977911
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789386977916
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789386977917
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "view_file",
+      "summary": "view_file Examine failing tests",
+      "at": 1789386977917
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "editing",
+      "label": "Implementing",
+      "tool": "edit_file",
+      "detail": "edit_file",
+      "at": 1789386980946
+    },
+    {
+      "type": "session.applying",
+      "summary": "editing in task workspace",
+      "at": 1789386980946
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "editing",
+      "label": "Implementing",
+      "tool": "edit_file",
+      "detail": "edit_file",
+      "at": 1789386980955
+    },
+    {
+      "type": "session.applying",
+      "summary": "editing in task workspace",
+      "at": 1789386980955
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "file_edit",
+      "tool": "edit_file",
+      "summary": "edit_file Edit add.go",
+      "at": 1789386980955
+    },
+    {
+      "type": "session.edit.summary",
+      "path": "edit_file Edit add.go",
+      "kind": "edit",
+      "at": 1789386980955
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "running_command",
+      "label": "Running command",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789386983728
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "running_command",
+      "label": "Running command",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789386987024
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "command",
+      "tool": "run_command",
+      "summary": "run_command ok  \tg9.go.accept\t0.707s",
+      "at": 1789386987024
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "complete",
+      "label": "Finishing",
+      "at": 1789386989684
+    },
+    {
+      "type": "session.engineering.handoff",
+      "summary": "The `Add` function has been fixed, and all tests are passing.",
+      "at": 1789386989693
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "verifying",
+      "label": "Verifying",
+      "at": 1789386989693
+    },
+    {
+      "type": "session.validation.plan",
+      "summary": "independent final validation",
+      "at": 1789386989693
+    },
+    {
+      "type": "session.validation.running",
+      "id": "go-test",
+      "kind": "TARGETED_TEST",
+      "check": "go-test",
+      "at": 1789386989709
+    },
+    {
+      "type": "session.validation.result",
+      "id": "go-test",
+      "check": "go-test",
+      "kind": "TARGETED_TEST",
+      "ok": true,
+      "status": "PASSED",
+      "exitCode": 0,
+      "at": 1789386992396
+    },
+    {
+      "type": "session.engineering.result",
+      "classification": "VERIFIED",
+      "changedFiles": [
+        "add.go"
+      ],
+      "primaryUntouched": true,
+      "durationMs": 218835,
+      "allowShell": true,
+      "sandbox": "AG1_SANDBOX_OK",
+      "taskBranch": "path/task-4b2e81e5-aab2-47e4-9bc0-7b70068f3028",
+      "commitSha": "fcc606274a0503be50d0223f793b4ca286aaa3eb",
+      "baselineSha": "7aff2293acda7e8c8cb647cd2a0b71a349833325",
+      "commitStatus": "VERIFIED",
+      "advancesSession": true,
+      "checks": [
+        {
+          "id": "go-test",
+          "kind": "TARGETED_TEST",
+          "ok": true,
+          "exitCode": 0,
+          "command": "go test ./..."
+        }
+      ],
+      "inspectCommand": "git diff --no-ext-diff --no-textconv 7aff2293acda7e8c8cb647cd2a0b71a349833325 fcc606274a0503be50d0223f793b4ca286aaa3eb --",
+      "preservedArtifact": null,
+      "diffPreviewLines": [
+        "diff --git a/add.go b/add.go",
+        "index 37c158a..8e4f653 100644",
+        "--- a/add.go",
+        "+++ b/add.go",
+        "@@ -2,5 +2,5 @@ package accept",
+        " ",
+        " // Add is intentionally wrong for Go live acceptance.",
+        " func Add(a, b int) int {",
+        "-\treturn a - b",
+        "+\treturn a + b",
+        " }"
+      ],
+      "diffPreviewTruncated": false,
+      "diffPreviewShownFiles": 1,
+      "at": 1789386995129
+    },
+    {
+      "type": "session.terminal",
+      "disposition": "VERIFIED",
+      "summary": "All configured final checks passed.",
+      "taskBranch": "path/task-4b2e81e5-aab2-47e4-9bc0-7b70068f3028",
+      "commitSha": "fcc606274a0503be50d0223f793b4ca286aaa3eb",
+      "at": 1789386995130
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "done command received",
+      "at": 1789386995131
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "continue loop end: done",
+      "at": 1789386995131
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "close command received",
+      "at": 1789386995132
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "bridge_exit",
+      "detail": "code=0 signal=null",
+      "at": 1789386995493
+    }
+  ]
+}

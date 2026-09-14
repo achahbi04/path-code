@@ -1,0 +1,4 @@
+[package]
+name = "g9_collab_accept"
+version = "0.1.0"
+edition = "2021"

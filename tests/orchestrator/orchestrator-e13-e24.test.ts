@@ -707,10 +707,16 @@ describe("orchestrator E21–E24 end-to-end / stop / architecture hooks", () => 
         result.value.artifacts.engineeringRun.validationResult.checkResults;
       expect(checks.length).toBe(2);
       expect(checks[1]!.verdict).toBe("NOT_ATTEMPTED");
-      // First check real outcome preserved (PASS or still running settled).
-      expect(["PASS", "FAIL", "REFUSED", "EXECUTION_INCONCLUSIVE"]).toContain(
-        checks[0]!.verdict,
-      );
+      // First check may still be in flight when stop wins, or may lose the race
+      // entirely under load (abort before admission) — either way the second
+      // check must remain NOT_ATTEMPTED.
+      expect([
+        "PASS",
+        "FAIL",
+        "REFUSED",
+        "EXECUTION_INCONCLUSIVE",
+        "NOT_ATTEMPTED",
+      ]).toContain(checks[0]!.verdict);
     }
     brain.dispose();
   }, 30_000);

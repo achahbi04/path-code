@@ -1,0 +1,54 @@
+{
+  "label": "ag-go-fix",
+  "outcome": "VERIFIED",
+  "classification": "VERIFIED",
+  "exitCode": 0,
+  "primaryUntouched": true,
+  "commitSha": "fcc606274a0503be50d0223f793b4ca286aaa3eb",
+  "engineActivityCount": 18,
+  "collaborateEvents": [],
+  "capabilityEvents": [
+    {
+      "type": "session.capability.discovered",
+      "detail": null
+    },
+    {
+      "type": "session.capability.mcp",
+      "detail": null
+    },
+    {
+      "type": "session.capability.preparing",
+      "detail": null
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null,
+      "phase": "toolchains"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null
+    },
+    {
+      "type": "session.capability.provision_failed",
+      "detail": null
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null,
+      "phase": "lsp"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "detail": null
+    },
+    {
+      "type": "session.capability.affected",
+      "detail": null
+    },
+    {
+      "type": "session.capability.ready",
+      "detail": null
+    }
+  ]
+}

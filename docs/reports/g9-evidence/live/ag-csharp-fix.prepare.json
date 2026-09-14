@@ -1,0 +1,93 @@
+{
+  "label": "ag-csharp-fix",
+  "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/csharp-accept",
+  "runtimeRoot": "/tmp/pathcode-g9-runtime-csharp",
+  "prepared": {
+    "brief": "## PATH G9 engineering environment\nLanguages: csharp\nToolchains:\n- dotnet: PATH_RUNTIME_READY\n- lsp:csharp: FAILED (health check failed for lsp:csharp)\nLanguage servers:\n- csharp: unavailable\nCode intelligence (SCIP): skipped (not indicated)\nAffected checks: UNAVAILABLE via none\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+    "provision": [
+      "dotnet: PATH_RUNTIME_READY",
+      "lsp:csharp: FAILED (health check failed for lsp:csharp)"
+    ],
+    "lsp": [
+      {
+        "id": "csharp",
+        "status": "unavailable",
+        "executable": null,
+        "evidence": [
+          "bins=csharp-ls,OmniSharp",
+          "csharp-ls not found",
+          "OmniSharp not found",
+          "mise install dotnet ok=true status=0"
+        ]
+      }
+    ],
+    "pathPrepend": [
+      "/tmp/pathcode-g9-runtime-csharp/toolchains/mise-data/dotnet-root",
+      "/tmp/pathcode-g9-runtime-csharp/tool-manager/mise/bin",
+      "/tmp/pathcode-g9-runtime-csharp/language-servers/bin",
+      "/tmp/pathcode-g9-runtime-csharp/language-servers/npm/bin",
+      "/tmp/pathcode-g9-runtime-csharp/toolchains/cargo-home/bin",
+      "/tmp/pathcode-g9-runtime-csharp/toolchains/mise-data/shims",
+      "/tmp/pathcode-g9-runtime-csharp/language-servers",
+      "/tmp/pathcode-g9-runtime-csharp/language-servers/npm",
+      "/tmp/pathcode-g9-runtime-csharp/indexers/npm"
+    ]
+  },
+  "prepEvents": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/csharp-accept",
+      "runtimeRoot": "/tmp/pathcode-g9-runtime-csharp",
+      "at": 1789387164580
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789387164664
+    },
+    {
+      "type": "session.capability.provisioning",
+      "id": "dotnet",
+      "at": 1789387164666
+    },
+    {
+      "type": "session.capability.provisioned",
+      "id": "dotnet",
+      "at": 1789387236255
+    },
+    {
+      "type": "session.capability.provisioning",
+      "id": "lsp:csharp",
+      "at": 1789387236255
+    },
+    {
+      "type": "session.capability.provision_failed",
+      "id": "lsp:csharp",
+      "reason": "health check failed for lsp:csharp",
+      "at": 1789387312632
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789387312633
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:csharp",
+      "at": 1789387312668
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "UNAVAILABLE",
+      "source": "none",
+      "at": 1789387313414
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [],
+      "scip": false,
+      "affected": "UNAVAILABLE",
+      "at": 1789387313418
+    }
+  ]
+}

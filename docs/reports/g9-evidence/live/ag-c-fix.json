@@ -1,0 +1,537 @@
+{
+  "summary": {
+    "label": "ag-c-fix",
+    "outcome": "VERIFIED",
+    "classification": "VERIFIED",
+    "exitCode": 0,
+    "primaryUntouched": true,
+    "commitSha": "d554a493b487e36544cea33c39cfb36271aabe99",
+    "engineActivityCount": 18,
+    "collaborateEvents": [],
+    "capabilityEvents": [
+      {
+        "type": "session.capability.discovered",
+        "detail": null
+      },
+      {
+        "type": "session.capability.mcp",
+        "detail": null
+      },
+      {
+        "type": "session.capability.preparing",
+        "detail": null
+      },
+      {
+        "type": "session.capability.provisioning",
+        "detail": null,
+        "phase": "toolchains"
+      },
+      {
+        "type": "session.capability.provisioning",
+        "detail": null,
+        "phase": "lsp"
+      },
+      {
+        "type": "session.capability.provisioning",
+        "detail": null
+      },
+      {
+        "type": "session.capability.affected",
+        "detail": null
+      },
+      {
+        "type": "session.capability.ready",
+        "detail": null
+      }
+    ]
+  },
+  "result": {
+    "exitCode": 0,
+    "outcome": "VERIFIED",
+    "classification": "VERIFIED",
+    "taskId": "8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba",
+    "taskBranch": "path/task-8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba",
+    "commitSha": "d554a493b487e36544cea33c39cfb36271aabe99",
+    "commitStatus": "VERIFIED",
+    "advancesSession": true,
+    "durableSummary": "Result: ✓ VERIFIED\nFiles changed: 2\n\nEngineering handoff:\nThe `add` function has been fixed, and all tests are passing.\n\nEvidence:\nTests: ✓\nTask branch: path/task-8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba\nBaseline: 822e36cb4d478bb26c81b49323f687dcd9600ad8\nCommit: d554a493b487e36544cea33c39cfb36271aabe99\nPrimary checkout untouched: yes\n\nInspect full result:\ngit diff --no-ext-diff --no-textconv 822e36cb4d478bb26c81b49323f687dcd9600ad8 d554a493b487e36544cea33c39cfb36271aabe99 --\n\nTo merge this work:\ngit merge path/task-8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba\n\nChanged files:\n  - add.c\n  - test_add\n\nDiff preview:\ndiff --git a/add.c b/add.c\nindex b908a71..98a0ce7 100644\n--- a/add.c\n+++ b/add.c\n@@ -1,4 +1,4 @@\n /* Intentionally wrong for C live acceptance. */\n int add(int a, int b) {\n-  return a - b;\n+  return a + b;\n }\n",
+    "sessionBaseCommit": "d554a493b487e36544cea33c39cfb36271aabe99",
+    "baselineCommit": "822e36cb4d478bb26c81b49323f687dcd9600ad8",
+    "worktreePath": null,
+    "cleanup": {
+      "ok": true,
+      "code": "CLEANED",
+      "primaryUntouched": true,
+      "worktreePath": "/tmp/pathcode-g9-runtime-c/ag1-tasks/8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba"
+    },
+    "changedFiles": [
+      "add.c",
+      "test_add"
+    ],
+    "diff": "diff --git a/add.c b/add.c\nindex b908a71..98a0ce7 100644\n--- a/add.c\n+++ b/add.c\n@@ -1,4 +1,4 @@\n /* Intentionally wrong for C live acceptance. */\n int add(int a, int b) {\n-  return a - b;\n+  return a + b;\n }",
+    "validation": {
+      "classification": "VERIFIED",
+      "reason": "All configured final checks passed.",
+      "checks": [
+        {
+          "id": "make-test",
+          "name": "make-test",
+          "kind": "TARGETED_TEST",
+          "command": "make test",
+          "exitCode": 0,
+          "timedOut": false,
+          "durationMs": 782,
+          "ok": true,
+          "stdoutTail": "cc -o test_add add.c test_add.c && ./test_add\n",
+          "stderrTail": ""
+        }
+      ]
+    },
+    "primaryUntouched": true,
+    "allowShell": true,
+    "durationMs": 117026,
+    "engineActivityCount": 18,
+    "modelCalls": 0,
+    "diagFile": "/tmp/pathcode-g9-runtime-c/diag/bridge-8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba.log"
+  },
+  "events": [
+    {
+      "type": "session.task.received",
+      "taskId": "8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba",
+      "preview": "Fix add so tests pass. Run make test. Do not push.",
+      "mode": "ag1",
+      "at": 1789387027918
+    },
+    {
+      "type": "session.preflight",
+      "branch": "main",
+      "head": "822e36cb4d478bb26c81b49323f687dcd9600ad8",
+      "sessionBaseCommit": "822e36cb4d478bb26c81b49323f687dcd9600ad8",
+      "dirtySummary": "clean",
+      "projectName": "c-accept",
+      "at": 1789387103233
+    },
+    {
+      "type": "session.engineering.workspace",
+      "taskId": "8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba",
+      "taskBranch": "path/task-8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba",
+      "workspace": "/tmp/pathcode-g9-runtime-c/ag1-tasks/8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba",
+      "workingSubdir": "",
+      "engineeringCwd": "/tmp/pathcode-g9-runtime-c/ag1-tasks/8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba",
+      "baselineHead": "822e36cb4d478bb26c81b49323f687dcd9600ad8",
+      "status": "ready",
+      "at": 1789387103713
+    },
+    {
+      "type": "session.recovery.checkpoint",
+      "id": "ag1-baseline:822e36cb4d478bb26c81b49323f687dcd9600ad8",
+      "kind": "task-worktree-baseline",
+      "at": 1789387103713
+    },
+    {
+      "type": "session.capability.discovered",
+      "matrix": {
+        "languages": [
+          {
+            "id": "c_cpp",
+            "status": "ready"
+          }
+        ],
+        "toolchains": [
+          {
+            "id": "make",
+            "status": "ready"
+          },
+          {
+            "id": "clangd",
+            "status": "ready"
+          }
+        ],
+        "languageIntelligence": [
+          {
+            "id": "c_cpp",
+            "status": "ready"
+          }
+        ],
+        "specialist": {
+          "copilot": {
+            "status": "ready"
+          }
+        }
+      },
+      "at": 1789387103749
+    },
+    {
+      "type": "session.capability.mcp",
+      "enabled": 0,
+      "denied": 0,
+      "servers": [],
+      "at": 1789387103750
+    },
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/tmp/pathcode-g9-runtime-c/ag1-tasks/8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba",
+      "runtimeRoot": "/tmp/pathcode-g9-runtime-c",
+      "at": 1789387103760
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789387104375
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789387104377
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:c_cpp",
+      "at": 1789387104406
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "UNAVAILABLE",
+      "source": "none",
+      "at": 1789387106780
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [
+        "c_cpp"
+      ],
+      "scip": false,
+      "affected": "UNAVAILABLE",
+      "at": 1789387106783
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "understanding",
+      "label": "Understanding",
+      "at": 1789387112731
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "spawn",
+      "detail": "starting engineering bridge",
+      "at": 1789387112731
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "start_written",
+      "detail": "pid=42085 python=ok",
+      "at": 1789387115232
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "protocol stdin isolated from fd0",
+      "at": 1789387115505
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "tool_env_keys=88",
+      "at": 1789387117326
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "auth_mode=vertex project=path-code-gc1-260910 location=us-central1 model=model-2.5-flash",
+      "at": 1789387117327
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "understanding",
+      "label": "Understanding",
+      "at": 1789387117329
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "sdk_session",
+      "detail": "engineering session started",
+      "at": 1789387124252
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "understanding",
+      "label": "Understanding",
+      "at": 1789387124252
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "list_directory",
+      "detail": "list_directory",
+      "at": 1789387127069
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789387127069
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "list_directory",
+      "detail": "list_directory",
+      "at": 1789387127074
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789387127074
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "list_directory",
+      "summary": "list_directory .git (199 bytes)\nMakefile (78 bytes)\nadd.c (91 bytes)\ntest_add.c (172 bytes)",
+      "at": 1789387127075
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789387129478
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789387129478
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789387129492
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789387129492
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "view_file",
+      "summary": "view_file File view",
+      "at": 1789387129492
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789387131615
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789387131615
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789387131621
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789387131621
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "view_file",
+      "summary": "view_file File view",
+      "at": 1789387131621
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "editing",
+      "label": "Implementing",
+      "tool": "edit_file",
+      "detail": "edit_file",
+      "at": 1789387134961
+    },
+    {
+      "type": "session.applying",
+      "summary": "editing in task workspace",
+      "at": 1789387134961
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "editing",
+      "label": "Implementing",
+      "tool": "edit_file",
+      "detail": "edit_file",
+      "at": 1789387134970
+    },
+    {
+      "type": "session.applying",
+      "summary": "editing in task workspace",
+      "at": 1789387134970
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "file_edit",
+      "tool": "edit_file",
+      "summary": "edit_file File edit",
+      "at": 1789387134970
+    },
+    {
+      "type": "session.edit.summary",
+      "path": "edit_file File edit",
+      "kind": "edit",
+      "at": 1789387134971
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "running_command",
+      "label": "Running command",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789387137935
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "testing",
+      "label": "Testing",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789387140423
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "test",
+      "tool": "run_command",
+      "summary": "run_command cc -o test_add add.c test_add.c && ./test_add",
+      "at": 1789387140426
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "complete",
+      "label": "Finishing",
+      "at": 1789387142830
+    },
+    {
+      "type": "session.engineering.handoff",
+      "summary": "The `add` function has been fixed, and all tests are passing.",
+      "at": 1789387142837
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "verifying",
+      "label": "Verifying",
+      "at": 1789387142837
+    },
+    {
+      "type": "session.validation.plan",
+      "summary": "independent final validation",
+      "at": 1789387142837
+    },
+    {
+      "type": "session.validation.running",
+      "id": "make-test",
+      "kind": "TARGETED_TEST",
+      "check": "make-test",
+      "at": 1789387142868
+    },
+    {
+      "type": "session.validation.result",
+      "id": "make-test",
+      "check": "make-test",
+      "kind": "TARGETED_TEST",
+      "ok": true,
+      "status": "PASSED",
+      "exitCode": 0,
+      "at": 1789387143650
+    },
+    {
+      "type": "session.engineering.result",
+      "classification": "VERIFIED",
+      "changedFiles": [
+        "add.c",
+        "test_add"
+      ],
+      "primaryUntouched": true,
+      "durationMs": 116698,
+      "allowShell": true,
+      "sandbox": "AG1_SANDBOX_OK",
+      "taskBranch": "path/task-8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba",
+      "commitSha": "d554a493b487e36544cea33c39cfb36271aabe99",
+      "baselineSha": "822e36cb4d478bb26c81b49323f687dcd9600ad8",
+      "commitStatus": "VERIFIED",
+      "advancesSession": true,
+      "checks": [
+        {
+          "id": "make-test",
+          "kind": "TARGETED_TEST",
+          "ok": true,
+          "exitCode": 0,
+          "command": "make test"
+        }
+      ],
+      "inspectCommand": "git diff --no-ext-diff --no-textconv 822e36cb4d478bb26c81b49323f687dcd9600ad8 d554a493b487e36544cea33c39cfb36271aabe99 --",
+      "preservedArtifact": null,
+      "diffPreviewLines": [
+        "diff --git a/add.c b/add.c",
+        "index b908a71..98a0ce7 100644",
+        "--- a/add.c",
+        "+++ b/add.c",
+        "@@ -1,4 +1,4 @@",
+        " /* Intentionally wrong for C live acceptance. */",
+        " int add(int a, int b) {",
+        "-  return a - b;",
+        "+  return a + b;",
+        " }"
+      ],
+      "diffPreviewTruncated": false,
+      "diffPreviewShownFiles": 2,
+      "at": 1789387144616
+    },
+    {
+      "type": "session.terminal",
+      "disposition": "VERIFIED",
+      "summary": "All configured final checks passed.",
+      "taskBranch": "path/task-8c5a0a0e-e8e1-4c0c-a30f-a85b37d6b8ba",
+      "commitSha": "d554a493b487e36544cea33c39cfb36271aabe99",
+      "at": 1789387144618
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "done command received",
+      "at": 1789387144619
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "continue loop end: done",
+      "at": 1789387144619
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "close command received",
+      "at": 1789387144619
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "bridge_exit",
+      "detail": "code=0 signal=null",
+      "at": 1789387144943
+    }
+  ]
+}

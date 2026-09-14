@@ -1,0 +1,74 @@
+{
+  "label": "ag-c-fix",
+  "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/c-accept",
+  "runtimeRoot": "/tmp/pathcode-g9-runtime-c",
+  "prepared": {
+    "brief": "## PATH G9 engineering environment\nLanguages: c_cpp\nToolchains:\n- clangd-toolchain: HOST_READY\n- make: HOST_READY\n- clangd: HOST_READY\n- lsp:c_cpp: HOST_READY\nLanguage servers:\n- c_cpp: ready (/tmp/pathcode-g9-runtime-c/language-servers/clangd)\nCode intelligence (SCIP): skipped (not indicated)\nCopilot LSP home: /tmp/pathcode-g9-runtime-c/copilot-home (servers: c_cpp)\nAffected checks: UNAVAILABLE via none\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+    "provision": [
+      "clangd-toolchain: HOST_READY",
+      "make: HOST_READY",
+      "clangd: HOST_READY",
+      "lsp:c_cpp: HOST_READY"
+    ],
+    "lsp": [
+      {
+        "id": "c_cpp",
+        "status": "ready",
+        "executable": "/tmp/pathcode-g9-runtime-c/language-servers/clangd",
+        "evidence": [
+          "bins=clangd",
+          "host clangd → /usr/bin/clangd",
+          "health: --version → status=0 Apple clangd version 21.0.0 (clang-2100.1.1.101)\nFeatures: mac+xpc\nPlatform: arm64-apple-darwin25.5.0"
+        ]
+      }
+    ],
+    "pathPrepend": [
+      "/usr/bin",
+      "/tmp/pathcode-g9-runtime-c/tool-manager/mise/bin",
+      "/tmp/pathcode-g9-runtime-c/language-servers/bin",
+      "/tmp/pathcode-g9-runtime-c/language-servers/npm/bin",
+      "/tmp/pathcode-g9-runtime-c/toolchains/cargo-home/bin",
+      "/tmp/pathcode-g9-runtime-c/language-servers",
+      "/tmp/pathcode-g9-runtime-c/language-servers/npm",
+      "/tmp/pathcode-g9-runtime-c/indexers/npm"
+    ]
+  },
+  "prepEvents": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/c-accept",
+      "runtimeRoot": "/tmp/pathcode-g9-runtime-c",
+      "at": 1789386996102
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789387001609
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789387001611
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:c_cpp",
+      "at": 1789387019535
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "UNAVAILABLE",
+      "source": "none",
+      "at": 1789387027891
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [
+        "c_cpp"
+      ],
+      "scip": false,
+      "affected": "UNAVAILABLE",
+      "at": 1789387027903
+    }
+  ]
+}

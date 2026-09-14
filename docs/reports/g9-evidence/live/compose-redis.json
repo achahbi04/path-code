@@ -1,0 +1,105 @@
+{
+  "summary": {
+    "label": "compose-redis",
+    "detected": {
+      "composeFile": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/compose-svc/compose.yaml",
+      "devcontainer": false,
+      "evidence": [
+        "compose.yaml"
+      ]
+    },
+    "started": {
+      "status": "STARTED",
+      "projectKey": "04151e1ea1f0",
+      "composeProject": "pathcode-g9-04151e1ea1f0",
+      "metaPath": "/tmp/pathcode-g9-runtime-svc2/metadata/services-04151e1ea1f0.json",
+      "evidence": [
+        "compose.yaml",
+        "docker=/opt/homebrew/bin/docker",
+        "composeMode=docker-compose-standalone",
+        "compose -p pathcode-g9-04151e1ea1f0 up -d status=0",
+        " Network pathcode-g9-04151e1ea1f0_default Creating \n Network pathcode-g9-04151e1ea1f0_default Creating \n Network pathcode-g9-04151e1ea1f0_default Created \n Network pathcode-g9-04151e1ea1f0_default Created \n Container pathcode-g9-04151e1ea1f0-redis-1 Creating \n Container pathcode-g9-04151e1ea1f0-redis-1 Created \n Container pathcode-g9-04151e1ea1f0-redis-1 Starting \n Container pathcode-g9-04151e1ea1",
+        "plugin: unknown shorthand flag: 'f' in -f\n\nUsage:  docker [OPTIONS] COMMAND [ARG...]\n\nRun 'docker --help' for more information\n"
+      ]
+    },
+    "preparedServices": {
+      "detected": {
+        "composeFile": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/compose-svc/compose.yaml",
+        "devcontainer": false,
+        "evidence": [
+          "compose.yaml"
+        ]
+      },
+      "runtime": {
+        "status": "SKIPPED",
+        "reason": "startServices_false"
+      }
+    },
+    "session": {
+      "classification": "VERIFIED",
+      "primaryUntouched": true,
+      "commitSha": "ddb94219e0afb5e5317e2c4350545ffc21635c71"
+    },
+    "stopped": {
+      "status": "STOPPED",
+      "composeProject": "pathcode-g9-04151e1ea1f0",
+      "evidence": [
+        "docker=/opt/homebrew/bin/docker",
+        "composeMode=docker-compose-standalone",
+        "compose -p pathcode-g9-04151e1ea1f0 down status=0",
+        " Container pathcode-g9-04151e1ea1f0-redis-1 Stopping \n Container pathcode-g9-04151e1ea1f0-redis-1 Stopped \n Container pathcode-g9-04151e1ea1f0-redis-1 Removing \n Container pathcode-g9-04151e1ea1f0-redis-1 Removed \n Network pathcode-g9-04151e1ea1f0_default Removing \n Network pathcode-g9-04151e1ea1f0_"
+      ]
+    },
+    "liveServiceOk": true,
+    "engineeringOk": true,
+    "cleanupOk": true
+  },
+  "session": {
+    "exitCode": 0,
+    "outcome": "VERIFIED",
+    "classification": "VERIFIED",
+    "taskId": "119c2d4d-0f9d-4f7e-aa90-80f82e27b293",
+    "taskBranch": "path/task-119c2d4d-0f9d-4f7e-aa90-80f82e27b293",
+    "commitSha": "ddb94219e0afb5e5317e2c4350545ffc21635c71",
+    "commitStatus": "VERIFIED",
+    "advancesSession": true,
+    "durableSummary": "Result: ✓ VERIFIED\nFiles changed: 1\n\nEngineering handoff:\nI have modified `src/ping.js` to return \"PONG\" as requested. However, I am unable to run `npm test` due to sandbox restrictions. The error `Operation not permitted` is returned when trying to execute `node`. This prevents me from verifying the fix by running tests. The requested code change has been applied. I'll now mark the task as complete.\n\nEvidence:\nTests: ✓\nTask branch: path/task-119c2d4d-0f9d-4f7e-aa90-80f82e27b293\nBaseline: 425cbd87f42c3a9b4a2d79b95589792a98452e34\nCommit: ddb94219e0afb5e5317e2c4350545ffc21635c71\nPrimary checkout untouched: yes\n\nInspect full result:\ngit diff --no-ext-diff --no-textconv 425cbd87f42c3a9b4a2d79b95589792a98452e34 ddb94219e0afb5e5317e2c4350545ffc21635c71 --\n\nTo merge this work:\ngit merge path/task-119c2d4d-0f9d-4f7e-aa90-80f82e27b293\n\nChanged files:\n  - src/ping.js\n\nDiff preview:\ndiff --git a/src/ping.js b/src/ping.js\nindex 540d42b..0ea3314 100644\n--- a/src/ping.js\n+++ b/src/ping.js\n@@ -1,4 +1,4 @@\n /** Intentionally returns PONGX so engineering must fix after redis is up. */\n export function expectedPong() {\n-  return \"PONGX\";\n+  return \"PONG\";\n }\n",
+    "sessionBaseCommit": "ddb94219e0afb5e5317e2c4350545ffc21635c71",
+    "baselineCommit": "425cbd87f42c3a9b4a2d79b95589792a98452e34",
+    "worktreePath": null,
+    "cleanup": {
+      "ok": true,
+      "code": "CLEANED",
+      "primaryUntouched": true,
+      "worktreePath": "/tmp/pathcode-g9-runtime-svc2/ag1-tasks/119c2d4d-0f9d-4f7e-aa90-80f82e27b293"
+    },
+    "changedFiles": [
+      "src/ping.js"
+    ],
+    "diff": "diff --git a/src/ping.js b/src/ping.js\nindex 540d42b..0ea3314 100644\n--- a/src/ping.js\n+++ b/src/ping.js\n@@ -1,4 +1,4 @@\n /** Intentionally returns PONGX so engineering must fix after redis is up. */\n export function expectedPong() {\n-  return \"PONGX\";\n+  return \"PONG\";\n }",
+    "validation": {
+      "classification": "VERIFIED",
+      "reason": "All configured final checks passed.",
+      "checks": [
+        {
+          "id": "npm-test",
+          "name": "npm-test",
+          "kind": "TARGETED_TEST",
+          "command": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run test",
+          "exitCode": 0,
+          "timedOut": false,
+          "durationMs": 867,
+          "ok": true,
+          "stdoutTail": "\n> test\n> node --test test/redis.test.js\n\n✔ redis PING matches expectedPong (24.157708ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 206.195292\n",
+          "stderrTail": ""
+        }
+      ]
+    },
+    "primaryUntouched": true,
+    "allowShell": true,
+    "durationMs": 118469,
+    "engineActivityCount": 27,
+    "modelCalls": 0,
+    "diagFile": "/tmp/pathcode-g9-runtime-svc2/diag/bridge-119c2d4d-0f9d-4f7e-aa90-80f82e27b293.log"
+  }
+}

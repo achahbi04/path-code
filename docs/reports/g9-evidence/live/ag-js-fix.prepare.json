@@ -1,0 +1,85 @@
+{
+  "label": "ag-js-fix",
+  "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/js-accept",
+  "runtimeRoot": "/tmp/pathcode-g9-runtime-js",
+  "prepared": {
+    "brief": "## PATH G9 engineering environment\nLanguages: typescript\nToolchains:\n- node: HOST_READY\n- npm: HOST_READY\n- lsp:typescript: PATH_RUNTIME_READY\nLanguage servers:\n- typescript: ready (/tmp/pathcode-g9-runtime-js/language-servers/typescript-language-server)\nCode intelligence (SCIP): skipped (not indicated)\nCopilot LSP home: /tmp/pathcode-g9-runtime-js/copilot-home (servers: typescript)\nAffected checks: CONSERVATIVE via npm-test\n- /opt/homebrew/bin/npm test\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+    "provision": [
+      "node: HOST_READY",
+      "npm: HOST_READY",
+      "lsp:typescript: PATH_RUNTIME_READY"
+    ],
+    "lsp": [
+      {
+        "id": "typescript",
+        "status": "ready",
+        "executable": "/tmp/pathcode-g9-runtime-js/language-servers/typescript-language-server",
+        "evidence": [
+          "bins=typescript-language-server",
+          "typescript-language-server not found",
+          "npm typescript-language-server → /tmp/pathcode-g9-runtime-js/language-servers/npm/typescript-language-server/node_modules/.bin/typescript-language-server",
+          "health: --version → status=0 6.0.0"
+        ]
+      }
+    ],
+    "pathPrepend": [
+      "/opt/homebrew/bin",
+      "/tmp/pathcode-g9-runtime-js/language-servers/npm/bin",
+      "/tmp/pathcode-g9-runtime-js/tool-manager/mise/bin",
+      "/tmp/pathcode-g9-runtime-js/language-servers/bin",
+      "/tmp/pathcode-g9-runtime-js/toolchains/cargo-home/bin",
+      "/tmp/pathcode-g9-runtime-js/toolchains/mise-data/shims",
+      "/tmp/pathcode-g9-runtime-js/language-servers",
+      "/tmp/pathcode-g9-runtime-js/language-servers/npm",
+      "/tmp/pathcode-g9-runtime-js/indexers/npm"
+    ]
+  },
+  "prepEvents": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/js-accept",
+      "runtimeRoot": "/tmp/pathcode-g9-runtime-js",
+      "at": 1789386082652
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789386083699
+    },
+    {
+      "type": "session.capability.provisioning",
+      "id": "lsp:typescript",
+      "at": 1789386083702
+    },
+    {
+      "type": "session.capability.provisioned",
+      "id": "lsp:typescript",
+      "at": 1789386127289
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789386127290
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:typescript",
+      "at": 1789386127322
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "CONSERVATIVE",
+      "source": "npm-test",
+      "at": 1789386133309
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [
+        "typescript"
+      ],
+      "scip": false,
+      "affected": "CONSERVATIVE",
+      "at": 1789386133321
+    }
+  ]
+}

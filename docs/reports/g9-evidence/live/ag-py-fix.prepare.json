@@ -1,0 +1,109 @@
+{
+  "label": "ag-py-fix",
+  "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/py-accept",
+  "runtimeRoot": "/tmp/pathcode-g9-runtime-py",
+  "prepared": {
+    "brief": "## PATH G9 engineering environment\nLanguages: python\nToolchains:\n- python: HOST_READY\n- uv: HOST_READY\n- pip: PATH_RUNTIME_READY (reused)\n- pytest: PATH_RUNTIME_READY (reused)\n- lsp:python: PATH_RUNTIME_READY\nLanguage servers:\n- python: unavailable\nCode intelligence (SCIP): skipped (not indicated)\nAffected checks: UNAVAILABLE via none\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+    "provision": [
+      "python: HOST_READY",
+      "uv: HOST_READY",
+      "pip: PATH_RUNTIME_READY (reused)",
+      "pytest: PATH_RUNTIME_READY (reused)",
+      "lsp:python: PATH_RUNTIME_READY"
+    ],
+    "lsp": [
+      {
+        "id": "python",
+        "status": "unavailable",
+        "executable": null,
+        "evidence": [
+          "bins=basedpyright-langserver,basedpyright,pyright-langserver,pyright,pylsp",
+          "basedpyright-langserver not found",
+          "basedpyright not found",
+          "pyright-langserver not found",
+          "pyright not found",
+          "pylsp not found",
+          "npm install pyright failed or npm missing"
+        ]
+      }
+    ],
+    "pathPrepend": [
+      "/opt/homebrew/bin",
+      "/tmp/pathcode-g9-runtime-py/toolchains/python-venv/bin",
+      "/Users/achahbi/.local/bin",
+      "/tmp/pathcode-g9-runtime-py/language-servers/npm/bin",
+      "/tmp/pathcode-g9-runtime-py/tool-manager/mise/bin",
+      "/tmp/pathcode-g9-runtime-py/language-servers/bin",
+      "/tmp/pathcode-g9-runtime-py/toolchains/cargo-home/bin",
+      "/tmp/pathcode-g9-runtime-py/language-servers",
+      "/tmp/pathcode-g9-runtime-py/language-servers/npm",
+      "/tmp/pathcode-g9-runtime-py/indexers/npm"
+    ]
+  },
+  "prepEvents": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/py-accept",
+      "runtimeRoot": "/tmp/pathcode-g9-runtime-py",
+      "at": 1789387651840
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789387681526
+    },
+    {
+      "type": "session.capability.provisioning",
+      "id": "pip",
+      "at": 1789387681529
+    },
+    {
+      "type": "session.capability.provisioned",
+      "id": "pip",
+      "at": 1789387683196
+    },
+    {
+      "type": "session.capability.provisioning",
+      "id": "pytest",
+      "at": 1789387683196
+    },
+    {
+      "type": "session.capability.provisioned",
+      "id": "pytest",
+      "at": 1789387684646
+    },
+    {
+      "type": "session.capability.provisioning",
+      "id": "lsp:python",
+      "at": 1789387684646
+    },
+    {
+      "type": "session.capability.provisioned",
+      "id": "lsp:python",
+      "at": 1789387721187
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789387721188
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:python",
+      "at": 1789387721269
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "UNAVAILABLE",
+      "source": "none",
+      "at": 1789387758190
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [],
+      "scip": false,
+      "affected": "UNAVAILABLE",
+      "at": 1789387758199
+    }
+  ]
+}

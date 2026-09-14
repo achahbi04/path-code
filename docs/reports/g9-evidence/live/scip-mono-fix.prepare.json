@@ -1,0 +1,98 @@
+{
+  "label": "scip-mono-fix",
+  "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/scip-mono",
+  "runtimeRoot": "/tmp/pathcode-g9-runtime-scip",
+  "prepared": {
+    "brief": "## PATH G9 engineering environment\nLanguages: typescript\nToolchains:\n- node: PATH_RUNTIME_READY\n- pnpm: HOST_READY\n- npm: PATH_RUNTIME_READY\n- lsp:typescript: PATH_RUNTIME_READY\nLanguage servers:\n- typescript: ready (/tmp/pathcode-g9-runtime-scip/language-servers/typescript-language-server)\nCode intelligence (SCIP): ready fingerprint=0fb06d74da42598f9c5f57f9e9567241\nCopilot LSP home: /tmp/pathcode-g9-runtime-scip/copilot-home (servers: typescript)\nAffected checks: PROJECT_EXACT via pnpm\n- /opt/homebrew/bin/pnpm -r --filter=...[HEAD^1] test\nServices: UNAVAILABLE (no_service_evidence)\nPATH acquires/configures mature tools; Antigravity and Copilot collaborate as full engineering engines in this session.",
+    "provision": [
+      "node: PATH_RUNTIME_READY",
+      "pnpm: HOST_READY",
+      "npm: PATH_RUNTIME_READY",
+      "lsp:typescript: PATH_RUNTIME_READY"
+    ],
+    "lsp": [
+      {
+        "id": "typescript",
+        "status": "ready",
+        "executable": "/tmp/pathcode-g9-runtime-scip/language-servers/typescript-language-server",
+        "evidence": [
+          "bins=typescript-language-server",
+          "typescript-language-server not found",
+          "npm typescript-language-server → /tmp/pathcode-g9-runtime-scip/language-servers/npm/typescript-language-server/node_modules/.bin/typescript-language-server",
+          "health: --version → status=0 6.0.0"
+        ]
+      }
+    ],
+    "pathPrepend": [
+      "/tmp/pathcode-g9-runtime-scip/toolchains/mise-data/installs/node/lts/bin",
+      "/opt/homebrew/bin",
+      "/tmp/pathcode-g9-runtime-scip/language-servers/npm/bin",
+      "/tmp/pathcode-g9-runtime-scip/tool-manager/mise/bin",
+      "/tmp/pathcode-g9-runtime-scip/language-servers/bin",
+      "/tmp/pathcode-g9-runtime-scip/toolchains/cargo-home/bin",
+      "/tmp/pathcode-g9-runtime-scip/toolchains/mise-data/shims",
+      "/tmp/pathcode-g9-runtime-scip/language-servers",
+      "/tmp/pathcode-g9-runtime-scip/language-servers/npm",
+      "/tmp/pathcode-g9-runtime-scip/indexers/npm"
+    ]
+  },
+  "prepEvents": [
+    {
+      "type": "session.capability.preparing",
+      "projectRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/scip-mono",
+      "runtimeRoot": "/tmp/pathcode-g9-runtime-scip",
+      "at": 1789388986909
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "toolchains",
+      "at": 1789388990991
+    },
+    {
+      "type": "session.capability.provisioning",
+      "id": "lsp:typescript",
+      "at": 1789388990993
+    },
+    {
+      "type": "session.capability.provisioned",
+      "id": "lsp:typescript",
+      "at": 1789388995401
+    },
+    {
+      "type": "session.capability.provisioning",
+      "phase": "lsp",
+      "at": 1789388995401
+    },
+    {
+      "type": "session.capability.provisioning",
+      "tool": "lsp:typescript",
+      "at": 1789388995449
+    },
+    {
+      "type": "session.capability.indexing",
+      "phase": "scip",
+      "at": 1789388995865
+    },
+    {
+      "type": "session.capability.indexing",
+      "status": "cache_hit",
+      "fingerprint": "0fb06d74da42598f9c5f57f9e9567241",
+      "at": 1789388996042
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "PROJECT_EXACT",
+      "source": "pnpm",
+      "at": 1789389000116
+    },
+    {
+      "type": "session.capability.ready",
+      "lspReady": [
+        "typescript"
+      ],
+      "scip": true,
+      "affected": "PROJECT_EXACT",
+      "at": 1789389000182
+    }
+  ]
+}

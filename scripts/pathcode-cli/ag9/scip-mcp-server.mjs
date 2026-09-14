@@ -165,18 +165,18 @@ async function trySdkMain() {
 }
 
 /**
- * Write one MCP JSON-RPC message with Content-Length framing.
+ * Write one MCP JSON-RPC message as NDJSON.
+ * Antigravity localharness JSON-parses stdout directly; Content-Length
+ * responses start with 'C' and fail initialize. Accept Content-Length on
+ * input, always reply NDJSON.
  * @param {object} msg
  */
 function writeMessage(msg) {
-  const body = Buffer.from(JSON.stringify(msg), "utf8");
-  const header = `Content-Length: ${body.length}\r\n\r\n`;
-  process.stdout.write(header);
-  process.stdout.write(body);
+  process.stdout.write(`${JSON.stringify(msg)}\n`);
 }
 
 /**
- * Minimal MCP JSON-RPC over stdio (Content-Length framing).
+ * Minimal MCP JSON-RPC over stdio (NDJSON + Content-Length input).
  */
 async function jsonRpcMain() {
   let buffer = Buffer.alloc(0);
@@ -188,37 +188,46 @@ async function jsonRpcMain() {
 
   async function processBuffer() {
     while (true) {
-      const headerEnd = buffer.indexOf("\r\n\r\n");
-      if (headerEnd === -1) {
-        // Also accept NDJSON / bare JSON without Content-Length (test harnesses).
-    // Prefer Content-Length when present.
-        const nl = buffer.indexOf("\n");
-        if (nl === -1) return;
-        const line = buffer.slice(0, nl).toString("utf8").trim();
-        buffer = buffer.slice(nl + 1);
-        if (!line || line.startsWith("Content-Length")) continue;
-        try {
-          const msg = JSON.parse(line);
-          await dispatch(msg);
-        } catch {
-          /* ignore */
-        }
-        continue;
+      // Content-Length framing (standard MCP) — prefer when headers present.
+      const headerEndCrLf = buffer.indexOf("\r\n\r\n");
+      const headerEndLf = buffer.indexOf("\n\n");
+      let headerEnd = -1;
+      let sepLen = 4;
+      if (headerEndCrLf !== -1 && (headerEndLf === -1 || headerEndCrLf <= headerEndLf)) {
+        headerEnd = headerEndCrLf;
+        sepLen = 4;
+      } else if (headerEndLf !== -1) {
+        headerEnd = headerEndLf;
+        sepLen = 2;
       }
 
-      const header = buffer.slice(0, headerEnd).toString("utf8");
-      const match = /Content-Length:\s*(\d+)/i.exec(header);
-      if (!match) {
-        buffer = buffer.slice(headerEnd + 4);
-        continue;
+      if (headerEnd !== -1) {
+        const header = buffer.slice(0, headerEnd).toString("utf8");
+        const match = /Content-Length:\s*(\d+)/i.exec(header);
+        if (match) {
+          const len = Number(match[1]);
+          const start = headerEnd + sepLen;
+          if (buffer.length < start + len) return;
+          const body = buffer.slice(start, start + len).toString("utf8");
+          buffer = buffer.slice(start + len);
+          try {
+            const msg = JSON.parse(body);
+            await dispatch(msg);
+          } catch {
+            /* ignore */
+          }
+          continue;
+        }
       }
-      const len = Number(match[1]);
-      const start = headerEnd + 4;
-      if (buffer.length < start + len) return;
-      const body = buffer.slice(start, start + len).toString("utf8");
-      buffer = buffer.slice(start + len);
+
+      // NDJSON / bare JSON lines (Antigravity localharness).
+      const nl = buffer.indexOf("\n");
+      if (nl === -1) return;
+      const line = buffer.slice(0, nl).toString("utf8").trim();
+      buffer = buffer.slice(nl + 1);
+      if (!line || /^content-length:/i.test(line)) continue;
       try {
-        const msg = JSON.parse(body);
+        const msg = JSON.parse(line);
         await dispatch(msg);
       } catch {
         /* ignore */

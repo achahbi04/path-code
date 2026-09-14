@@ -134,11 +134,30 @@ export function resolveDockerCli() {
  * }} input
  */
 function runCompose({ docker, args, cwd, timeoutMs = 300_000 }) {
+  /** Prefer a Docker config without Desktop credsStore (Colima / Homebrew). */
+  /** @type {Record<string, string | undefined>} */
+  const env = { ...process.env };
+  if (!env.DOCKER_CONFIG) {
+    try {
+      const dirs = ensureAg9RuntimeDirs(
+        env.PATHCODE_RUNTIME_ROOT || process.cwd(),
+      );
+      const cfgDir = join(dirs.metadata, "docker-config");
+      mkdirSync(cfgDir, { recursive: true });
+      writeFileSync(
+        join(cfgDir, "config.json"),
+        `${JSON.stringify({ auths: {} }, null, 2)}\n`,
+      );
+      env.DOCKER_CONFIG = cfgDir;
+    } catch {
+      /* keep host DOCKER_CONFIG */
+    }
+  }
   const plugin = spawnSync(docker, ["compose", ...args], {
     cwd,
     encoding: "utf8",
     timeout: timeoutMs,
-    env: process.env,
+    env,
   });
   if (plugin.status === 0) {
     return { ...plugin, mode: "docker-compose-plugin" };
@@ -149,7 +168,7 @@ function runCompose({ docker, args, cwd, timeoutMs = 300_000 }) {
       cwd,
       encoding: "utf8",
       timeout: timeoutMs,
-      env: process.env,
+      env,
     });
     return {
       ...r,

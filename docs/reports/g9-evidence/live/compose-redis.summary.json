@@ -1,0 +1,55 @@
+{
+  "label": "compose-redis",
+  "detected": {
+    "composeFile": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/compose-svc/compose.yaml",
+    "devcontainer": false,
+    "evidence": [
+      "compose.yaml"
+    ]
+  },
+  "started": {
+    "status": "STARTED",
+    "projectKey": "04151e1ea1f0",
+    "composeProject": "pathcode-g9-04151e1ea1f0",
+    "metaPath": "/tmp/pathcode-g9-runtime-svc2/metadata/services-04151e1ea1f0.json",
+    "evidence": [
+      "compose.yaml",
+      "docker=/opt/homebrew/bin/docker",
+      "composeMode=docker-compose-standalone",
+      "compose -p pathcode-g9-04151e1ea1f0 up -d status=0",
+      " Network pathcode-g9-04151e1ea1f0_default Creating \n Network pathcode-g9-04151e1ea1f0_default Creating \n Network pathcode-g9-04151e1ea1f0_default Created \n Network pathcode-g9-04151e1ea1f0_default Created \n Container pathcode-g9-04151e1ea1f0-redis-1 Creating \n Container pathcode-g9-04151e1ea1f0-redis-1 Created \n Container pathcode-g9-04151e1ea1f0-redis-1 Starting \n Container pathcode-g9-04151e1ea1",
+      "plugin: unknown shorthand flag: 'f' in -f\n\nUsage:  docker [OPTIONS] COMMAND [ARG...]\n\nRun 'docker --help' for more information\n"
+    ]
+  },
+  "preparedServices": {
+    "detected": {
+      "composeFile": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/live-repos/compose-svc/compose.yaml",
+      "devcontainer": false,
+      "evidence": [
+        "compose.yaml"
+      ]
+    },
+    "runtime": {
+      "status": "SKIPPED",
+      "reason": "startServices_false"
+    }
+  },
+  "session": {
+    "classification": "VERIFIED",
+    "primaryUntouched": true,
+    "commitSha": "ddb94219e0afb5e5317e2c4350545ffc21635c71"
+  },
+  "stopped": {
+    "status": "STOPPED",
+    "composeProject": "pathcode-g9-04151e1ea1f0",
+    "evidence": [
+      "docker=/opt/homebrew/bin/docker",
+      "composeMode=docker-compose-standalone",
+      "compose -p pathcode-g9-04151e1ea1f0 down status=0",
+      " Container pathcode-g9-04151e1ea1f0-redis-1 Stopping \n Container pathcode-g9-04151e1ea1f0-redis-1 Stopped \n Container pathcode-g9-04151e1ea1f0-redis-1 Removing \n Container pathcode-g9-04151e1ea1f0-redis-1 Removed \n Network pathcode-g9-04151e1ea1f0_default Removing \n Network pathcode-g9-04151e1ea1f0_"
+    ]
+  },
+  "liveServiceOk": true,
+  "engineeringOk": true,
+  "cleanupOk": true
+}

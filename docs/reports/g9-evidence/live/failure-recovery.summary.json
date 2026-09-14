@@ -1,0 +1,66 @@
+{
+  "runtimeRoot": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/runtime-live-failure",
+  "cases": {
+    "corruptRuntime": {
+      "classifiedStatus": "BROKEN",
+      "classifiedExecutable": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/runtime-live-failure/corrupt/language-servers/bin/gopls",
+      "detectedBroken": true,
+      "afterPrepareLsp": {
+        "id": "go",
+        "status": "unavailable",
+        "executable": null,
+        "evidence": [
+          "bins=gopls",
+          "gopls not found",
+          "mise install gopls ok=false status=1",
+          "mise ERROR Failed to install gopls@latest: gopls not found in mise tool registry\n\nDid you mean?\n  gopass\n  go\n  golines\n  go:golang.org/x/tools/gopls\n  aqua:sivchari/gopls-lazy\nmise ERROR Version: 202"
+        ]
+      },
+      "repaired": false,
+      "provisionBrief": [
+        "go: HOST_READY",
+        "lsp:go: FAILED (mise ERROR Failed to install gopls@latest: gopls not found in mise tool registry\n\nDid you mean?\n  gopass\n  go\n  golines\n  go:golang.org/x/tools/gopls\n  aqua:sivchari/gopls-lazy\nmise ERROR Version: 2026.9.7 macos-arm64 (2026-09-13)\nmise ERROR Run with --verbose or MISE_VERBOSE=1 for more information\n)"
+      ]
+    },
+    "lspFailure": {
+      "languageServers": [
+        {
+          "id": "rust",
+          "status": "ready",
+          "executable": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/runtime-live-failure/lsp-fault/language-servers/rust-analyzer",
+          "evidence": [
+            "bins=rust-analyzer",
+            "mise rust-analyzer → /Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/runtime-live-failure/lsp-fault/toolchains/cargo-home/bin/rust-analyzer",
+            "health: --version → status=1 error: Unknown binary 'rust-analyzer' in official toolchain 'stable-aarch64-apple-darwin'.",
+            "health: version → status=1 error: Unknown binary 'rust-analyzer' in official toolchain 'stable-aarch64-apple-darwin'.",
+            "health: --help → status=1 error: Unknown binary 'rust-analyzer' in official toolchain 'stable-aarch64-apple-darwin'.",
+            "health: help → status=1 error: Unknown binary 'rust-analyzer' in official toolchain 'stable-aarch64-apple-darwin'.",
+            "health: stdio probe status=null (short timeout expected)"
+          ]
+        }
+      ],
+      "ready": true,
+      "executable": "/Users/achahbi/.cursor/worktrees/g9-gaps-2be29924/cursor-pathcode-antigravity-v1-3e0a5996e7d6/docs/reports/g9-evidence/runtime-live-failure/lsp-fault/language-servers/rust-analyzer",
+      "healedAwayFromCorrupt": true,
+      "truthfulTerminal": true
+    },
+    "scipStale": {
+      "firstOk": true,
+      "firstCached": false,
+      "secondOk": true,
+      "secondCached": false,
+      "rebuilt": true,
+      "queryOk": true,
+      "queryHits": 1,
+      "indexMs": 29269,
+      "rebuildMs": 5829,
+      "queryMs": 400
+    },
+    "provisionCancel": {
+      "brief": "G9 preparation aborted.",
+      "scipReason": "aborted",
+      "aborted": true,
+      "sane": true
+    }
+  }
+}

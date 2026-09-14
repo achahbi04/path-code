@@ -21,6 +21,10 @@ export const MCP_ENV_ALLOWLIST = Object.freeze([
   "TEMP",
   "USER",
   "LOGNAME",
+  // PATH-owned G9 SCIP MCP (non-secret runtime pointers for path-scip stdio server)
+  "PATHCODE_SCIP_INDEX_DIR",
+  "PATHCODE_RUNTIME_ROOT",
+  "PATHCODE_SCIP_TRUST_CLASS",
 ]);
 
 const NAME_RE = /^[a-zA-Z0-9_-]+$/;

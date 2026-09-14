@@ -1,0 +1,190 @@
+{
+  "classification": "VERIFIED",
+  "commitSha": "a7d82d813c55e3fcf333cc66c819b07c1dfee3a0",
+  "mcpServersEmitted": [
+    {
+      "name": "path-scip",
+      "type": "stdio",
+      "trustClass": "read_only",
+      "source": "path_runtime",
+      "enabled": 1
+    }
+  ],
+  "mcpToolCallsObserved": [
+    {
+      "type": "session.engineering.activity",
+      "tool": "code_search_symbol",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "code_search_symbol",
+      "kind": null,
+      "summary": null,
+      "at": 1789394737676
+    },
+    {
+      "type": "session.engineering.activity",
+      "tool": "code_search_symbol",
+      "activity": "mcp",
+      "label": "MCP",
+      "detail": "path-scip",
+      "kind": null,
+      "summary": null,
+      "at": 1789394737878
+    },
+    {
+      "type": "session.engineering.tool",
+      "tool": "code_search_symbol",
+      "activity": null,
+      "label": null,
+      "detail": null,
+      "kind": "mcp",
+      "summary": "code_search_symbol {\n  \"ok\": true,\n  \"source\": \"symbol_map\",\n  \"op\": \"search\",\n  \"results\": [\n    {\n      \"name\": \"tokenPrefix\",\n      \"path\": \"packages/a/index.ts\",\n      \"kind\": \"definition\"\n    }\n  ]\n}",
+      "at": 1789394737878
+    },
+    {
+      "type": "session.engineering.activity",
+      "tool": "code_references",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "code_references",
+      "kind": null,
+      "summary": null,
+      "at": 1789394740822
+    },
+    {
+      "type": "session.engineering.activity",
+      "tool": "code_references",
+      "activity": "mcp",
+      "label": "MCP",
+      "detail": "path-scip",
+      "kind": null,
+      "summary": null,
+      "at": 1789394741352
+    },
+    {
+      "type": "session.engineering.tool",
+      "tool": "code_references",
+      "activity": null,
+      "label": null,
+      "detail": null,
+      "kind": "mcp",
+      "summary": "code_references {\n  \"ok\": true,\n  \"source\": \"symbol_map\",\n  \"op\": \"references\",\n  \"results\": [\n    {\n      \"name\": \"tokenPrefix\",\n      \"path\": \"packages/a/index.ts\",\n      \"kind\": \"definition\"\n    }\n  ]\n}",
+      "at": 1789394741353
+    }
+  ],
+  "factsUsed": {
+    "scipReady": true,
+    "scipFingerprint": "e489e2af7eee64c77dd5f3f60f7f26a0",
+    "mcpServersEmittedCount": 1,
+    "mcpToolNamesObserved": [
+      "code_search_symbol",
+      "code_references"
+    ],
+    "mcpExecutionErrors": [],
+    "mcpToolsSucceededWithoutIndexUnset": true,
+    "bridgeMcpServers": [
+      "mcp_servers=1"
+    ],
+    "validation": {
+      "classification": "VERIFIED",
+      "reason": "All configured final checks passed.",
+      "checks": [
+        {
+          "id": "typecheck-local-tsc",
+          "name": "typecheck-local-tsc",
+          "kind": "TYPECHECK",
+          "command": "node /tmp/pathcode-g9-runtime-scip2/ag1-tasks/d1ee4790-a25b-4e0e-bfb3-803ba31d8cb5/node_modules/typescript/lib/tsc.js -p /tmp/pathcode-g9-runtime-scip2/ag1-tasks/d1ee4790-a25b-4e0e-bfb3-803ba31d8cb5/tsconfig.json --noEmit",
+          "exitCode": 0,
+          "timedOut": false,
+          "durationMs": 1894,
+          "ok": true,
+          "stdoutTail": "",
+          "stderrTail": ""
+        },
+        {
+          "id": "npm-test",
+          "name": "npm-test",
+          "kind": "TARGETED_TEST",
+          "command": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run test",
+          "exitCode": 0,
+          "timedOut": false,
+          "durationMs": 1196,
+          "ok": true,
+          "stdoutTail": "\n> test\n> node --import tsx --test packages/b/auth.test.ts\n\n✔ authHeader uses correct token prefix (19.705792ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 553.279791\n",
+          "stderrTail": ""
+        }
+      ]
+    },
+    "changedFiles": [
+      "package-lock.json",
+      "package.json",
+      "packages/a/index.ts",
+      "packages/b/package.json",
+      "tsconfig.json"
+    ],
+    "commitStatus": "VERIFIED",
+    "durableSummaryHead": "Result: ✓ VERIFIED\nFiles changed: 5\n\nEngineering handoff:\nI have modified the `tokenPrefix` function in `packages/a/index.ts` to return `\"tok:\" + name;` as requested. However, I am unable to run `npm test` or `npm typecheck` to validate the change due to a persistent \"env: node: Operation not permitted\" error when executing any `node`-related command. This prevents `npm install`, `npm test`, and `tsc` from running. The code change has been applied, but…\n\nEvidence:\nTypecheck: ✓\nTests: ✓\nTask branch: path/task-d1ee4790-a25b-4e0e-bfb3-803ba31d8cb5\nBaseline: 5bf8b162d230bd90e62803098bce8d6d82a4780",
+    "collaborate": [
+      {
+        "type": "session.capability.collaborate",
+        "engine": "copilot",
+        "phase": "turn",
+        "detail": "Copilot engineering turn"
+      },
+      {
+        "type": "session.capability.collaborate",
+        "engine": "copilot",
+        "phase": "done",
+        "detail": "mutated 5 path(s)"
+      }
+    ]
+  },
+  "materialMutation": {
+    "commitSha": "a7d82d813c55e3fcf333cc66c819b07c1dfee3a0",
+    "files": [
+      "package-lock.json",
+      "package.json",
+      "packages/a/index.ts",
+      "packages/b/package.json",
+      "tsconfig.json"
+    ],
+    "tokenPrefixFixed": true,
+    "afterContent": "/** Shared token helper — intentionally returns wrong prefix for SCIP live engineering. */\nexport function tokenPrefix(name: string): string {\n  return \"tok:\" + name;\n}\nexport function helloA(): string {\n  return \"a\";\n}",
+    "diffSnippet": "commit a7d82d813c55e3fcf333cc66c819b07c1dfee3a0\nAuthor: G9 Evidence <g9-evidence@pathcode.local>\nDate:   Mon Sep 14 16:08:14 2026 +0200\n\n    PATH: verified task d1ee4790-a25b-4e0e-bfb3-803ba31d8cb5\n\ndiff --git a/packages/a/index.ts b/packages/a/index.ts\nindex 1f0c362..3ceec54 100644\n--- a/packages/a/index.ts\n+++ b/packages/a/index.ts\n@@ -1,6 +1,6 @@\n /** Shared token helper — intentionally returns wrong prefix for SCIP live engineering. */\n export function tokenPrefix(name: string): string {\n-  return \"bad:\" + name;\n+  return \"tok:\" + name;\n }\n export function helloA(): string {\n   return \"a\";\n"
+  },
+  "verified": true,
+  "demonstrablyCalledPathScipTools": true,
+  "mcpIndexEnvAllowlisted": true,
+  "bridgeDiag": {
+    "path": "/tmp/pathcode-g9-runtime-scip2/diag/bridge-d1ee4790-a25b-4e0e-bfb3-803ba31d8cb5.log",
+    "lineCount": 13,
+    "mcpRelatedLineCount": 1,
+    "mcpRelatedSamples": [
+      "{\"kind\":\"stderr\",\"text\":\"mcp_servers=1\",\"ts\":1789394722253}"
+    ]
+  },
+  "goplsCorruptFailure": {
+    "classifiedStatus": "BROKEN",
+    "classifiedExecutable": "/tmp/pathcode-g9-runtime-failure-gopls/corrupt/language-servers/bin/gopls",
+    "detectedBroken": true,
+    "afterPrepareLsp": {
+      "id": "go",
+      "status": "unavailable",
+      "executable": null,
+      "evidence": [
+        "bins=gopls",
+        "gopls not found",
+        "mise install go:golang.org/x/tools/gopls ok=false status=1",
+        "mise ERROR Failed to install go:golang.org/x/tools/gopls@latest: timed out after 20.00s\nmise ERROR Version: 2026.9.7 macos-arm64 (2026-09-13)\nmise ERROR Run with --verbose or MISE_VERBOSE=1 for more i"
+      ]
+    },
+    "repaired": false,
+    "provisionBrief": [
+      "go: HOST_READY",
+      "lsp:go: FAILED (no mise mapping for lsp:go)"
+    ],
+    "brokenPath": "/tmp/pathcode-g9-runtime-failure-gopls/corrupt/language-servers/bin/gopls"
+  },
+  "generatedAt": "2026-09-14T14:09:02.578Z",
+  "runtimeRoot": "/tmp/pathcode-g9-runtime-scip2"
+}

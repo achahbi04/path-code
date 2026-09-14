@@ -276,7 +276,7 @@ function toolchainMiseMap(id) {
  * @param {string} langId
  */
 function lspMiseMap(langId) {
-  /** @type {Record<string, { miseTool?: string, bins: string[], npmPackage?: string }>} */
+  /** @type {Record<string, { miseTool?: string, bins: string[], npmPackage?: string, eclipseJdtls?: boolean }>} */
   const map = {
     typescript: {
       bins: ["typescript-language-server"],
@@ -287,6 +287,7 @@ function lspMiseMap(langId) {
     rust: { bins: ["rust-analyzer"], miseTool: "rust-analyzer" },
     java: { bins: ["jdtls", "java-language-server"], eclipseJdtls: true },
     c_cpp: { bins: ["clangd"], miseTool: "llvm" },
+    csharp: { bins: ["csharp-ls", "OmniSharp"], miseTool: "dotnet" },
   };
   return map[langId] || null;
 }
