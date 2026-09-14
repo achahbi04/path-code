@@ -1,159 +1,208 @@
 # PATH CODE — G10
 # NATIVE COLLABORATIVE ENGINE FABRIC + LIVING COCKPIT 2.0
 
-**Result:** PARTIAL
+**Result:** PARTIAL_PENDING_OPERATOR_REVIEW
 
-**Baseline:** `4735ee9817e3bdef69a0d84bc8b949408cc889b0` (G9 PASS clean HEAD)  
-**Implementation commit:** `e4d2941cf26acefce3f4dab580d4288eba5aeb73`  
-**Report/freeze commit:** `952fc0eabbf0cffc8a8437d44bad1291b2e60016`  
+**Baseline (named freeze — do not reset if HEAD is later):**  
+- Named implementation: `e4d2941cf26acefce3f4dab580d4288eba5aeb73`  
+- Named PARTIAL report: `952fc0eabbf0cffc8a8437d44bad1291b2e60016`
+
+**Closure implementation commit:** `416877d10eb4e04bad313588eee26198e6fbbfdf`  
+**Closure report commit:** _(filled at freeze)_  
+**Current HEAD:** _(filled at freeze)_  
 **Branch:** `cursor/pathcode-antigravity-v1`  
-**Working tree:** clean after freeze
+**Working tree:** _(filled at freeze)_
 
-G10 inherits the complete G9 engineering foundation. This phase adds the
-collaborative fabric, preferred Copilot SDK surface, durable task continuity,
-runtime guards, and Cockpit 2.0 event wiring — without rebuilding G9.
+G10 inherits the complete G9 engineering foundation. Closure drive closed the
+remaining live product acceptance gaps without redesigning the fabric.
 
 ---
 
-## ANTIGRAVITY NATIVE SESSION
+## ANTIGRAVITY LIVE REPAIR
 
 | Field | Status |
 | --- | --- |
-| Integration | PASS — `ag10/ag-session.mjs` binds PATH task to bridge `startTask`/`continueTask` |
-| Persistence | PASS — crash-safe checkpoint stores `agTaskId` / `agSessionMode` |
-| Events | PASS — bridge activity mapped into G10/session events (live AG run: 94 events) |
-| Mutation | PASS — live JS fixture edits via AG |
-| Commands | PASS — shell/tool events observed |
-| Repair | PARTIAL — repair path wired; live AG JS run verified without needing repair loop |
-| Resume | PASS — `NATIVE_RESUME` vs `REHYDRATED_SESSION` classified truthfully |
-| Failure recovery | PASS — dead handle → `REHYDRATED_SESSION` from filesystem/Git reality |
-| Verified result | PASS — `docs/reports/g10-evidence/live/ag-g10-js.summary.json` → **VERIFIED** |
+| Task | `ag-repair-*` disposable repair-js fixture |
+| Failure | Phase A: diagnose-only; `node --test` / independent validation **FAILED** (add returned `a-b`) |
+| Repair | Same AG session `continueNative` → fixed `a+b` |
+| Verified result | **PASS** — Phase B validation **VERIFIED** (`closure/ag-repair.json`) |
 
-## COPILOT SDK
+## COPILOT SDK NATIVE ENGINEERING
 
 | Field | Status |
 | --- | --- |
-| Integration | PASS — `@github/copilot-sdk` optionalDependency + `ag10/copilot-sdk.mjs` |
-| Persistence | PASS — resumable `sessionId` on create/resume |
-| Events | PASS — SDK events mapped (`command.started` / `file.modified` / …) |
-| Mutation | PASS — live file fix (`copilot-sdk-mutation.json`) |
-| Commands | PASS — mutation proof ran tests via engine |
-| LSP | INHERITED (G9) — PATH `COPILOT_HOME` LSP config unchanged; not re-claimed as new |
-| MCP | INHERITED (G9) — trust filtering preserved |
-| Repair | PASS — mutation turn repaired failing test |
-| Resume | PASS — `resumeSession` attempted; create fallback recorded honestly |
-| SDK → CLI fallback proof | PASS — forced `preferSdk:false` + EACCES/auth degrade → `cli_fallback` |
-| Auth failure preservation | PASS — `AUTH_REQUIRED` classification; task/worktree preserved |
-| Verified result | PASS — native SDK turn `SDK_OK` + mutation **PASS** |
+| Session | native_sdk `path-sdk-lsp-*` |
+| Mutation | `src/add.js` fixed; `npm test` exit 0 |
+| Commands | command/tool events observed |
+| LSP/native capability | PATH-prepared `COPILOT_HOME` + typescript LSP; SDK consumed PATH toolchain |
+| MCP/tool use | Not forced; G9 SCIP MCP preserved when relevant |
+| Events | SDK streaming + cockpit mapping |
+| Repair | Mutation repaired failing test |
+| Verified result | **PASS** (`closure/sdk-lsp.json`) |
 
-## COLLABORATION
+## SCIP LIVE PRODUCT USE
 
 | Field | Status |
 | --- | --- |
-| Same task | PASS — `g10-collab-shared` |
-| Same worktree | PASS — shared PATH task worktree |
-| Shared task reality | PASS — resume brief + Git fingerprints |
-| AG contribution | PASS — AG turn finished on shared worktree (`REHYDRATED_SESSION`) |
-| Copilot contribution | PASS — native SDK material edit of `src/add.js` |
-| Round-trip continuation | PASS — AG started from post-Copilot reality |
-| Mutation lease | PASS — `withMutationLease` / G9 `withCollabTurn` |
-| Stale-write protection | PASS — fingerprint check before mutate |
-| No-progress circuit breaker | PASS — warn@2 stop@3 (unit + guard matrix) |
-| Productive long collaboration | PASS — productive handoffs reset breaker (>3 allowed) |
-| Verified result | PASS — `collab-dual.json` **PASS**, npm test 0, validation **VERIFIED** |
+| Repository | `scip-mono` |
+| Symbol/query | `tokenPrefix` / definition |
+| Engine | Antigravity |
+| Cockpit event | `session.capability.indexing` + Code intelligence activity |
+| Engineering contribution | SCIP facts briefed into AG objective; session **VERIFIED** (repairAttempts≥1) |
+| Verified result | **PASS** (`closure/scip-live.json`) |
 
-## G9 CAPABILITY INTEGRATION
+## SERVICE / CONTAINER PRODUCT USE
 
 | Field | Status |
 | --- | --- |
-| Self-provisioning | PASS — live AG preparing/provisioning/ready events |
-| Polyglot | INHERITED — G9 live matrix preserved |
-| LSP | PASS — typescript language-server ready in AG live prep |
-| SCIP | INHERITED — G9 SCIP MCP preserved; G10 event family wired |
-| Affected checks | PASS — `session.capability.affected` in AG live |
-| Containers/services | INHERITED — G9 disposable services preserved |
+| Backend | G9 Colima + Docker (DOCKER_HOST pin for Colima socket) |
+| Service | PATH-owned compose Redis `pathcode-g9-*` |
+| Cockpit state | preparing / ready / Verified |
+| Engineering use | AG fixed `expectedPong` against live Redis |
+| Cleanup | compose **STOPPED** (PATH-owned only) |
+| Verified result | **PASS** (`closure/service-live.json`) |
 
-## LIVING COCKPIT 2.0
-
-| Field | Status |
-| --- | --- |
-| Environment preparation | PASS — preparing/provisioning/ready events |
-| Language intelligence | PASS — LSP ready in prep; cockpit label wiring |
-| Code intelligence | PASS — event→phase mapping (`Code intelligence`) unit-proven |
-| Implementing | PASS — applying/edit events in AG live |
-| Build/test | PASS — validation plan/running/result |
-| Collaboration | PASS — collaborate events + phase labels |
-| Repair | PASS — Repairing phase wiring |
-| Background work | PASS — background/stale event families + guard |
-| Steering | PASS — pending/applied queue + terminal `drainSteering` |
-| Validation | PASS — independent PATH validation events |
-| Result | PASS — engineering.result / terminal |
-| Second task | PARTIAL — session REPL multi-task path unchanged; not re-proven live |
-| Third task | PARTIAL — same |
-
-## PERSISTENCE / RECOVERY
+## BACKGROUND ACTIVITY
 
 | Field | Status |
 | --- | --- |
-| Crash-safe checkpoint | PASS — atomic JSON under runtime metadata/tasks |
-| PATH restart | PASS — `resume-proof.json` reopen + reconcile |
-| Invalid AG session | PASS — rehydrate classification |
-| Invalid Copilot session | PASS — SDK resume miss → create / CLI fallback |
-| UI reconstruction | PARTIAL — hydration events wired; full TTY resize/manual not operator-reviewed |
-| External action idempotency | PASS — `ExternalActionRegistry` (guard K) |
+| Operation | SCIP indexing |
+| Foreground responsiveness | steering accepted while indexing (~408ms) |
+| Stale-result case | old fingerprint → mutate → result **STALE** |
+| Result | **PASS** (`closure/background-stale.json`) |
 
-## RUNTIME GUARDS
+## LIVE STEERING
 
 | Field | Status |
 | --- | --- |
-| Background stale result | PASS — fingerprint STALE (guard D) |
-| Provision concurrency | PASS — inherits G9 locks (guard I) |
-| Cancellation | PASS — lease release / AC abort path (guard J) |
-| Cost/resource breaker | PASS — time/handoff ceilings implemented |
-| Degraded mode visibility | PASS — `cli_fallback` / `AUTH_REQUIRED` recorded truthfully |
+| Mutation state | lease active → PENDING deferred |
+| Pending | **PENDING** while mutating |
+| Applied | boundary apply → steering APPLIED |
+| Engineering response | kept `export function add`; fixed body |
+| Verified result | **PASS** / validation **VERIFIED** (`closure/steering-live.json`) |
 
-Guard matrix: `docs/reports/g10-evidence/guards/guard-matrix.json` → **PASS**
-
-## MANUAL UI ACCEPTANCE
+## MULTI-TASK REPL
 
 | Field | Status |
 | --- | --- |
-| Wide / Narrow / Resize | PARTIAL — not operator-reviewed in this freeze |
-| ANSI | PARTIAL — no new ANSI regressions found in unit/cockpit tests |
-| Scrollback | PARTIAL — living frame path unchanged; needs operator eyes |
-| Terminal restore | PARTIAL — needs operator eyes |
+| Task 1 | VERIFIED — fix `add` |
+| Task 2 | VERIFIED — add `greet` |
+| Task 3 | VERIFIED — add `mul` |
+| Single process | YES (`runPathcodeMain` one process) |
+| Cockpit retained | YES (alt-screen / PATH frame) |
+| Verified result | **PASS** (`closure/multitask-repl.json`) |
+
+## PROCESS RESTART
+
+| Field | Status |
+| --- | --- |
+| Pre-restart task | `g10-resume-e2e` (Copilot SDK + AG mid-task) |
+| AG session | ACTIVE pre-exit |
+| Copilot session | native_sdk `path-g10-resume-e2e` |
+| Reconciliation | Git/worktree **aligned** |
+| AG restore mode | **REHYDRATED_SESSION** (truthful; native conversation not live after process exit) |
+| Copilot restore mode | native_sdk resume/create same sessionId |
+| Post-restart collaboration | both engines continued on same worktree |
+| Verified result | **PASS** / **VERIFIED** (`closure/resume-e2e.json`) |
+
+## VIEWPORT / TERMINAL
+
+| Field | Status |
+| --- | --- |
+| Wide | MECHANICAL_OK (140 cols) |
+| Narrow | MECHANICAL_OK (60 cols) |
+| Resize | MECHANICAL_OK wide↔narrow |
+| ANSI | no literal escape dumps; SGR present |
+| Borders | frame intact in mechanical samples |
+| Scrollback | living-frame path exercised mechanically |
+| Prompt | idle prompt retained in cockpit model |
+| Cancellation | not operator-filmed |
+| Terminal restore | not operator-filmed |
+
+Evidence: `closure/viewport-mechanical.json`  
+**MANUAL_UI_ACCEPTANCE: PENDING_OPERATOR_REVIEW**
+
+## GUARDS A–K
+
+`docs/reports/g10-evidence/guards/guard-matrix.json` → **PASS** (A–K all ok)
 
 ## CANONICAL VALIDATION
 
-- `npm run check` → **PASS** (1424/1424 tests) with clean PATH
-- Primary checkout protection: preserved (`primaryUntouched` in collab)
-- Credential isolation: PATH-owned runtime; SDK uses user Copilot auth discovery (no secrets in checkpoints)
+- `npm run check` → full suite under disk/load pressure: 14 timeouts; **reconfirm of all failing files 67/67 PASS** (`closure/canonical-check-rerun.txt`); G10 unit tests 12/12 PASS
+- Guards A–K → **PASS**
+- Primary checkout: protected (task worktrees; primaryUntouched where asserted)
+- Credential isolation: PATH-owned runtime; no secrets in checkpoints
 - Published releases: **UNCHANGED**
 - Publication: **NO**
 
-## WHY PARTIAL (not PASS)
+## MANUAL_UI_ACCEPTANCE
 
-G10 engineering fabric, Copilot SDK native surface, AG live VERIFIED, shared-worktree
-collaboration, guards A–K, resume reconciliation, and canonical check are proven.
+**PENDING_OPERATOR_REVIEW**
 
-Still open for a full product PASS:
+Cursor must not promote to PASS based solely on mechanical screenshots/tests.
 
-1. Operator manual Living Cockpit 2.0 visual review (§24)
-2. Live multi-task second/third task in one PATH REPL session
-3. Live steering injection during an active mutation (queue proven in guards; not in a long live TUI session)
-4. End-to-end PATH process restart that reconnects **both** provider sessions inside the product cockpit (checkpoint/reopen proven; full product UX resume not filmed)
+---
 
-## Evidence index
+## OPERATOR DEMO
 
-- `docs/reports/g10-evidence/live/copilot-sdk-probe.json` — SDK_NATIVE_OK
-- `docs/reports/g10-evidence/live/copilot-sdk-mutation.json` — PASS
-- `docs/reports/g10-evidence/live/ag-g10-js.summary.json` — VERIFIED
-- `docs/reports/g10-evidence/live/collab-dual.json` — PASS
-- `docs/reports/g10-evidence/live/resume-proof.json` — PASS
-- `docs/reports/g10-evidence/guards/guard-matrix.json` — PASS
-- `tests/g10/g10-fabric.test.ts`, `tests/g10/g10-cockpit.test.ts`
+**DEMO PROJECT:** disposable copy of `docs/reports/g9-evidence/live-repos/js-accept` (or any small Node repo with a failing `npm test`)
+
+**EXACT LAUNCH COMMAND:**
+
+```bash
+cd /path/to/demo-project
+PATH="/opt/homebrew/bin:$PATH" \
+GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-path-code-gc1-260910}" \
+node /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs --execution local
+```
+
+**TASK 1 TO TYPE:**  
+`Fix src/add.js so npm test passes. Keep public add(a,b). Do not push.`
+
+**WHEN TO SEND STEERING:** while PATH shows active mutation / Applying / Editing
+
+**STEERING LINE:**  
+`Keep backward compatibility and do not change the public API.`
+
+**TASK 2 TO TYPE:**  
+`Add src/greet.js exporting greet(name) returning hello ${name} and a node:test that proves it. Do not push.`
+
+**TASK 3 TO TYPE:**  
+`Add src/mul.js exporting mul(a,b) returning a*b and a node:test proving mul(3,4)===12. Do not push.`
+
+**EXACT RESUME PROCEDURE:**
+
+1. During Task 1 after real edits appear in PROJECT, note the task id from PATH/EVIDENCE if shown.
+2. Exit PATH cleanly (`/exit` or Ctrl-C once to cancel cycle, then `/exit`).
+3. Relaunch the same launch command from the same project directory.
+4. Use `/recover <task-id>` if offered, or continue the resumable task PATH presents.
+5. Confirm AG/Copilot restore modes are truthful (NATIVE_RESUME vs REHYDRATED_SESSION / SDK resume).
+6. Finish engineering until VERIFIED.
+
+**EXACT CLEAN EXIT:** type `/exit` at the cockpit prompt (or Ctrl-C to cancel an active cycle, then `/exit`). Confirm terminal leaves alternate screen and shell prompt returns.
+
+**WHAT SHOULD APPEAR IN PROJECT:** task branches/worktrees; durable commits on VERIFIED; primary checkout files unchanged until admit/merge policy says otherwise.
+
+**WHAT SHOULD APPEAR IN PATH:** preparing → engineering → collaboration/repair/steering phases → Verified; idle prompt returns for next task.
+
+**WHAT SHOULD APPEAR IN EVIDENCE:** workspace/mutation/validation markers; indexing/service events when those capabilities run; no false native-resume claims.
+
+---
+
+## Evidence index (closure)
+
+- `docs/reports/g10-evidence/closure/ag-repair.json`
+- `docs/reports/g10-evidence/closure/sdk-lsp.json`
+- `docs/reports/g10-evidence/closure/scip-live.json`
+- `docs/reports/g10-evidence/closure/service-live.json`
+- `docs/reports/g10-evidence/closure/background-stale.json`
+- `docs/reports/g10-evidence/closure/steering-live.json`
+- `docs/reports/g10-evidence/closure/multitask-repl.json`
+- `docs/reports/g10-evidence/closure/resume-e2e.json`
+- `docs/reports/g10-evidence/closure/viewport-mechanical.json`
+- `docs/reports/g10-evidence/guards/guard-matrix.json`
 
 ## Continuous drive
 
-Continue from this PARTIAL: close manual UI acceptance + product resume UX, then
-promote to PASS without resetting G9/G10 work.
+Automated/live product acceptance closed. Strongest valid automated verdict:
+**PARTIAL_PENDING_OPERATOR_REVIEW**. Operator performs final visual acceptance.
