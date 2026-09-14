@@ -5,7 +5,7 @@
 
 **Baseline:** `4735ee9817e3bdef69a0d84bc8b949408cc889b0` (G9 PASS clean HEAD)  
 **Implementation commit:**   
-**Report/freeze commit:** _(filled on freeze)_  
+**Report/freeze commit:**   
 **Branch:** `cursor/pathcode-antigravity-v1`  
 **Working tree:** clean after freeze
 
