@@ -8,8 +8,8 @@
 - Named PARTIAL report: `952fc0eabbf0cffc8a8437d44bad1291b2e60016`
 
 **Closure implementation commit:** `416877d10eb4e04bad313588eee26198e6fbbfdf`  
-**Closure report commit:** `6bfae13dc2c76a89e2b4a0f55d27b399bd0b2594`  
-**Current HEAD:** `b6973369aabee63e72dc38f6ae8a261892ef7941`  
+**Closure report commit:** `dfab83946d77b8750a8db971daa68d8f8c03a5d0`  
+**Current HEAD:** `dfab83946d77b8750a8db971daa68d8f8c03a5d0`  
 **Branch:** `cursor/pathcode-antigravity-v1`  
 **Working tree:** clean after freeze
 
