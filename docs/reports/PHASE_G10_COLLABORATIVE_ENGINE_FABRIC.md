@@ -9,12 +9,16 @@
 
 **Closure implementation commit:** `416877d10eb4e04bad313588eee26198e6fbbfdf`  
 **Closure report commit:** `dfab83946d77b8750a8db971daa68d8f8c03a5d0`  
-**Current HEAD:** `dfab83946d77b8750a8db971daa68d8f8c03a5d0`  
+**UI correction implementation commit:** `9965e411769ba9d37ab9d387da748c87881c5bed`  
+**UI correction report commit:** *(this commit)*  
+**Current HEAD:** *(this commit)*  
 **Branch:** `cursor/pathcode-antigravity-v1`  
 **Working tree:** clean after freeze
 
 G10 inherits the complete G9 engineering foundation. Closure drive closed the
-remaining live product acceptance gaps without redesigning the fabric.
+remaining live product acceptance gaps. This UI-correction drive fixes
+release-blocking paste/composer ownership and ships the minimal living surface
+without changing engineering engines.
 
 ---
 
@@ -109,18 +113,32 @@ remaining live product acceptance gaps without redesigning the fabric.
 
 | Field | Status |
 | --- | --- |
-| Wide | MECHANICAL_OK (140 cols) |
-| Narrow | MECHANICAL_OK (60 cols) |
+| Wide | MECHANICAL_OK (140 cols) + minimal living default |
+| Narrow | MECHANICAL_OK (60 cols) + same single-column composition |
 | Resize | MECHANICAL_OK wide↔narrow |
-| ANSI | no literal escape dumps; SGR present |
+| ANSI | no literal escape dumps; white/yellow/white brand SGR |
 | Borders | frame intact in mechanical samples |
 | Scrollback | living-frame path exercised mechanically |
-| Prompt | idle prompt retained in cockpit model |
+| Prompt | PATH-owned composer (raw mode + bracketed paste); no readline echo into frame |
 | Cancellation | not operator-filmed |
-| Terminal restore | not operator-filmed |
+| Terminal restore | title + bracketed paste + raw/alt-screen restored on exit |
 
-Evidence: `closure/viewport-mechanical.json`  
+Evidence: `closure/viewport-mechanical.json`, `ui-correction/ui-correction.json`  
 **MANUAL_UI_ACCEPTANCE: PENDING_OPERATOR_REVIEW**
+
+## UI CORRECTION (paste / composer / branding)
+
+| Field | Status |
+| --- | --- |
+| Root cause | Idle readline echo + `setIdlePrompt` cursor teleport into alt-screen body |
+| Composer | Raw-mode PATH buffer; Enter submits; paste never auto-submits |
+| Branding | `PATH` white · `●` yellow · `Code` white (`NO_COLOR` plain) |
+| Default layout | Minimal single-column living surface (legacy 3-col via `PATHCODE_LEGACY_THREE_COLUMN=1`) |
+| Stable title | OSC `` `${project} — PATH Code` `` on enter; restored on exit |
+| Compact result | `✓ VERIFIED · N files · sha` — no handoff prose / inspect dump |
+| Evidence | `docs/reports/g10-evidence/ui-correction/ui-correction.json` → **PASS** |
+| Multitask after fix | `closure/multitask-repl.json` → **PASS** |
+| Guards A–K | **PASS** |
 
 ## GUARDS A–K
 
@@ -128,7 +146,7 @@ Evidence: `closure/viewport-mechanical.json`
 
 ## CANONICAL VALIDATION
 
-- `npm run check` → full suite under disk/load pressure: 14 timeouts; **reconfirm of all failing files 67/67 PASS** (`closure/canonical-check-rerun.txt`); G10 unit tests 12/12 PASS
+- `npm run check` → **EXIT 0** — Test Files 156 passed / Tests 1424 passed (`ui-correction/canonical-check.txt`); one clean run, no targeted-rerun story
 - Guards A–K → **PASS**
 - Primary checkout: protected (task worktrees; primaryUntouched where asserted)
 - Credential isolation: PATH-owned runtime; no secrets in checkpoints
@@ -145,16 +163,28 @@ Cursor must not promote to PASS based solely on mechanical screenshots/tests.
 
 ## OPERATOR DEMO
 
-**DEMO PROJECT:** disposable copy of `docs/reports/g9-evidence/live-repos/js-accept` (or any small Node repo with a failing `npm test`)
+**DEMO PROJECT (absolute):**  
+`/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/pathcode-g10-operator-demo`
+
+Disposable Node fixture with broken `src/add.js` (`a - b`) and `npm test` via `node:test`.
 
 **EXACT LAUNCH COMMAND:**
 
 ```bash
-cd /path/to/demo-project
+cd /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/pathcode-g10-operator-demo
 PATH="/opt/homebrew/bin:$PATH" \
 GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-path-code-gc1-260910}" \
+PATHCODE_RUNTIME_ROOT="/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag" \
 node /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs --execution local
 ```
+
+**WHAT TO VERIFY (operator):**
+- Paste stays in the bottom composer (not in the living body)
+- Header is white/yellow/white `PATH ● Code` (not cyan)
+- Window title stays `` `pathcode-g10-operator-demo — PATH Code` `` (does not churn with activity)
+- Minimal living surface (not a permanent three-column dashboard)
+- Compact VERIFIED block after Task 1
+- Mid-cycle steering accepted; Tasks 2–3; resize; clean `/exit`
 
 **TASK 1 TO TYPE:**  
 `Fix src/add.js so npm test passes. Keep public add(a,b). Do not push.`
@@ -172,24 +202,20 @@ node /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/
 
 **EXACT RESUME PROCEDURE:**
 
-1. During Task 1 after real edits appear in PROJECT, note the task id from PATH/EVIDENCE if shown.
+1. During Task 1 after real edits appear, note the task id if shown.
 2. Exit PATH cleanly (`/exit` or Ctrl-C once to cancel cycle, then `/exit`).
 3. Relaunch the same launch command from the same project directory.
 4. Use `/recover <task-id>` if offered, or continue the resumable task PATH presents.
 5. Confirm AG/Copilot restore modes are truthful (NATIVE_RESUME vs REHYDRATED_SESSION / SDK resume).
 6. Finish engineering until VERIFIED.
 
-**EXACT CLEAN EXIT:** type `/exit` at the cockpit prompt (or Ctrl-C to cancel an active cycle, then `/exit`). Confirm terminal leaves alternate screen and shell prompt returns.
+**EXACT CLEAN EXIT:** type `/exit` at the cockpit composer (or Ctrl-C to cancel an active cycle, then `/exit`). Confirm terminal leaves alternate screen, title restores, and shell prompt returns.
 
-**WHAT SHOULD APPEAR IN PROJECT:** task branches/worktrees; durable commits on VERIFIED; primary checkout files unchanged until admit/merge policy says otherwise.
-
-**WHAT SHOULD APPEAR IN PATH:** preparing → engineering → collaboration/repair/steering phases → Verified; idle prompt returns for next task.
-
-**WHAT SHOULD APPEAR IN EVIDENCE:** workspace/mutation/validation markers; indexing/service events when those capabilities run; no false native-resume claims.
+**WHAT SHOULD APPEAR:** preparing → engineering → Verified; composer returns for next task; primary checkout unchanged until admit/merge policy says otherwise.
 
 ---
 
-## Evidence index (closure)
+## Evidence index (closure + UI correction)
 
 - `docs/reports/g10-evidence/closure/ag-repair.json`
 - `docs/reports/g10-evidence/closure/sdk-lsp.json`
@@ -200,9 +226,12 @@ node /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/
 - `docs/reports/g10-evidence/closure/multitask-repl.json`
 - `docs/reports/g10-evidence/closure/resume-e2e.json`
 - `docs/reports/g10-evidence/closure/viewport-mechanical.json`
+- `docs/reports/g10-evidence/ui-correction/ui-correction.json`
+- `docs/reports/g10-evidence/ui-correction/canonical-check.txt`
 - `docs/reports/g10-evidence/guards/guard-matrix.json`
 
 ## Continuous drive
 
-Automated/live product acceptance closed. Strongest valid automated verdict:
-**PARTIAL_PENDING_OPERATOR_REVIEW**. Operator performs final visual acceptance.
+Automated/live product acceptance + UI correction closed for operator review.
+Strongest valid automated verdict: **PARTIAL_PENDING_OPERATOR_REVIEW**.
+Operator performs final visual acceptance (paste, branding, title, minimal UI).
