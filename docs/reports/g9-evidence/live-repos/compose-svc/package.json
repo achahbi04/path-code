@@ -1,1 +1,8 @@
-{"name":"g9-compose-svc","private":true}
+{
+  "name": "g9-compose-svc",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/redis.test.js"
+  }
+}
