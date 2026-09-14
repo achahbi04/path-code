@@ -1422,6 +1422,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     durationMs: Date.now() - startedAt,
     engineActivityCount,
     modelCalls: 0,
+    repairAttempts,
     diagFile: typeof agent.getDiagFile === "function" ? agent.getDiagFile() : null,
   };
 }

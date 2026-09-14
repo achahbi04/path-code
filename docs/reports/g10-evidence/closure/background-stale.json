@@ -1,0 +1,24 @@
+{
+  "schema": "pathcode.g10.closure.background.v1",
+  "at": "2026-09-14T18:01:51.221Z",
+  "operation": "SCIP indexing",
+  "foreground": {
+    "responsiveMs": 408,
+    "steeringPendingOrApplied": true,
+    "mutatedDuringBackground": true
+  },
+  "stale": {
+    "ok": true,
+    "status": "STALE",
+    "oldFp": "3ce1ff31af124a5041257508",
+    "newFp": "4c593704ca71879753751934"
+  },
+  "currentAccept": {
+    "status": "current"
+  },
+  "events": {
+    "backgroundStarted": true,
+    "backgroundStale": true
+  },
+  "verdict": "PASS"
+}

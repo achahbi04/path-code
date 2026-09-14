@@ -1,0 +1,61 @@
+{
+  "schema": "pathcode.g10.closure.viewport.v1",
+  "at": "2026-09-14T18:02:19.232Z",
+  "note": "Mechanical frame checks only. MANUAL_UI_ACCEPTANCE remains PENDING_OPERATOR_REVIEW.",
+  "livingProductMinColumns": 120,
+  "wide": {
+    "label": "wide",
+    "columns": 140,
+    "lineCount": 27,
+    "chars": 3951,
+    "literalEscapeSequences": false,
+    "hasAnsiSgr": true,
+    "containsProject": true,
+    "containsPath": true,
+    "containsEvidence": true,
+    "containsVerified": true,
+    "preview": "\u001b[?25l\r\u001b[2K╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮\n\r\u001b[2K│ PATH ● Code                                                                                                                              │\n\r\u001b[2K├─────────────────────────────────────────────┬─────────────────────────────────────────────┬──────────────────────────────────────────────┤\n\r\u001b[2K│ PROJECT                                     │  PA"
+  },
+  "narrow": {
+    "label": "narrow",
+    "columns": 60,
+    "lineCount": 27,
+    "chars": 1791,
+    "literalEscapeSequences": false,
+    "hasAnsiSgr": true,
+    "containsProject": true,
+    "containsPath": true,
+    "containsEvidence": true,
+    "containsVerified": true,
+    "preview": "\u001b[?25l\r\u001b[2K╭──────────────────────────────────────────────────────────╮\n\r\u001b[2K│ PATH ● Code                                              │\n\r\u001b[2K├──────────────────┬──────────────────┬────────────────────┤\n\r\u001b[2K│ PROJECT          │  PATH             │  EVIDENCE         │\n\r\u001b[2K│                  │                   │                   │\n\r\u001b[2K│ Branches         │  ✓ Verified       │  Workspace       —│\n\r\u001b[2K│   task     path… │    24 file(s) ch… │  Mutation        ✓│\n\r\u001b[2K│                  │       "
+  },
+  "resizeWideToNarrow": {
+    "label": "resize-narrow",
+    "columns": 70,
+    "lineCount": 27,
+    "chars": 2061,
+    "literalEscapeSequences": false,
+    "hasAnsiSgr": true,
+    "containsProject": true,
+    "containsPath": true,
+    "containsEvidence": true,
+    "containsVerified": true,
+    "preview": "\u001b[?25l\r\u001b[2K╭────────────────────────────────────────────────────────────────────╮\n\r\u001b[2K│ PATH ● Code                                                        │\n\r\u001b[2K├─────────────────────┬─────────────────────┬────────────────────────┤\n\r\u001b[2K│ PROJECT             │  PATH                │  EVIDENCE             │\n\r\u001b[2K│                     │                      │                       │\n\r\u001b[2K│ Branches            │  ✓ Verified          │  Workspace       —    │\n\r\u001b[2K│   task     path/ta… │    24 fil"
+  },
+  "resizeNarrowToWide": {
+    "label": "resize-wide",
+    "columns": 120,
+    "lineCount": 27,
+    "chars": 3411,
+    "literalEscapeSequences": false,
+    "hasAnsiSgr": true,
+    "containsProject": true,
+    "containsPath": true,
+    "containsEvidence": true,
+    "containsVerified": true,
+    "preview": "\u001b[?25l\r\u001b[2K╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮\n\r\u001b[2K│ PATH ● Code                                                                                                          │\n\r\u001b[2K├──────────────────────────────────────┬──────────────────────────────────────┬────────────────────────────────────────┤\n\r\u001b[2K│ PROJECT                              │  PATH                                 │  EVIDENCE                     "
+  },
+  "mechanicalOk": true,
+  "MANUAL_UI_ACCEPTANCE": "PENDING_OPERATOR_REVIEW",
+  "verdict": "MECHANICAL_OK"
+}
