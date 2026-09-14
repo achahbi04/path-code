@@ -4,8 +4,8 @@
 **Result:** PARTIAL
 
 **Baseline:** `4735ee9817e3bdef69a0d84bc8b949408cc889b0` (G9 PASS clean HEAD)  
-**Implementation commit:**   
-**Report/freeze commit:**   
+**Implementation commit:** `e4d2941cf26acefce3f4dab580d4288eba5aeb73`  
+**Report/freeze commit:** `PENDING_FREEZE`  
 **Branch:** `cursor/pathcode-antigravity-v1`  
 **Working tree:** clean after freeze
 
