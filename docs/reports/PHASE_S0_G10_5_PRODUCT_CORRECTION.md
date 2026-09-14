@@ -189,8 +189,8 @@ Explicitly:
 
 Filled at freeze:
 
-- **Implementation commit:** _(set on report freeze)_
-- **Report commit:** _(this commit)_
+- **Implementation commit:** 
+- **Report commit:** _(set after report commit)_
 - **Current HEAD:** _(report freeze tip)_
 - **Branch:** `cursor/pathcode-antigravity-v1`
 - **Working tree:** clean after freeze
