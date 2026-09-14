@@ -1,12 +1,27 @@
 # PATH CODE — G8 NATIVE CAPABILITY GATEWAY
 
-**Result:** PASS  
+**Result:** FROZEN  
 **Baseline:** G7 Living Cockpit Completion · `eacd7638b9df4e82085b01d77ff5e483744aa51a`  
 **Implementation commit:** `b6dd2f0502bafa7fd5dc685003ce21699e92f363`  
 **Advisory acceptance commit:** `b7d1e2aff03fdeb531531595aaddd63b57c81c60`  
+**Freeze commit:** (recorded in follow-up SHA note)  
 **Branch:** `cursor/pathcode-antigravity-v1`  
-**Working tree:** clean after G8 advisory acceptance commit  
+**Working tree:** clean after G8 freeze  
+**Canonical validation:** `npm run check` PASS (typecheck · build · 147 files / 1376 tests · cli:smoke · ledger:verify)  
 **Published releases:** UNCHANGED · Publication performed: NO
+
+## Freeze baseline — proven vs declared limitations
+
+**Proven (accepted):** Antigravity sole primary engineer · polyglot toolchain
+discovery · native MCP discovery/use · MCP trust/filter · real read-only Copilot
+advisory into the same Antigravity session · same-session repair · PATH
+independent validation · G7 living cockpit preserved · credential isolation ·
+primary checkout protection.
+
+**Declared limitations (not claimed / not marketed):** Rust live engineering not
+established (cargo unavailable) · Java live engineering not established (Maven
+unavailable) · only clangd LSP currently ready · Copilot LSP not available/proven.
+Do not install toolchains merely to improve the report.
 
 ## Purpose
 
