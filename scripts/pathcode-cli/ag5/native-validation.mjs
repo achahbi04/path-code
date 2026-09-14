@@ -277,6 +277,41 @@ export function discoverNativeValidationCandidates(projectRoot, options = {}) {
     }
   }
 
+  // .NET — admit `dotnet test` when a project/solution is present and SDK exists.
+  const hasDotnetProject =
+    existsSync(join(root, "global.json")) ||
+    (() => {
+      try {
+        return readdirSync(root).some(
+          (n) => /\.csproj$/i.test(n) || /\.sln$/i.test(n),
+        );
+      } catch {
+        return false;
+      }
+    })();
+  if (hasDotnetProject) {
+    const dotnet = resolveHostBinary("dotnet", toolRoots);
+    if (dotnet) {
+      candidates.push({
+        id: "dotnet-test",
+        kind: "TARGETED_TEST",
+        source: "DOTNET_TEST",
+        label: "dotnet test",
+        request: {
+          executable: dotnet,
+          argv: ["test", "--nologo"],
+          cwd: root,
+          timeoutMs: NATIVE_TIMEOUT_MS,
+        },
+        disclosure: {
+          command: "dotnet test",
+          chain: [],
+          lifecycleHooks: [],
+        },
+      });
+    }
+  }
+
   // CMake — ctest only when an existing build/ tree is present (configured).
   if (existsSync(join(root, "CMakeLists.txt")) && existsSync(join(root, "build"))) {
     const ctest = resolveHostBinary("ctest", toolRoots);

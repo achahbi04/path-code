@@ -65,6 +65,11 @@ export const LSP_SERVERS = Object.freeze({
     bins: ["clangd"],
     miseTool: "llvm",
   },
+  // Discover uses language id "c_cpp"; map to the same clangd capability.
+  c_cpp: {
+    bins: ["clangd"],
+    miseTool: "llvm",
+  },
   csharp: {
     bins: ["csharp-ls", "OmniSharp"],
     miseTool: "dotnet",

@@ -1,0 +1,15 @@
+{
+  "capturedAt": "2026-09-14T11:20:31.443020Z",
+  "head": "314103c68e15d9fda3c57ccbceba620315de44e1",
+  "headShort": "314103c",
+  "implementationCommit": "61ed3f272e9d03dc53490c92afc8cdb0b82f7d54",
+  "implementationCommitVerified": "commit",
+  "reportCommit": "314103c68e15d9fda3c57ccbceba620315de44e1",
+  "reportCommitVerified": "commit",
+  "branch": "cursor/pathcode-antigravity-v1",
+  "statusPorcelain": "M docs/reports/PHASE_G9_SELF_PROVISIONING_RUNTIME.md",
+  "statusShort": "## cursor/pathcode-antigravity-v1...origin/cursor/pathcode-antigravity-v1 [ahead 15]\n M docs/reports/PHASE_G9_SELF_PROVISIONING_RUNTIME.md",
+  "workingTreeClean": false,
+  "strayBogusHashPresentInReport": false,
+  "implementationShaInReport": "**Implementation commit:** `61ed3f272e9d03dc53490c92afc8cdb0b82f7d54`"
+}

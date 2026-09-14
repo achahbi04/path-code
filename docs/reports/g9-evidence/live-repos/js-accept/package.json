@@ -1,0 +1,8 @@
+{
+  "name": "g9-js-accept",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/add.test.js"
+  }
+}

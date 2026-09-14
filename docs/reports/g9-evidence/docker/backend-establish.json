@@ -1,0 +1,19 @@
+{
+  "attempted": true,
+  "backend": "colima",
+  "dockerOk": true,
+  "colimaOk": true,
+  "reason": "Homebrew non-interactively installed colima/docker/docker-compose; root-owned broken Docker Desktop symlink at /usr/local/bin/docker could not be removed without sudo but /opt/homebrew/bin/docker is first on PATH; colima start --cpu 2 --memory 4 succeeded; docker info OK. docker-compose standalone works; `docker compose` plugin needs cliPluginsExtraDirs (not configured).",
+  "commandsRun": [
+    "ls -la /usr/local/bin/docker /opt/homebrew/bin/docker",
+    "command -v brew",
+    "brew list colima docker docker-compose",
+    "rm -f /usr/local/bin/docker  # Permission denied (root-owned; skipped sudo)",
+    "NONINTERACTIVE=1 brew install colima docker docker-compose",
+    "colima start --cpu 2 --memory 4",
+    "colima status",
+    "docker info",
+    "docker-compose version",
+    "docker compose version"
+  ]
+}

@@ -489,6 +489,39 @@ export function discoverCapabilityPlane(projectRoot, options = {}) {
     );
   }
 
+  // ── .NET / C# ────────────────────────────────────────────────────────────
+  const csprojFiles = listRootFiles(root, (n) => /\.csproj$/i.test(n));
+  const hasSln =
+    has(root, "Directory.Build.props") ||
+    listRootFiles(root, (n) => /\.sln$/i.test(n)).length > 0;
+  if (csprojFiles.length > 0 || hasSln || has(root, "global.json")) {
+    /** @type {string[]} */
+    const csEvidence = [];
+    if (csprojFiles.length > 0) csEvidence.push(...csprojFiles.slice(0, 3));
+    if (has(root, "global.json")) csEvidence.push("global.json");
+    if (hasSln) csEvidence.push(".sln / Directory.Build.props");
+    languages.push({ id: "csharp", status: "ready", evidence: csEvidence });
+    const dotnet = whichBinary("dotnet");
+    toolchains.push({
+      id: "dotnet",
+      status: dotnet ? "ready" : "unavailable",
+      executable: dotnet,
+      evidence: [
+        ...csEvidence.slice(0, 2),
+        dotnet ? `dotnet → ${dotnet}` : "dotnet not on PATH",
+      ],
+    });
+    languageIntelligence.push(
+      lspEntry(
+        "csharp",
+        ["csharp-ls", "OmniSharp"],
+        lspConfig.ready,
+        lspConfig.evidence,
+        csEvidence,
+      ),
+    );
+  }
+
   // ── Bazel ────────────────────────────────────────────────────────────────
   const hasBazel =
     has(root, "WORKSPACE") ||

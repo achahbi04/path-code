@@ -96,6 +96,71 @@ function metaPath(runtimeRoot, projectKey) {
 }
 
 /**
+ * Resolve a usable Docker CLI. Prefer a real executable over a broken Desktop
+ * symlink; verify `docker version` when possible.
+ * @returns {string | null}
+ */
+export function resolveDockerCli() {
+  /** @type {string[]} */
+  const candidates = [];
+  const which = whichBinary("docker");
+  if (which) candidates.push(which);
+  for (const p of [
+    "/opt/homebrew/bin/docker",
+    "/usr/local/bin/docker",
+    "/usr/bin/docker",
+  ]) {
+    if (!candidates.includes(p)) candidates.push(p);
+  }
+  for (const exe of candidates) {
+    if (!existsSync(exe)) continue;
+    const probe = spawnSync(exe, ["version", "--format", "{{.Client.Version}}"], {
+      encoding: "utf8",
+      timeout: 15_000,
+      env: process.env,
+    });
+    if (probe.status === 0) return exe;
+  }
+  return which && existsSync(which) ? which : null;
+}
+
+/**
+ * Run compose up/down using `docker compose` or standalone `docker-compose`.
+ * @param {{
+ *   docker: string,
+ *   args: string[],
+ *   cwd: string,
+ *   timeoutMs?: number,
+ * }} input
+ */
+function runCompose({ docker, args, cwd, timeoutMs = 300_000 }) {
+  const plugin = spawnSync(docker, ["compose", ...args], {
+    cwd,
+    encoding: "utf8",
+    timeout: timeoutMs,
+    env: process.env,
+  });
+  if (plugin.status === 0) {
+    return { ...plugin, mode: "docker-compose-plugin" };
+  }
+  const standalone = whichBinary("docker-compose");
+  if (standalone) {
+    const r = spawnSync(standalone, args, {
+      cwd,
+      encoding: "utf8",
+      timeout: timeoutMs,
+      env: process.env,
+    });
+    return {
+      ...r,
+      mode: "docker-compose-standalone",
+      pluginStderr: plugin.stderr,
+    };
+  }
+  return { ...plugin, mode: "docker-compose-plugin" };
+}
+
+/**
  * Start disposable compose services under a PATH-owned project name.
  *
  * @param {{
@@ -119,7 +184,7 @@ export function startDisposableServices({ projectRoot, runtimeRoot, emit }) {
     };
   }
 
-  const docker = whichBinary("docker");
+  const docker = resolveDockerCli();
   if (!docker) {
     return {
       status: "UNAVAILABLE",
@@ -135,30 +200,21 @@ export function startDisposableServices({ projectRoot, runtimeRoot, emit }) {
     project: composeProject,
   });
 
-  const r = spawnSync(
+  const r = runCompose({
     docker,
-    [
-      "compose",
-      "-f",
-      detected.composeFile,
-      "-p",
-      composeProject,
-      "up",
-      "-d",
-    ],
-    {
-      cwd: projectRoot,
-      encoding: "utf8",
-      timeout: 300_000,
-      env: process.env,
-    },
-  );
+    args: ["-f", detected.composeFile, "-p", composeProject, "up", "-d"],
+    cwd: projectRoot,
+    timeoutMs: 300_000,
+  });
 
   const evidence = [
     ...detected.evidence,
-    `docker compose -p ${composeProject} up -d status=${r.status}`,
+    `docker=${docker}`,
+    `composeMode=${r.mode}`,
+    `compose -p ${composeProject} up -d status=${r.status}`,
   ];
   if (r.stderr) evidence.push((r.stderr || "").slice(0, 400));
+  if (r.pluginStderr) evidence.push(`plugin: ${String(r.pluginStderr).slice(0, 200)}`);
 
   if (r.status !== 0) {
     return {
@@ -207,7 +263,7 @@ export function stopDisposableServices({ runtimeRoot, projectKey, projectRoot })
     }
   }
 
-  const docker = whichBinary("docker");
+  const docker = resolveDockerCli();
   if (!docker) {
     return {
       status: "UNAVAILABLE",
@@ -227,19 +283,23 @@ export function stopDisposableServices({ runtimeRoot, projectKey, projectRoot })
     process.cwd();
 
   /** @type {string[]} */
-  const args = ["compose"];
+  const args = [];
   if (composeFile) args.push("-f", composeFile);
   args.push("-p", composeProject, "down", "--remove-orphans");
 
-  const r = spawnSync(docker, args, {
+  const r = runCompose({
+    docker,
+    args,
     cwd,
-    encoding: "utf8",
-    timeout: 180_000,
-    env: process.env,
+    timeoutMs: 180_000,
   });
 
   /** @type {string[]} */
-  const evidence = [`docker compose -p ${composeProject} down status=${r.status}`];
+  const evidence = [
+    `docker=${docker}`,
+    `composeMode=${r.mode}`,
+    `compose -p ${composeProject} down status=${r.status}`,
+  ];
   if (r.stderr) evidence.push((r.stderr || "").slice(0, 300));
 
   if (existsSync(path)) {
