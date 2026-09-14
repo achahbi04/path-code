@@ -1,0 +1,61 @@
+{
+  "schema": "pathcode.g10.copilot-sdk-mutation.v1",
+  "at": "2026-09-14T17:31:37.722Z",
+  "events": [
+    {
+      "type": "session.capability.collaborate",
+      "at": 1789407099489,
+      "detail": "Copilot SDK session ready"
+    },
+    {
+      "type": "session.engineering.activity",
+      "at": 1789407104398
+    },
+    {
+      "type": "session.engineering.tool",
+      "at": 1789407104409,
+      "detail": "bash"
+    },
+    {
+      "type": "session.engineering.activity",
+      "at": 1789407107147
+    },
+    {
+      "type": "session.applying",
+      "at": 1789407107148,
+      "detail": "edit"
+    },
+    {
+      "type": "session.engineering.activity",
+      "at": 1789407108619
+    },
+    {
+      "type": "session.engineering.tool",
+      "at": 1789407108620,
+      "detail": "bash"
+    },
+    {
+      "type": "session.engineering.activity",
+      "at": 1789407109871,
+      "detail": "Fixed: `greet()` now returns `'hello'`. Test passes (`ok`)."
+    }
+  ],
+  "connect": {
+    "mode": "native_sdk",
+    "ok": true,
+    "sessionId": "path-sdk-mut-1789407098057"
+  },
+  "turn": {
+    "ok": true,
+    "mode": "native_sdk",
+    "detail": "Copilot SDK turn completed",
+    "textPreview": "Fixed: `greet()` now returns `'hello'`. Test passes (`ok`)."
+  },
+  "mutation": {
+    "greetSource": "export function greet(){ return 'hello' }\n",
+    "returnsHello": true,
+    "testExit": 0,
+    "testOut": "ok\n"
+  },
+  "verdict": "PASS"
+}

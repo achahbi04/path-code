@@ -1,0 +1,1 @@
+{"verdict":"PASS","cp":{"ok":true,"mode":"native_sdk","changed":true,"files":["src/add.js"],"detail":"Copilot SDK turn completed"},"agMode":"REHYDRATED_SESSION","testExit":0}

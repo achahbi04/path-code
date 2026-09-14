@@ -1,0 +1,539 @@
+/**
+ * G10 — collaborative engine fabric façade over G9 + engines + guards.
+ */
+
+import {
+  createCheckpointSkeleton,
+  patchTaskCheckpoint,
+  readTaskCheckpoint,
+  findLatestResumableCheckpoint,
+  writeTaskCheckpoint,
+} from "./task-checkpoint.mjs";
+import {
+  captureTaskReality,
+  reconcileTaskReality,
+  detectProgress,
+} from "./task-reality.mjs";
+import {
+  normalizeG10Event,
+  toSessionEvent,
+  mapAntigravityBridgeEvent,
+} from "./events.mjs";
+import {
+  EventIdempotencyGuard,
+  NoProgressCircuitBreaker,
+  ResourceCircuitBreaker,
+  StaleIntelligenceGuard,
+  ExternalActionRegistry,
+  withMutationLease,
+} from "./guards.mjs";
+import { SteeringQueue } from "./steering.mjs";
+import { createCopilotEngine } from "./copilot-sdk.mjs";
+import { bindAntigravitySession } from "./ag-session.mjs";
+import {
+  withCollabTurn,
+  formatCollabHandoff,
+  readCollabJournal,
+  chooseCollabEngine,
+} from "../ag9/collaborate.mjs";
+
+/**
+ * @param {{
+ *   runtimeRoot: string,
+ *   taskId: string,
+ *   sessionId?: string,
+ *   worktreePath: string,
+ *   repoRoot?: string,
+ *   objective?: string,
+ *   emit?: (event: object) => void,
+ *   wallClockMs?: number,
+ *   preferCopilotSdk?: boolean,
+ *   toolEnv?: Record<string, string>,
+ *   copilotConfigDirectory?: string,
+ * }} options
+ */
+export async function createG10Fabric(options) {
+  const emitRaw = typeof options.emit === "function" ? options.emit : () => {};
+  const idempotency = new EventIdempotencyGuard();
+  const noProgress = new NoProgressCircuitBreaker();
+  const resources = new ResourceCircuitBreaker({
+    timeCeilingMs:
+      typeof options.wallClockMs === "number" && options.wallClockMs > 0
+        ? options.wallClockMs
+        : undefined,
+  });
+  const steering = new SteeringQueue();
+  const externalActions = new ExternalActionRegistry(
+    options.runtimeRoot,
+    options.taskId,
+  );
+
+  /**
+   * Emit normalized G10 → session event with idempotency.
+   * @param {Parameters<typeof normalizeG10Event>[0]} input
+   */
+  function emitG10(input) {
+    const g10 = normalizeG10Event({
+      ...input,
+      taskId: options.taskId,
+    });
+    if (!g10) return null;
+    if (!idempotency.accept(g10.id)) return null;
+    const sessionEvent = toSessionEvent(g10);
+    emitRaw(sessionEvent);
+    return g10;
+  }
+
+  function emitSession(event) {
+    if (event && typeof event.type === "string") emitRaw(event);
+  }
+
+  // Seed checkpoint.
+  const reality0 = captureTaskReality(options.worktreePath, options.toolEnv);
+  let checkpoint = readTaskCheckpoint(options.runtimeRoot, options.taskId);
+  if (!checkpoint) {
+    checkpoint = createCheckpointSkeleton({
+      taskId: options.taskId,
+      sessionId: options.sessionId || options.taskId,
+      worktreePath: options.worktreePath,
+      repoRoot: options.repoRoot,
+      objective: options.objective,
+      headSha: reality0.headSha || undefined,
+      diffFingerprint: reality0.diffFingerprint,
+      preparedCapabilities: [],
+      copilotMode: "none",
+      agSessionMode: "NONE",
+    });
+    writeTaskCheckpoint(options.runtimeRoot, checkpoint);
+  } else {
+    steering.restoreFromCheckpoint(checkpoint.pendingSteering || []);
+  }
+
+  emitG10({
+    family: checkpoint.finalState ? "task.resumed" : "task.started",
+    detail: options.objective?.slice(0, 120) || options.taskId,
+    payload: { mode: checkpoint.agSessionMode },
+  });
+
+  /** @type {Awaited<ReturnType<typeof createCopilotEngine>> | null} */
+  let copilot = null;
+  /** @type {ReturnType<typeof bindAntigravitySession> | null} */
+  let agBind = null;
+
+  function persist(patch = {}) {
+    const reality = captureTaskReality(options.worktreePath, options.toolEnv);
+    checkpoint = patchTaskCheckpoint(options.runtimeRoot, options.taskId, {
+      worktreePath: options.worktreePath,
+      objective: options.objective,
+      headSha: reality.headSha || undefined,
+      diffFingerprint: reality.diffFingerprint,
+      pendingSteering: steering.toCheckpoint(),
+      copilotMode: copilot?.getMode?.() || checkpoint.copilotMode || "none",
+      copilotSessionId:
+        copilot?.getSessionId?.() || checkpoint.copilotSessionId,
+      agSessionMode: agBind?.getMode?.() || checkpoint.agSessionMode || "NONE",
+      agTaskId: options.taskId,
+      usage: resources.evaluate().metrics,
+      collaboration: {
+        noProgress: noProgress.consecutiveNoProgress,
+        handoffs: resources.handoffs,
+        breaker: noProgress.state,
+      },
+      ...patch,
+    });
+    return checkpoint;
+  }
+
+  async function attachCopilot() {
+    // Prefer default Copilot auth discovery (~/.copilot). Only use an explicit
+    // PATH-owned configDirectory when the caller opts in — isolating config
+    // without forwarding OAuth makes every turn AUTH_REQUIRED.
+    const configDirectory = options.copilotConfigDirectory;
+    copilot = await createCopilotEngine({
+      taskId: options.taskId,
+      cwd: options.worktreePath,
+      sessionId: checkpoint.copilotSessionId || `path-${options.taskId}`,
+      toolEnv: options.toolEnv,
+      preferSdk: options.preferCopilotSdk !== false,
+      ...(configDirectory ? { configDirectory } : {}),
+      emit: emitSession,
+    });
+    const connected = await copilot.ensureConnected({
+      resumeSessionId: checkpoint.copilotSessionId || undefined,
+    });
+    persist({
+      copilotMode: copilot.getMode(),
+      copilotSessionId: copilot.getSessionId() || undefined,
+    });
+    if (copilot.getMode() === "cli_fallback") {
+      emitG10({
+        family: "degraded.mode",
+        engine: "copilot",
+        detail: "Copilot SDK → CLI harness fallback",
+        payload: { mode: "cli_fallback" },
+      });
+    }
+    return connected;
+  }
+
+  /**
+   * @param {object} agent createAntigravityEngineeringAgent handle
+   */
+  function attachAntigravity(agent) {
+    agBind = bindAntigravitySession({
+      taskId: options.taskId,
+      agent,
+      emit: emitSession,
+    });
+    return agBind;
+  }
+
+  /**
+   * Accept operator steering immediately.
+   * @param {string} text
+   */
+  function acceptSteering(text) {
+    const item = steering.accept(text);
+    if (item.status === "PENDING") {
+      emitG10({
+        family: "steering.pending",
+        detail: item.text.slice(0, 160),
+        providerEventId: item.id,
+      });
+      persist();
+    }
+    return item;
+  }
+
+  /**
+   * Apply pending steering at a safe boundary.
+   */
+  function applySteeringBoundary() {
+    const result = steering.applyAtBoundary();
+    if (result.deferred) {
+      return result;
+    }
+    for (const item of result.applied) {
+      emitG10({
+        family: "steering.applied",
+        detail: item.text.slice(0, 160),
+        providerEventId: `${item.id}:applied`,
+      });
+    }
+    persist();
+    return result;
+  }
+
+  /**
+   * Collaborative Copilot turn under mutation lease.
+   * @param {{ prompt: string, timeoutMs?: number, expectedFingerprint?: string }} turn
+   */
+  async function runCopilotCollabTurn(turn) {
+    if (!copilot) await attachCopilot();
+    const budget = resources.evaluate();
+    if (budget.state === "hard") {
+      emitG10({
+        family: "guard.circuit",
+        detail: budget.reason || "resource ceiling",
+      });
+      return {
+        ok: false,
+        code: budget.reason,
+        detail: "resource circuit breaker",
+        changedFiles: [],
+      };
+    }
+
+    const steeringApply = applySteeringBoundary();
+    const prompt = [
+      turn.prompt,
+      steeringApply.combinedText
+        ? `\nOperator steering (apply):\n${steeringApply.combinedText}`
+        : "",
+      formatCollabHandoff(
+        readCollabJournal({
+          runtimeRoot: options.runtimeRoot,
+          taskId: options.taskId,
+          limit: 12,
+        }),
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const before = captureTaskReality(options.worktreePath, options.toolEnv);
+    steering.setMutationActive(true);
+    try {
+      const leased = await withMutationLease(
+        {
+          withCollabTurn,
+          captureTaskReality: (p) => captureTaskReality(p, options.toolEnv),
+          runtimeRoot: options.runtimeRoot,
+          taskId: options.taskId,
+          engine: "copilot",
+          worktreePath: options.worktreePath,
+          timeoutMs: turn.timeoutMs,
+          expectedFingerprint: turn.expectedFingerprint,
+        },
+        async () => {
+          emitG10({
+            family: "collaboration.handoff",
+            engine: "copilot",
+            detail: "Copilot engineering turn",
+          });
+          const result = await copilot.runEngineeringTurn({
+            prompt,
+            timeoutMs: turn.timeoutMs,
+          });
+          return result;
+        },
+      );
+      const after = captureTaskReality(options.worktreePath, options.toolEnv);
+      const progress = detectProgress({ before, after });
+      resources.recordHandoff();
+      const breaker = noProgress.recordHandoff({
+        productive: progress.productive || leased?.ok === true,
+      });
+      if (breaker.action === "warn") {
+        emitG10({
+          family: "guard.circuit",
+          detail: "no-progress collaboration warning",
+        });
+      }
+      if (breaker.action === "stop_auto_bounce") {
+        emitG10({
+          family: "task.blocked",
+          detail: "NO_PROGRESS_COLLABORATION — needs direction",
+        });
+      }
+      persist({
+        latestEngineTurn: "copilot",
+        collaboration: {
+          noProgress: noProgress.consecutiveNoProgress,
+          handoffs: resources.handoffs,
+          breaker: noProgress.state,
+          lastProgress: progress,
+        },
+      });
+      return {
+        ...leased,
+        progress,
+        breaker,
+        mode: copilot.getMode(),
+      };
+    } finally {
+      steering.setMutationActive(false);
+      applySteeringBoundary();
+    }
+  }
+
+  /**
+   * Collaborative Antigravity turn under mutation lease.
+   * @param {{
+   *   runTurn: () => Promise<object>|object,
+   *   timeoutMs?: number,
+   *   expectedFingerprint?: string,
+   * }} turn
+   */
+  async function runAntigravityCollabTurn(turn) {
+    const budget = resources.evaluate();
+    if (budget.state === "hard") {
+      emitG10({
+        family: "guard.circuit",
+        detail: budget.reason || "resource ceiling",
+      });
+      return { ok: false, code: budget.reason, breaker: budget };
+    }
+    if (noProgress.state === "stop") {
+      emitG10({
+        family: "task.blocked",
+        detail: "NO_PROGRESS_COLLABORATION",
+      });
+      return {
+        ok: false,
+        code: "NO_PROGRESS_COLLABORATION",
+        breaker: { action: "stop_auto_bounce" },
+      };
+    }
+
+    applySteeringBoundary();
+    const before = captureTaskReality(options.worktreePath, options.toolEnv);
+    steering.setMutationActive(true);
+    try {
+      const leased = await withMutationLease(
+        {
+          withCollabTurn,
+          captureTaskReality: (p) => captureTaskReality(p, options.toolEnv),
+          runtimeRoot: options.runtimeRoot,
+          taskId: options.taskId,
+          engine: "antigravity",
+          worktreePath: options.worktreePath,
+          timeoutMs: turn.timeoutMs,
+          expectedFingerprint: turn.expectedFingerprint,
+        },
+        async () => {
+          emitG10({
+            family: "collaboration.handoff",
+            engine: "antigravity",
+            detail: "Antigravity engineering turn",
+          });
+          return turn.runTurn();
+        },
+      );
+      const after = captureTaskReality(options.worktreePath, options.toolEnv);
+      const progress = detectProgress({ before, after });
+      resources.recordHandoff();
+      const breaker = noProgress.recordHandoff({
+        productive: progress.productive,
+      });
+      if (breaker.action === "warn") {
+        emitG10({
+          family: "guard.circuit",
+          detail: "no-progress collaboration warning",
+        });
+      }
+      if (breaker.action === "stop_auto_bounce") {
+        emitG10({
+          family: "task.blocked",
+          detail: "NO_PROGRESS_COLLABORATION — needs direction",
+        });
+      }
+      persist({
+        latestEngineTurn: "antigravity",
+        agSessionMode: agBind?.getMode?.() || "ACTIVE",
+      });
+      return { ...leased, progress, breaker };
+    } finally {
+      steering.setMutationActive(false);
+      applySteeringBoundary();
+    }
+  }
+
+  /**
+   * Map AG bridge message into G10 events (idempotent).
+   * @param {object} msg
+   */
+  function onAntigravityBridgeEvent(msg) {
+    const mapped = mapAntigravityBridgeEvent(msg);
+    if (mapped && idempotency.accept(mapped.id)) {
+      emitSession(toSessionEvent(mapped));
+    }
+  }
+
+  /**
+   * Consume background result only if fingerprint matches.
+   * @param {{ fingerprint: string, kind: string, result: unknown }} recorded
+   */
+  function acceptBackgroundResult(recorded) {
+    const current = captureTaskReality(
+      options.worktreePath,
+      options.toolEnv,
+    ).diffFingerprint;
+    const verdict = StaleIntelligenceGuard.classify(recorded, current);
+    if (!verdict.ok) {
+      emitG10({
+        family: "background.stale",
+        detail: `${recorded.kind}: ${verdict.reason}`,
+      });
+      return { ok: false, ...verdict };
+    }
+    emitG10({
+      family: "background.completed",
+      detail: recorded.kind,
+    });
+    return { ok: true, ...verdict, result: recorded.result };
+  }
+
+  function reconcileResume() {
+    const cp = readTaskCheckpoint(options.runtimeRoot, options.taskId);
+    return reconcileTaskReality({
+      checkpoint: cp,
+      worktreePath: options.worktreePath,
+      env: options.toolEnv,
+    });
+  }
+
+  function markFinal(state, extra = {}) {
+    persist({ finalState: state, ...extra });
+    if (state === "VERIFIED") {
+      emitG10({ family: "task.verified", detail: state });
+    } else if (state === "FAILED") {
+      emitG10({ family: "task.failed", detail: state });
+    } else if (state === "BLOCKED" || state === "NEEDS_DIRECTION") {
+      emitG10({ family: "task.blocked", detail: state });
+    }
+  }
+
+  async function shutdown() {
+    persist();
+    try {
+      await copilot?.disconnect?.();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return {
+    emitG10,
+    emitSession,
+    persist,
+    attachCopilot,
+    attachAntigravity,
+    acceptSteering,
+    applySteeringBoundary,
+    runCopilotCollabTurn,
+    runAntigravityCollabTurn,
+    onAntigravityBridgeEvent,
+    acceptBackgroundResult,
+    reconcileResume,
+    markFinal,
+    shutdown,
+    chooseCollabEngine,
+    getCheckpoint: () => checkpoint,
+    getSteering: () => steering,
+    getNoProgress: () => noProgress,
+    getResources: () => resources,
+    getExternalActions: () => externalActions,
+    getCopilot: () => copilot,
+    getAgBind: () => agBind,
+  };
+}
+
+export {
+  findLatestResumableCheckpoint,
+  readTaskCheckpoint,
+  createCheckpointSkeleton,
+  writeTaskCheckpoint,
+  patchTaskCheckpoint,
+  captureTaskReality,
+  reconcileTaskReality,
+  detectProgress,
+  StaleIntelligenceGuard,
+  NoProgressCircuitBreaker,
+  EventIdempotencyGuard,
+  ResourceCircuitBreaker,
+  ExternalActionRegistry,
+  withMutationLease,
+  SteeringQueue,
+};
+
+export {
+  normalizeG10Event,
+  toSessionEvent,
+  mapCopilotSdkEvent,
+  mapAntigravityBridgeEvent,
+  makeEventId,
+  G10_EVENT_FAMILIES,
+} from "./events.mjs";
+
+export {
+  classifyAgSessionContinuity,
+  buildAgRehydratePrompt,
+  bindAntigravitySession,
+} from "./ag-session.mjs";
+
+export {
+  createCopilotEngine,
+  loadCopilotSdk,
+  classifyCopilotFailure,
+} from "./copilot-sdk.mjs";

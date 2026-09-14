@@ -1,0 +1,670 @@
+{
+  "summary": {
+    "schema": "pathcode.g10.ag-live.v1",
+    "label": "ag-g10-js",
+    "at": "2026-09-14T17:39:08.586Z",
+    "outcome": "VERIFIED",
+    "classification": "VERIFIED",
+    "exitCode": 0,
+    "taskId": "f3ae92c7-f755-4a57-abb9-2c23ad1bb1c6",
+    "engineActivityCount": 33,
+    "eventCount": 94,
+    "eventTypes": [
+      "session.task.received",
+      "session.preflight",
+      "session.engineering.workspace",
+      "session.recovery.checkpoint",
+      "session.capability.discovered",
+      "session.capability.mcp",
+      "session.capability.preparing",
+      "session.capability.provisioning",
+      "session.capability.affected",
+      "session.capability.ready",
+      "session.capability.collaborate",
+      "session.engineering.activity",
+      "session.engineering.bridge",
+      "session.reading",
+      "session.engineering.tool",
+      "session.applying",
+      "session.edit.summary",
+      "session.engineering.handoff",
+      "session.validation.plan",
+      "session.validation.running",
+      "session.validation.result",
+      "session.engineering.result",
+      "session.terminal"
+    ],
+    "g10Signals": {
+      "preparing": true,
+      "collaborating": true,
+      "repairing": false,
+      "result": true
+    },
+    "prepBrief": "## PATH G9 engineering environment\nLanguages: typescript\nToolchains:\n- node: PATH_RUNTIME_READY\n- npm: PATH_RUNTIME_READY\n- lsp:typescript: PATH_RUNTIME_READY\nLanguage servers:\n- typescript: ready (/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/language-servers/typescript-language-server)\nCode intelligence (SCIP): skipped (not i",
+    "watchedFamilies": [
+      "session.capability.preparing",
+      "session.capability.collaborate",
+      "session.engineering.activity",
+      "session.hydration",
+      "session.engineering.result",
+      "session.terminal"
+    ]
+  },
+  "result": {
+    "exitCode": 0,
+    "outcome": "VERIFIED",
+    "classification": "VERIFIED",
+    "taskId": "f3ae92c7-f755-4a57-abb9-2c23ad1bb1c6",
+    "taskBranch": "path/task-f3ae92c7-f755-4a57-abb9-2c23ad1bb1c6",
+    "commitSha": "045ee860aa4190a2001dd039ce662750cd3484f2",
+    "commitStatus": "VERIFIED",
+    "advancesSession": true,
+    "durableSummary": "Result: ✓ VERIFIED\nFiles changed: 1\n\nEngineering handoff:\nThe `add.js` file has been updated to correctly perform addition, and all tests are passing. I've fixed the bug in `src/add.js` by changing `return a - b;` to `return a + b;`. This aligns with the expected behavior of an `add` function. ```diff --- a/src/add.js +++ b/src/add.js @@ -1,2 +1,2 @@ -export function add(a, b) { return a - b; } +export function add(a, b) { return a + b; } ```\n\nEvidence:\nTests: ✓\nTask branch: path/task-f3ae92c7-f755-4a57-abb9-2c23ad1bb1c6\nBaseline: 5d5dca7d9da779f5ada2f9cf369a8fbe77a49a6f\nCommit: 045ee860aa4190a2001dd039ce662750cd3484f2\nPrimary checkout untouched: yes\n\nInspect full result:\ngit diff --no-ext-diff --no-textconv 5d5dca7d9da779f5ada2f9cf369a8fbe77a49a6f 045ee860aa4190a2001dd039ce662750cd3484f2 --\n\nTo merge this work:\ngit merge path/task-f3ae92c7-f755-4a57-abb9-2c23ad1bb1c6\n\nChanged files:\n  - src/add.js\n\nDiff preview:\ndiff --git a/src/add.js b/src/add.js\nindex 89b41c0..f643dbe 100644\n--- a/src/add.js\n+++ b/src/add.js\n@@ -1 +1 @@\n-export function add(a, b) { return a - b; }\n+export function add(a, b) { return a + b; }\n",
+    "sessionBaseCommit": "045ee860aa4190a2001dd039ce662750cd3484f2",
+    "baselineCommit": "5d5dca7d9da779f5ada2f9cf369a8fbe77a49a6f",
+    "worktreePath": null,
+    "cleanup": {
+      "ok": true,
+      "code": "CLEANED",
+      "primaryUntouched": true,
+      "worktreePath": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/ag1-tasks/f3ae92c7-f755-4a57-abb9-2c23ad1bb1c6"
+    },
+    "changedFiles": [
+      "src/add.js"
+    ],
+    "diff": "diff --git a/src/add.js b/src/add.js\nindex 89b41c0..f643dbe 100644\n--- a/src/add.js\n+++ b/src/add.js\n@@ -1 +1 @@\n-export function add(a, b) { return a - b; }\n+export function add(a, b) { return a + b; }",
+    "validation": {
+      "classification": "VERIFIED",
+      "reason": "All configured final checks passed.",
+      "checks": [
+        {
+          "id": "npm-test",
+          "name": "npm-test",
+          "kind": "TARGETED_TEST",
+          "command": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run test",
+          "exitCode": 0,
+          "timedOut": false,
+          "durationMs": 1278,
+          "ok": true,
+          "stdoutTail": "\n> test\n> node --test test/add.test.js\n\n✔ add (1.673917ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 217.0935\n",
+          "stderrTail": ""
+        }
+      ]
+    },
+    "primaryUntouched": true,
+    "allowShell": true,
+    "durationMs": 61629,
+    "engineActivityCount": 33,
+    "modelCalls": 0,
+    "diagFile": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/diag/bridge-f3ae92c7-f755-4a57-abb9-2c23ad1bb1c6.log"
+  },
+  "events": [
+    {
+      "type": "session.engineering.activity",
+      "activity": "understanding",
+      "label": "Understanding",
+      "at": 1789407496127
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "spawn",
+      "detail": "starting engineering bridge",
+      "at": 1789407496127
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "ag_session",
+      "detail": "Antigravity session ACTIVE",
+      "mode": "ACTIVE",
+      "at": 1789407497805
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "start_written",
+      "detail": "pid=54607 python=ok",
+      "at": 1789407497805
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "protocol stdin isolated from fd0",
+      "at": 1789407497961
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "tool_env_keys=94",
+      "at": 1789407498897
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "auth_mode=vertex project=path-code-gc1-260910 location=us-central1 model=model-2.5-flash",
+      "at": 1789407498897
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "understanding",
+      "label": "Understanding",
+      "at": 1789407498899
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "sdk_session",
+      "detail": "engineering session started",
+      "at": 1789407505106
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "understanding",
+      "label": "Understanding",
+      "at": 1789407505106
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "list_directory",
+      "at": 1789407508493
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "list_directory",
+      "detail": "list_directory",
+      "at": 1789407508493
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789407508493
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "list_directory",
+      "at": 1789407508499
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "list_directory",
+      "detail": "list_directory",
+      "at": 1789407508499
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789407508499
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "list_directory",
+      "summary": "list_directory .git (180 bytes)\njsconfig.json (51 bytes)\npackage.json (131 bytes)\nsrc/ (dir)\ntest/ (dir)",
+      "at": 1789407508500
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "list_directory",
+      "at": 1789407511035
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "list_directory",
+      "detail": "list_directory",
+      "at": 1789407511035
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789407511035
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "list_directory",
+      "at": 1789407511038
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "list_directory",
+      "detail": "list_directory",
+      "at": 1789407511038
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789407511038
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "list_directory",
+      "summary": "list_directory add.js (44 bytes)",
+      "at": 1789407511038
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "list_directory",
+      "at": 1789407513482
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "list_directory",
+      "detail": "list_directory",
+      "at": 1789407513482
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789407513482
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "list_directory",
+      "at": 1789407513486
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "list_directory",
+      "detail": "list_directory",
+      "at": 1789407513486
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789407513486
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "list_directory",
+      "summary": "list_directory add.test.js (162 bytes)",
+      "at": 1789407513486
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "view_file",
+      "at": 1789407517039
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789407517039
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789407517039
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "view_file",
+      "at": 1789407517043
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789407517043
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789407517043
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "view_file",
+      "summary": "view_file View add.js",
+      "at": 1789407517043
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "view_file",
+      "at": 1789407519337
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789407519337
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789407519337
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "detail": "view_file",
+      "at": 1789407519374
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "inspecting",
+      "label": "Inspecting",
+      "tool": "view_file",
+      "detail": "view_file",
+      "at": 1789407519374
+    },
+    {
+      "type": "session.reading",
+      "files": [],
+      "at": 1789407519374
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "inspect",
+      "tool": "view_file",
+      "summary": "view_file View package.json",
+      "at": 1789407519374
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "running_command",
+      "label": "Running command",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789407522495
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "running_command",
+      "label": "Running command",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789407525604
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "command",
+      "tool": "run_command",
+      "summary": "run_command env: node: Operation not permitted",
+      "at": 1789407525604
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "running_command",
+      "label": "Running command",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789407528527
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "running_command",
+      "label": "Running command",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789407528606
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "command",
+      "tool": "run_command",
+      "summary": "run_command /opt/homebrew/bin/node",
+      "at": 1789407528606
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "running_command",
+      "label": "Running command",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789407532209
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "testing",
+      "label": "Testing",
+      "detail": "test.started",
+      "at": 1789407535717
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "testing",
+      "label": "Testing",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789407535717
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "test",
+      "tool": "run_command",
+      "summary": "run_command ✖ add (3.495291ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 222.510041\n\n✖ failing tests:\n\ntest at test/add.test.js:4:1\n✖ add (3.495291ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  0 !== 4\n  \n      at TestContext.<anonymous> (file:///Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-PATH-v1",
+      "at": 1789407535718
+    },
+    {
+      "type": "session.applying",
+      "summary": "edit_file",
+      "at": 1789407538963
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "editing",
+      "label": "Implementing",
+      "tool": "edit_file",
+      "detail": "edit_file",
+      "at": 1789407538963
+    },
+    {
+      "type": "session.applying",
+      "summary": "editing in task workspace",
+      "at": 1789407538963
+    },
+    {
+      "type": "session.applying",
+      "summary": "edit_file",
+      "at": 1789407538973
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "editing",
+      "label": "Implementing",
+      "tool": "edit_file",
+      "detail": "edit_file",
+      "at": 1789407538973
+    },
+    {
+      "type": "session.applying",
+      "summary": "editing in task workspace",
+      "at": 1789407538973
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "file_edit",
+      "tool": "edit_file",
+      "summary": "edit_file Fix add.js",
+      "at": 1789407538974
+    },
+    {
+      "type": "session.edit.summary",
+      "path": "edit_file Fix add.js",
+      "kind": "edit",
+      "at": 1789407538974
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "running_command",
+      "label": "Running command",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789407541735
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "testing",
+      "label": "Testing",
+      "detail": "test.started",
+      "at": 1789407541953
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "testing",
+      "label": "Testing",
+      "tool": "run_command",
+      "detail": "run_command",
+      "at": 1789407541953
+    },
+    {
+      "type": "session.engineering.tool",
+      "kind": "test",
+      "tool": "run_command",
+      "summary": "run_command ✔ add (1.011083ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 100.348083",
+      "at": 1789407541953
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "complete",
+      "label": "Finishing",
+      "at": 1789407545552
+    },
+    {
+      "type": "session.engineering.handoff",
+      "summary": "The `add.js` file has been updated to correctly perform addition, and all tests are passing. I've fixed the bug in `src/add.js` by changing `return a - b;` to `return a + b;`. This aligns with the expected behavior of an `add` function. ```diff --- a/src/add.js +++ b/src/add.js @@ -1,2 +1,2 @@ -export function add(a, b) { return a - b; } +export function add(a, b) { return a + b; } ```",
+      "at": 1789407545555
+    },
+    {
+      "type": "session.engineering.activity",
+      "activity": "verifying",
+      "label": "Verifying",
+      "at": 1789407545555
+    },
+    {
+      "type": "session.validation.plan",
+      "summary": "independent final validation",
+      "at": 1789407545555
+    },
+    {
+      "type": "session.validation.running",
+      "id": "npm-test",
+      "kind": "TARGETED_TEST",
+      "check": "npm-test",
+      "at": 1789407545559
+    },
+    {
+      "type": "session.validation.result",
+      "id": "npm-test",
+      "check": "npm-test",
+      "kind": "TARGETED_TEST",
+      "ok": true,
+      "status": "PASSED",
+      "exitCode": 0,
+      "at": 1789407546837
+    },
+    {
+      "type": "session.engineering.result",
+      "classification": "VERIFIED",
+      "changedFiles": [
+        "src/add.js"
+      ],
+      "primaryUntouched": true,
+      "durationMs": 61134,
+      "allowShell": true,
+      "sandbox": "AG1_SANDBOX_OK",
+      "taskBranch": "path/task-f3ae92c7-f755-4a57-abb9-2c23ad1bb1c6",
+      "commitSha": "045ee860aa4190a2001dd039ce662750cd3484f2",
+      "baselineSha": "5d5dca7d9da779f5ada2f9cf369a8fbe77a49a6f",
+      "commitStatus": "VERIFIED",
+      "advancesSession": true,
+      "checks": [
+        {
+          "id": "npm-test",
+          "kind": "TARGETED_TEST",
+          "ok": true,
+          "exitCode": 0,
+          "command": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run test"
+        }
+      ],
+      "inspectCommand": "git diff --no-ext-diff --no-textconv 5d5dca7d9da779f5ada2f9cf369a8fbe77a49a6f 045ee860aa4190a2001dd039ce662750cd3484f2 --",
+      "preservedArtifact": null,
+      "diffPreviewLines": [
+        "diff --git a/src/add.js b/src/add.js",
+        "index 89b41c0..f643dbe 100644",
+        "--- a/src/add.js",
+        "+++ b/src/add.js",
+        "@@ -1 +1 @@",
+        "-export function add(a, b) { return a - b; }",
+        "+export function add(a, b) { return a + b; }"
+      ],
+      "diffPreviewTruncated": false,
+      "diffPreviewShownFiles": 1,
+      "at": 1789407548091
+    },
+    {
+      "type": "session.terminal",
+      "disposition": "VERIFIED",
+      "summary": "All configured final checks passed.",
+      "taskBranch": "path/task-f3ae92c7-f755-4a57-abb9-2c23ad1bb1c6",
+      "commitSha": "045ee860aa4190a2001dd039ce662750cd3484f2",
+      "at": 1789407548091
+    },
+    {
+      "type": "session.engineering.result",
+      "classification": "VERIFIED",
+      "summary": "VERIFIED",
+      "at": 1789407548095
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "done command received",
+      "at": 1789407548101
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "continue loop end: done",
+      "at": 1789407548101
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "stderr",
+      "detail": "close command received",
+      "at": 1789407548408
+    },
+    {
+      "type": "session.engineering.bridge",
+      "stage": "bridge_exit",
+      "detail": "code=0 signal=null",
+      "at": 1789407548586
+    }
+  ]
+}

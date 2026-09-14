@@ -111,6 +111,9 @@ export function createPromptSession(streams, options = {}) {
   let cycleActive = false;
   /** First mid-cycle SIGINT cancels the cycle; a second force-exits. */
   let cycleCancelInProgress = false;
+  /** Mid-cycle operator steering lines (G10). */
+  /** @type {string[]} */
+  let steeringQueue = [];
   const stderr = streams.stderr ?? streams.stdout;
 
   const rl = createInterface({
@@ -137,11 +140,24 @@ export function createPromptSession(streams, options = {}) {
     stopRequested = false;
   }
 
+  function onCycleSteeringLine(value) {
+    if (!cycleActive || mode !== "idle") return;
+    const text = typeof value === "string" ? value.trim() : "";
+    if (!text) return;
+    steeringQueue.push(text.slice(0, 4_000));
+    if (steeringQueue.length > 16) {
+      steeringQueue = steeringQueue.slice(-16);
+    }
+  }
+
   function beginCycle() {
     cycleActive = true;
     cycleCancelInProgress = false;
+    steeringQueue = [];
     // Mid-cycle SIGINT must cancel engineering even when askLine is not waiting.
     rl.on("SIGINT", onCycleSigint);
+    // G10: accept operator steering lines without ending the cycle.
+    rl.on("line", onCycleSteeringLine);
   }
 
   function endCycle() {
@@ -150,8 +166,24 @@ export function createPromptSession(streams, options = {}) {
     } catch {
       // ignore
     }
+    try {
+      rl.off("line", onCycleSteeringLine);
+    } catch {
+      // ignore
+    }
     cycleActive = false;
     cycleCancelInProgress = false;
+    steeringQueue = [];
+  }
+
+  /**
+   * Drain mid-cycle steering lines accepted by the operator (G10).
+   * @returns {string[]}
+   */
+  function drainSteering() {
+    const out = steeringQueue.slice();
+    steeringQueue = [];
+    return out;
   }
 
   function isCycleActive() {
@@ -537,6 +569,7 @@ export function createPromptSession(streams, options = {}) {
     clearStop,
     beginCycle,
     endCycle,
+    drainSteering,
     isCycleActive,
     isCycleCancelRequested,
     requestCycleCancel,

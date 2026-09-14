@@ -791,6 +791,8 @@ export function applyStudioEvent(state, event, opts = {}) {
         state.product.ag1Mutation = true;
       } else if (/inspect|read|understand/i.test(phaseLabel)) {
         setCard(state, "reading", "active", phaseLabel);
+      } else if (/repair/i.test(phaseLabel)) {
+        state.product.ag1Mutation = true;
       } else if (/test/i.test(phaseLabel) && !/verif/i.test(phaseLabel)) {
         // Engine-time testing is provisional — do not mark final validation cards.
         state.product.engineCheckFeedback = "running";

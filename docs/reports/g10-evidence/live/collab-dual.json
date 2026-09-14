@@ -1,0 +1,37 @@
+{
+  "schema": "pathcode.g10.collab-shared-worktree.v1",
+  "at": "2026-09-14T17:44:04.811Z",
+  "copilot": {
+    "ok": true,
+    "mode": "native_sdk",
+    "changed": true,
+    "files": [
+      "src/add.js"
+    ],
+    "detail": "Copilot SDK turn completed"
+  },
+  "agStart": {
+    "ok": true,
+    "mode": "REHYDRATED_SESSION"
+  },
+  "agTurn": {
+    "ok": true,
+    "terminal": "finished",
+    "leased": true,
+    "mode": "REHYDRATED_SESSION"
+  },
+  "shared": {
+    "taskId": "g10-collab-shared",
+    "worktree": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-collab/ag1-tasks/g10-collab-shared",
+    "primaryUntouched": true,
+    "source": "export function add(a, b) { return a + b; }\n",
+    "testExit": 0,
+    "validationClassification": "VERIFIED",
+    "fingerprints": {
+      "before": "c4d03e82a30d5e9051b55532",
+      "mid": "6e85501ef66053f86f548116",
+      "after": "6e85501ef66053f86f548116"
+    }
+  },
+  "verdict": "PASS"
+}

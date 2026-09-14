@@ -1,0 +1,34 @@
+{
+  "schema": "pathcode.g10.resume-proof.v1",
+  "at": "2026-09-14T17:22:57.374Z",
+  "create": {
+    "ok": true,
+    "taskId": "resume-demo",
+    "path": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/g10-resume-rt-DddPoS/ag1-tasks/resume-demo"
+  },
+  "reopen": {
+    "ok": true,
+    "taskId": "resume-demo",
+    "path": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/g10-resume-rt-DddPoS/ag1-tasks/resume-demo"
+  },
+  "reconcile": {
+    "ok": true,
+    "status": "aligned",
+    "head": "76089f7815f45c9ef2f36b564f9c99a6f6a2e0c4",
+    "objective": "bump log",
+    "files": [
+      "app.js"
+    ]
+  },
+  "gitOutranks": {
+    "ok": true,
+    "changedFiles": [
+      "app.js"
+    ]
+  },
+  "deadProvider": {
+    "mode": "REHYDRATED_SESSION",
+    "detail": "new Antigravity conversation established from current PATH task reality"
+  },
+  "verdict": "PASS"
+}

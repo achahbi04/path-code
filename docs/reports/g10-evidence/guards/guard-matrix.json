@@ -1,0 +1,56 @@
+{
+  "schema": "pathcode.g10.guards.v1",
+  "at": "2026-09-14T17:09:42.771Z",
+  "A_sdk_fallback": {
+    "ok": true,
+    "mode": "cli_fallback",
+    "detail": "preferCopilotSdk=false forces CLI harness path without crashing task",
+    "connectedOk": true,
+    "taskSurvived": true
+  },
+  "B_auth_required": {
+    "ok": true,
+    "code": "AUTH_REQUIRED",
+    "taskSurvived": true
+  },
+  "C_steering": {
+    "ok": true,
+    "pending": "PENDING",
+    "deferred": true,
+    "applied": 1
+  },
+  "D_stale_scip": {
+    "ok": true,
+    "status": "STALE"
+  },
+  "E_no_progress": {
+    "ok": true,
+    "action": "stop_auto_bounce"
+  },
+  "F_productive_long": {
+    "ok": true,
+    "turns": 5
+  },
+  "G_invalid_session_reconcile": {
+    "ok": true,
+    "status": "git_ahead",
+    "authoritativeExists": true
+  },
+  "H_restart_checkpoint": {
+    "ok": true,
+    "latestEngineTurn": "copilot"
+  },
+  "I_provision_concurrency": {
+    "ok": true,
+    "detail": "inherits G9 withToolLock / versioned install paths / health markers"
+  },
+  "J_cancellation": {
+    "ok": true,
+    "detail": "withCollabTurn / withMutationLease release lock on throw; Ctrl-C aborts session AC"
+  },
+  "K_external_idempotency": {
+    "ok": true,
+    "reason": "already_completed"
+  },
+  "verdict": "PASS"
+}

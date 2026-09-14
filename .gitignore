@@ -35,6 +35,10 @@ Thumbs.db
 docs/reports/g9-evidence/runtime-*/
 docs/reports/g9-evidence/**/target/
 docs/reports/g9-evidence/**/Cargo.lock
+docs/reports/g10-evidence/tmp/
+docs/reports/g10-evidence/runtime-*/
+docs/reports/g10-evidence/**/node_modules/
+docs/reports/g10-evidence/**/target/
 
 # G9 disposable accept fixtures (regenerable deps / build)
 docs/reports/g9-evidence/live-repos/**/node_modules/

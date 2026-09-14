@@ -239,6 +239,124 @@ export function collectWorktreeResult(worktreePath, baselineHead) {
 }
 
 /**
+ * Reopen an existing PATH task worktree for resume (G10).
+ * Does not create a new branch; binds to the durable task branch/worktree.
+ *
+ * @param {{
+ *   primaryRoot: string,
+ *   taskId: string,
+ *   worktreePath?: string,
+ *   tasksParent?: string,
+ *   checkoutRoot?: string,
+ *   runtimeRoot?: string,
+ * }} input
+ */
+export function reopenTaskWorktree(input) {
+  const primaryRoot = resolve(input.primaryRoot);
+  const checkoutRoot = input.checkoutRoot ?? resolveCheckoutRoot();
+  const runtimeRoot =
+    input.runtimeRoot ??
+    resolvePathRuntimeRoot({ packageRoot: checkoutRoot });
+  const tasksParent =
+    input.tasksParent ?? join(runtimeRoot, "ag1-tasks");
+  const taskId = String(input.taskId || "").trim();
+  if (!taskId) {
+    return {
+      ok: false,
+      code: "G10_RESUME_NO_TASK_ID",
+      message: "Resume requires a task id",
+    };
+  }
+  const taskBranch = `path/task-${taskId}`;
+  const worktreePath = resolve(
+    typeof input.worktreePath === "string" && input.worktreePath.trim()
+      ? input.worktreePath.trim()
+      : join(tasksParent, taskId),
+  );
+  const before = capturePrimaryFingerprint(primaryRoot);
+  if (!before.ok || !before.head) {
+    return {
+      ok: false,
+      code: "AG1_PRIMARY_GIT_UNAVAILABLE",
+      message: `Cannot read primary Git state under ${primaryRoot}`,
+    };
+  }
+
+  if (existsSync(worktreePath)) {
+    const head = git(worktreePath, ["rev-parse", "HEAD"]);
+    const branch = git(worktreePath, ["rev-parse", "--abbrev-ref", "HEAD"]);
+    return {
+      ok: true,
+      resumed: true,
+      taskId,
+      taskBranch:
+        branch.status === 0 && branch.stdout.trim()
+          ? branch.stdout.trim()
+          : taskBranch,
+      worktreePath,
+      baseline: {
+        head: head.status === 0 ? head.stdout.trim() : before.head,
+        branch: before.branch,
+        porcelain: before.porcelain,
+      },
+      primaryBefore: before,
+    };
+  }
+
+  // Worktree path missing but branch may still exist — re-add.
+  const branchExists = git(primaryRoot, [
+    "show-ref",
+    "--verify",
+    "--quiet",
+    `refs/heads/${taskBranch}`,
+  ]);
+  if (branchExists.status !== 0) {
+    return {
+      ok: false,
+      code: "G10_RESUME_BRANCH_MISSING",
+      message: `Task branch missing for resume: ${taskBranch}`,
+    };
+  }
+  mkdirSync(tasksParent, { recursive: true });
+  const add = git(primaryRoot, [
+    "worktree",
+    "add",
+    worktreePath,
+    taskBranch,
+  ]);
+  if (add.status !== 0) {
+    return {
+      ok: false,
+      code: "G10_RESUME_WORKTREE_ADD_FAILED",
+      message: add.stderr || add.stdout || "git worktree add failed on resume",
+    };
+  }
+  const after = capturePrimaryFingerprint(primaryRoot);
+  if (!primaryUntouched(before, after)) {
+    git(primaryRoot, ["worktree", "remove", "--force", worktreePath]);
+    return {
+      ok: false,
+      code: "AG1_PRIMARY_TOUCHED",
+      message: "Primary checkout changed while resuming the task worktree.",
+    };
+  }
+  const head = git(worktreePath, ["rev-parse", "HEAD"]);
+  return {
+    ok: true,
+    resumed: true,
+    taskId,
+    taskBranch,
+    worktreePath: resolve(worktreePath),
+    baseline: {
+      head: head.status === 0 ? head.stdout.trim() : before.head,
+      branch: before.branch,
+      porcelain: before.porcelain,
+    },
+    primaryBefore: before,
+  };
+}
+
+/**
  * Remove a task worktree (best effort). Leaves primary untouched.
  * Task branch is preserved by default.
  *

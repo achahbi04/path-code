@@ -1,0 +1,35 @@
+{
+  "schema": "pathcode.g10.copilot-sdk-probe.v1",
+  "at": "2026-09-14T17:12:51.962Z",
+  "sdkLoad": {
+    "ok": true,
+    "hasClient": true
+  },
+  "sdkConnect": {
+    "ok": true,
+    "mode": "native_sdk",
+    "sessionId": "path-sdk-probe-1789405972715",
+    "detail": null,
+    "degraded": false
+  },
+  "sdkTurn": {
+    "ok": true,
+    "mode": "native_sdk",
+    "detail": "Copilot SDK turn completed",
+    "textPreview": "SDK_OK",
+    "sdkResume": false
+  },
+  "forcedCliFallback": {
+    "ok": true,
+    "mode": "cli_fallback",
+    "fb": {
+      "ok": true,
+      "mode": "cli_fallback"
+    }
+  },
+  "authClassify": {
+    "code": "AUTH_REQUIRED",
+    "message": "GitHub authentication required"
+  },
+  "verdict": "SDK_NATIVE_OK"
+}
