@@ -3,7 +3,7 @@ SELF-PROVISIONING POLYGLOT + COLLABORATIVE ENGINEERING RUNTIME
 
 **Result:** PARTIAL  
 **Baseline:** G8 freeze `3ca50e0acf04739b647624c840ca86530944e8f4`  
-**Implementation commit:** (recorded immediately after this acceptance lands)  
+**Implementation commit:** `61ed3f272e9d03dc53490c92afc8cdb0b82f7d54`  
 **Working tree:** `cursor/pathcode-antigravity-v1`  
 **Canonical validation:** `npm run check` PASS (154 files / 1412 tests)  
 **Published releases:** UNCHANGED  
