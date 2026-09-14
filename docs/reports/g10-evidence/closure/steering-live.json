@@ -1,0 +1,56 @@
+{
+  "schema": "pathcode.g10.closure.steering.v1",
+  "at": "2026-09-14T18:10:53.014Z",
+  "sequence": [
+    {
+      "t": 1789409541601,
+      "type": "session.task.received"
+    },
+    {
+      "t": 1789409541603,
+      "type": "session.engineering.activity",
+      "label": "Steering pending",
+      "detail": "Keep backward compatibility and do not change the public API."
+    },
+    {
+      "t": 1789409541735,
+      "type": "steering.accept",
+      "status": "PENDING",
+      "text": "Keep backward compatibility and do not change the public API."
+    },
+    {
+      "t": 1789409541737,
+      "type": "session.engineering.activity",
+      "label": "Steering applied",
+      "detail": "Keep backward compatibility and do not change the public API."
+    },
+    {
+      "t": 1789409541860,
+      "type": "steering.applied",
+      "text": "Keep backward compatibility and do not change the public API."
+    }
+  ],
+  "pendingWhileMutating": {
+    "status": "PENDING",
+    "deferred": true,
+    "appliedCount": 0
+  },
+  "applied": {
+    "deferred": false,
+    "count": 1,
+    "text": "Keep backward compatibility and do not change the public API."
+  },
+  "terminal": "failed",
+  "engineering": {
+    "exportStillAdd": true,
+    "fixed": false,
+    "testExit": 1,
+    "validation": "FAILED",
+    "source": "/** Broken on purpose for G10 Antigravity repair-loop acceptance. */\nexport function add(a, b) {\n  return a - b;\n}\n"
+  },
+  "events": {
+    "pending": true,
+    "applied": true
+  },
+  "verdict": "PARTIAL"
+}

@@ -1,0 +1,12 @@
+{"type":"session.capability.preparing","sessionId":"ag-repair","projectRoot":"/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/ag-repair-primary","runtimeRoot":"/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-closure-ag-repair","at":1789409026889}
+{"type":"session.capability.provisioning","sessionId":"ag-repair","phase":"toolchains","at":1789409027757}
+{"type":"session.capability.provisioning","sessionId":"ag-repair","id":"lsp:typescript","at":1789409027758}
+{"type":"session.capability.provisioned","sessionId":"ag-repair","id":"lsp:typescript","at":1789409120634}
+{"type":"session.capability.provisioning","sessionId":"ag-repair","phase":"lsp","at":1789409120638}
+{"type":"session.capability.provisioning","sessionId":"ag-repair","tool":"lsp:javascript","at":1789409120676}
+{"type":"session.capability.affected","sessionId":"ag-repair","classification":"CONSERVATIVE","source":"npm-test","at":1789409123091}
+{"type":"session.capability.ready","sessionId":"ag-repair","lspReady":["javascript"],"scip":false,"affected":"CONSERVATIVE","at":1789409123098}
+{"type":"session.task.received","sessionId":"ag-repair","summary":"AG same-session repair","at":1789409123990}
+{"type":"session.engineering.activity","sessionId":"ag-repair","activity":"repairing","label":"Repairing","detail":"validation failure returned to same Antigravity session","at":1789409125841}
+{"type":"session.engineering.activity","sessionId":"ag-repair","activity":"repairing","label":"Repairing","detail":"same-session repair after failed validation","at":1789409125842}
+{"type":"session.engineering.result","sessionId":"ag-repair","classification":"FAILED","summary":"FAILED","at":1789409427476}
