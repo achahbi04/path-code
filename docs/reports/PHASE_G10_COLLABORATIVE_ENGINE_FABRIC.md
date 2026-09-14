@@ -8,10 +8,10 @@
 - Named PARTIAL report: `952fc0eabbf0cffc8a8437d44bad1291b2e60016`
 
 **Closure implementation commit:** `416877d10eb4e04bad313588eee26198e6fbbfdf`  
-**Closure report commit:** _(filled at freeze)_  
-**Current HEAD:** _(filled at freeze)_  
+**Closure report commit:** `6bfae13dc2c76a89e2b4a0f55d27b399bd0b2594`  
+**Current HEAD:** `6bfae13dc2c76a89e2b4a0f55d27b399bd0b2594`  
 **Branch:** `cursor/pathcode-antigravity-v1`  
-**Working tree:** _(filled at freeze)_
+**Working tree:** clean after freeze
 
 G10 inherits the complete G9 engineering foundation. Closure drive closed the
 remaining live product acceptance gaps without redesigning the fabric.
