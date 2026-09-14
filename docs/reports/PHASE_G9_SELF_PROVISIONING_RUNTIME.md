@@ -2,8 +2,9 @@
 
 **Result:** ACCEPTED  
 **Baseline:** G8 Native Capability Gateway · freeze `3ca50e0acf04739b647624c840ca86530944e8f4`  
+**Acceptance commit:** `985e6c4086cd9f40bf71b86bd4612e09deb912d2`  
 **Branch:** `cursor/pathcode-antigravity-v1`  
-**Canonical validation:** `npm run check` PASS (typecheck · build · tests · cli:smoke · ledger:verify)  
+**Canonical validation:** `npm run check` PASS (typecheck · build · 154 files / 1412 tests · cli:smoke · ledger:verify)  
 **Published releases:** UNCHANGED · Publication performed: NO
 
 ## Architecture (corrected)
