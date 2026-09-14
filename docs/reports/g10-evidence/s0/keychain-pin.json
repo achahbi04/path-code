@@ -1,0 +1,9 @@
+{
+  "schema": "pathcode.s0.keychain.v1",
+  "at": "2026-09-14T22:25:38.153Z",
+  "rootCause": "SDK default copilot-runtime fingerprint cache path identity churn vs Keychain ACL",
+  "fix": "RuntimeConnection.forStdio({path}) + COPILOT_CLI_PATH pin to host copilot",
+  "resolvedCliPath": "/Users/achahbi/.local/bin/copilot",
+  "envPinned": true,
+  "MANUAL_KEYCHAIN_OPERATOR": "PENDING_ALWAYS_ALLOW_ONCE_ON_STABLE_BIN"
+}

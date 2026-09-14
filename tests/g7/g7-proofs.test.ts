@@ -67,7 +67,7 @@ describe("G7 B — failure truth", () => {
     });
     let evidence = buildEvidenceLines(state).join("\n");
     expect(evidence).toMatch(/Eng\. tests/);
-    expect(evidence).toMatch(/Final validate\s+—/);
+    expect(evidence).toMatch(/Checks\s+—/);
 
     applyStudioEvent(state, {
       type: "session.validation.plan",
@@ -133,7 +133,7 @@ describe("G7 D — large result bounded preview", () => {
     expect(buildFullResultInspectCommand({})).toBeNull();
   });
 
-  it("renders compact VERIFIED result in the minimal living frame", async () => {
+  it("renders compact COMPLETE result in the minimal living frame", async () => {
     const { createEmptyStudioState, applyStudioEvent } = await load(STUDIO);
     const { buildInlineCardLines, buildLivingProductLines } = await load(INLINE);
     const sid = "g7d";
@@ -161,16 +161,15 @@ describe("G7 D — large result bounded preview", () => {
       checks: [{ id: "test", kind: "TARGETED_TEST", ok: true }],
     });
     const wide = buildInlineCardLines(state, { rows: 50, columns: 140 }).join("\n");
-    expect(wide).toMatch(/VERIFIED/);
+    expect(wide).toMatch(/COMPLETE/);
     expect(wide).toMatch(/9 files/);
-    expect(wide).toMatch(/path\/task-big/);
-    expect(wide).toMatch(/2222222b/);
+    expect(wide).toMatch(/Commit 2222222b/);
     // Primary surface must not dump raw inspect commands.
     expect(wide).not.toMatch(/git diff --no-ext-diff/);
     const narrow = buildInlineCardLines(state, { rows: 40, columns: 72 }).join("\n");
-    expect(narrow).toMatch(/VERIFIED/);
+    expect(narrow).toMatch(/COMPLETE/);
     expect(narrow).toMatch(/PATH ● Code/);
-    expect(narrow).toMatch(/Branch: path\/task-big/);
+    expect(narrow).toMatch(/GOAL/);
     // Legacy three-column still discloses inspect command when asked explicitly.
     const legacy = buildLivingProductLines(state, { rows: 50, columns: 140 }).join(
       "\n",
@@ -339,7 +338,7 @@ describe("G7 F — final ANSI write boundary", () => {
     expect(mid).not.toContain("\\u001b");
     renderer.setIdlePrompt("PATH ● Code > ");
     const idle = stdout.chunks.join("");
-    expect(idle).toMatch(/VERIFIED/);
+    expect(idle).toMatch(/COMPLETE/);
     expect(idle).toMatch(/PATH ● Code/);
     expect(idle).toMatch(/> /);
     // Second task must not exit alt screen.

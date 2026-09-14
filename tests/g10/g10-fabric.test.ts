@@ -246,4 +246,27 @@ describe("G10 fabric guards", () => {
     expect(cp?.pendingSteering?.length).toBeGreaterThan(0);
     expect(cp?.latestEngineTurn).toBe("antigravity");
   });
+
+  it("pins a stable host Copilot CLI path for Keychain ACL identity", async () => {
+    const sdkPath = join(CHECKOUT_ROOT, "scripts/pathcode-cli/ag10/copilot-sdk.mjs");
+    const {
+      resolveStableCopilotCliPath,
+      withStableCopilotPath,
+    } = await import(`${pathToFileURL(sdkPath).href}?g10=${randomUUID()}`);
+    const fake = join(tmp("copilot-bin"), "copilot");
+    mkdirSync(dirname(fake), { recursive: true });
+    writeFileSync(fake, "#!/bin/sh\necho ok\n", { mode: 0o755 });
+    const resolved = resolveStableCopilotCliPath({
+      COPILOT_CLI_PATH: fake,
+      PATH: "/usr/bin:/bin",
+    });
+    expect(resolved).toBe(fake);
+    const env = withStableCopilotPath({
+      COPILOT_CLI_PATH: fake,
+      PATH: "/usr/bin:/bin",
+    });
+    expect(env.COPILOT_CLI_PATH).toBe(fake);
+    expect(env.PATHCODE_COPILOT_BIN).toBe(fake);
+    expect(String(env.PATH || "").startsWith(dirname(fake))).toBe(true);
+  });
 });

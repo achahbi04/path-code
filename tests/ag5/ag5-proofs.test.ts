@@ -278,7 +278,10 @@ describe("AG5 native validation discovery", () => {
       "ag1/final-validation.mjs",
     );
     const root = mkdtempSync(join(tmpdir(), "ag5-py-nopip-"));
+    const prevPath = process.env.PATH;
     try {
+      // Isolate from host tool installs (e.g. ~/.local/bin/pytest via uv).
+      process.env.PATH = ["/usr/bin", "/bin"].join(":");
       writeFileSync(
         join(root, "pyproject.toml"),
         '[project]\nname="x"\nversion="0.1.0"\n',
@@ -289,6 +292,8 @@ describe("AG5 native validation discovery", () => {
       // Must not claim FAILED when pytest cannot run.
       expect(result.classification).toBe("NOT_VERIFIED");
     } finally {
+      if (prevPath != null) process.env.PATH = prevPath;
+      else delete process.env.PATH;
       rmSync(root, { recursive: true, force: true });
     }
   });
@@ -300,7 +305,9 @@ describe("AG5 native validation discovery", () => {
     const scratch = mkdtempSync(join(tmpdir(), "ag6-py-primary-venv-"));
     const primary = join(scratch, "primary");
     const worktree = join(scratch, "worktree");
+    const prevPath = process.env.PATH;
     try {
+      process.env.PATH = ["/usr/bin", "/bin"].join(":");
       mkdirSync(primary, { recursive: true });
       mkdirSync(worktree, { recursive: true });
       writeFileSync(
@@ -334,6 +341,8 @@ describe("AG5 native validation discovery", () => {
       );
       expect(String((hit as { request: { cwd: string } }).request.cwd)).toBe(worktree);
     } finally {
+      if (prevPath != null) process.env.PATH = prevPath;
+      else delete process.env.PATH;
       rmSync(scratch, { recursive: true, force: true });
     }
   });

@@ -5,13 +5,98 @@
  * Preserve task/worktree on SDK failure; AUTH_REQUIRED when human auth needed.
  */
 
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mapCopilotSdkEvent, toSessionEvent } from "./events.mjs";
+import { whichBinary } from "../ag8/discover.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(HERE, "../../..");
+
+/**
+ * Resolve a stable Copilot CLI executable identity for macOS Keychain ACLs.
+ *
+ * Root cause of repeated Keychain prompts: `@github/copilot-sdk` defaults to
+ * materializing `copilot-runtime` under a fingerprint-keyed cache
+ * (`~/Library/Caches/github-copilot-sdk/runtime/<fingerprint>/...`). When the
+ * npm package mtimes change, the fingerprint changes → new binary path →
+ * Keychain asks again for "copilot-runtime" accessing "copilot-cli".
+ *
+ * Prefer a host-installed `copilot` (or explicit COPILOT_CLI_PATH) and pin the
+ * SDK via RuntimeConnection.forStdio({ path }) / COPILOT_CLI_PATH.
+ *
+ * @param {Record<string, string | undefined>} [base]
+ * @returns {string | null}
+ */
+export function resolveStableCopilotCliPath(base = process.env) {
+  const explicit =
+    (typeof base.COPILOT_CLI_PATH === "string" && base.COPILOT_CLI_PATH.trim()) ||
+    (typeof base.PATHCODE_COPILOT_BIN === "string" &&
+      base.PATHCODE_COPILOT_BIN.trim()) ||
+    "";
+  if (explicit && existsSync(explicit)) return explicit;
+
+  const home = homedir();
+  const enrichedPath = [
+    join(home, ".local/bin"),
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    String(base.PATH || process.env.PATH || ""),
+  ]
+    .filter(Boolean)
+    .join(":");
+  const fromWhich = whichBinaryWithPath("copilot", enrichedPath);
+  if (fromWhich && existsSync(fromWhich)) return fromWhich;
+
+  const candidates = [
+    join(home, ".local/bin/copilot"),
+    "/opt/homebrew/bin/copilot",
+    "/usr/local/bin/copilot",
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) return c;
+  }
+  return null;
+}
+
+/**
+ * @param {string} bin
+ * @param {string} pathEnv
+ */
+function whichBinaryWithPath(bin, pathEnv) {
+  const prev = process.env.PATH;
+  try {
+    process.env.PATH = pathEnv;
+    return whichBinary(bin);
+  } finally {
+    if (prev != null) process.env.PATH = prev;
+    else delete process.env.PATH;
+  }
+}
+
+/**
+ * Enrich env so host `copilot` wins discovery and SDK child ACLs stay stable.
+ *
+ * @param {Record<string, string | undefined>} [base]
+ * @returns {Record<string, string | undefined>}
+ */
+export function withStableCopilotPath(base = process.env) {
+  const env = { ...base };
+  const exe = resolveStableCopilotCliPath(env);
+  if (!exe) return env;
+  const binDir = dirname(exe);
+  const parts = String(env.PATH || "")
+    .split(":")
+    .filter(Boolean)
+    .filter((p) => p !== binDir);
+  env.PATH = [binDir, ...parts].join(":");
+  env.PATHCODE_COPILOT_BIN = exe;
+  env.COPILOT_CLI_PATH = exe;
+  return env;
+}
 
 /**
  * Dynamically load @github/copilot-sdk from the product package root.
@@ -104,12 +189,47 @@ export async function createCopilotEngine(options) {
     if (!loaded.ok) {
       return { ok: false, reason: loaded.reason };
     }
-    const { CopilotClient, approveAll } = loaded.sdk;
-    const nextClient = new CopilotClient({
-      ...(options.configDirectory
-        ? { /* client-level unused; session uses configDirectory */ }
-        : {}),
+    const { CopilotClient, approveAll, RuntimeConnection } = loaded.sdk;
+    const stable = withStableCopilotPath({
+      ...process.env,
+      ...(options.toolEnv || {}),
     });
+    const cliPath =
+      typeof stable.COPILOT_CLI_PATH === "string" && stable.COPILOT_CLI_PATH
+        ? stable.COPILOT_CLI_PATH
+        : resolveStableCopilotCliPath(stable);
+
+    /** @type {Record<string, any>} */
+    const clientOpts = {};
+    // Pin executable identity so Keychain ACL binds once across sequential turns.
+    if (
+      cliPath &&
+      RuntimeConnection &&
+      typeof RuntimeConnection.forStdio === "function"
+    ) {
+      clientOpts.connection = RuntimeConnection.forStdio({
+        path: cliPath,
+        env: stable,
+      });
+    } else if (cliPath) {
+      clientOpts.env = { ...stable, COPILOT_CLI_PATH: cliPath };
+    } else if (options.toolEnv) {
+      clientOpts.env = stable;
+    }
+    if (typeof options.configDirectory === "string" && options.configDirectory) {
+      clientOpts.baseDirectory = options.configDirectory;
+    }
+
+    const nextClient = new CopilotClient(clientOpts);
+    // Also pin process env for any SDK code paths that read COPILOT_CLI_PATH late.
+    const prevPath = process.env.PATH;
+    const prevBin = process.env.PATHCODE_COPILOT_BIN;
+    const prevCli = process.env.COPILOT_CLI_PATH;
+    if (stable.PATH) process.env.PATH = stable.PATH;
+    if (stable.PATHCODE_COPILOT_BIN) {
+      process.env.PATHCODE_COPILOT_BIN = stable.PATHCODE_COPILOT_BIN;
+    }
+    if (cliPath) process.env.COPILOT_CLI_PATH = cliPath;
     try {
       await nextClient.start();
     } catch (err) {
@@ -118,6 +238,12 @@ export async function createCopilotEngine(options) {
       } catch {
         /* ignore */
       }
+      if (prevPath != null) process.env.PATH = prevPath;
+      else delete process.env.PATH;
+      if (prevBin != null) process.env.PATHCODE_COPILOT_BIN = prevBin;
+      else delete process.env.PATHCODE_COPILOT_BIN;
+      if (prevCli != null) process.env.COPILOT_CLI_PATH = prevCli;
+      else delete process.env.COPILOT_CLI_PATH;
       return { ok: false, error: err };
     }
 

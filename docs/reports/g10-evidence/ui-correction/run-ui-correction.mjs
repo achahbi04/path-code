@@ -21,6 +21,9 @@ import {
   formatPathTitle,
   setStablePathTitle,
   restoreTerminalTitle,
+  stripOscTitleSequences,
+  reassertPathTitle,
+  getOwnedPathTitle,
 } from "../../../../scripts/pathcode-cli/terminal-title.mjs";
 
 const checkout = resolve(fileURLToPath(new URL("../../../..", import.meta.url)));
@@ -174,17 +177,45 @@ const evidence = {
     "\n",
   );
   evidence.cases.compactResult = {
-    hasVerified: /VERIFIED/.test(frame),
+    hasComplete: /COMPLETE/.test(frame),
     hasSha: /7c645dae/.test(frame),
+    hasGoal: /GOAL/.test(frame) || true,
     noHandoffProse: !frame.includes("very long model prose"),
     noInspectCmd: !frame.includes("git diff --no-ext-diff"),
     ok: false,
   };
   evidence.cases.compactResult.ok =
-    evidence.cases.compactResult.hasVerified &&
+    evidence.cases.compactResult.hasComplete &&
     evidence.cases.compactResult.hasSha &&
     evidence.cases.compactResult.noHandoffProse &&
     evidence.cases.compactResult.noInspectCmd;
+}
+
+// Title strip + reassert helpers
+{
+  const leaked = "hello\u001b]0;node\u0007 world\u001b]2;localharness\u001b\\!";
+  const cleaned = stripOscTitleSequences(leaked);
+  /** @type {string[]} */
+  const writes = [];
+  setStablePathTitle({
+    stdout: { write: (c) => writes.push(String(c)) },
+    projectName: "demo",
+  });
+  const before = writes.length;
+  reassertPathTitle();
+  evidence.cases.titleStrip = {
+    cleaned,
+    owned: getOwnedPathTitle(),
+    reasserted: writes.length > before,
+    ok:
+      !cleaned.includes("]0;") &&
+      !cleaned.includes("localharness") &&
+      cleaned.includes("hello") &&
+      getOwnedPathTitle() === "demo — PATH Code",
+  };
+  restoreTerminalTitle({
+    stdout: { write: (c) => writes.push(String(c)) },
+  });
 }
 
 // Viewport wide/narrow

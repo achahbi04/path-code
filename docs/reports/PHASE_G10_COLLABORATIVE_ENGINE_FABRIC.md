@@ -135,10 +135,25 @@ Evidence: `closure/viewport-mechanical.json`, `ui-correction/ui-correction.json`
 | Branding | `PATH` white · `●` yellow · `Code` white (`NO_COLOR` plain) |
 | Default layout | Minimal single-column living surface (legacy 3-col via `PATHCODE_LEGACY_THREE_COLUMN=1`) |
 | Stable title | OSC `` `${project} — PATH Code` `` on enter; restored on exit |
-| Compact result | `✓ VERIFIED · N files · sha` — no handoff prose / inspect dump |
+| Compact result | `✓ COMPLETE` + files / tests / build / `Commit <sha>` — no handoff prose / inspect dump |
 | Evidence | `docs/reports/g10-evidence/ui-correction/ui-correction.json` → **PASS** |
 | Multitask after fix | `closure/multitask-repl.json` → **PASS** |
 | Guards A–K | **PASS** |
+
+## S0 — G10.5 PRODUCT CORRECTION
+
+Authoritative roadmap stage **S0** (before Gateway extract). Full report:
+`docs/reports/PHASE_S0_G10_5_PRODUCT_CORRECTION.md`
+
+| Field | Status |
+| --- | --- |
+| Living surface | HEADER · GOAL · STREAM · COMPACT STATE · COMPOSER |
+| Title | OSC strip + stream guards + `` `<project> — PATH Code` `` |
+| Keychain | Pin host `copilot` via `RuntimeConnection.forStdio` / `COPILOT_CLI_PATH` |
+| Terminology | Checks / COMPLETE (gateway semantics; no judge language) |
+| Architecture | PATH = engineering gateway / product layer |
+| S1 / Build / Studio / Cursor SDK | **NOT BEGUN** |
+| MANUAL_UI_ACCEPTANCE | **PENDING_OPERATOR_REVIEW** |
 
 ## GUARDS A–K
 

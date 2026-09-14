@@ -123,7 +123,7 @@ export function createEmptyStudioState() {
       baselineSha: null,
       resultSha: null,
       changedFileTotal: 0,
-      /** Provisional engine-time check feedback (not final PATH validation). */
+      /** Provisional engine-time check feedback (tests/build while engineering). */
       engineCheckFeedback: null,
       finalValidationStarted: false,
       finalValidationComplete: false,
@@ -133,7 +133,7 @@ export function createEmptyStudioState() {
       diffPreviewShownFiles: 0,
       inspectCommand: null,
       preservedArtifact: null,
-      /** Engineering handoff (engine-derived; distinct from PATH evidence). */
+      /** Engineering handoff text (engine-derived; not shown in primary living UI). */
       engineeringHandoff: null,
       /** Compact multi-task history inside the session-long cockpit. */
       sessionHistory: /** @type {Array<{ preview: string, classification: string }>} */ ([]),
@@ -398,7 +398,7 @@ export function applyStudioEvent(state, event, opts = {}) {
               ? event.preview
               : null;
         if (preview) {
-          state.product.taskPreview = preview.slice(0, 80);
+          state.product.taskPreview = preview.slice(0, 200);
         }
       }
       state.product.awaitingInput = false;
@@ -545,7 +545,7 @@ export function applyStudioEvent(state, event, opts = {}) {
       setCard(state, "validationPlan", "done", `${checks.length} check(s)`);
       state.product.finalValidationStarted = true;
       state.product.engineCheckFeedback = null;
-      // Reset provisional check rows; final validation owns ag1Checks from here.
+      // Reset provisional check rows; project checks accumulate from here.
       state.product.ag1Checks = [];
       setPathPhase(state, "Verifying");
       break;
@@ -775,7 +775,7 @@ export function applyStudioEvent(state, event, opts = {}) {
           : activity || "Working";
       const detail =
         typeof event.detail === "string" ? event.detail.slice(0, 96) : null;
-      // Agent "complete" is NOT a product terminal — only PATH validation is.
+      // Engine "complete" is activity only — product terminal comes from session.result / checks.
       if (/^complete$/i.test(activity) || /^complete$/i.test(label)) {
         setPathPhase(state, "Finishing");
         break;

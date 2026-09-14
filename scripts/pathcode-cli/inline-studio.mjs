@@ -26,6 +26,8 @@ import {
 import {
   setStablePathTitle,
   restoreTerminalTitle,
+  reassertPathTitle,
+  stripOscTitleSequences,
 } from "./terminal-title.mjs";
 
 const ANSI_RE = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)|\u001b./g;
@@ -184,7 +186,7 @@ export function buildEvidenceLines(state) {
       lines.push("Mutation        —");
     }
 
-    // Provisional engine-time feedback — never pretend this is final validation.
+    // Provisional engine-time feedback — not the session outcome row.
     if (
       product.engineCheckFeedback === "running" &&
       product.finalValidationStarted !== true
@@ -203,7 +205,7 @@ export function buildEvidenceLines(state) {
         state.cards.validationRunning?.status === "active" &&
         checks.length === 0
       ) {
-        lines.push("Final validate  ●");
+        lines.push("Checks          ●");
       } else if (checks.length > 0) {
         for (const c of checks) {
           const kind = String(c.kind || c.id || "Check");
@@ -219,18 +221,18 @@ export function buildEvidenceLines(state) {
           lines.push(`${label}${pad}${c.ok ? "✓" : "✕"}`);
         }
         if (product.finalValidationComplete === true) {
-          lines.push("Final validate  ✓");
+          lines.push("Checks          ✓");
         }
       } else if (state.cards.validationResult?.arrived) {
         const detail = state.cards.validationResult.detail || "";
-        if (/fail|FAILED/i.test(detail)) lines.push("Final validate  ✕");
-        else if (/PASSED|pass/i.test(detail)) lines.push("Final validate  ✓");
-        else lines.push("Final validate  —");
+        if (/fail|FAILED/i.test(detail)) lines.push("Checks          ✕");
+        else if (/PASSED|pass/i.test(detail)) lines.push("Checks          ✓");
+        else lines.push("Checks          —");
       } else {
-        lines.push("Final validate  ●");
+        lines.push("Checks          ●");
       }
     } else {
-      lines.push("Final validate  —");
+      lines.push("Checks          —");
     }
 
     const term = state.cards.terminal;
@@ -416,27 +418,53 @@ export function brandPathCode() {
  */
 function activityLabel(phase) {
   const p = String(phase || "Idle");
-  if (p === "Verified") return "Verified";
+  if (p === "Verified") return "Completing";
   if (p === "Failed" || p === "Not verified") return p;
   if (p === "Idle") return "Ready";
   if (/prepar/i.test(p)) return "Preparing environment";
   if (/language intelligence|lsp/i.test(p)) return "Language intelligence";
   if (/index/i.test(p)) return "Indexing";
   if (/code intelligence|scip/i.test(p)) return "Code intelligence";
-  if (/inspect|read|research/i.test(p)) return "Inspecting";
+  if (/inspect|read|research|understand/i.test(p)) return "Inspecting";
   if (/implement|apply|edit|writ/i.test(p)) return "Implementing";
   if (/build/i.test(p)) return "Building";
+  if (/run_command|running|shell|cmd/i.test(p)) return "Running";
   if (/test/i.test(p)) return "Testing";
   if (/collaborat/i.test(p)) return "Collaborating";
   if (/repair|correct/i.test(p)) return "Correcting";
-  if (/verif/i.test(p)) return "Verifying";
+  if (/verif|finish/i.test(p)) return "Completing";
   if (/steer/i.test(p)) return p;
   return p;
 }
 
 /**
- * G10 minimal living surface — one activity line + compact status + composer.
- * Default product view (all widths).
+ * Aggregate recent ops into meaningful engineering stream lines.
+ * @param {Array<{ label?: string, detail?: string }>} ops
+ * @param {number} max
+ */
+function livingStreamLines(ops, max) {
+  /** @type {string[]} */
+  const out = [];
+  const list = Array.isArray(ops) ? ops : [];
+  for (let i = list.length - 1; i >= 0 && out.length < max; i -= 1) {
+    const op = list[i];
+    const label = activityLabel(op.label || "");
+    // Drop pure hook noise (empty / identical consecutive).
+    if (!label || label === "Working") continue;
+    const detail =
+      typeof op.detail === "string" && op.detail.trim()
+        ? op.detail.trim().slice(0, 48)
+        : "";
+    const line = detail ? `${label} · ${detail}` : label;
+    if (out[0] === line) continue;
+    out.unshift(line);
+  }
+  return out;
+}
+
+/**
+ * G10.5 living engineering surface — full-height, simple, event-driven.
+ * Header · Goal · Stream · Compact state · Composer (not a three-column dashboard).
  *
  * @param {ReturnType<typeof createEmptyStudioState>} state
  * @param {{ rows: number, columns: number }} viewport
@@ -451,7 +479,7 @@ export function buildMinimalLivingLines(state, viewport) {
     typeof viewport.rows === "number" && viewport.rows > 0
       ? Math.floor(viewport.rows)
       : 24;
-  const maxHeight = Math.max(8, rows - 2);
+  const maxHeight = Math.max(10, rows - 2);
   const inner = Math.max(16, columns - 2);
   const product = state.product || {};
   const pathPhase = projectAuthoritativePathPhase(state);
@@ -475,17 +503,16 @@ export function buildMinimalLivingLines(state, viewport) {
   );
   const headerInner = ` ${headerLeft}${" ".repeat(headerGap)}${headerRight} `;
 
+  const goalRaw =
+    typeof product.taskPreview === "string" && product.taskPreview.trim()
+      ? product.taskPreview.trim()
+      : pathPhase === "Idle" || product.awaitingInput
+        ? "Waiting for the next engineering objective"
+        : "Engineering in progress";
+  const goalLine = safeDisplay(goalRaw).slice(0, Math.max(12, inner - 4));
+
   const mark = pathGlyph(pathPhase);
   const label = activityLabel(pathPhase);
-  const detailRaw =
-    typeof product.currentDetail === "string" && product.currentDetail
-      ? product.currentDetail
-      : typeof product.pathDetail === "string" && product.pathDetail
-        ? product.pathDetail
-        : "";
-  const detail = detailRaw
-    ? `  ${safeDisplay(detailRaw).slice(0, Math.max(8, inner - visibleWidth(`${mark} ${label}`) - 6))}`
-    : "";
   const phaseTone =
     pathPhase === "Verified"
       ? style.green
@@ -494,7 +521,7 @@ export function buildMinimalLivingLines(state, viewport) {
         : pathPhase === "Partially verified"
           ? style.yellow
           : style.white;
-  const activity = phaseTone(`${mark} ${safeDisplay(label)}${detail}`);
+  const currentActivity = phaseTone(`${mark} ${safeDisplay(label)}`);
 
   const fileN =
     typeof product.changedFileTotal === "number" && product.changedFileTotal > 0
@@ -508,92 +535,53 @@ export function buildMinimalLivingLines(state, viewport) {
       ? product.engineCheckFeedback
       : null;
   let testsBit = "Tests —";
-  if (feedback) {
-    testsBit = safeDisplay(feedback).slice(0, 24);
-  } else if (state.cards?.validationRunning?.arrived) {
+  const ag1Checks = Array.isArray(product.ag1Checks) ? product.ag1Checks : [];
+  if (ag1Checks.length > 0) {
+    const testChecks = ag1Checks.filter(
+      (c) =>
+        c &&
+        (c.kind === "TARGETED_TEST" ||
+          /test/i.test(String(c.kind || "")) ||
+          /test/i.test(String(c.id || ""))),
+    );
+    const use = testChecks.length > 0 ? testChecks : ag1Checks;
+    const ok = use.filter((c) => c && c.ok === true).length;
+    testsBit = `Tests ${ok}/${use.length}`;
+  } else if (feedback && feedback !== "running") {
+    testsBit = safeDisplay(feedback).slice(0, 28);
+  } else if (feedback === "running" || state.cards?.validationRunning?.arrived) {
     testsBit = "Tests running";
   } else if (state.cards?.validationResult?.arrived) {
     testsBit = "Tests done";
   }
-  let finalBit = "Final —";
-  if (pathPhase === "Verified") finalBit = "Final VERIFIED";
-  else if (pathPhase === "Failed") finalBit = "Final FAILED";
-  else if (pathPhase === "Partially verified") finalBit = "Final partial";
-  else if (product.finalValidationStarted && !product.finalValidationComplete) {
-    finalBit = "Final running";
+  let buildBit = "Build —";
+  const buildChecks = ag1Checks.filter(
+    (c) =>
+      c &&
+      (c.kind === "BUILD" ||
+        /build|typecheck/i.test(String(c.kind || "")) ||
+        /build|typecheck/i.test(String(c.id || ""))),
+  );
+  if (buildChecks.length > 0) {
+    buildBit = buildChecks.every((c) => c.ok === true)
+      ? "Build passed"
+      : "Build failed";
+  } else if (/build/i.test(String(product.currentDetail || "")) || /build/i.test(label)) {
+    buildBit = pathPhase === "Failed" ? "Build failed" : "Build running";
+  }
+  if (pathPhase === "Verified" && buildBit === "Build —") buildBit = "Build passed";
+  let serviceBit = "";
+  if (
+    typeof product.pathDetail === "string" &&
+    /service|redis|compose|docker/i.test(product.pathDetail)
+  ) {
+    serviceBit = ` · Service ${safeDisplay(product.pathDetail).slice(0, 20)}`;
   }
   const status = style.dim(
-    `${fileN} file${fileN === 1 ? "" : "s"} changed · ${testsBit} · ${finalBit}`,
+    `${fileN} file${fileN === 1 ? "" : "s"} · ${buildBit} · ${testsBit}${serviceBit}`,
   );
 
-  /** @type {string[]} */
-  const lines = [];
-  lines.push(fitLine(`╭${"─".repeat(inner)}╮`, columns));
-  lines.push(fitLine(`│${padVisible(headerInner.trimEnd(), inner)}│`, columns));
-  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
-  lines.push(fitLine(`│${padVisible(` ${activity}`, inner)}│`, columns));
-  lines.push(fitLine(`│${padVisible("", inner)}│`, columns));
-  lines.push(fitLine(`│${padVisible(` ${status}`, inner)}│`, columns));
-
-  const ops = Array.isArray(product.recentOps) ? product.recentOps.slice(-2) : [];
-  if (ops.length > 0 && !state.cards?.terminal?.arrived) {
-    lines.push(fitLine(`│${padVisible("", inner)}│`, columns));
-    for (const op of ops) {
-      const bit = style.dim(
-        safeDisplay(
-          `${op.label || ""}${op.detail ? ` · ${op.detail}` : ""}`,
-        ).slice(0, Math.max(8, inner - 4)),
-      );
-      lines.push(fitLine(`│${padVisible(` ${bit}`, inner)}│`, columns));
-    }
-  }
-
-  if (state.cards?.terminal?.arrived) {
-    lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
-    const sha =
-      typeof product.resultSha === "string" ? product.resultSha.slice(0, 8) : "";
-    const classLabel =
-      pathPhase === "Verified"
-        ? "VERIFIED"
-        : pathPhase === "Failed"
-          ? "FAILED"
-          : pathPhase === "Partially verified"
-            ? "PARTIAL"
-            : String(pathPhase || "DONE");
-    const tone =
-      pathPhase === "Verified"
-        ? style.green
-        : pathPhase === "Failed" || pathPhase === "Not verified"
-          ? style.red
-          : style.yellow;
-    const resultLine = tone(
-      `✓ ${classLabel} · ${fileN} files${sha ? ` · ${sha}` : ""}`,
-    );
-    lines.push(fitLine(`│${padVisible(` ${resultLine}`, inner)}│`, columns));
-    if (taskBranch) {
-      lines.push(
-        fitLine(
-          `│${padVisible(
-            ` ${style.dim(`Branch: ${safeDisplay(taskBranch)}`)}`,
-            inner,
-          )}│`,
-          columns,
-        ),
-      );
-    }
-    if (sha) {
-      lines.push(
-        fitLine(
-          `│${padVisible(` ${style.dim(`Commit: ${sha}`)}`, inner)}│`,
-          columns,
-        ),
-      );
-    }
-  }
-
-  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
-
-  const composerWidth = Math.max(8, inner - 4);
+  // Budget rows: borders + header + goal block + status + composer + stream.
   const composerState = {
     text: typeof product.composerText === "string" ? product.composerText : "",
     cursor: 0,
@@ -601,11 +589,119 @@ export function buildMinimalLivingLines(state, viewport) {
     scroll:
       typeof product.composerScroll === "number" ? product.composerScroll : 0,
   };
+  const composerWidth = Math.max(8, inner - 4);
   const vis = composerVisibleLines(
     composerState,
     composerWidth,
     COMPOSER_MAX_ROWS,
   );
+  const composerRows =
+    Math.max(1, vis.lines.length) + (vis.total > vis.lines.length ? 1 : 0);
+  // Fixed chrome ≈ 10 lines (borders/sections) + composer.
+  const streamBudget = Math.max(3, maxHeight - (10 + composerRows));
+  const stream = livingStreamLines(product.recentOps, streamBudget);
+
+  /** @type {string[]} */
+  const lines = [];
+  lines.push(fitLine(`╭${"─".repeat(inner)}╮`, columns));
+  lines.push(fitLine(`│${padVisible(headerInner.trimEnd(), inner)}│`, columns));
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+  lines.push(
+    fitLine(
+      `│${padVisible(` ${style.dim("GOAL")}`, inner)}│`,
+      columns,
+    ),
+  );
+  lines.push(fitLine(`│${padVisible(` ${goalLine}`, inner)}│`, columns));
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+  lines.push(
+    fitLine(
+      `│${padVisible(` ${currentActivity}`, inner)}│`,
+      columns,
+    ),
+  );
+  if (stream.length === 0 && !state.cards?.terminal?.arrived) {
+    lines.push(
+      fitLine(
+        `│${padVisible(` ${style.dim("· waiting for engineering activity")}`, inner)}│`,
+        columns,
+      ),
+    );
+  } else if (!state.cards?.terminal?.arrived) {
+    for (const row of stream) {
+      lines.push(
+        fitLine(
+          `│${padVisible(` ${style.dim(`· ${safeDisplay(row)}`)}`, inner)}│`,
+          columns,
+        ),
+      );
+    }
+  }
+
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+  lines.push(fitLine(`│${padVisible(` ${status}`, inner)}│`, columns));
+
+  if (state.cards?.terminal?.arrived) {
+    lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+    const sha =
+      typeof product.resultSha === "string" ? product.resultSha.slice(0, 8) : "";
+    const complete =
+      pathPhase === "Verified"
+        ? "COMPLETE"
+        : pathPhase === "Failed"
+          ? "FAILED"
+          : pathPhase === "Partially verified"
+            ? "PARTIAL"
+            : pathPhase === "Cancelled"
+              ? "CANCELLED"
+              : "DONE";
+    const tone =
+      pathPhase === "Verified"
+        ? style.green
+        : pathPhase === "Failed" || pathPhase === "Not verified"
+          ? style.red
+          : style.yellow;
+    const resultMark =
+      pathPhase === "Verified" ? "✓" : pathPhase === "Failed" ? "✕" : "·";
+    lines.push(
+      fitLine(
+        `│${padVisible(` ${tone(`${resultMark} ${complete}`)}`, inner)}│`,
+        columns,
+      ),
+    );
+    lines.push(
+      fitLine(
+        `│${padVisible(
+          ` ${style.dim(`${fileN} files changed`)}`,
+          inner,
+        )}│`,
+        columns,
+      ),
+    );
+    lines.push(
+      fitLine(
+        `│${padVisible(` ${style.dim(testsBit)}`, inner)}│`,
+        columns,
+      ),
+    );
+    lines.push(
+      fitLine(
+        `│${padVisible(` ${style.dim(buildBit)}`, inner)}│`,
+        columns,
+      ),
+    );
+    if (sha) {
+      lines.push(
+        fitLine(
+          `│${padVisible(` ${style.dim(`Commit ${sha}`)}`, inner)}│`,
+          columns,
+        ),
+      );
+    }
+  }
+
+  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
+
   const showPrompt =
     product.awaitingInput === true ||
     (typeof product.composerText === "string" &&
@@ -1734,6 +1830,11 @@ export function createInlineStudioRenderer(options = {}) {
       needsReanchor = false;
       forceFull = false;
       lastFrameAt = Date.now();
+      try {
+        reassertPathTitle();
+      } catch {
+        // ignore
+      }
       return;
     }
 
@@ -1749,6 +1850,11 @@ export function createInlineStudioRenderer(options = {}) {
     prevLines = lines.slice();
     needsReanchor = false;
     lastFrameAt = Date.now();
+    try {
+      reassertPathTitle();
+    } catch {
+      // ignore
+    }
   }
 
   function scheduleFrame() {
@@ -2047,7 +2153,7 @@ export function installCollisionGuard(prompt, renderer) {
   /** @type {string[]} */
   const diagnostics = [];
   prompt.write = (text) => {
-    const raw = String(text ?? "");
+    const raw = stripOscTitleSequences(String(text ?? ""));
     if (renderer.isActive() && renderer.enabled) {
       // Session-long cockpit owns the TTY. Suppress scrollback dumps, including
       // durable result banners and prompt redraws that would tear the frame.
@@ -2060,12 +2166,17 @@ export function installCollisionGuard(prompt, renderer) {
         if (typeof renderer.noteDiagnostic === "function") {
           renderer.noteDiagnostic(raw);
         }
+        try {
+          reassertPathTitle();
+        } catch {
+          // ignore
+        }
         return;
       }
       // Interactive challenges briefly surface; re-anchor after.
       renderer.noteExternalWrite();
     }
-    return original(text);
+    return original(raw);
   };
   return () => {
     prompt.write = original;

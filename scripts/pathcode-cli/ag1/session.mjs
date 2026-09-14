@@ -1435,27 +1435,20 @@ function formatAg2ResultBanner(r) {
   const lines = [];
   const label =
     r.classification === "VERIFIED"
-      ? "✓ VERIFIED"
+      ? "✓ COMPLETE"
       : r.classification === "PARTIALLY_VERIFIED"
-        ? "◐ PARTIALLY VERIFIED"
+        ? "◐ PARTIAL"
         : r.classification === "CANCELLED"
           ? "— CANCELLED"
           : r.classification === "GIT_IDENTITY_REQUIRED"
             ? "✕ GIT IDENTITY REQUIRED"
             : r.classification === "FAILED"
               ? "✕ FAILED"
-              : "— NOT VERIFIED";
+              : "— NOT COMPLETE";
   lines.push(`Result: ${label}`);
   lines.push(`Files changed: ${r.changedFiles?.length ?? 0}`);
-  const handoff =
-    typeof r.engineeringHandoff === "string" ? r.engineeringHandoff.trim() : "";
-  if (handoff) {
-    lines.push("");
-    lines.push("Engineering handoff:");
-    lines.push(handoff);
-  }
+  // Handoff prose stays available for inspect/logs — not dumped into living UI.
   if (Array.isArray(r.validation?.checks)) {
-    if (handoff) lines.push("");
     lines.push("Evidence:");
     for (const c of r.validation.checks) {
       const mark = c.ok ? "✓" : "✕";

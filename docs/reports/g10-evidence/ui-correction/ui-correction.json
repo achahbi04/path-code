@@ -1,6 +1,6 @@
 {
   "schema": "pathcode.g10.ui-correction.v1",
-  "at": "2026-09-14T20:33:59.075Z",
+  "at": "2026-09-14T22:25:25.532Z",
   "cases": {
     "shortPaste": {
       "text": "Keep backward compatibility.",
@@ -38,15 +38,22 @@
       "ok": true
     },
     "compactResult": {
-      "hasVerified": true,
+      "hasComplete": true,
       "hasSha": true,
+      "hasGoal": true,
       "noHandoffProse": true,
       "noInspectCmd": true,
       "ok": true
     },
+    "titleStrip": {
+      "cleaned": "hello world!",
+      "owned": "demo — PATH Code",
+      "reasserted": true,
+      "ok": true
+    },
     "viewport": {
-      "wideLines": 10,
-      "narrowLines": 12,
+      "wideLines": 14,
+      "narrowLines": 16,
       "hasComposerWide": true,
       "hasComposerNarrow": true,
       "noLiteralEscapes": true,

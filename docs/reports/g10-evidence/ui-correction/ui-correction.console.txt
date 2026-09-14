@@ -1,1 +1,1 @@
-{"verdict":"PASS","cases":{"shortPaste":true,"longPaste":true,"multilinePaste":true,"pasteInFrame":true,"branding":true,"title":true,"compactResult":true,"viewport":true}}
+{"verdict":"PASS","cases":{"shortPaste":true,"longPaste":true,"multilinePaste":true,"pasteInFrame":true,"branding":true,"title":true,"compactResult":true,"titleStrip":true,"viewport":true}}

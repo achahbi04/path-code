@@ -9,7 +9,7 @@ import {
   applyStudioEvent,
 } from "../../../../scripts/path-studio/state.mjs";
 import {
-  buildLivingProductLines,
+  buildInlineCardLines,
   assembleAnsiFrame,
   LIVING_PRODUCT_MIN_COLUMNS,
 } from "../../../../scripts/pathcode-cli/inline-studio.mjs";
@@ -85,10 +85,11 @@ function buildState() {
 
 function checkFrame(label, columns, rows = 36) {
   const state = buildState();
-  const lines = buildLivingProductLines(state, { columns, rows });
+  const lines = buildInlineCardLines(state, { columns, rows });
   const frame = assembleAnsiFrame(lines, { columns, rows });
   const text = Array.isArray(frame) ? frame.join("\n") : String(frame || "");
   const literalEscapes = /\\u001b|\\x1b|\\\\u001b/.test(text);
+  const plain = text.replace(/\u001b\[[0-9;]*m/g, "");
   return {
     label,
     columns,
@@ -96,11 +97,11 @@ function checkFrame(label, columns, rows = 36) {
     chars: text.length,
     literalEscapeSequences: literalEscapes,
     hasAnsiSgr: /\u001b\[/.test(text),
-    containsProject: /PROJECT/.test(text),
-    containsPath: /\bPATH\b/.test(text),
-    containsEvidence: /EVIDENCE/.test(text),
-    containsVerified: /VERIFIED|Verified/.test(text),
-    preview: text.replace(/\u001b\[[0-9;]*m/g, "").slice(0, 500),
+    containsGoal: /GOAL/.test(plain),
+    containsPath: /\bPATH\b/.test(plain),
+    containsComplete: /COMPLETE/.test(plain),
+    containsComposer: />/.test(plain),
+    preview: plain.slice(0, 500),
   };
 }
 
@@ -111,9 +112,9 @@ evidence.resizeNarrowToWide = checkFrame("resize-wide", 120);
 evidence.mechanicalOk =
   evidence.wide.literalEscapeSequences === false &&
   evidence.narrow.literalEscapeSequences === false &&
-  evidence.wide.containsProject === true &&
+  evidence.wide.containsGoal === true &&
   evidence.wide.containsPath === true &&
-  evidence.wide.containsEvidence === true;
+  evidence.wide.containsComplete === true;
 evidence.MANUAL_UI_ACCEPTANCE = "PENDING_OPERATOR_REVIEW";
 evidence.verdict = evidence.mechanicalOk ? "MECHANICAL_OK" : "PARTIAL";
 
