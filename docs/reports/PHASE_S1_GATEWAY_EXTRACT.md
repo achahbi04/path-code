@@ -38,9 +38,9 @@ mechanically.
 Filled at freeze:
 
 - **Starting HEAD:** `843abcef2f4820bafd2e2c3fbdee31e215dd8d95`
-- **Implementation commit:** _(set on freeze)_
-- **Report commit:** _(set on freeze)_
-- **Current HEAD:** _(tip)_
+- **Implementation commit:** `1763a6d7ba5636f2d5bec2793b6f084e57a47865`
+- **Report commit:** `1763a6d7ba5636f2d5bec2793b6f084e57a47865` (combined with implementation; docs SHA sync follows)
+- **Current HEAD:** `1763a6d7ba5636f2d5bec2793b6f084e57a47865`
 - **Branch:** `cursor/pathcode-antigravity-v1`
 - **Working tree:** clean after freeze
 
