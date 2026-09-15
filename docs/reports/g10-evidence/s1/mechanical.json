@@ -1,0 +1,53 @@
+{
+  "schema": "pathcode.s1.gateway.mechanical.v1",
+  "at": "2026-09-14T23:33:46.040Z",
+  "note": "Mechanical gateway ownership proof. MANUAL_UI_ACCEPTANCE remains PENDING_OPERATOR_REVIEW from S0.",
+  "cases": {
+    "bind": {
+      "ok": true,
+      "projectRoot": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s1-repo-Y5AAua"
+    },
+    "socket": {
+      "path": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s1-ev-R3uf6n/gateway/pathcode-gateway.sock",
+      "ok": true
+    },
+    "capabilities": {
+      "ok": true,
+      "engines": [
+        "antigravity",
+        "copilot",
+        "cursor"
+      ]
+    },
+    "start": {
+      "ok": true,
+      "taskId": "bdc67cbd-bed1-45e8-ad85-bfba06e0589d"
+    },
+    "sameTaskAttach": {
+      "ok": true,
+      "sameTaskId": true,
+      "taskId": "bdc67cbd-bed1-45e8-ad85-bfba06e0589d"
+    },
+    "steer": {
+      "ok": true,
+      "text": "Keep public API"
+    },
+    "completion": {
+      "ok": true,
+      "classification": "VERIFIED",
+      "bothClientsSawEvents": true,
+      "cliEventCount": 4,
+      "headlessEventCount": 4
+    },
+    "disconnectPolicy": {
+      "ok": true,
+      "statusAfterCliDrop": "running",
+      "taskStillOwnedByGateway": true
+    },
+    "cancel": {
+      "ok": true,
+      "status": "cancelled"
+    }
+  },
+  "verdict": "PASS"
+}

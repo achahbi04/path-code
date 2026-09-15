@@ -23,6 +23,7 @@ import {
   assertPathPackagePresent,
   resolveTargetProjectRoot,
   resolvePathPackageRoot,
+  resolvePathRuntimeRoot,
 } from "./pathcode-cli/paths.mjs";
 import {
   createPromptSession,
@@ -52,6 +53,10 @@ import {
   assertSupportedNode,
   assertSupportedPlatform,
 } from "./pathcode-cli/ag6/platform.mjs";
+import {
+  createGatewayRuntime,
+  startGatewayServer,
+} from "./pathcode-cli/gateway/index.mjs";
 
 const root = resolvePathPackageRoot();
 
@@ -442,6 +447,40 @@ export async function runPathcodeMain(argv, testIo = {}) {
   /** @type {number} */
   let lastExitCode = 0;
 
+  // S1 — embedded gateway runtime owns engineering; CLI is a presentation client.
+  // Socket exposes the same runtime for headless attach without a second backend.
+  const useGateway =
+    testIo.runAg1Session == null &&
+    testIo.runGeneralSession == null &&
+    process.env.PATHCODE_USE_GATEWAY !== "0";
+  /** @type {ReturnType<typeof createGatewayRuntime> | null} */
+  let gatewayRuntime = null;
+  /** @type {Awaited<ReturnType<typeof startGatewayServer>> | null} */
+  let gatewayServer = null;
+  /** @type {string | null} */
+  let activeGatewayTaskId = null;
+  if (useGateway) {
+    const runtimeRoot = resolvePathRuntimeRoot({ packageRoot: root });
+    gatewayRuntime = createGatewayRuntime({
+      packageRoot: root,
+      runtimeRoot,
+    });
+    try {
+      await gatewayRuntime.bindProject({ cwd: projectRoot });
+      gatewayServer = await startGatewayServer({
+        runtime: gatewayRuntime,
+        runtimeRoot,
+        packageRoot: root,
+      });
+    } catch (err) {
+      // Socket bind failure must not kill the product — runtime still works in-process.
+      stderr.write(
+        `PATH Gateway socket unavailable (${err instanceof Error ? err.message : String(err)}); continuing in-process.\n`,
+      );
+      gatewayServer = null;
+    }
+  }
+
   // One living-session id for the process; stamped on every session.* event.
   const sessionId =
     typeof testIo.sessionId === "string" && testIo.sessionId.trim() !== ""
@@ -508,6 +547,11 @@ export async function runPathcodeMain(argv, testIo = {}) {
   });
   setActiveTerminalCleanup(() => {
     try {
+      if (gatewayServer) gatewayServer.stop();
+    } catch {
+      // ignore
+    }
+    try {
       if (typeof inlineStudio.restoreTerminalState === "function") {
         inlineStudio.restoreTerminalState();
       } else {
@@ -532,7 +576,18 @@ export async function runPathcodeMain(argv, testIo = {}) {
       : {}),
   });
 
-  const prompt = createPromptSession(streams);
+  const prompt = createPromptSession(streams, {
+    onSteering: (text) => {
+      if (gatewayRuntime && activeGatewayTaskId) {
+        gatewayRuntime.steerTask(activeGatewayTaskId, text);
+      }
+    },
+    onCycleCancel: () => {
+      if (gatewayRuntime && activeGatewayTaskId) {
+        gatewayRuntime.cancelTask(activeGatewayTaskId);
+      }
+    },
+  });
   if (ttyInline && typeof prompt.enableLivingComposer === "function") {
     prompt.enableLivingComposer({
       onChange: (composerState) => {
@@ -604,6 +659,37 @@ export async function runPathcodeMain(argv, testIo = {}) {
             cardsOwnProgress: ttyInline,
             signal,
           });
+        } else if (useGateway && gatewayRuntime) {
+          const off = gatewayRuntime.onEvent((envelope) => {
+            const ev = envelope?.event;
+            if (!ev || typeof ev.type !== "string") return;
+            const { type, ...fields } = ev;
+            eventSink.emit(type, fields);
+          });
+          try {
+            const started = await gatewayRuntime.startTask({
+              objective: taskText,
+              sessionId,
+              sessionBaseCommit: sessionStats.sessionBaseCommit,
+            });
+            if (!started.ok) {
+              throw new Error(started.message || "gateway task start failed");
+            }
+            activeGatewayTaskId = started.taskId;
+            await gatewayRuntime.awaitTask(started.taskId);
+            const full = gatewayRuntime.snapshotTask(started.taskId);
+            sessionResult =
+              (full && full.result) ||
+              {
+                exitCode: full?.status === "completed" ? 0 : 1,
+                classification: full?.classification,
+                taskBranch: full?.taskBranch,
+                commitSha: full?.commitSha,
+              };
+          } finally {
+            activeGatewayTaskId = null;
+            off();
+          }
         } else {
           const { runAntigravityEngineeringSession } = await import(
             "./pathcode-cli/ag1/session.mjs"

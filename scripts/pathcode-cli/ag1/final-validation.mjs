@@ -1,5 +1,9 @@
 /**
- * AG1 — PATH independent final validation (agent "finished" ≠ VERIFIED).
+ * AG1 — project-native engineering checks (build/test/typecheck evidence).
+ *
+ * Engine "finished" alone does not imply a completed engineering outcome.
+ * These checks are project/runtime feedback carried by the gateway — not a
+ * second PATH reasoning authority that judges engines.
  */
 
 import { spawn } from "node:child_process";

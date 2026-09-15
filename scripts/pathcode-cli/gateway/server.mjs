@@ -1,0 +1,179 @@
+/**
+ * S1 — Unix-socket gateway server (NDJSON frames, one JSON object per line).
+ */
+
+import { createServer } from "node:net";
+import { mkdirSync, unlinkSync, existsSync, writeFileSync, chmodSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { createGatewayRuntime } from "./runtime.mjs";
+import {
+  GATEWAY_PROTOCOL_VERSION,
+  GatewayMethods,
+  makeError,
+} from "./protocol.mjs";
+
+/**
+ * @param {string} runtimeRoot
+ */
+export function resolveGatewaySocketPath(runtimeRoot) {
+  return join(runtimeRoot, "gateway", "pathcode-gateway.sock");
+}
+
+/**
+ * @param {string} runtimeRoot
+ */
+export function resolveGatewayPidPath(runtimeRoot) {
+  return join(runtimeRoot, "gateway", "pathcode-gateway.pid");
+}
+
+/**
+ * @param {{
+ *   runtime?: ReturnType<typeof createGatewayRuntime>,
+ *   runtimeRoot?: string,
+ *   packageRoot?: string,
+ *   socketPath?: string,
+ * }} [options]
+ */
+export async function startGatewayServer(options = {}) {
+  const runtime =
+    options.runtime ||
+    createGatewayRuntime({
+      runtimeRoot: options.runtimeRoot,
+      packageRoot: options.packageRoot,
+    });
+  const socketPath =
+    options.socketPath || resolveGatewaySocketPath(runtime.runtimeRoot);
+  const pidPath = resolveGatewayPidPath(runtime.runtimeRoot);
+
+  mkdirSync(dirname(socketPath), { recursive: true });
+  if (existsSync(socketPath)) {
+    try {
+      unlinkSync(socketPath);
+    } catch {
+      // ignore
+    }
+  }
+
+  /** @type {Set<import('node:net').Socket>} */
+  const clients = new Set();
+
+  const server = createServer((socket) => {
+    clients.add(socket);
+    let buffer = "";
+    /** @type {Set<string>} */
+    const attached = new Set();
+
+    const onEvent = (envelope) => {
+      if (attached.size > 0 && !attached.has(envelope.taskId)) return;
+      try {
+        socket.write(`${JSON.stringify(envelope)}\n`);
+      } catch {
+        // ignore broken pipe
+      }
+    };
+    // By default, stream all events to every connected client.
+    // task.attach narrows optional filters later; for S1 broadcast is correct
+    // for same-task multi-client observation.
+    const offAll = runtime.onEvent(onEvent);
+
+    socket.on("data", async (chunk) => {
+      buffer += chunk.toString("utf8");
+      let idx;
+      while ((idx = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, idx).trim();
+        buffer = buffer.slice(idx + 1);
+        if (!line) continue;
+        let msg;
+        try {
+          msg = JSON.parse(line);
+        } catch {
+          socket.write(
+            `${JSON.stringify(makeError("0", "BAD_JSON", "invalid JSON line"))}\n`,
+          );
+          continue;
+        }
+        const id = typeof msg.id === "string" ? msg.id : "0";
+        const method = typeof msg.method === "string" ? msg.method : "";
+        const params =
+          msg.params && typeof msg.params === "object" ? msg.params : {};
+
+        if (method === GatewayMethods.TASK_ATTACH && params.taskId) {
+          attached.add(String(params.taskId));
+        }
+
+        const response = await runtime.dispatch(method, params, id);
+        try {
+          socket.write(`${JSON.stringify(response)}\n`);
+        } catch {
+          // ignore
+        }
+
+        if (method === GatewayMethods.SHUTDOWN) {
+          setImmediate(() => {
+            stop();
+          });
+        }
+      }
+    });
+
+    socket.on("close", () => {
+      clients.delete(socket);
+      offAll();
+      // Lost client ≠ cancel engineering (S1 policy).
+    });
+    socket.on("error", () => {
+      clients.delete(socket);
+      offAll();
+    });
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(socketPath, () => {
+      try {
+        chmodSync(socketPath, 0o600);
+      } catch {
+        // ignore
+      }
+      try {
+        writeFileSync(
+          pidPath,
+          `${process.pid}\n${socketPath}\n${GATEWAY_PROTOCOL_VERSION}\n`,
+          { mode: 0o600 },
+        );
+      } catch {
+        // ignore
+      }
+      resolve();
+    });
+  });
+
+  function stop() {
+    for (const c of clients) {
+      try {
+        c.destroy();
+      } catch {
+        // ignore
+      }
+    }
+    clients.clear();
+    try {
+      server.close();
+    } catch {
+      // ignore
+    }
+    try {
+      if (existsSync(socketPath)) unlinkSync(socketPath);
+    } catch {
+      // ignore
+    }
+  }
+
+  return {
+    runtime,
+    socketPath,
+    pidPath,
+    server,
+    stop,
+  };
+}

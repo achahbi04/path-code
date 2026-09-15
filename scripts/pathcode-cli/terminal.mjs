@@ -123,6 +123,11 @@ export function createPromptSession(streams, options = {}) {
   /** @type {string[]} */
   let steeringQueue = [];
   const stderr = streams.stderr ?? streams.stdout;
+  /** Optional S1 gateway bridge hooks. */
+  const onSteering =
+    typeof options.onSteering === "function" ? options.onSteering : null;
+  const onCycleCancel =
+    typeof options.onCycleCancel === "function" ? options.onCycleCancel : null;
 
   /** Living TUI owns echo — PATH composer paints via renderer. */
   let livingComposerEnabled = false;
@@ -198,6 +203,13 @@ export function createPromptSession(streams, options = {}) {
     steeringQueue.push(trimmed.slice(0, 4_000));
     if (steeringQueue.length > 16) {
       steeringQueue = steeringQueue.slice(-16);
+    }
+    if (onSteering) {
+      try {
+        onSteering(trimmed);
+      } catch {
+        // ignore bridge failures
+      }
     }
   }
 
@@ -419,6 +431,13 @@ export function createPromptSession(streams, options = {}) {
     if (!cycleActive) return false;
     if (cycleCancelInProgress) return true;
     cycleCancelInProgress = true;
+    if (onCycleCancel) {
+      try {
+        onCycleCancel();
+      } catch {
+        // ignore bridge failures
+      }
+    }
     return true;
   }
 
