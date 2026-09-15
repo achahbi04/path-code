@@ -1,0 +1,50 @@
+[s1-live] prepare project
+[s1-live] start detached gateway
+[s1-live] spawn CLI helper against external gateway
+[s1-live] headless attach 7e4e3ded-1e19-4c2d-add5-5361fa513a8e
+[s1-live] disconnect CLI (SIGTERM) while status= running
+[s1-live] await task completion 7e4e3ded-1e19-4c2d-add5-5361fa513a8e
+{
+  "verdict": "PASS",
+  "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+  "classification": "VERIFIED",
+  "cases": {
+    "projectBinding": true,
+    "gatewayDaemon": true,
+    "capabilities": true,
+    "cliEntry": true,
+    "cliStart": true,
+    "sameTaskAttach": true,
+    "liveEngineActivity": true,
+    "disconnectDuringActivity": true,
+    "reattach": true,
+    "completion": true,
+    "collaborationThroughGateway": true,
+    "capabilityUse": true,
+    "headlessObserve": true
+  },
+  "g10Signals": {
+    "preparing": true,
+    "lspOrReady": true,
+    "collaborating": true,
+    "engineering": true,
+    "result": true
+  },
+  "enginesBookkeeping": [
+    {
+      "id": "antigravity",
+      "status": "available",
+      "role": "engineering_collaborator"
+    },
+    {
+      "id": "copilot",
+      "status": "available",
+      "role": "engineering_collaborator"
+    },
+    {
+      "id": "cursor",
+      "status": "slot_reserved",
+      "role": "engineering_collaborator"
+    }
+  ]
+}

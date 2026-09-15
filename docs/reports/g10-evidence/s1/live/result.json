@@ -1,0 +1,183 @@
+{
+  "finished": {
+    "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+    "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+    "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/pathcode-s1-live-project",
+    "workingSubdir": "",
+    "objective": "Fix the failing unit test for add(a,b). The implementation incorrectly subtracts. Change src/add.js so add returns a+b. Run npm test. Do not push.",
+    "status": "completed",
+    "seq": 77,
+    "createdAt": "2026-09-15T05:54:28.389Z",
+    "updatedAt": "2026-09-15T05:55:21.673Z",
+    "worktreePath": null,
+    "taskBranch": "path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+    "commitSha": "7a0e30a02969c8c637c0c637253dcb01caf05f60",
+    "classification": "VERIFIED",
+    "capabilities": null,
+    "result": {
+      "exitCode": 0,
+      "outcome": "VERIFIED",
+      "classification": "VERIFIED",
+      "taskId": "b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "taskBranch": "path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "commitSha": "7a0e30a02969c8c637c0c637253dcb01caf05f60",
+      "commitStatus": "VERIFIED",
+      "advancesSession": true,
+      "durableSummary": "Result: ✓ COMPLETE\nFiles changed: 1\nEvidence:\nTests: ✓\nTask branch: path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c\nBaseline: 093b02701e2f432fcee47eb879c385ac14b7f8a0\nCommit: 7a0e30a02969c8c637c0c637253dcb01caf05f60\nPrimary checkout untouched: yes\n\nInspect full result:\ngit diff --no-ext-diff --no-textconv 093b02701e2f432fcee47eb879c385ac14b7f8a0 7a0e30a02969c8c637c0c637253dcb01caf05f60 --\n\nTo merge this work:\ngit merge path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c\n\nChanged files:\n  - src/add.js\n\nDiff preview:\ndiff --git a/src/add.js b/src/add.js\nindex 89b41c0..f643dbe 100644\n--- a/src/add.js\n+++ b/src/add.js\n@@ -1 +1 @@\n-export function add(a, b) { return a - b; }\n+export function add(a, b) { return a + b; }\n",
+      "sessionBaseCommit": "7a0e30a02969c8c637c0c637253dcb01caf05f60",
+      "baselineCommit": "093b02701e2f432fcee47eb879c385ac14b7f8a0",
+      "worktreePath": null,
+      "cleanup": {
+        "ok": true,
+        "code": "CLEANED",
+        "primaryUntouched": true,
+        "worktreePath": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/ag1-tasks/b66d52ef-c693-47e8-88ed-f05c5e7d7d0c"
+      },
+      "changedFiles": [
+        "src/add.js"
+      ],
+      "diff": "diff --git a/src/add.js b/src/add.js\nindex 89b41c0..f643dbe 100644\n--- a/src/add.js\n+++ b/src/add.js\n@@ -1 +1 @@\n-export function add(a, b) { return a - b; }\n+export function add(a, b) { return a + b; }",
+      "validation": {
+        "classification": "VERIFIED",
+        "reason": "All configured final checks passed.",
+        "checks": [
+          {
+            "id": "npm-test",
+            "name": "npm-test",
+            "kind": "TARGETED_TEST",
+            "command": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run test",
+            "exitCode": 0,
+            "timedOut": false,
+            "durationMs": 637,
+            "ok": true,
+            "stdoutTail": "\n> test\n> node --test test/add.test.js\n\n✔ add (1.14675ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 155.457667\n",
+            "stderrTail": ""
+          }
+        ]
+      },
+      "primaryUntouched": true,
+      "allowShell": true,
+      "durationMs": 53218,
+      "engineActivityCount": 21,
+      "modelCalls": 0,
+      "repairAttempts": 0,
+      "diagFile": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/diag/bridge-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c.log"
+    }
+  },
+  "resultPack": {
+    "snapshot": {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/pathcode-s1-live-project",
+      "workingSubdir": "",
+      "objective": "Fix the failing unit test for add(a,b). The implementation incorrectly subtracts. Change src/add.js so add returns a+b. Run npm test. Do not push.",
+      "status": "completed",
+      "seq": 77,
+      "createdAt": "2026-09-15T05:54:28.389Z",
+      "updatedAt": "2026-09-15T05:55:21.673Z",
+      "worktreePath": null,
+      "taskBranch": "path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "commitSha": "7a0e30a02969c8c637c0c637253dcb01caf05f60",
+      "classification": "VERIFIED",
+      "capabilities": null,
+      "result": {
+        "exitCode": 0,
+        "outcome": "VERIFIED",
+        "classification": "VERIFIED",
+        "taskId": "b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+        "taskBranch": "path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+        "commitSha": "7a0e30a02969c8c637c0c637253dcb01caf05f60",
+        "commitStatus": "VERIFIED",
+        "advancesSession": true,
+        "durableSummary": "Result: ✓ COMPLETE\nFiles changed: 1\nEvidence:\nTests: ✓\nTask branch: path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c\nBaseline: 093b02701e2f432fcee47eb879c385ac14b7f8a0\nCommit: 7a0e30a02969c8c637c0c637253dcb01caf05f60\nPrimary checkout untouched: yes\n\nInspect full result:\ngit diff --no-ext-diff --no-textconv 093b02701e2f432fcee47eb879c385ac14b7f8a0 7a0e30a02969c8c637c0c637253dcb01caf05f60 --\n\nTo merge this work:\ngit merge path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c\n\nChanged files:\n  - src/add.js\n\nDiff preview:\ndiff --git a/src/add.js b/src/add.js\nindex 89b41c0..f643dbe 100644\n--- a/src/add.js\n+++ b/src/add.js\n@@ -1 +1 @@\n-export function add(a, b) { return a - b; }\n+export function add(a, b) { return a + b; }\n",
+        "sessionBaseCommit": "7a0e30a02969c8c637c0c637253dcb01caf05f60",
+        "baselineCommit": "093b02701e2f432fcee47eb879c385ac14b7f8a0",
+        "worktreePath": null,
+        "cleanup": {
+          "ok": true,
+          "code": "CLEANED",
+          "primaryUntouched": true,
+          "worktreePath": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/ag1-tasks/b66d52ef-c693-47e8-88ed-f05c5e7d7d0c"
+        },
+        "changedFiles": [
+          "src/add.js"
+        ],
+        "diff": "diff --git a/src/add.js b/src/add.js\nindex 89b41c0..f643dbe 100644\n--- a/src/add.js\n+++ b/src/add.js\n@@ -1 +1 @@\n-export function add(a, b) { return a - b; }\n+export function add(a, b) { return a + b; }",
+        "validation": {
+          "classification": "VERIFIED",
+          "reason": "All configured final checks passed.",
+          "checks": [
+            {
+              "id": "npm-test",
+              "name": "npm-test",
+              "kind": "TARGETED_TEST",
+              "command": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run test",
+              "exitCode": 0,
+              "timedOut": false,
+              "durationMs": 637,
+              "ok": true,
+              "stdoutTail": "\n> test\n> node --test test/add.test.js\n\n✔ add (1.14675ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 155.457667\n",
+              "stderrTail": ""
+            }
+          ]
+        },
+        "primaryUntouched": true,
+        "allowShell": true,
+        "durationMs": 53218,
+        "engineActivityCount": 21,
+        "modelCalls": 0,
+        "repairAttempts": 0,
+        "diagFile": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/diag/bridge-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c.log"
+      }
+    },
+    "result": {
+      "exitCode": 0,
+      "outcome": "VERIFIED",
+      "classification": "VERIFIED",
+      "taskId": "b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "taskBranch": "path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "commitSha": "7a0e30a02969c8c637c0c637253dcb01caf05f60",
+      "commitStatus": "VERIFIED",
+      "advancesSession": true,
+      "durableSummary": "Result: ✓ COMPLETE\nFiles changed: 1\nEvidence:\nTests: ✓\nTask branch: path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c\nBaseline: 093b02701e2f432fcee47eb879c385ac14b7f8a0\nCommit: 7a0e30a02969c8c637c0c637253dcb01caf05f60\nPrimary checkout untouched: yes\n\nInspect full result:\ngit diff --no-ext-diff --no-textconv 093b02701e2f432fcee47eb879c385ac14b7f8a0 7a0e30a02969c8c637c0c637253dcb01caf05f60 --\n\nTo merge this work:\ngit merge path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c\n\nChanged files:\n  - src/add.js\n\nDiff preview:\ndiff --git a/src/add.js b/src/add.js\nindex 89b41c0..f643dbe 100644\n--- a/src/add.js\n+++ b/src/add.js\n@@ -1 +1 @@\n-export function add(a, b) { return a - b; }\n+export function add(a, b) { return a + b; }\n",
+      "sessionBaseCommit": "7a0e30a02969c8c637c0c637253dcb01caf05f60",
+      "baselineCommit": "093b02701e2f432fcee47eb879c385ac14b7f8a0",
+      "worktreePath": null,
+      "cleanup": {
+        "ok": true,
+        "code": "CLEANED",
+        "primaryUntouched": true,
+        "worktreePath": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/ag1-tasks/b66d52ef-c693-47e8-88ed-f05c5e7d7d0c"
+      },
+      "changedFiles": [
+        "src/add.js"
+      ],
+      "diff": "diff --git a/src/add.js b/src/add.js\nindex 89b41c0..f643dbe 100644\n--- a/src/add.js\n+++ b/src/add.js\n@@ -1 +1 @@\n-export function add(a, b) { return a - b; }\n+export function add(a, b) { return a + b; }",
+      "validation": {
+        "classification": "VERIFIED",
+        "reason": "All configured final checks passed.",
+        "checks": [
+          {
+            "id": "npm-test",
+            "name": "npm-test",
+            "kind": "TARGETED_TEST",
+            "command": "node /opt/homebrew/lib/node_modules/npm/bin/npm-cli.js run test",
+            "exitCode": 0,
+            "timedOut": false,
+            "durationMs": 637,
+            "ok": true,
+            "stdoutTail": "\n> test\n> node --test test/add.test.js\n\n✔ add (1.14675ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 155.457667\n",
+            "stderrTail": ""
+          }
+        ]
+      },
+      "primaryUntouched": true,
+      "allowShell": true,
+      "durationMs": 53218,
+      "engineActivityCount": 21,
+      "modelCalls": 0,
+      "repairAttempts": 0,
+      "diagFile": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/diag/bridge-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c.log"
+    }
+  }
+}

@@ -1,0 +1,243 @@
+{
+  "schema": "pathcode.s1.gateway.live.v1",
+  "at": "2026-09-15T05:54:24.465Z",
+  "note": "Live gateway ownership proof. MANUAL_UI_ACCEPTANCE remains PENDING_OPERATOR_REVIEW from S0. PATHCODE_GATEWAY_FAKE_ENGINE was not set.",
+  "project": {
+    "kind": "isolated_copy_of_operator_demo",
+    "source": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/pathcode-g10-operator-demo",
+    "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/pathcode-s1-live-project"
+  },
+  "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag",
+  "socketPath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pc-gw-034cc729e9fb9e2d.sock",
+  "cases": {
+    "projectBinding": {
+      "ok": true,
+      "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/pathcode-s1-live-project",
+      "source": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/tmp/pathcode-g10-operator-demo",
+      "head": "093b02701e2f432fcee47eb879c385ac14b7f8a0",
+      "dirty": false,
+      "notMechanicalTmpFixture": true
+    },
+    "gatewayDaemon": {
+      "ok": true,
+      "socketPath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pc-gw-034cc729e9fb9e2d.sock",
+      "started": true,
+      "pid": 87122
+    },
+    "capabilities": {
+      "ok": true,
+      "engines": [
+        {
+          "id": "antigravity",
+          "status": "available",
+          "role": "engineering_collaborator"
+        },
+        {
+          "id": "copilot",
+          "status": "available",
+          "role": "engineering_collaborator"
+        },
+        {
+          "id": "cursor",
+          "status": "slot_reserved",
+          "role": "engineering_collaborator"
+        }
+      ],
+      "note": "cursor is S3 slot_reserved only — not claimed LIVE in S1"
+    },
+    "cliEntry": {
+      "ok": true,
+      "helper": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/s1/run-cli-live-client.mjs",
+      "pathcodeMain": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs",
+      "mode": "runPathcodeMain_fake_tty_external_gateway"
+    },
+    "cliStart": {
+      "ok": true,
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "cliPid": 87183,
+      "externalGateway": true
+    },
+    "sameTaskAttach": {
+      "ok": true,
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "statusAtAttach": "running"
+    },
+    "liveEngineActivity": {
+      "ok": true,
+      "preparing": true,
+      "lspOrReady": true,
+      "collaborating": false,
+      "engineering": true,
+      "result": false,
+      "eventCountAtProbe": 16
+    },
+    "disconnectDuringActivity": {
+      "ok": true,
+      "statusBefore": "running",
+      "statusAfterCliDrop": "running",
+      "droppedWhileRunning": true,
+      "taskStillOwnedByGateway": true,
+      "sameTaskId": true,
+      "note": "CLI process terminated without task.cancel; gateway retained ownership"
+    },
+    "reattach": {
+      "ok": true,
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "status": "running"
+    },
+    "completion": {
+      "ok": true,
+      "status": "completed",
+      "classification": "VERIFIED",
+      "commitSha": "7a0e30a02969c8c637c0c637253dcb01caf05f60",
+      "taskBranch": "path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "changedFiles": [
+        "src/add.js"
+      ],
+      "primaryUntouched": true
+    },
+    "collaborationThroughGateway": {
+      "ok": true,
+      "collaborateEvents": 2,
+      "note": "Collaboration fabric exercised on gateway-owned task (not historical G10-only)"
+    },
+    "capabilityUse": {
+      "ok": true,
+      "preparing": true,
+      "lspOrMcpOrReady": true,
+      "sample": [
+        {
+          "t": 1789451671532,
+          "type": "session.capability.discovered",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+        },
+        {
+          "t": 1789451671533,
+          "type": "session.capability.mcp",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+        },
+        {
+          "t": 1789451671581,
+          "type": "session.capability.preparing",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+        },
+        {
+          "t": 1789451672898,
+          "type": "session.capability.provisioning",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+          "phase": "toolchains"
+        },
+        {
+          "t": 1789451672901,
+          "type": "session.capability.provisioning",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+          "id": "lsp:typescript"
+        },
+        {
+          "t": 1789451676503,
+          "type": "session.capability.provisioned",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+          "id": "lsp:typescript"
+        },
+        {
+          "t": 1789451676503,
+          "type": "session.capability.provisioning",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+          "phase": "lsp"
+        },
+        {
+          "t": 1789451676542,
+          "type": "session.capability.provisioning",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+        },
+        {
+          "t": 1789451678819,
+          "type": "session.capability.affected",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+        },
+        {
+          "t": 1789451678823,
+          "type": "session.capability.ready",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+        },
+        {
+          "t": 1789451686285,
+          "type": "session.capability.collaborate",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+          "label": "Collaborative engineering",
+          "detail": "Copilot SDK session ready",
+          "engine": "copilot",
+          "phase": "sdk_ready"
+        },
+        {
+          "t": 1789451686285,
+          "type": "session.capability.collaborate",
+          "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+          "label": "Collaborative engineering",
+          "detail": "Copilot SDK session ready",
+          "engine": "copilot",
+          "phase": "sdk_ready"
+        }
+      ]
+    },
+    "headlessObserve": {
+      "ok": true,
+      "eventCount": 77,
+      "reattachEventCount": 61,
+      "cliNdjsonEventCount": 16
+    }
+  },
+  "eventTypes": [
+    "session.task.received",
+    "session.preflight",
+    "session.engineering.workspace",
+    "session.recovery.checkpoint",
+    "session.capability.discovered",
+    "session.capability.mcp",
+    "session.capability.preparing",
+    "session.capability.provisioning",
+    "session.capability.provisioned",
+    "session.capability.affected",
+    "session.capability.ready",
+    "session.capability.collaborate",
+    "session.engineering.activity",
+    "session.engineering.bridge",
+    "session.reading",
+    "session.engineering.tool",
+    "session.applying",
+    "session.edit.summary",
+    "session.engineering.handoff",
+    "session.validation.plan",
+    "session.validation.running",
+    "session.validation.result",
+    "session.engineering.result",
+    "session.terminal",
+    "gateway.task.finished"
+  ],
+  "g10Signals": {
+    "preparing": true,
+    "lspOrReady": true,
+    "collaborating": true,
+    "engineering": true,
+    "result": true
+  },
+  "enginesBookkeeping": [
+    {
+      "id": "antigravity",
+      "status": "available",
+      "role": "engineering_collaborator"
+    },
+    {
+      "id": "copilot",
+      "status": "available",
+      "role": "engineering_collaborator"
+    },
+    {
+      "id": "cursor",
+      "status": "slot_reserved",
+      "role": "engineering_collaborator"
+    }
+  ],
+  "verdict": "PASS",
+  "atEnd": "2026-09-15T05:55:22.089Z"
+}

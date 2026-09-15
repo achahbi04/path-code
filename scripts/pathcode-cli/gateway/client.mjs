@@ -179,6 +179,24 @@ export function createGatewayClient(options = {}) {
     return res.result;
   }
 
+  /**
+   * Poll until the task leaves `running` (socket clients have no shared Promise).
+   * @param {string} taskId
+   * @param {number} [timeoutMs]
+   * @param {number} [pollMs]
+   */
+  async function awaitTask(taskId, timeoutMs = 1_800_000, pollMs = 750) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const snap = await snapshotTask(taskId);
+      if (!snap || snap.status !== "running") return snap;
+      if (Date.now() >= deadline) {
+        throw new Error(`task ${taskId} timed out after ${timeoutMs}ms`);
+      }
+      await new Promise((r) => setTimeout(r, pollMs));
+    }
+  }
+
   function onEvent(fn) {
     bus.on("event", fn);
     return () => bus.off("event", fn);
@@ -213,6 +231,7 @@ export function createGatewayClient(options = {}) {
     cancelTask,
     listCapabilities,
     getResult,
+    awaitTask,
     request,
     onEvent,
     onTaskEvent,

@@ -1,0 +1,1054 @@
+{
+  "headlessEvents": [
+    {
+      "t": 1789451668393,
+      "type": "session.task.received",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451668459,
+      "type": "session.task.received",
+      "taskId": "b66d52ef-c693-47e8-88ed-f05c5e7d7d0c"
+    },
+    {
+      "t": 1789451671033,
+      "type": "session.preflight",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451671487,
+      "type": "session.engineering.workspace",
+      "taskId": "b66d52ef-c693-47e8-88ed-f05c5e7d7d0c"
+    },
+    {
+      "t": 1789451671487,
+      "type": "session.recovery.checkpoint",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "id": "ag1-baseline:093b02701e2f432fcee47eb879c385ac14b7f8a0"
+    },
+    {
+      "t": 1789451671532,
+      "type": "session.capability.discovered",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451671533,
+      "type": "session.capability.mcp",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451671581,
+      "type": "session.capability.preparing",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451672898,
+      "type": "session.capability.provisioning",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "phase": "toolchains"
+    },
+    {
+      "t": 1789451672901,
+      "type": "session.capability.provisioning",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "id": "lsp:typescript"
+    },
+    {
+      "t": 1789451676503,
+      "type": "session.capability.provisioned",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "id": "lsp:typescript"
+    },
+    {
+      "t": 1789451676503,
+      "type": "session.capability.provisioning",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "phase": "lsp"
+    },
+    {
+      "t": 1789451676542,
+      "type": "session.capability.provisioning",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451678819,
+      "type": "session.capability.affected",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451678823,
+      "type": "session.capability.ready",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451679094,
+      "type": "session.task.received",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451686285,
+      "type": "session.capability.collaborate",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Collaborative engineering",
+      "detail": "Copilot SDK session ready",
+      "engine": "copilot",
+      "phase": "sdk_ready"
+    },
+    {
+      "t": 1789451690177,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Understanding",
+      "activity": "understanding"
+    },
+    {
+      "t": 1789451690177,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "starting engineering bridge"
+    },
+    {
+      "t": 1789451691467,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "Antigravity session ACTIVE"
+    },
+    {
+      "t": 1789451691467,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "pid=88466 python=ok"
+    },
+    {
+      "t": 1789451691635,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "protocol stdin isolated from fd0"
+    },
+    {
+      "t": 1789451692454,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "tool_env_keys=95"
+    },
+    {
+      "t": 1789451692455,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "auth_mode=vertex project=path-code-gc1-260910 location=us-central1 model=model-2.5-flash"
+    },
+    {
+      "t": 1789451692456,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Understanding",
+      "activity": "understanding"
+    },
+    {
+      "t": 1789451692992,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "engineering session started"
+    },
+    {
+      "t": 1789451692992,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Understanding",
+      "activity": "understanding"
+    },
+    {
+      "t": 1789451696328,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "list_directory"
+    },
+    {
+      "t": 1789451696328,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "list_directory"
+    },
+    {
+      "t": 1789451696328,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451696333,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "list_directory"
+    },
+    {
+      "t": 1789451696333,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "list_directory"
+    },
+    {
+      "t": 1789451696333,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451696333,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451699256,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451699256,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451699256,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451699279,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451699279,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451699279,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451699279,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702281,
+      "type": "session.applying",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702281,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Implementing",
+      "activity": "editing",
+      "detail": "edit_file"
+    },
+    {
+      "t": 1789451702281,
+      "type": "session.applying",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702288,
+      "type": "session.applying",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702288,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Implementing",
+      "activity": "editing",
+      "detail": "edit_file"
+    },
+    {
+      "t": 1789451702288,
+      "type": "session.applying",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702288,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702288,
+      "type": "session.edit.summary",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451705088,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Running command",
+      "activity": "running_command",
+      "detail": "run_command"
+    },
+    {
+      "t": 1789451708177,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Running command",
+      "activity": "running_command",
+      "detail": "run_command"
+    },
+    {
+      "t": 1789451708178,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451711492,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451711492,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451711492,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451711501,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451711501,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451711501,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451711501,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451714923,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Running command",
+      "activity": "running_command",
+      "detail": "run_command"
+    },
+    {
+      "t": 1789451716641,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Testing",
+      "activity": "testing",
+      "detail": "test.started"
+    },
+    {
+      "t": 1789451716641,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Testing",
+      "activity": "testing",
+      "detail": "run_command"
+    },
+    {
+      "t": 1789451716644,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451719374,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Finishing",
+      "activity": "complete"
+    },
+    {
+      "t": 1789451719377,
+      "type": "session.engineering.handoff",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451719377,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Verifying",
+      "activity": "verifying"
+    },
+    {
+      "t": 1789451719377,
+      "type": "session.validation.plan",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451719381,
+      "type": "session.validation.running",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "id": "npm-test"
+    },
+    {
+      "t": 1789451720019,
+      "type": "session.validation.result",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "id": "npm-test"
+    },
+    {
+      "t": 1789451721328,
+      "type": "session.engineering.result",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451721329,
+      "type": "session.terminal",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451721332,
+      "type": "session.engineering.result",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451721336,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "done command received"
+    },
+    {
+      "t": 1789451721336,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "continue loop end: done"
+    },
+    {
+      "t": 1789451721438,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "close command received"
+    },
+    {
+      "t": 1789451721673,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "code=0 signal=null"
+    },
+    {
+      "t": 1789451721673,
+      "type": "gateway.task.finished",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    }
+  ],
+  "reattachEvents": [
+    {
+      "t": 1789451686285,
+      "type": "session.capability.collaborate",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Collaborative engineering",
+      "detail": "Copilot SDK session ready",
+      "engine": "copilot",
+      "phase": "sdk_ready"
+    },
+    {
+      "t": 1789451690177,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Understanding",
+      "activity": "understanding"
+    },
+    {
+      "t": 1789451690177,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "starting engineering bridge"
+    },
+    {
+      "t": 1789451691467,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "Antigravity session ACTIVE"
+    },
+    {
+      "t": 1789451691467,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "pid=88466 python=ok"
+    },
+    {
+      "t": 1789451691635,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "protocol stdin isolated from fd0"
+    },
+    {
+      "t": 1789451692454,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "tool_env_keys=95"
+    },
+    {
+      "t": 1789451692455,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "auth_mode=vertex project=path-code-gc1-260910 location=us-central1 model=model-2.5-flash"
+    },
+    {
+      "t": 1789451692456,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Understanding",
+      "activity": "understanding"
+    },
+    {
+      "t": 1789451692992,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "engineering session started"
+    },
+    {
+      "t": 1789451692992,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Understanding",
+      "activity": "understanding"
+    },
+    {
+      "t": 1789451696328,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "list_directory"
+    },
+    {
+      "t": 1789451696328,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "list_directory"
+    },
+    {
+      "t": 1789451696328,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451696333,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "list_directory"
+    },
+    {
+      "t": 1789451696333,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "list_directory"
+    },
+    {
+      "t": 1789451696333,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451696333,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451699256,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451699256,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451699256,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451699279,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451699279,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451699279,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451699279,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702281,
+      "type": "session.applying",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702281,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Implementing",
+      "activity": "editing",
+      "detail": "edit_file"
+    },
+    {
+      "t": 1789451702281,
+      "type": "session.applying",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702288,
+      "type": "session.applying",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702288,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Implementing",
+      "activity": "editing",
+      "detail": "edit_file"
+    },
+    {
+      "t": 1789451702288,
+      "type": "session.applying",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702288,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451702288,
+      "type": "session.edit.summary",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451705089,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Running command",
+      "activity": "running_command",
+      "detail": "run_command"
+    },
+    {
+      "t": 1789451708178,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Running command",
+      "activity": "running_command",
+      "detail": "run_command"
+    },
+    {
+      "t": 1789451708178,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451711492,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451711492,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451711492,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451711501,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451711501,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Inspecting",
+      "activity": "inspecting",
+      "detail": "view_file"
+    },
+    {
+      "t": 1789451711501,
+      "type": "session.reading",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451711501,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451714923,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Running command",
+      "activity": "running_command",
+      "detail": "run_command"
+    },
+    {
+      "t": 1789451716641,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Testing",
+      "activity": "testing",
+      "detail": "test.started"
+    },
+    {
+      "t": 1789451716641,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Testing",
+      "activity": "testing",
+      "detail": "run_command"
+    },
+    {
+      "t": 1789451716644,
+      "type": "session.engineering.tool",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451719374,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Finishing",
+      "activity": "complete"
+    },
+    {
+      "t": 1789451719377,
+      "type": "session.engineering.handoff",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451719377,
+      "type": "session.engineering.activity",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "label": "Verifying",
+      "activity": "verifying"
+    },
+    {
+      "t": 1789451719377,
+      "type": "session.validation.plan",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451719381,
+      "type": "session.validation.running",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "id": "npm-test"
+    },
+    {
+      "t": 1789451720019,
+      "type": "session.validation.result",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "id": "npm-test"
+    },
+    {
+      "t": 1789451721329,
+      "type": "session.engineering.result",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451721329,
+      "type": "session.terminal",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451721332,
+      "type": "session.engineering.result",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    },
+    {
+      "t": 1789451721336,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "done command received"
+    },
+    {
+      "t": 1789451721336,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "continue loop end: done"
+    },
+    {
+      "t": 1789451721438,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "close command received"
+    },
+    {
+      "t": 1789451721673,
+      "type": "session.engineering.bridge",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "detail": "code=0 signal=null"
+    },
+    {
+      "t": 1789451721673,
+      "type": "gateway.task.finished",
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e"
+    }
+  ],
+  "cliNdjsonEvents": [
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "mode": "ag1",
+      "preview": "Fix the failing unit test for add(a,b). The implementation incorrectly subtracts. Change src/add.js so add returns a+b. Run npm test. Do not push.",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.task.received",
+      "ts": 1789451668393
+    },
+    {
+      "taskId": "b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "preview": "Fix the failing unit test for add(a,b). The implementation incorrectly subtracts. Change src/add.js so add returns a+b. Run npm test. Do not push.",
+      "mode": "ag1",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.task.received",
+      "ts": 1789451668460
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "branch": "main",
+      "head": "093b02701e2f432fcee47eb879c385ac14b7f8a0",
+      "sessionBaseCommit": "093b02701e2f432fcee47eb879c385ac14b7f8a0",
+      "dirtySummary": "clean",
+      "projectName": "pathcode-s1-live-project",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.preflight",
+      "ts": 1789451671033
+    },
+    {
+      "taskId": "b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "taskBranch": "path/task-b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "workspace": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/ag1-tasks/b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "workingSubdir": "",
+      "engineeringCwd": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/ag1-tasks/b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "baselineHead": "093b02701e2f432fcee47eb879c385ac14b7f8a0",
+      "status": "ready",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.engineering.workspace",
+      "ts": 1789451671487
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "id": "ag1-baseline:093b02701e2f432fcee47eb879c385ac14b7f8a0",
+      "kind": "task-worktree-baseline",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.recovery.checkpoint",
+      "ts": 1789451671501
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "matrix": {
+        "languages": [
+          {
+            "id": "typescript",
+            "status": "ready"
+          }
+        ],
+        "toolchains": [
+          {
+            "id": "npm",
+            "status": "ready"
+          }
+        ],
+        "languageIntelligence": [
+          {
+            "id": "typescript",
+            "status": "unavailable"
+          }
+        ],
+        "specialist": {
+          "copilot": {
+            "status": "ready"
+          }
+        }
+      },
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.capability.discovered",
+      "ts": 1789451671532
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "enabled": 0,
+      "denied": 0,
+      "servers": [],
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.capability.mcp",
+      "ts": 1789451671553
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag/ag1-tasks/b66d52ef-c693-47e8-88ed-f05c5e7d7d0c",
+      "runtimeRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.capability.preparing",
+      "ts": 1789451671591
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "phase": "toolchains",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.capability.provisioning",
+      "ts": 1789451672899
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "id": "lsp:typescript",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.capability.provisioning",
+      "ts": 1789451672913
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "id": "lsp:typescript",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.capability.provisioned",
+      "ts": 1789451676502
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "phase": "lsp",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.capability.provisioning",
+      "ts": 1789451676517
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "tool": "lsp:typescript",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.capability.provisioning",
+      "ts": 1789451676542
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "classification": "CONSERVATIVE",
+      "source": "npm-test",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.capability.affected",
+      "ts": 1789451678819
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "lspReady": [
+        "typescript"
+      ],
+      "scip": false,
+      "affected": "CONSERVATIVE",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.capability.ready",
+      "ts": 1789451678851
+    },
+    {
+      "taskId": "7e4e3ded-1e19-4c2d-add5-5361fa513a8e",
+      "summary": "Fix the failing unit test for add(a,b). The implementation incorrectly subtracts. Change src/add.js so add returns a+b. ",
+      "sessionId": "ef9dd054-5351-4170-82c6-2f6f46566f13",
+      "type": "session.task.received",
+      "ts": 1789451679094
+    }
+  ],
+  "types": [
+    "session.task.received",
+    "session.preflight",
+    "session.engineering.workspace",
+    "session.recovery.checkpoint",
+    "session.capability.discovered",
+    "session.capability.mcp",
+    "session.capability.preparing",
+    "session.capability.provisioning",
+    "session.capability.provisioned",
+    "session.capability.affected",
+    "session.capability.ready",
+    "session.capability.collaborate",
+    "session.engineering.activity",
+    "session.engineering.bridge",
+    "session.reading",
+    "session.engineering.tool",
+    "session.applying",
+    "session.edit.summary",
+    "session.engineering.handoff",
+    "session.validation.plan",
+    "session.validation.running",
+    "session.validation.result",
+    "session.engineering.result",
+    "session.terminal",
+    "gateway.task.finished"
+  ]
+}

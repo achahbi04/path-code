@@ -1,32 +1,45 @@
 {
   "schema": "pathcode.s1.gateway.mechanical.v1",
-  "at": "2026-09-14T23:33:46.040Z",
+  "at": "2026-09-15T05:55:31.967Z",
   "note": "Mechanical gateway ownership proof. MANUAL_UI_ACCEPTANCE remains PENDING_OPERATOR_REVIEW from S0.",
   "cases": {
     "bind": {
       "ok": true,
-      "projectRoot": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s1-repo-Y5AAua"
+      "projectRoot": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s1-repo-KUwEP7"
     },
     "socket": {
-      "path": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s1-ev-R3uf6n/gateway/pathcode-gateway.sock",
+      "path": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pc-gw-437080c883e182f8.sock",
       "ok": true
     },
     "capabilities": {
       "ok": true,
       "engines": [
-        "antigravity",
-        "copilot",
-        "cursor"
-      ]
+        {
+          "id": "antigravity",
+          "status": "available",
+          "role": "engineering_collaborator"
+        },
+        {
+          "id": "copilot",
+          "status": "available",
+          "role": "engineering_collaborator"
+        },
+        {
+          "id": "cursor",
+          "status": "slot_reserved",
+          "role": "engineering_collaborator"
+        }
+      ],
+      "note": "cursor is slot_reserved (S3) — not LIVE in S1"
     },
     "start": {
       "ok": true,
-      "taskId": "bdc67cbd-bed1-45e8-ad85-bfba06e0589d"
+      "taskId": "392577a7-d25a-4f64-b022-5c59eca8d8b3"
     },
     "sameTaskAttach": {
       "ok": true,
       "sameTaskId": true,
-      "taskId": "bdc67cbd-bed1-45e8-ad85-bfba06e0589d"
+      "taskId": "392577a7-d25a-4f64-b022-5c59eca8d8b3"
     },
     "steer": {
       "ok": true,

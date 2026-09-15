@@ -56,6 +56,7 @@ import {
 import {
   createGatewayRuntime,
   startGatewayServer,
+  ensureGateway,
 } from "./pathcode-cli/gateway/index.mjs";
 
 const root = resolvePathPackageRoot();
@@ -447,37 +448,53 @@ export async function runPathcodeMain(argv, testIo = {}) {
   /** @type {number} */
   let lastExitCode = 0;
 
-  // S1 — embedded gateway runtime owns engineering; CLI is a presentation client.
-  // Socket exposes the same runtime for headless attach without a second backend.
+  // S1 — gateway owns engineering; CLI is a presentation client.
+  // Default: embed runtime + expose socket for same-process multi-client attach.
+  // PATHCODE_GATEWAY_EXTERNAL=1: attach to a detached gateway (disconnect ≠ cancel).
   const useGateway =
     testIo.runAg1Session == null &&
     testIo.runGeneralSession == null &&
     process.env.PATHCODE_USE_GATEWAY !== "0";
+  const useExternalGateway =
+    useGateway &&
+    (process.env.PATHCODE_GATEWAY_EXTERNAL === "1" ||
+      process.env.PATHCODE_GATEWAY_MODE === "external");
   /** @type {ReturnType<typeof createGatewayRuntime> | null} */
   let gatewayRuntime = null;
   /** @type {Awaited<ReturnType<typeof startGatewayServer>> | null} */
   let gatewayServer = null;
+  /** @type {Awaited<ReturnType<typeof ensureGateway>>["client"] | null} */
+  let gatewayClient = null;
   /** @type {string | null} */
   let activeGatewayTaskId = null;
   if (useGateway) {
     const runtimeRoot = resolvePathRuntimeRoot({ packageRoot: root });
-    gatewayRuntime = createGatewayRuntime({
-      packageRoot: root,
-      runtimeRoot,
-    });
-    try {
-      await gatewayRuntime.bindProject({ cwd: projectRoot });
-      gatewayServer = await startGatewayServer({
-        runtime: gatewayRuntime,
-        runtimeRoot,
+    if (useExternalGateway) {
+      const ensured = await ensureGateway({
         packageRoot: root,
+        runtimeRoot,
       });
-    } catch (err) {
-      // Socket bind failure must not kill the product — runtime still works in-process.
-      stderr.write(
-        `PATH Gateway socket unavailable (${err instanceof Error ? err.message : String(err)}); continuing in-process.\n`,
-      );
-      gatewayServer = null;
+      gatewayClient = ensured.client;
+      await gatewayClient.bindProject(projectRoot);
+    } else {
+      gatewayRuntime = createGatewayRuntime({
+        packageRoot: root,
+        runtimeRoot,
+      });
+      try {
+        await gatewayRuntime.bindProject({ cwd: projectRoot });
+        gatewayServer = await startGatewayServer({
+          runtime: gatewayRuntime,
+          runtimeRoot,
+          packageRoot: root,
+        });
+      } catch (err) {
+        // Socket bind failure must not kill the product — runtime still works in-process.
+        stderr.write(
+          `PATH Gateway socket unavailable (${err instanceof Error ? err.message : String(err)}); continuing in-process.\n`,
+        );
+        gatewayServer = null;
+      }
     }
   }
 
@@ -547,7 +564,13 @@ export async function runPathcodeMain(argv, testIo = {}) {
   });
   setActiveTerminalCleanup(() => {
     try {
+      // External gateway must keep owning engineering after CLI disconnect.
       if (gatewayServer) gatewayServer.stop();
+    } catch {
+      // ignore
+    }
+    try {
+      gatewayClient?.close?.();
     } catch {
       // ignore
     }
@@ -578,13 +601,15 @@ export async function runPathcodeMain(argv, testIo = {}) {
 
   const prompt = createPromptSession(streams, {
     onSteering: (text) => {
-      if (gatewayRuntime && activeGatewayTaskId) {
-        gatewayRuntime.steerTask(activeGatewayTaskId, text);
+      if (activeGatewayTaskId) {
+        if (gatewayClient) gatewayClient.steerTask(activeGatewayTaskId, text);
+        else if (gatewayRuntime) gatewayRuntime.steerTask(activeGatewayTaskId, text);
       }
     },
     onCycleCancel: () => {
-      if (gatewayRuntime && activeGatewayTaskId) {
-        gatewayRuntime.cancelTask(activeGatewayTaskId);
+      if (activeGatewayTaskId) {
+        if (gatewayClient) gatewayClient.cancelTask(activeGatewayTaskId);
+        else if (gatewayRuntime) gatewayRuntime.cancelTask(activeGatewayTaskId);
       }
     },
   });
@@ -659,6 +684,42 @@ export async function runPathcodeMain(argv, testIo = {}) {
             cardsOwnProgress: ttyInline,
             signal,
           });
+        } else if (useGateway && gatewayClient) {
+          const off = gatewayClient.onEvent((envelope) => {
+            const ev = envelope?.event;
+            if (!ev || typeof ev.type !== "string") return;
+            const { type, ...fields } = ev;
+            eventSink.emit(type, fields);
+          });
+          try {
+            const started = await gatewayClient.startTask(taskText, {
+              sessionId,
+              sessionBaseCommit: sessionStats.sessionBaseCommit,
+            });
+            if (!started?.taskId) {
+              throw new Error(started?.message || "gateway task start failed");
+            }
+            activeGatewayTaskId = started.taskId;
+            for (;;) {
+              if (signal?.aborted) break;
+              await new Promise((r) => setTimeout(r, 750));
+              const full = await gatewayClient.snapshotTask(started.taskId);
+              if (!full || full.status !== "running") {
+                sessionResult =
+                  (full && full.result) ||
+                  {
+                    exitCode: full?.status === "completed" ? 0 : 1,
+                    classification: full?.classification,
+                    taskBranch: full?.taskBranch,
+                    commitSha: full?.commitSha,
+                  };
+                break;
+              }
+            }
+          } finally {
+            activeGatewayTaskId = null;
+            off();
+          }
         } else if (useGateway && gatewayRuntime) {
           const off = gatewayRuntime.onEvent((envelope) => {
             const ev = envelope?.event;

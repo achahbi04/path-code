@@ -45,6 +45,15 @@ function tmpGitRepo() {
 }
 
 describe("S1 gateway extraction", () => {
+  it("keeps Unix socket paths short enough for macOS sun_path limits", async () => {
+    const { resolveGatewaySocketPath } = await loadGw();
+    const longRoot =
+      "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/runtime-live-ag";
+    const sock = resolveGatewaySocketPath(longRoot);
+    expect(sock.length).toBeLessThan(104);
+    expect(sock.endsWith(".sock")).toBe(true);
+  });
+
   it("exposes capability registry with collaborator engines and future slots", async () => {
     const { createGatewayRuntime } = await loadGw();
     const rt = createGatewayRuntime({

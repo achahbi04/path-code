@@ -2,8 +2,10 @@
  * S1 — Unix-socket gateway server (NDJSON frames, one JSON object per line).
  */
 
+import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import { mkdirSync, unlinkSync, existsSync, writeFileSync, chmodSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createGatewayRuntime } from "./runtime.mjs";
 import {
@@ -13,10 +15,18 @@ import {
 } from "./protocol.mjs";
 
 /**
+ * macOS/BSD sun_path is ~104 bytes; long checkout runtimeRoots overflow EINVAL.
+ * Keep a stable short path under TMPDIR keyed by runtimeRoot hash, and mirror a
+ * pointer file under runtimeRoot/gateway/ for operators.
+ *
  * @param {string} runtimeRoot
  */
 export function resolveGatewaySocketPath(runtimeRoot) {
-  return join(runtimeRoot, "gateway", "pathcode-gateway.sock");
+  const hash = createHash("sha256")
+    .update(String(runtimeRoot || ""))
+    .digest("hex")
+    .slice(0, 16);
+  return join(tmpdir(), `pc-gw-${hash}.sock`);
 }
 
 /**
@@ -24,6 +34,20 @@ export function resolveGatewaySocketPath(runtimeRoot) {
  */
 export function resolveGatewayPidPath(runtimeRoot) {
   return join(runtimeRoot, "gateway", "pathcode-gateway.pid");
+}
+
+/**
+ * @param {string} runtimeRoot
+ * @param {string} socketPath
+ */
+function writeSocketPointer(runtimeRoot, socketPath) {
+  try {
+    const dir = join(runtimeRoot, "gateway");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "socket.path"), `${socketPath}\n`, { mode: 0o600 });
+  } catch {
+    // ignore
+  }
 }
 
 /**
@@ -46,6 +70,7 @@ export async function startGatewayServer(options = {}) {
   const pidPath = resolveGatewayPidPath(runtime.runtimeRoot);
 
   mkdirSync(dirname(socketPath), { recursive: true });
+  mkdirSync(dirname(pidPath), { recursive: true });
   if (existsSync(socketPath)) {
     try {
       unlinkSync(socketPath);
@@ -135,6 +160,7 @@ export async function startGatewayServer(options = {}) {
       } catch {
         // ignore
       }
+      writeSocketPointer(runtime.runtimeRoot, socketPath);
       try {
         writeFileSync(
           pidPath,

@@ -59,10 +59,11 @@ await headless.hello("headless");
 const caps = await cli.listCapabilities();
 evidence.cases.capabilities = {
   ok:
-    caps.engines?.some((e) => e.id === "antigravity") &&
-    caps.engines?.some((e) => e.id === "copilot") &&
+    caps.engines?.some((e) => e.id === "antigravity" && e.status === "available") &&
+    caps.engines?.some((e) => e.id === "copilot" && e.status === "available") &&
     caps.engines?.some((e) => e.id === "cursor" && e.status === "slot_reserved"),
-  engines: caps.engines?.map((e) => e.id),
+  engines: caps.engines?.map((e) => ({ id: e.id, status: e.status, role: e.role })),
+  note: "cursor is slot_reserved (S3) — not LIVE in S1",
 };
 
 /** @type {object[]} */
