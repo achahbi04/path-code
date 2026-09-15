@@ -39,8 +39,8 @@ Filled at freeze:
 
 - **Starting HEAD:** `843abcef2f4820bafd2e2c3fbdee31e215dd8d95`
 - **Implementation commit:** `1763a6d7ba5636f2d5bec2793b6f084e57a47865`
-- **Report commit:** `1763a6d7ba5636f2d5bec2793b6f084e57a47865` (combined with implementation; docs SHA sync follows)
-- **Current HEAD:** `1763a6d7ba5636f2d5bec2793b6f084e57a47865`
+- **Report commit:** `ed80df7a0649cb3b75eb49e2f3774d66f05b9725`
+- **Current HEAD:** `ed80df7a0649cb3b75eb49e2f3774d66f05b9725`
 - **Branch:** `cursor/pathcode-antigravity-v1`
 - **Working tree:** clean after freeze
 
