@@ -1,14 +1,45 @@
-# PATH CODE — LIVE ENGINEERING SURFACE
+# PATH CODE — S1 LIVE ENGINEERING SURFACE
 
-**RESULT:** PHASE B + C IMPLEMENTED — AWAITING PHASE D OPERATOR ACCEPTANCE  
+**S1 RESULT:** FROZEN / OPERATOR ACCEPTED  
+**Freeze tip:** `PENDING_FREEZE_COMMIT`  
 **Deeper S2 productization:** NOT STARTED
 
 **S1 Gateway:** FROZEN / ACCEPTED — tip `9f9db58c918b4ee690f0a5053aa8ebfd8bc15cfe`  
-**S1 live experience:** OPEN until Phase D operator acceptance → then FREEZE S1
+**S1 live experience:** FROZEN / OPERATOR ACCEPTED (Klarapp Phase D accepted; two bounded freeze repairs closed)
 
-**Phase A report contract:** ACCEPTED (operator — sufficient to proceed)  
-**Phase B (one engineer feel):** IMPLEMENTED — awaiting D  
-**Phase C (splash):** IMPLEMENTED — awaiting D  
+**Phase A report contract:** ACCEPTED  
+**Phase B (one engineer feel):** ACCEPTED  
+**Phase C (splash):** ACCEPTED (further visual refinement may move forward later)  
+**Phase D (Klarapp operator run):** ACCEPTED subject to freeze repairs below  
+
+---
+
+## Freeze repairs (bounded)
+
+### 1. Terminal.app title stays `<project> — PATH Code`
+Root cause: Terminal.app appends the tty **foreground** process name/argv when that preference is enabled; OSC/watchdog alone cannot clear a child that stole the foreground (copilot / python / TMPDIR=…). Mirroring the product string into `process.title` also duplicated the title.
+
+Fix: OSC window title only; inert `process.title` (`U+200B`); `tcsetpgrp` reclaim of tty foreground; stream OSC strip; 200ms reclaim+reassert watchdog.
+
+### 2. Read-only assessments do not commit setup-only churn
+Root cause: dependency prepare in the isolated task worktree mutated lockfiles (`devOptional` → `dev`); finalization treated that as the engineering result and created a task commit.
+
+Fix: before `collectWorktreeResult` / commit, `restoreIncidentalSetupChurn` restores known setup-only files when the objective is read-only/assessment and **only** incidental paths are dirty. Explicit dependency-upgrade objectives skip restore.
+
+Proof: `node docs/reports/g10-evidence/live-experience/run-s1-freeze-repair-proof.mjs`  
+Vitest: `tests/s1/freeze-repair.test.ts`
+
+---
+
+## Accepted and CLOSED (do not reopen)
+
+- real engineering capability; coherent live PATH surface
+- real reads / commands / code / diffs / checks
+- PATH-owned history / scrolling; heartbeat; Stop / cancellation
+- canonical engineering report; `/report` copy; durable report file
+- truthful completion; timing telemetry; ANSI/source rendering
+- non-Git / dirty / detached handling; Gateway architecture
+- steering path sufficient for S1; splash accepted for now
 
 ---
 
@@ -22,81 +53,41 @@ Proof: `node docs/reports/g10-evidence/live-experience/run-phase-a-report-proof.
 
 ## Phase B — PATH feels like one intelligent engineer
 
-Carried through real engine → Gateway → streamHistory → PATH Code:
-
-- Provider names scrubbed from live titles/narration (Copilot / Antigravity do not dominate)
-- User-facing engine prose surfaces as PATH narration
-- Mid-task steering enters the real session; visible `Guidance queued` / `Applying…`
-- Operator questions get a continue prompt that asks for substantive evidenced answers
-- Quiet periods: sticky `Waiting for engineering result · Ns` + elapsed + last activity
-- History scroll: PageUp/Down + wheel (incl. while composer has text); Jump to latest; no snap while reading
-- ANSI: strip pre-colored CSI before syntax paint; full CSI-aware line fit (no `38;5;180m` residue)
-- Title: `<project> — PATH Code` with faster reassert against child argv leakage
-
-Carry (report, no new subsystem):
-
-- No generic merge on assessment-like objectives
-- Lockfile-only churn filtered from Changed on assessments
-- Handoff Solid/Risk conclusions retained in discoveries
+Carried through real engine → Gateway → streamHistory → PATH Code (accepted via Phase D).
 
 Proof: `node docs/reports/g10-evidence/live-experience/run-phase-b-c-proof.mjs`
 
 ---
 
-## Phase C — splash (small visual finish)
+## Phase C — splash (accepted for now)
 
 - Centered `PATH  ●  Code` (~2s), stronger letter-spacing presence
-- No DEC double-width, no subtitle, no “engineering gateway”
 - Compact `PATH ● Code` remains on the live canvas
 
 ---
 
-## Phase D — ONE real Terminal.app acceptance (operator decides)
+## Phase D — Klarapp operator acceptance
 
-**Do not self-accept. Mechanical proofs are not acceptance.**
+**ACCEPTED.** Further S1 operator runs are not required.
 
-### Exact procedure
+Procedure used (historical):
 
 ```bash
 cd /Users/achahbi/Downloads/Klarapp
 export PATHCODE_RUNTIME_ROOT="$HOME/.path-code/runtime-klar-s1-d"
-rm -rf "$PATHCODE_RUNTIME_ROOT"
-node /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+node …/scripts/pathcode.mjs
 ```
-
-**Expected interactions**
-
-1. Splash: centered PATH ● Code (~2s), then compact brand on row 0  
-2. Title bar stays effectively: `Klarapp — PATH Code` (no copilot/TMPDIR/argv clutter)  
-3. Submit a real engineering objective (inspect / tests+typecheck / solid+risk)  
-4. Live story: narration + Read/Update/commands/outputs — not Copilot/Antigravity labels  
-5. During provider wait: heartbeat with seconds + elapsed / last activity  
-6. Mid-task: ask `What specifically did you find so far? Show me the files.`  
-   → guidance queued/applying → substantive answer when the engine returns  
-7. Scroll up (trackpad / PageUp) through real history while task runs; Jump to latest; no shell-buffer fall-through; no giant blank fake history  
-8. Confirm no ANSI residue (`38;5;…m`) in source/diffs  
-9. Stop remains immediate if tested  
-10. Completion: automatic canonical report (Asked = objective; useful What PATH did / discoveries; truthful checks)  
-11. `/report` → visible clipboard confirm + durable path; file matches  
-12. `/exit` → same report contract in the normal buffer  
-
-**Proof files (mechanical, not acceptance):**
-
-- `docs/reports/g10-evidence/live-experience/phase-a-report-proof.json`
-- `docs/reports/g10-evidence/live-experience/phase-b-c-proof.json`
-
-If Phase D passes: **FREEZE S1 IMMEDIATELY** (commit tip SHA into this doc) → then begin S2 as a NEW stage.
-
-Only genuine blockers from THIS run may trigger another S1 correction.
 
 ---
 
-## Still open
+## Status
 
 | Phase | Status |
 |---|---|
 | **A** | Accepted |
-| **B** | Implemented — needs D |
-| **C** | Implemented — needs D |
-| **D** | Operator acceptance |
-| **S2** | NOT STARTED |
+| **B** | Accepted |
+| **C** | Accepted |
+| **D** | Accepted |
+| **Freeze repairs** | Closed |
+| **S1** | **FROZEN / OPERATOR ACCEPTED** |
+| **S2** | **NOT STARTED** |

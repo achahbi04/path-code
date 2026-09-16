@@ -136,7 +136,9 @@ describe("T12 display escaping", () => {
       "line\u001b]8;;http://evil\u0007x\r\n\tover\uFEFF\u202Ewreck";
     const shown = esc.escapeForTerminalDisplay(raw);
     expect(shown).toContain("\\u001b");
-    expect(shown).toContain("\\r");
+    // CR is normalized to a newline for display (not shown as \\r).
+    expect(shown).toContain("\n");
+    expect(shown).not.toContain("\r");
     expect(shown).toContain("\\t");
     expect(shown).toContain("\\ufeff");
     expect(shown).toContain("\\u202e");

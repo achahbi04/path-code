@@ -1,22 +1,20 @@
 # PATH CODE — S2
 # REAL-PROJECT WORKFLOW PRODUCTIZATION
 
-**S2 RESULT:** NOT STARTED — blocked on live-engineering-surface review
+**S2 RESULT:** NOT STARTED — blocked until after S1 freeze
 
-**Prior stage:** S1 Gateway Extract — **FROZEN / ACCEPTED**  
-Tip: `9f9db58c918b4ee690f0a5053aa8ebfd8bc15cfe`
+**Prior stage:** S1 Gateway Extract + Live Engineering Surface — **FROZEN / OPERATOR ACCEPTED**  
+See [`PHASE_LIVE_ENGINEERING_SURFACE.md`](./PHASE_LIVE_ENGINEERING_SURFACE.md) for the live-surface freeze tip.
 
-**Blocking pass:** [`PHASE_LIVE_ENGINEERING_SURFACE.md`](./PHASE_LIVE_ENGINEERING_SURFACE.md)  
-Open-canvas CLI + Stop + trace + process cleanup must be operator-reviewed before deeper S2 settings/history/Studio productization.
+**S1 Gateway tip:** `9f9db58c918b4ee690f0a5053aa8ebfd8bc15cfe`
 
-**MANUAL_UI_ACCEPTANCE:** PENDING (see live-engineering-surface report)
+**MANUAL_UI_ACCEPTANCE:** S1 operator-accepted (Klarapp Phase D + two freeze repairs)
 
 **Published releases:** UNCHANGED  
 **Publication performed:** NO
 
 ---
 
-## Scope reminder (do not start until review)
+## Scope reminder (do not start until S1 freeze commit exists)
 
-S2 is for real-project workflow productization **after** the living engineering
-surface is accepted. Do not reopen S1 Gateway architecture.
+S2 is for real-project workflow productization **after** S1 is frozen. Do not reopen S1 Gateway architecture or the accepted live engineering surface.

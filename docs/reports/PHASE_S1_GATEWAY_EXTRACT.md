@@ -1,7 +1,7 @@
 # PATH CODE — S1
 # COMPLETE ENGINEERING GATEWAY EXTRACTION
 
-**S1 RESULT:** PASS
+**S1 RESULT:** PASS — FROZEN / OPERATOR ACCEPTED (live surface closed via Klarapp Phase D + freeze repairs; see `PHASE_LIVE_ENGINEERING_SURFACE.md`)
 
 **PRODUCT STATUS:** PATH Code now runs local engineering through an extracted
 PATH Gateway runtime. The living CLI is a presentation client of that runtime;
@@ -10,8 +10,7 @@ tasks over a Unix-socket IPC boundary. Antigravity and Copilot remain full
 engineering collaborators (not advisory hierarchy). Extension slots exist for
 Cursor, PATH Build, and PATH Studio without inventing those products in S1.
 
-**MANUAL_UI_ACCEPTANCE:** PENDING_OPERATOR_REVIEW (carried from S0; not
-re-declared accepted)
+**MANUAL_UI_ACCEPTANCE:** OPERATOR ACCEPTED (Klarapp Phase D; two bounded freeze repairs closed)
 
 **Published releases:** UNCHANGED  
 **Publication performed:** NO

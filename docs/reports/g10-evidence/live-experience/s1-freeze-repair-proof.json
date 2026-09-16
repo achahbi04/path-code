@@ -1,8 +1,8 @@
 {
   "phase": "S1_FREEZE_REPAIR",
-  "ok": false,
-  "passed": 11,
-  "failed": 5,
+  "ok": true,
+  "passed": 15,
+  "failed": 0,
   "checks": [
     {
       "id": "title_format_clean",
@@ -34,13 +34,12 @@
       "reclaimOk": false
     },
     {
-      "id": "ro_worktree_ok",
-      "ok": true
-    },
-    {
       "id": "ro_lockfile_dirty_before_restore",
-      "ok": false,
-      "changedFiles": []
+      "ok": true,
+      "changedFiles": [
+        "package-lock.json"
+      ],
+      "baselineHead": "47a215060ab0a304207a465698e7c3f2ef7fc512"
     },
     {
       "id": "ro_objective_classified",
@@ -48,11 +47,13 @@
     },
     {
       "id": "ro_restore_applied",
-      "ok": false,
+      "ok": true,
       "restore": {
-        "applied": false,
-        "restored": [],
-        "reason": "no_baseline"
+        "applied": true,
+        "restored": [
+          "package-lock.json"
+        ],
+        "reason": "restored"
       }
     },
     {
@@ -63,11 +64,12 @@
     },
     {
       "id": "ro_no_setup_only_task_commit",
-      "ok": false,
+      "ok": true,
       "committed": {
-        "ok": false,
+        "ok": true,
+        "skipped": true,
         "commitSha": null,
-        "code": "GIT_STATUS_FAILED"
+        "code": null
       }
     },
     {
@@ -89,13 +91,15 @@
     },
     {
       "id": "upgrade_lockfile_retained",
-      "ok": false,
-      "changedFiles": []
+      "ok": true,
+      "changedFiles": [
+        "package-lock.json"
+      ]
     },
     {
       "id": "upgrade_task_commit_keeps_lockfile",
-      "ok": false,
-      "commitSha": null
+      "ok": true,
+      "commitSha": "232ee4e39b0b4fc4e48715dda53bc5b9ef523c38"
     }
   ],
   "s2": "NOT_STARTED"

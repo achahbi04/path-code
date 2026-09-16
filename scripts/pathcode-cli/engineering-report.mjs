@@ -756,7 +756,9 @@ export function buildEngineeringReportModel(product, session = {}) {
         objective,
       );
     if (advancesSession && branch && sha && !objectiveLooksAssessment) {
-      remaining.push(`Merge when ready: git merge ${branch}`);
+      remaining.push(
+        `Merge when ready — integrate task branch ${branch} into your primary.`,
+      );
     }
   }
 

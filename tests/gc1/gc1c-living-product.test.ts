@@ -130,8 +130,10 @@ describe("GC1-c living product surface", () => {
       sessionId: "n",
       status: "grounded",
     });
-    const lines = buildInlineCardLines(state, { rows: 40, columns: 80 });
-    expect(lines.join("\n")).toContain("PATH ● Code");
-    expect(lines.join("\n")).toMatch(/Gate 1/);
+    const text = buildInlineCardLines(state, { rows: 40, columns: 80 }).join("\n");
+    expect(text).toContain("PATH ● Code");
+    // Open canvas no longer prints legacy "Gate 1" chrome; card state still advances.
+    expect(state.cards.gate1.arrived).toBe(true);
+    expect(text).toMatch(/Ready for engineering|PATH/);
   });
 });

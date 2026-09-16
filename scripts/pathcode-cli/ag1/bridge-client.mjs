@@ -25,6 +25,7 @@ import { buildNoninteractiveEngineeringEnv } from "./noninteractive-env.mjs";
 import { sanitizeEngineEnvForPublication } from "../ag4/credential-isolation.mjs";
 import { sanitizeProjectCommandEnv } from "../ag5/project-env.mjs";
 import { registerProcess } from "../process-registry.mjs";
+import { reclaimTtyForeground } from "../terminal-title.mjs";
 
 /**
  * @typedef {{
@@ -236,7 +237,6 @@ export function createAntigravityEngineeringAgent(options = {}) {
     );
 
     try {
-      const { reclaimTtyForeground } = await import("../terminal-title.mjs");
       reclaimTtyForeground();
     } catch {
       // Title reclaim is best-effort; bridge must still run.

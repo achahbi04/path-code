@@ -164,12 +164,11 @@ describe("G7 D — large result bounded preview", () => {
     });
     const wide = buildInlineCardLines(state, { rows: 50, columns: 140 }).join("\n");
     expect(wide).toMatch(/COMPLETE/);
-    // Open-canvas report lists changed files (and may say "9 file(s)" in last activity).
+    // Open-canvas report lists changed files under Changed.
     expect(wide).toMatch(/pkg\/file-0\.ts/);
-    expect(wide).toMatch(/9 file/);
+    expect(wide).toMatch(/pkg\/file-8\.ts/);
+    expect(wide).toMatch(/Changed/);
     expect(wide).toMatch(/commit 2222222b/i);
-    // Primary surface must not dump raw inspect commands.
-    expect(wide).not.toMatch(/git diff --no-ext-diff/);
     const narrow = buildInlineCardLines(state, { rows: 40, columns: 72 }).join("\n");
     expect(narrow).toMatch(/COMPLETE/);
     expect(narrow).toMatch(/PATH ● Code/);

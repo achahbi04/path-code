@@ -5,27 +5,9 @@ import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import {
-  normalizeObjectiveText,
-  containsCarriageReturn,
-} from "../../scripts/pathcode-cli/normalize-text.mjs";
-import { isTaskStopCommand } from "../../scripts/pathcode-cli/task-control.mjs";
-import { escapeForTerminalDisplay } from "../../scripts/pathcode-cli/escape.mjs";
-import {
-  applyComposerInput,
-  createComposerState,
-  PASTE_START,
-  PASTE_END,
-} from "../../scripts/pathcode-cli/composer.mjs";
-import {
-  registerProcess,
-  cancelTaskProcesses,
-  listProcesses,
-  markProcessEnded,
-  resetProcessRegistryForTests,
-} from "../../scripts/pathcode-cli/process-registry.mjs";
 
 const CHECKOUT = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const CLI = join(CHECKOUT, "scripts/pathcode-cli");
 const STUDIO = join(CHECKOUT, "scripts/path-studio/state.mjs");
 const INLINE = join(CHECKOUT, "scripts/pathcode-cli/inline-studio.mjs");
 
@@ -34,7 +16,11 @@ async function load(path: string) {
 }
 
 describe("engineering surface — paste / objective normalize", () => {
-  it("normalizes CRLF and lone CR before durable use", () => {
+  it("normalizes CRLF and lone CR before durable use", async () => {
+    const { normalizeObjectiveText, containsCarriageReturn } = await load(
+      join(CLI, "normalize-text.mjs"),
+    );
+    const { escapeForTerminalDisplay } = await load(join(CLI, "escape.mjs"));
     const raw = "Para one.\r\rPara two.\r\nPara three.";
     const n = normalizeObjectiveText(raw);
     expect(containsCarriageReturn(n)).toBe(false);
@@ -42,7 +28,16 @@ describe("engineering surface — paste / objective normalize", () => {
     expect(escapeForTerminalDisplay(raw)).not.toMatch(/\\r/);
   });
 
-  it("composer paste normalizes CR before buffer insert", () => {
+  it("composer paste normalizes CR before buffer insert", async () => {
+    const {
+      applyComposerInput,
+      createComposerState,
+      PASTE_START,
+      PASTE_END,
+    } = await load(join(CLI, "composer.mjs"));
+    const { containsCarriageReturn } = await load(
+      join(CLI, "normalize-text.mjs"),
+    );
     let state = createComposerState();
     const chunk = `${PASTE_START}Line A.\r\rLine B.${PASTE_END}`;
     const r = applyComposerInput(state, chunk);
@@ -53,7 +48,8 @@ describe("engineering surface — paste / objective normalize", () => {
 });
 
 describe("engineering surface — stop vs steering", () => {
-  it("recognizes stop control phrases and ignores long steering", () => {
+  it("recognizes stop control phrases and ignores long steering", async () => {
+    const { isTaskStopCommand } = await load(join(CLI, "task-control.mjs"));
     expect(isTaskStopCommand("/stop")).toBe(true);
     expect(isTaskStopCommand("stop")).toBe(true);
     expect(isTaskStopCommand("Stop here and give the report")).toBe(true);
@@ -107,7 +103,14 @@ describe("engineering surface — open canvas", () => {
 });
 
 describe("engineering surface — process registry", () => {
-  it("tracks and cancels task-owned processes without killing live children when marked ended", () => {
+  it("tracks and cancels task-owned processes without killing live children when marked ended", async () => {
+    const {
+      registerProcess,
+      cancelTaskProcesses,
+      listProcesses,
+      markProcessEnded,
+      resetProcessRegistryForTests,
+    } = await load(join(CLI, "process-registry.mjs"));
     resetProcessRegistryForTests();
     const taskId = "task-es-1";
     const rec = registerProcess({
@@ -116,18 +119,32 @@ describe("engineering surface — process registry", () => {
       command: "echo noop",
       pid: 999999001,
     });
-    expect(listProcesses(taskId).some((p) => p.id === rec.id)).toBe(true);
+    expect(
+      listProcesses(taskId).some(
+        (p: { id: string }) => p.id === rec.id,
+      ),
+    ).toBe(true);
     markProcessEnded(rec.id, { exitCode: 0, cleanup: "ok" });
     const cancelled = cancelTaskProcesses(taskId);
-    expect(cancelled.some((p) => p.id === rec.id && p.cancelled)).toBe(true);
-    expect(cancelled.find((p) => p.id === rec.id)?.endedAt).toBeTruthy();
+    expect(
+      cancelled.some(
+        (p: { id: string; cancelled?: boolean }) =>
+          p.id === rec.id && p.cancelled,
+      ),
+    ).toBe(true);
+    expect(
+      cancelled.find((p: { id: string }) => p.id === rec.id)?.endedAt,
+    ).toBeTruthy();
   });
 
   it("inherits task ownership from AsyncLocalStorage context", async () => {
+    const {
+      registerProcess,
+      listProcesses,
+      resetProcessRegistryForTests,
+      runWithTaskContext,
+    } = await load(join(CLI, "process-registry.mjs"));
     resetProcessRegistryForTests();
-    const { runWithTaskContext } = await import(
-      "../../scripts/pathcode-cli/process-registry.mjs"
-    );
     runWithTaskContext("task-ctx-9", () => {
       registerProcess({
         kind: "ctx_child",

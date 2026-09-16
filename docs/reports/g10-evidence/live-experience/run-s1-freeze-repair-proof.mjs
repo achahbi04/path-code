@@ -57,7 +57,10 @@ function git(cwd, args) {
  */
 function initTaskRepo(dir) {
   mkdirSync(dir, { recursive: true });
-  git(dir, ["init"]);
+  const init = git(dir, ["init"]);
+  if (init.status !== 0) {
+    throw new Error(`git init failed: ${init.stderr || init.stdout}`);
+  }
   git(dir, ["config", "user.email", "freeze@example.com"]);
   git(dir, ["config", "user.name", "Freeze Proof"]);
   writeFileSync(join(dir, "README.md"), "klarapp fixture\n", "utf8");
@@ -87,7 +90,10 @@ function initTaskRepo(dir) {
     ) + "\n",
     "utf8",
   );
-  git(dir, ["add", "-A"]);
+  const add = git(dir, ["add", "-A"]);
+  if (add.status !== 0) {
+    throw new Error(`git add failed: ${add.stderr || add.stdout}`);
+  }
   const commit = git(dir, ["commit", "-m", "init"]);
   if (commit.status !== 0) {
     throw new Error(`init commit failed: ${commit.stderr || commit.stdout}`);
