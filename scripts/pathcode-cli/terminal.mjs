@@ -137,6 +137,8 @@ export function createPromptSession(streams, options = {}) {
   let onComposerChange = null;
   /** @type {((delta: number) => void) | null} */
   let onStreamScroll = null;
+  /** @type {(() => void) | null} */
+  let onDismissOverlay = null;
   /** @type {import("./composer.mjs").ComposerState} */
   let composer = createComposerState();
   /** @type {((line: string | null) => void) | null} */
@@ -228,6 +230,7 @@ export function createPromptSession(streams, options = {}) {
    * @param {{
    *   onChange?: (state: import("./composer.mjs").ComposerState) => void,
    *   onStreamScroll?: (delta: number) => void,
+   *   onDismissOverlay?: () => void,
    * }} [opts]
    */
   function enableLivingComposer(opts = {}) {
@@ -236,6 +239,10 @@ export function createPromptSession(streams, options = {}) {
       typeof opts.onChange === "function" ? opts.onChange : null;
     onStreamScroll =
       typeof opts.onStreamScroll === "function" ? opts.onStreamScroll : null;
+    onDismissOverlay =
+      typeof opts.onDismissOverlay === "function"
+        ? opts.onDismissOverlay
+        : null;
     composer = createComposerState();
     notifyComposer();
   }
@@ -328,6 +335,13 @@ export function createPromptSession(streams, options = {}) {
       ) {
         try {
           onStreamScroll(result.streamScrollDelta);
+        } catch {
+          // ignore
+        }
+      }
+      if (result.dismissOverlay === true && typeof onDismissOverlay === "function") {
+        try {
+          onDismissOverlay();
         } catch {
           // ignore
         }

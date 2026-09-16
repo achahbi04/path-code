@@ -694,6 +694,14 @@ export async function runPathcodeMain(argv, testIo = {}) {
           inlineStudio.adjustStreamScroll(delta);
         }
       },
+      onDismissOverlay: () => {
+        if (typeof inlineStudio.setOperatorPanel === "function") {
+          inlineStudio.setOperatorPanel(null);
+        }
+        if (typeof inlineStudio.setReportActionNotice === "function") {
+          inlineStudio.setReportActionNotice("");
+        }
+      },
     });
   }
   const uninstallCollisionGuard = ttyInline
@@ -1063,6 +1071,12 @@ export async function runPathcodeMain(argv, testIo = {}) {
       }
       const cmd = line.trim();
       if (cmd === "") {
+        if (
+          ttyInline &&
+          typeof inlineStudio.setOperatorPanel === "function"
+        ) {
+          inlineStudio.setOperatorPanel(null);
+        }
         redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }

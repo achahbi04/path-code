@@ -92,6 +92,8 @@ export function composerVisibleLines(state, width, maxRows = COMPOSER_MAX_ROWS) 
  *   submit: string | null,
  *   cancel: boolean,
  *   eof: boolean,
+ *   dismissOverlay?: boolean,
+ *   streamScrollDelta?: number,
  * }}
  */
 export function applyComposerInput(state, chunk) {
@@ -105,6 +107,7 @@ export function applyComposerInput(state, chunk) {
   let submit = null;
   let cancel = false;
   let eof = false;
+  let dismissOverlay = false;
   let streamScrollDelta = 0;
 
   const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8");
@@ -129,6 +132,7 @@ export function applyComposerInput(state, chunk) {
         cursor = r.cursor;
         streamScrollDelta += r.streamScrollDelta || 0;
         if (r.pendingEsc) pendingEsc = r.pendingEsc;
+        if (r.dismissOverlay) dismissOverlay = true;
         if (r.submit != null) {
           submit = r.submit;
           break;
@@ -169,10 +173,19 @@ export function applyComposerInput(state, chunk) {
     cursor = r.cursor;
     streamScrollDelta += r.streamScrollDelta || 0;
     if (r.pendingEsc) pendingEsc = r.pendingEsc;
+    if (r.dismissOverlay) dismissOverlay = true;
     submit = r.submit;
     cancel = r.cancel;
     eof = r.eof;
     s = "";
+  }
+
+  // Bare Esc often arrives as its own chunk and is held as pendingEsc so CSI
+  // sequences can complete. When the buffer is empty, treat that lone Esc as
+  // "close overlay" so command panels never trap the session.
+  if (!submit && !cancel && !eof && pendingEsc === "\u001b" && text.length === 0) {
+    dismissOverlay = true;
+    pendingEsc = "";
   }
 
   // Keep scroll near end when editing.
@@ -188,6 +201,7 @@ export function applyComposerInput(state, chunk) {
     submit,
     cancel,
     eof,
+    dismissOverlay,
     streamScrollDelta,
   };
 }
@@ -219,6 +233,7 @@ function applyPlainKeys(text, cursor, s, opts) {
   let submit = null;
   let cancel = false;
   let eof = false;
+  let dismissOverlay = false;
   let streamScrollDelta = 0;
   let pendingEsc = "";
   let i = 0;
@@ -304,7 +319,10 @@ function applyPlainKeys(text, cursor, s, opts) {
         i += seq.length;
         continue;
       }
-      // Lone ESC or unknown — drop (do not type into composer).
+      // Lone ESC or unknown — close overlays when the buffer is empty.
+      if (t.length === 0) {
+        dismissOverlay = true;
+      }
       i += 1;
       continue;
     }
@@ -367,6 +385,7 @@ function applyPlainKeys(text, cursor, s, opts) {
     submit,
     cancel,
     eof,
+    dismissOverlay,
     streamScrollDelta,
     pendingEsc,
   };

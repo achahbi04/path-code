@@ -28,6 +28,17 @@ describe("engineering surface — paste / objective normalize", () => {
     expect(escapeForTerminalDisplay(raw)).not.toMatch(/\\r/);
   });
 
+  it("bare Esc dismisses overlays without requiring Ctrl-D", async () => {
+    const { applyComposerInput, createComposerState } = await load(
+      join(CLI, "composer.mjs"),
+    );
+    const r = applyComposerInput(createComposerState(), "\u001b");
+    expect(r.dismissOverlay).toBe(true);
+    expect(r.eof).toBe(false);
+    expect(r.cancel).toBe(false);
+    expect(r.submit).toBeNull();
+  });
+
   it("composer paste normalizes CR before buffer insert", async () => {
     const {
       applyComposerInput,
@@ -146,6 +157,10 @@ describe("engineering surface — open canvas", () => {
     expect(panelPlain).toMatch(/Durable task history/);
     expect(panelPlain).toMatch(/demo-task-1/);
     expect(panelPlain).toMatch(/idle · complete/);
+    // Command panels must keep the composer — never trap the session.
+    expect(panelPlain).toMatch(/Composer ready below/);
+    expect(panelPlain).toMatch(/^> /m);
+    expect(panelPlain).toMatch(/Esc closes/);
   });
 });
 

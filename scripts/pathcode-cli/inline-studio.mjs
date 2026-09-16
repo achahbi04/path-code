@@ -792,42 +792,33 @@ export function buildMinimalLivingLines(state, viewport) {
   const ops = Array.isArray(product.recentOps) ? product.recentOps : [];
 
   // S2 slash-command responses — painted in-canvas so alt-screen redraw cannot hide them.
-  // When set, the panel owns the body (stream/report stay reachable after clear).
+  // Panel replaces the stream body but NEVER drops the composer footer — the session
+  // must stay immediately usable (no Ctrl-D / trapped modal).
   const operatorPanel =
     typeof product.operatorPanel === "string" && product.operatorPanel.trim()
       ? product.operatorPanel.trim()
       : "";
   if (operatorPanel) {
     body.push(fitCanvasLine(style.bold("PATH · command"), columns));
+    body.push(
+      fitCanvasLine(
+        style.dim("Composer ready below — type next command · Esc closes"),
+        columns,
+      ),
+    );
     body.push("");
-    const panelBudget = Math.max(12, frameRows - 8);
+    const panelBudget = Math.max(
+      6,
+      frameRows - header.length - footer.length - 4,
+    );
     for (const rawLine of operatorPanel.split("\n").slice(0, panelBudget)) {
       body.push(fitCanvasLine(safeDisplay(rawLine), columns));
     }
-    // Panel is the deliverable for /history /inspect /prefs /report /merge.
-    const footerReserve = 6;
-    while (body.length + footerReserve < frameRows) body.push("");
-    const brand = brandPathCode();
-    const header = [fitCanvasLine(brand, columns), ""];
-    const stopBit = completed
-      ? style.dim("■ idle · complete")
-      : running
-        ? `${style.yellow("■")} Stop   Ctrl-C`
-        : style.dim("■ idle");
-    const modeBit = style.dim(
-      ["auto", projectName || null, completed ? "complete" : null]
-        .filter(Boolean)
-        .join(" · "),
-    );
-    const panelFooter = [
-      fitCanvasLine(style.dim("─".repeat(Math.max(20, columns))), columns),
-      fitCanvasLine(`${stopBit}   ${modeBit}`, columns),
-    ];
     /** @type {string[]} */
     const panelLines = [
       ...header,
-      ...body.slice(0, Math.max(3, frameRows - header.length - panelFooter.length)),
-      ...panelFooter,
+      ...body.slice(0, Math.max(3, frameRows - header.length - footer.length)),
+      ...footer,
     ];
     while (panelLines.length < frameRows) panelLines.push("");
     return panelLines.slice(0, frameRows).map((l) => fitLine(l, columns));
@@ -2438,6 +2429,14 @@ export function createInlineStudioRenderer(options = {}) {
   function setComposerState(next) {
     if (!state.product) return;
     if (typeof next.text === "string") {
+      // Typing into the composer dismisses command panels so they never trap.
+      if (
+        next.text.length > 0 &&
+        typeof state.product.operatorPanel === "string" &&
+        state.product.operatorPanel.trim()
+      ) {
+        state.product.operatorPanel = null;
+      }
       state.product.composerText = next.text;
     }
     if (typeof next.scroll === "number") {
