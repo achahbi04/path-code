@@ -1,7 +1,7 @@
 # PATH CODE — S1 LIVE ENGINEERING SURFACE
 
 **S1 RESULT:** FROZEN / OPERATOR ACCEPTED  
-**Freeze tip:** `PENDING_FREEZE_COMMIT`  
+**Freeze tip:** `eac5f8620fea8c75070cd27421643bb167864294`  
 **Deeper S2 productization:** NOT STARTED
 
 **S1 Gateway:** FROZEN / ACCEPTED — tip `9f9db58c918b4ee690f0a5053aa8ebfd8bc15cfe`  
