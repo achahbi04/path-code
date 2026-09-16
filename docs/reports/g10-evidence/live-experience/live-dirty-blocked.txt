@@ -1,0 +1,36 @@
+PATH ● Code
+
+> Inspect architecture
+> Then run checks
+
+✕ Blocked
+  PATH found uncommitted work in this project.
+  Commit or stash those changes before starting an autonomous task.
+
+■ BLOCKED
+
+Objective
+  Inspect architecture
+  Then run checks
+
+Reason
+  PATH found uncommitted work in this project.
+  Commit or stash those changes before starting an autonomous task.
+
+Suggested operator action
+  Commit or stash local changes, then submit the task again.
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+> 
+────────────────────────────────────────────────────────────────────────────────────────────────────
+■ idle   auto · nordic-rain-pathcode-live

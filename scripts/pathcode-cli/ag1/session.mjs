@@ -16,11 +16,14 @@ import { admitPrimaryCheckout } from "./admission.mjs";
 import { commitTaskWorktree } from "./task-commit.mjs";
 import {
   capturePrimaryFingerprint,
+  captureFileDiffForUi,
+  captureFilePreviewForUi,
   collectWorktreeResult,
   createTaskWorktree,
   primaryUntouched,
   removeTaskWorktree,
   reopenTaskWorktree,
+  restoreIncidentalSetupChurn,
 } from "./task-worktree.mjs";
 import {
   classifyAg1Result,
@@ -28,6 +31,14 @@ import {
   setFinalValidationProgressHook,
 } from "./final-validation.mjs";
 import { resolveEngineeringCwd, resolvePathRuntimeRoot } from "../paths.mjs";
+import { normalizeObjectiveText } from "../normalize-text.mjs";
+import {
+  buildEngineeringReportModel,
+  formatEngineeringReportPlain,
+  writeEngineeringReportFile,
+  dispositionFromOutcome,
+  summarizeTimingMarks,
+} from "../engineering-report.mjs";
 import {
   buildBoundedDiffPreview,
   buildFullResultInspectCommand,
@@ -40,6 +51,10 @@ import {
   applyMcpTrustPolicy,
   toAntigravityMcpServers,
   extractEngineeringHandoff,
+  extractEngineeringNarration,
+  busyLabelFromDetail,
+  isOperatorQuestion,
+  buildSteeringContinuePrompt,
   shouldAttemptSameSessionRepair,
   runCopilotAdvisory,
 } from "../ag8/index.mjs";
@@ -104,10 +119,30 @@ async function runSessionValidation(emit, worktree, engineeringCwd, projectRoot,
     activity: "verifying",
     label: "Verifying",
   });
+  emit("session.engineering.busy", {
+    label: "Running validation checks",
+    detail: "independent final validation",
+    since: Date.now(),
+  });
   emit("session.validation.plan", {
     summary: "independent final validation",
   });
   setFinalValidationProgressHook((check) => {
+    const label =
+      check.kind === "TEST"
+        ? "Running tests"
+        : check.kind === "TYPECHECK"
+          ? "Checking TypeScript"
+          : check.kind === "LINT"
+            ? "Linting"
+            : check.kind === "BUILD"
+              ? "Building"
+              : "Running validation checks";
+    emit("session.engineering.busy", {
+      label,
+      detail: String(check.id || check.command || check.kind || "").slice(0, 160),
+      since: Date.now(),
+    });
     emit("session.validation.running", {
       id: check.id,
       kind: check.kind,
@@ -133,6 +168,7 @@ async function runSessionValidation(emit, worktree, engineeringCwd, projectRoot,
     }
     return validation;
   } finally {
+    emit("session.engineering.busy", { clear: true });
     setFinalValidationProgressHook(null);
   }
 }
@@ -154,6 +190,8 @@ export function scrubEngineIdentity(text) {
     .replace(/\bgoogle-antigravity\b/gi, "engine")
     .replace(/\bGoogle Antigravity\b/gi, "PATH")
     .replace(/\bAntigravity\b/gi, "PATH")
+    .replace(/\bGitHub Copilot\b/gi, "PATH")
+    .replace(/\bCopilot\b/gi, "PATH")
     .replace(/\bGemini\b/gi, "model");
 }
 
@@ -189,8 +227,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     }
   };
 
-  const taskText =
-    typeof options.taskText === "string" ? options.taskText.trim() : "";
+  const taskText = normalizeObjectiveText(
+    typeof options.taskText === "string" ? options.taskText.trim() : "",
+  );
   const projectRoot = resolve(options.projectRoot || process.cwd());
   const resumeTaskId =
     typeof options.resumeTaskId === "string" && options.resumeTaskId.trim()
@@ -198,6 +237,12 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       : "";
   const taskId = resumeTaskId || randomUUID();
   const startedAt = Date.now();
+  /** @type {string[]} */
+  const timingMarks = [];
+  const markTiming = (name) => {
+    timingMarks.push(`${name}:${Date.now() - startedAt}`);
+  };
+  markTiming("session_start");
   const isResume = Boolean(resumeTaskId);
 
   if (taskText.length === 0 && !isResume) {
@@ -213,11 +258,37 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     };
   }
 
-  emit("session.task.received", {
-    taskId,
-    preview: taskText.slice(0, 200),
-    mode: "ag1",
+  if (options.suppressTaskReceived !== true) {
+    emit("session.task.received", {
+      taskId,
+      task: taskText.slice(0, 4000),
+      preview: taskText.slice(0, 4000),
+      mode: "ag1",
+    });
+  }
+
+  emit("session.capability.preparing", {
+    detail: "Admitting project and preparing environment",
   });
+
+  // Observe repository state before bootstrap. Ordinary dirty / detached
+  // checkouts are admitted — only unusable Git conditions fail closed here.
+  const admission = admitPrimaryCheckout(projectRoot);
+  if (!admission.ok) {
+    write(`${admission.message}\n`);
+    emit("session.terminal", {
+      disposition: admission.code,
+      summary: admission.message,
+    });
+    return {
+      exitCode: 2,
+      outcome: admission.code,
+      classification: "NOT_VERIFIED",
+      blocked: true,
+      blocker: admission.message,
+      engineActivityCount: 0,
+    };
+  }
 
   const boot = await ensureAg1Runtime({
     ...(options.checkoutRoot ? { packageRoot: options.checkoutRoot } : {}),
@@ -270,23 +341,6 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     };
   }
 
-  const admission = admitPrimaryCheckout(projectRoot);
-  if (!admission.ok) {
-    write(`${admission.message}\n`);
-    emit("session.terminal", {
-      disposition: admission.code,
-      summary: admission.message,
-    });
-    return {
-      exitCode: 2,
-      outcome: admission.code,
-      classification: "NOT_VERIFIED",
-      blocked: true,
-      blocker: admission.message,
-      engineActivityCount: 0,
-    };
-  }
-
   const sessionBaseCommit =
     typeof options.sessionBaseCommit === "string" &&
     options.sessionBaseCommit.trim() !== ""
@@ -294,14 +348,39 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       : admission.head;
 
   const primaryBefore = capturePrimaryFingerprint(projectRoot);
+  const branchLabel = admission.unversioned
+    ? "unversioned"
+    : admission.detached || !admission.branch
+      ? "(detached)"
+      : admission.branch;
   emit("session.preflight", {
-    branch: admission.branch,
+    branch: branchLabel,
     head: admission.head,
     sessionBaseCommit,
-    dirtySummary: "clean",
+    dirtySummary: admission.unversioned
+      ? "unversioned"
+      : admission.dirty
+        ? "dirty"
+        : "clean",
     projectName: basename(projectRoot),
+    detached: admission.detached === true,
+    unversioned: admission.unversioned === true,
   });
 
+  if (admission.unversioned) {
+    emit("session.capability.preparing", {
+      detail:
+        "Unversioned project — engineering in place until source control is established",
+    });
+  } else if (admission.dirty) {
+    emit("session.capability.preparing", {
+      detail: "Adopting current working-tree state into the isolated task workspace",
+    });
+  } else if (admission.detached) {
+    emit("session.capability.preparing", {
+      detail: "Creating an internal task branch from the current commit",
+    });
+  }
   const worktree = isResume
     ? reopenTaskWorktree({
         primaryRoot: projectRoot,
@@ -351,16 +430,22 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     ),
     baselineHead: worktree.baseline.head,
     status: "ready",
+    bootstrapMode: worktree.bootstrapMode || undefined,
   });
   emit("session.recovery.checkpoint", {
-    id: `ag1-baseline:${worktree.baseline.head}`,
-    kind: "task-worktree-baseline",
+    id: worktree.baseline.head
+      ? `ag1-baseline:${worktree.baseline.head}`
+      : `ag1-unversioned:${worktree.taskId}`,
+    kind: worktree.bootstrapMode === "unversioned_inplace"
+      ? "unversioned-bootstrap"
+      : "task-worktree-baseline",
   });
 
   const capabilityPlane = discoverCapabilityPlane(worktree.worktreePath, {
     toolRoots: [worktree.worktreePath, projectRoot],
     primaryRoot: projectRoot,
   });
+  markTiming("discovery_done");
   emit("session.capability.discovered", {
     matrix: compactCapabilityMatrix(capabilityPlane),
   });
@@ -416,7 +501,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         }
       },
     });
+    markTiming("environment_ready");
   } catch (err) {
+    markTiming("environment_failed");
     emit("session.capability.preparing", {
       detail: "environment preparation failed; continuing with discovery-only",
       error: scrubEngineIdentity(
@@ -614,17 +701,31 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
           typeof msg.activity === "string" ? msg.activity : "inspecting";
         lastActivity = activity;
         engineActivityCount += 1;
+        const detailRaw =
+          typeof msg.detail === "string"
+            ? msg.detail
+            : typeof msg.tool === "string"
+              ? msg.tool
+              : undefined;
         emit("session.engineering.activity", {
           activity,
           label: labelActivity(activity),
           tool: typeof msg.tool === "string" ? msg.tool : undefined,
-          detail:
-            typeof msg.detail === "string"
-              ? msg.detail
-              : typeof msg.tool === "string"
-                ? msg.tool
-                : undefined,
+          detail: detailRaw,
         });
+        // Live busy heartbeat while a real command/tool is in flight.
+        if (
+          detailRaw &&
+          !/^(bash|sh|zsh|run_command|view_file|edit_file|list_directory)$/i.test(
+            detailRaw.trim(),
+          )
+        ) {
+          emit("session.engineering.busy", {
+            label: busyLabelFromDetail(detailRaw, labelActivity(activity)),
+            detail: detailRaw.slice(0, 200),
+            since: Date.now(),
+          });
+        }
         if (activity === "editing") {
           emit("session.applying", { summary: "editing in task workspace" });
         } else if (activity === "inspecting") {
@@ -632,19 +733,145 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         }
       } else if (type === "tool") {
         engineActivityCount += 1;
-        emit("session.engineering.tool", {
-          kind: msg.kind,
-          tool: msg.tool,
-          summary: scrubEngineIdentity(String(msg.summary ?? "")),
-        });
-        if (msg.kind === "file_edit") {
+        const summary = scrubEngineIdentity(String(msg.summary ?? ""));
+        const toolName = typeof msg.tool === "string" ? msg.tool : "";
+        const kind = typeof msg.kind === "string" ? msg.kind : "";
+        const eventPath =
+          typeof msg.path === "string" && msg.path.trim()
+            ? msg.path.trim().replace(/^\.\//, "")
+            : "";
+        const eventCommand =
+          typeof msg.command === "string" && msg.command.trim()
+            ? msg.command.trim()
+            : "";
+        const eventQuery =
+          typeof msg.query === "string" && msg.query.trim()
+            ? msg.query.trim()
+            : "";
+        const eventOutput =
+          typeof msg.output === "string" && msg.output.trim()
+            ? msg.output.trim()
+            : "";
+
+        const pathMatch =
+          summary.match(
+            /(?:view_file|edit_file|create_file|EDIT_FILE|CREATE_FILE|VIEW_FILE)\s+(?:View\s+|Edit\s+|Create\s+)?([^\s]+)/i,
+          ) ||
+          summary.match(/(?:^|\s)((?:src|test|tests|lib|scripts|docs|app|packages)\/[^\s]+)/) ||
+          summary.match(/(?:^|\s)([^\s/]+\/[^\s]+?\.[A-Za-z0-9]{1,12})\b/) ||
+          summary.match(/(?:^|\s)([^\s]+?\.[A-Za-z0-9]{1,12})\b/);
+        let relPath = eventPath || (pathMatch?.[1] ? String(pathMatch[1]).replace(/^\.\//, "") : "");
+        if (
+          /^(Code|View|Edit|Create|bash|sh|zsh|run_command|view_file|edit_file|list_directory|find_file|search_directory)$/i.test(
+            relPath,
+          )
+        ) {
+          relPath = "";
+        }
+
+        /** @type {Record<string, unknown>} */
+        const toolFields = {
+          kind,
+          tool: toolName,
+          summary,
+        };
+        if (relPath) toolFields.path = relPath;
+        if (eventQuery) toolFields.query = eventQuery;
+
+        if (kind === "file_edit" || /edit_file|create_file/i.test(toolName)) {
+          try {
+            const captured = captureFileDiffForUi(
+              worktree.worktreePath,
+              worktree.baseline?.head || "",
+              relPath,
+            );
+            if (captured.diff) {
+              toolFields.diff = captured.diff;
+              toolFields.added = captured.added;
+              toolFields.removed = captured.removed;
+              if (captured.path) toolFields.path = captured.path;
+            }
+          } catch {
+            // presentation only
+          }
+        } else if (
+          kind === "inspect" ||
+          /view_file|list_dir|list_directory|find_file|search_dir/i.test(toolName)
+        ) {
+          if (/view_file/i.test(toolName) && relPath) {
+            try {
+              const prev = captureFilePreviewForUi(
+                worktree.worktreePath,
+                relPath,
+                { maxLines: 18 },
+              );
+              if (prev.preview) toolFields.preview = prev.preview;
+            } catch {
+              // presentation only
+            }
+          }
+          if (eventOutput && !toolFields.preview) {
+            // list_dir / search results arrive as tool output.
+            toolFields.preview = eventOutput.split("\n").slice(0, 18).join("\n");
+          }
+        } else if (
+          kind === "command" ||
+          kind === "test" ||
+          /run_command/i.test(toolName)
+        ) {
+          const cmdMatch =
+            summary.match(/CommandLine[=:\s]+([^\n]+)/i) ||
+            summary.match(/run_command\s+([^\n]+)/i);
+          let command = eventCommand;
+          if (!command && cmdMatch?.[1]) {
+            const candidate = cmdMatch[1].trim();
+            // Reject when "command" is clearly stdout (errors, test banners).
+            const looksLikeOutput =
+              /^[✔✖ℹ✓✗]/.test(candidate) ||
+              /^(PASS|FAIL|ok|tests?\s+\d|suites?\s+\d|env:)/i.test(candidate) ||
+              candidate.includes("\n");
+            if (!looksLikeOutput) command = candidate.slice(0, 500);
+          }
+          if (command) toolFields.command = command;
+          const out =
+            eventOutput ||
+            summary
+              .replace(/^run_command\s*/i, "")
+              .replace(/CommandLine[=:\s]+[^\n]+\n?/i, "")
+              .trim();
+          if (out && out !== command) {
+            toolFields.output = out.slice(0, 4_000);
+          }
+        } else if (eventOutput) {
+          toolFields.output = eventOutput.slice(0, 4_000);
+        }
+
+        emit("session.engineering.tool", toolFields);
+        // Tool result clears the in-flight busy line.
+        emit("session.engineering.busy", { clear: true });
+        if (kind === "file_edit" || /edit_file|create_file/i.test(toolName)) {
           emit("session.edit.summary", {
-            path: String(msg.summary ?? "").slice(0, 120),
-            kind: "edit",
+            path: relPath || String(summary).slice(0, 120),
+            kind: /create/i.test(toolName) ? "create" : "edit",
+            diff: typeof toolFields.diff === "string" ? toolFields.diff : undefined,
+            added: toolFields.added,
+            removed: toolFields.removed,
           });
         }
       } else if (type === "finished") {
         agentFinished = true;
+        emit("session.engineering.busy", { clear: true });
+        const finishedText =
+          typeof msg.summary === "string" ? msg.summary : "";
+        if (finishedText.trim()) {
+          const narration = extractEngineeringNarration(finishedText);
+          if (narration.text) {
+            emit("session.engineering.narration", {
+              text: narration.text,
+              paragraphs: narration.paragraphs,
+            });
+          }
+        }
         emit("session.engineering.activity", {
           activity: "complete",
           label: "Finishing",
@@ -780,8 +1007,41 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     stage: "start_written",
     detail: `pid=${startResult.pid ?? "?"} python=ok`,
   });
+  emit("session.engineering.busy", {
+    label: "Waiting for engineering result",
+    detail: "session started",
+    since: Date.now(),
+  });
 
   let terminalMsg = await waitForTerminal;
+
+  // Surface operator steering into the stream immediately while the engine works,
+  // and queue it for the next safe continue boundary.
+  const steerPoll = setInterval(() => {
+    if (typeof prompt?.drainSteering !== "function") return;
+    for (const line of prompt.drainSteering()) {
+      const text = String(line || "").trim();
+      if (!text) continue;
+      emit("session.operator.note", { text: text.slice(0, 400) });
+      try {
+        g10Fabric?.acceptSteering?.(text);
+      } catch {
+        /* ignore */
+      }
+      const question = isOperatorQuestion(text);
+      emit("session.engineering.steer", {
+        phase: "queued",
+        text: text.slice(0, 400),
+        question,
+      });
+      emit("session.engineering.narration", {
+        text: question
+          ? "Got your question — I'll answer with concrete evidence at the next safe engineering step."
+          : "Guidance received — queued until the next safe engineering step.",
+      });
+    }
+  }, 400);
+  if (typeof steerPoll.unref === "function") steerPoll.unref();
 
   if (terminalMsg?.type === "cancelled" || ac.signal.aborted) {
     agentCancelled = true;
@@ -792,6 +1052,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   /** @type {string} */
   let engineeringHandoffSummary = "";
   let repairAttempts = 0;
+  markTiming("first_engine_terminal");
+  /** Steering continues applied before validation (bounded). */
+  let steeringContinues = 0;
 
   while (
     !agentCancelled &&
@@ -810,6 +1073,84 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       }
     }
 
+    // Apply pending operator steering as a real continue turn BEFORE validation.
+    if (
+      steeringContinues < 3 &&
+      !ac.signal.aborted &&
+      !agentCancelled &&
+      wallMs - (Date.now() - startedAt) > 20_000
+    ) {
+      if (typeof prompt?.drainSteering === "function") {
+        for (const line of prompt.drainSteering()) {
+          const text = String(line || "").trim();
+          if (!text) continue;
+          emit("session.operator.note", { text: text.slice(0, 400) });
+          try {
+            g10Fabric?.acceptSteering?.(text);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      const steeringApply = g10Fabric?.applySteeringBoundary?.() || null;
+      const steerText =
+        typeof steeringApply?.combinedText === "string"
+          ? steeringApply.combinedText.trim()
+          : "";
+      if (steerText) {
+        steeringContinues += 1;
+        markTiming(`steering_continue_${steeringContinues}`);
+        const question = isOperatorQuestion(steerText);
+        const continuePrompt = buildSteeringContinuePrompt(steerText);
+        emit("session.engineering.steer", {
+          phase: "applying",
+          text: steerText.slice(0, 400),
+          question,
+        });
+        emit("session.engineering.narration", {
+          text: question
+            ? "Answering your question in the active engineering session now."
+            : "Got it — applying your guidance in the active engineering session now.",
+        });
+        emit("session.engineering.busy", {
+          label: question ? "Answering your question" : "Applying your guidance",
+          detail: steerText.slice(0, 160),
+          since: Date.now(),
+        });
+        armTerminalWait();
+        try {
+          if (agBind?.isLive?.()) {
+            const cont = agBind.continueNative({
+              text: continuePrompt,
+            });
+            if (!cont.ok) {
+              agent.continueTask({
+                text: continuePrompt,
+              });
+            }
+          } else {
+            agent.continueTask({
+              text: continuePrompt,
+            });
+          }
+          terminalMsg = await waitForTerminal;
+          agentFinished = terminalMsg?.type === "finished";
+          if (terminalMsg?.type === "cancelled" || ac.signal.aborted) {
+            agentCancelled = true;
+            break;
+          }
+          if (terminalMsg?.type === "failed") {
+            agentFailed = true;
+            break;
+          }
+          continue;
+        } catch {
+          // Fall through to validation if continue fails.
+        }
+      }
+    }
+
+    markTiming(`validation_start_${repairAttempts}`);
     validation = await runSessionValidation(
       emit,
       worktree,
@@ -817,6 +1158,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       projectRoot,
       ac.signal,
     );
+    markTiming(`validation_end_${repairAttempts}`);
 
     const hasFailingChecks =
       Array.isArray(validation?.checks) &&
@@ -826,6 +1168,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     // G10: drain mid-cycle operator steering into the fabric queue.
     if (g10Fabric && typeof prompt?.drainSteering === "function") {
       for (const line of prompt.drainSteering()) {
+        const text = String(line || "").trim();
+        if (text) emit("session.operator.note", { text: text.slice(0, 400) });
         g10Fabric.acceptSteering(line);
       }
       g10Fabric.applySteeringBoundary();
@@ -889,9 +1233,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     if (engineChoice === "copilot") {
       emit("session.capability.collaborate", {
         engine: "copilot",
-        phase: "turn",
-        label: "Collaborative engineering",
-        detail: "Copilot engineering turn",
+        phase: "repair",
+        label: "Repairing",
+        detail: "repairing validation failures in the task workspace",
       });
       /** @type {boolean} */
       let copilotTurnOk = false;
@@ -941,15 +1285,21 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
           peerNotes =
             typeof turn.text === "string" && turn.text.trim()
               ? turn.text.trim().slice(0, 2_000)
-              : turn.detail || "Copilot turn completed";
+              : turn.detail || "repair turn completed";
+          const turnNarration = extractEngineeringNarration(
+            typeof turn.text === "string" ? turn.text : peerNotes || "",
+          );
+          if (turnNarration.text) {
+            emit("session.engineering.narration", {
+              text: turnNarration.text,
+              paragraphs: turnNarration.paragraphs,
+            });
+          }
           emit("session.capability.collaborate", {
             engine: "copilot",
             phase: "done",
-            label: "Collaborative engineering",
-            detail:
-              turn.mode === "cli_fallback"
-                ? "Copilot CLI harness turn done (SDK fallback)"
-                : turn.detail || "Copilot turn done",
+            label: "Repair complete",
+            detail: "repair turn complete",
             mode: turn.mode || undefined,
           });
           if (turn.breaker?.action === "stop_auto_bounce") {
@@ -962,7 +1312,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         } else if (turn?.code === "AUTH_REQUIRED") {
           emit("session.terminal", {
             disposition: "AUTH_REQUIRED",
-            summary: "Copilot authentication required; task preserved",
+            summary: "Engineering authentication required; task preserved",
           });
           try {
             g10Fabric?.persist?.({
@@ -977,8 +1327,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
           emit("session.capability.collaborate", {
             engine: "copilot",
             phase: "fallback",
-            label: "Collaborative engineering",
-            detail: turn?.detail || "Copilot unavailable; continuing with peer",
+            label: "Continuing",
+            detail: turn?.detail || "peer unavailable; continuing",
           });
           try {
             const advisory = await runCopilotAdvisory({
@@ -993,6 +1343,13 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
             });
             if (advisory?.ok && advisory.text?.trim()) {
               peerNotes = advisory.text.trim();
+              const notesNarration = extractEngineeringNarration(peerNotes);
+              if (notesNarration.text) {
+                emit("session.engineering.narration", {
+                  text: notesNarration.text,
+                  paragraphs: notesNarration.paragraphs,
+                });
+              }
             }
           } catch {
             /* optional */
@@ -1002,8 +1359,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         emit("session.capability.collaborate", {
           engine: "copilot",
           phase: "error",
-          label: "Collaborative engineering",
-          detail: "Copilot turn error; Antigravity continues",
+          label: "Continuing",
+          detail: "peer turn error; continuing engineering",
         });
       }
 
@@ -1019,8 +1376,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     emit("session.capability.collaborate", {
       engine: "antigravity",
       phase: "turn",
-      label: "Collaborative engineering",
-      detail: "Antigravity engineering turn",
+      label: "Repairing",
+      detail: "repairing validation failures in the task workspace",
     });
     const steeringText = g10Fabric?.applySteeringBoundary?.()?.combinedText || "";
     const mergedPeerNotes = [peerNotes, steeringText].filter(Boolean).join("\n") || null;
@@ -1095,8 +1452,11 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     emit("session.capability.collaborate", {
       engine: "antigravity",
       phase: "done",
-      label: "Collaborative engineering",
-      detail: String(terminalMsg?.type || "done"),
+      label: "Repair complete",
+      detail:
+        terminalMsg?.type === "finished"
+          ? "repair turn complete"
+          : String(terminalMsg?.type || "repair turn complete"),
     });
     repairAttempts += 1;
 
@@ -1121,12 +1481,29 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
 
   clearTimeout(wallTimer);
   clearInterval(pollCancel);
+  clearInterval(steerPoll);
 
   if (agentCancelled) {
     emit("session.validation.skipped", { reason: "cancelled" });
   } else if (agentFailed && !validation) {
     emit("session.validation.skipped", {
       reason: String(terminalMsg?.code ?? "engine_failed"),
+    });
+  }
+
+  // Read-only / assessment objectives: restore incidental setup-only churn
+  // (e.g. package-lock.json from dependency install) before final diff /
+  // classification so setup never becomes the engineering result. Explicit
+  // dependency-upgrade intents skip this path.
+  const setupRestore = restoreIncidentalSetupChurn({
+    worktreePath: worktree.worktreePath,
+    baselineHead: worktree.baseline.head,
+    objective: effectiveTaskText,
+  });
+  if (setupRestore.applied) {
+    emit("session.engineering.setup_restore", {
+      restored: setupRestore.restored,
+      reason: setupRestore.reason,
     });
   }
 
@@ -1303,41 +1680,101 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     diffPreviewLines: preview.lines,
     diffPreviewTruncated: preview.truncated,
     diffPreviewShownFiles: preview.shownFiles,
+    timingMarks,
+    engineeringHandoff: engineeringHandoffSummary || null,
   });
 
-  const durableSummary = formatAg2ResultBanner({
-    classification:
-      terminalDisposition === "CANCELLED"
-        ? "CANCELLED"
-        : terminalDisposition === "GIT_IDENTITY_REQUIRED"
-          ? "GIT_IDENTITY_REQUIRED"
-          : classification,
-    changedFiles: gitResult.changedFiles,
-    validation,
-    taskBranch: worktree.taskBranch,
-    commitSha,
-    baselineSha,
-    commitStatus,
-    primaryUntouched: untouched,
-    preservedPath,
-    cleanup,
-    inspectCommand,
-    diffPreview: preview,
-    engineeringHandoff: engineeringHandoffSummary,
-  });
+  const outcomeClassification =
+    terminalDisposition === "CANCELLED"
+      ? "CANCELLED"
+      : terminalDisposition === "GIT_IDENTITY_REQUIRED"
+        ? "GIT_IDENTITY_REQUIRED"
+        : classification;
+  const reportDisposition = dispositionFromOutcome(
+    outcomeClassification,
+    "",
+    outcomeClassification,
+  );
+  const reportModel = buildEngineeringReportModel(
+    {
+      taskPreview: effectiveTaskText,
+      taskObjective: effectiveTaskText,
+      taskId: worktree.taskId,
+      narrationExcerpts: engineeringHandoffSummary
+        ? [engineeringHandoffSummary]
+        : [],
+      engineeringHandoff: engineeringHandoffSummary || null,
+      ag1Checks: checkSummaries,
+      projectFiles: gitResult.changedFiles,
+      diffPreviewLines: preview.lines,
+      durationMs: Date.now() - startedAt,
+      timingSummary: summarizeTimingMarks(timingMarks),
+      taskBranch: worktree.taskBranch,
+      resultSha: commitSha,
+      baselineSha,
+      inspectCommand,
+      preservedArtifact: preservedPath || null,
+      resultClassification: outcomeClassification,
+      terminalDisposition: outcomeClassification,
+      terminalSummary,
+      blockReason: terminalSummary,
+      advancesSession,
+    },
+    {
+      classification: outcomeClassification,
+      disposition: outcomeClassification,
+      objective: effectiveTaskText,
+      validation,
+      changedFiles: gitResult.changedFiles,
+      taskBranch: worktree.taskBranch,
+      commitSha,
+      baselineSha,
+      inspectCommand,
+      preservedPath,
+      primaryUntouched: untouched,
+      durationMs: Date.now() - startedAt,
+      engineeringHandoff: engineeringHandoffSummary || null,
+      terminalSummary,
+      pushPerformed: false,
+      timingSummary: summarizeTimingMarks(timingMarks),
+      advancesSession,
+    },
+  );
+  reportModel.disposition = reportDisposition;
+  let durableSummary = formatEngineeringReportPlain(reportModel);
+  try {
+    const reportPath = writeEngineeringReportFile(
+      worktree.taskId,
+      durableSummary,
+      runtimeRoot,
+    );
+    if (reportPath) {
+      durableSummary = formatEngineeringReportPlain({
+        ...reportModel,
+        reportPath,
+      });
+      emit("session.engineering.report", {
+        disposition: reportDisposition,
+        path: reportPath,
+        plain: durableSummary,
+      });
+    }
+  } catch {
+    emit("session.engineering.report", {
+      disposition: reportDisposition,
+      plain: durableSummary,
+    });
+  }
+
   // When the living TUI owns stdout, defer the durable summary until after
-  // alternate-screen exit (pathcode prints durableSummary).
+  // alternate-screen exit (pathcode prints durableSummary). Studio also
+  // rematerializes a richer report from streamHistory on terminal.
   if (!options.cardsOwnProgress) {
     write(`\n${durableSummary}`);
   }
 
   emit("session.terminal", {
-    disposition:
-      terminalDisposition === "CANCELLED"
-        ? "CANCELLED"
-        : terminalDisposition === "GIT_IDENTITY_REQUIRED"
-          ? "GIT_IDENTITY_REQUIRED"
-          : classification,
+    disposition: outcomeClassification,
     summary: terminalSummary,
     taskBranch: worktree.taskBranch,
     commitSha,
@@ -1425,98 +1862,4 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     repairAttempts,
     diagFile: typeof agent.getDiagFile === "function" ? agent.getDiagFile() : null,
   };
-}
-
-/**
- * Product-facing result banner (no engine branding).
- * @param {Record<string, any>} r
- */
-function formatAg2ResultBanner(r) {
-  const lines = [];
-  const label =
-    r.classification === "VERIFIED"
-      ? "✓ COMPLETE"
-      : r.classification === "PARTIALLY_VERIFIED"
-        ? "◐ PARTIAL"
-        : r.classification === "CANCELLED"
-          ? "— CANCELLED"
-          : r.classification === "GIT_IDENTITY_REQUIRED"
-            ? "✕ GIT IDENTITY REQUIRED"
-            : r.classification === "FAILED"
-              ? "✕ FAILED"
-              : "— NOT COMPLETE";
-  lines.push(`Result: ${label}`);
-  lines.push(`Files changed: ${r.changedFiles?.length ?? 0}`);
-  // Handoff prose stays available for inspect/logs — not dumped into living UI.
-  if (Array.isArray(r.validation?.checks)) {
-    lines.push("Evidence:");
-    for (const c of r.validation.checks) {
-      const mark = c.ok ? "✓" : "✕";
-      const kind =
-        c.kind === "TYPECHECK"
-          ? "Typecheck"
-          : c.kind === "TARGETED_TEST" || /test/i.test(String(c.id))
-            ? "Tests"
-            : c.kind === "BUILD" || /build/i.test(String(c.id))
-              ? "Build"
-              : String(c.id || c.kind || "Check");
-      lines.push(`${kind}: ${mark}`);
-    }
-  }
-  if (r.taskBranch) lines.push(`Task branch: ${r.taskBranch}`);
-  if (r.baselineSha) lines.push(`Baseline: ${r.baselineSha}`);
-  if (r.commitSha) lines.push(`Commit: ${r.commitSha}`);
-  if (r.commitStatus && r.commitStatus !== "VERIFIED" && r.commitStatus !== "NO_CHANGES") {
-    lines.push(`Status: ${r.commitStatus}`);
-  }
-  lines.push(
-    `Primary checkout untouched: ${r.primaryUntouched ? "yes" : "NO"}`,
-  );
-  if (r.inspectCommand) {
-    lines.push("");
-    lines.push("Inspect full result:");
-    lines.push(r.inspectCommand);
-  } else if (r.preservedPath) {
-    lines.push("");
-    lines.push(`Preserved task artifact: ${r.preservedPath}`);
-  }
-  if (r.classification === "VERIFIED" && r.taskBranch && r.commitSha) {
-    lines.push("");
-    lines.push("To merge this work:");
-    lines.push(`git merge ${r.taskBranch}`);
-  }
-  if (r.preservedPath) {
-    lines.push(`Preserved worktree: ${r.preservedPath}`);
-  }
-  if (r.cleanup && r.cleanup.ok === false && r.cleanup.code === "CLEANUP_INCOMPLETE") {
-    lines.push("Cleanup: CLEANUP_INCOMPLETE");
-  }
-  const files = Array.isArray(r.changedFiles) ? r.changedFiles : [];
-  if (files.length) {
-    lines.push("");
-    lines.push("Changed files:");
-    for (const f of files.slice(0, 5)) {
-      lines.push(`  - ${f}`);
-    }
-    if (files.length > 5) {
-      lines.push(`  (${5} of ${files.length} changed files shown)`);
-    }
-  }
-  const preview = r.diffPreview;
-  if (preview && Array.isArray(preview.lines) && preview.lines.length > 0) {
-    lines.push("");
-    lines.push("Diff preview:");
-    for (const line of preview.lines) {
-      lines.push(line);
-    }
-    if (preview.truncated) {
-      lines.push("Diff preview truncated");
-      if (preview.fileTruncated) {
-        lines.push(
-          `${preview.shownFiles} of ${preview.totalFiles} changed files shown`,
-        );
-      }
-    }
-  }
-  return `${lines.join("\n")}\n`;
 }

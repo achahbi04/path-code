@@ -1,0 +1,67 @@
+{
+  "started": {
+    "ok": true,
+    "taskId": "7a9729ae-e4fa-49df-9879-ee3a668e68bc",
+    "sessionId": "path-7a9729ae-e4fa-49df-9879-ee3a668e68bc",
+    "snapshot": {
+      "taskId": "7a9729ae-e4fa-49df-9879-ee3a668e68bc",
+      "sessionId": "path-7a9729ae-e4fa-49df-9879-ee3a668e68bc",
+      "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+      "workingSubdir": "",
+      "objective": "Add a hello() function and a tiny test",
+      "status": "running",
+      "seq": 1,
+      "createdAt": "2026-09-15T11:34:45.100Z",
+      "updatedAt": "2026-09-15T11:34:45.101Z",
+      "worktreePath": null,
+      "taskBranch": null,
+      "commitSha": null,
+      "classification": null,
+      "capabilities": null,
+      "result": null
+    }
+  },
+  "snap": {
+    "taskId": "7a9729ae-e4fa-49df-9879-ee3a668e68bc",
+    "sessionId": "path-7a9729ae-e4fa-49df-9879-ee3a668e68bc",
+    "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+    "workingSubdir": "",
+    "objective": "Add a hello() function and a tiny test",
+    "status": "failed",
+    "seq": 4,
+    "createdAt": "2026-09-15T11:34:45.100Z",
+    "updatedAt": "2026-09-15T11:34:47.777Z",
+    "worktreePath": null,
+    "taskBranch": null,
+    "commitSha": null,
+    "classification": "NOT_VERIFIED",
+    "capabilities": null,
+    "result": {
+      "exitCode": 2,
+      "outcome": "DIRTY_PRIMARY_TREE",
+      "classification": "NOT_VERIFIED",
+      "blocked": true,
+      "blocker": "PATH found uncommitted work in this project.\nCommit or stash those changes before starting an autonomous task.",
+      "engineActivityCount": 0
+    }
+  },
+  "events": [
+    {
+      "type": "session.task.received",
+      "preview": "Add a hello() function and a tiny test"
+    },
+    {
+      "type": "session.task.received",
+      "preview": "Add a hello() function and a tiny test"
+    },
+    {
+      "type": "session.terminal",
+      "disposition": "DIRTY_PRIMARY_TREE",
+      "summary": "PATH found uncommitted work in this project.\nCommit or stash those changes before starting an autonomous task."
+    },
+    {
+      "type": "gateway.task.finished",
+      "classification": "NOT_VERIFIED"
+    }
+  ]
+}

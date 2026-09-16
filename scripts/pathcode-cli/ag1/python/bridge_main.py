@@ -173,11 +173,49 @@ class BridgeState:
         self.task: asyncio.Task | None = None
         self.workspace: Path | None = None
         self.allow_shell = True
+        # FIFO of pre-tool args so post-tool observe can emit real argv/paths
+        # (PostToolCall only sees the result text, not the call arguments).
+        self.pending_tool_calls: list[dict[str, Any]] = []
 
 
 STATE = BridgeState()
 MAX_CONTINUES = 3
 CONTINUE_WAIT_SECONDS = 300.0
+
+
+def _tool_path_from_args(args: dict[str, Any]) -> str:
+    for key in (
+        "Path",
+        "path",
+        "TargetFile",
+        "AbsolutePath",
+        "file_path",
+        "target_file",
+        "FilePath",
+        "DirectoryPath",
+        "directory",
+        "dir",
+    ):
+        val = args.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return ""
+
+
+def _tool_query_from_args(args: dict[str, Any]) -> str:
+    for key in ("Query", "query", "Pattern", "pattern", "SearchPath", "search"):
+        val = args.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return ""
+
+
+def _tool_command_from_args(args: dict[str, Any]) -> str:
+    for key in ("CommandLine", "command", "cmd"):
+        val = args.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return ""
 
 
 async def _run_engineering_task(payload: dict[str, Any]) -> None:
@@ -312,6 +350,13 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
             del context
             name = data.name or ""
             args = dict(data.args or {})
+            # Stash call args for PostTool observe (real command/path evidence).
+            try:
+                STATE.pending_tool_calls.append({"name": str(name), "args": args})
+                if len(STATE.pending_tool_calls) > 64:
+                    STATE.pending_tool_calls = STATE.pending_tool_calls[-64:]
+            except Exception:  # noqa: BLE001
+                pass
             if name == BuiltinTools.RUN_COMMAND.value or name == "run_command":
                 if not STATE.allow_shell:
                     return HookResult(
@@ -374,7 +419,27 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                     or getattr(data, "serverName", None)
                     or ""
                 )
-                observe_args: dict[str, Any] = {"CommandLine": result_text}
+                # Recover real argv/path from the matching PreToolCall stash.
+                call_args: dict[str, Any] = {}
+                try:
+                    for i, pending in enumerate(STATE.pending_tool_calls):
+                        if str(pending.get("name") or "") == str(name):
+                            call_args = dict(pending.get("args") or {})
+                            STATE.pending_tool_calls.pop(i)
+                            break
+                    if not call_args and STATE.pending_tool_calls:
+                        # FIFO fallback when names diverge slightly.
+                        call_args = dict(STATE.pending_tool_calls.pop(0).get("args") or {})
+                except Exception:  # noqa: BLE001
+                    call_args = {}
+
+                cmd = _tool_command_from_args(call_args)
+                path = _tool_path_from_args(call_args)
+                query = _tool_query_from_args(call_args)
+
+                observe_args: dict[str, Any] = dict(call_args)
+                if cmd:
+                    observe_args["CommandLine"] = cmd
                 if server_name:
                     observe_args["server_name"] = str(server_name)
                 activity = _activity_for_tool(str(name), observe_args)
@@ -396,19 +461,40 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                     "tool": str(name),
                 }
                 if activity == "mcp":
-                    detail = str(server_name or name)[:120]
-                    activity_msg["detail"] = detail
+                    activity_msg["detail"] = str(server_name or name)[:120]
+                elif cmd:
+                    activity_msg["detail"] = cmd[:160]
+                elif path:
+                    activity_msg["detail"] = path[:160]
+                elif query:
+                    activity_msg["detail"] = query[:160]
                 _emit(activity_msg)
-                summary = f"{name} {result_text}".strip()[:400]
-                _emit(
-                    {
-                        "type": "tool",
-                        "taskId": task_id,
-                        "kind": kind,
-                        "tool": str(name),
-                        "summary": summary,
-                    }
-                )
+
+                if cmd:
+                    summary = f"run_command {cmd}".strip()[:400]
+                elif path:
+                    summary = f"{name} {path}".strip()[:400]
+                elif query:
+                    summary = f"{name} {query}".strip()[:400]
+                else:
+                    summary = f"{name} {result_text}".strip()[:400]
+
+                tool_msg: dict[str, Any] = {
+                    "type": "tool",
+                    "taskId": task_id,
+                    "kind": kind,
+                    "tool": str(name),
+                    "summary": summary,
+                }
+                if cmd:
+                    tool_msg["command"] = cmd[:500]
+                if path:
+                    tool_msg["path"] = path[:400]
+                if query:
+                    tool_msg["query"] = query[:200]
+                if result_text.strip():
+                    tool_msg["output"] = result_text.strip()[:4000]
+                _emit(tool_msg)
             except Exception as exc:  # noqa: BLE001
                 _diag(f"observe hook error: {exc!r}")
 
@@ -587,6 +673,16 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                                         or name
                                     )[:120]
                                     msg["detail"] = detail
+                                else:
+                                    cmd = _tool_command_from_args(args)
+                                    path = _tool_path_from_args(args)
+                                    query = _tool_query_from_args(args)
+                                    if cmd:
+                                        msg["detail"] = cmd[:160]
+                                    elif path:
+                                        msg["detail"] = path[:160]
+                                    elif query:
+                                        msg["detail"] = query[:160]
                                 _emit(msg)
                         except asyncio.CancelledError:
                             raise
@@ -667,7 +763,7 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                     {
                         "type": "finished",
                         "taskId": task_id,
-                        "summary": (text or "")[:2000],
+                        "summary": (text or "")[:4000],
                     }
                 )
 
@@ -711,7 +807,7 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                         {
                             "type": "finished",
                             "taskId": task_id,
-                            "summary": (text or "")[:2000],
+                            "summary": (text or "")[:4000],
                         }
                     )
             finally:

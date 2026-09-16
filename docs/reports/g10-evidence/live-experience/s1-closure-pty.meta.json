@@ -1,0 +1,10 @@
+{
+  "has_alt": true,
+  "has_dec6": false,
+  "has_dec5": true,
+  "has_brand": true,
+  "enables_1000h": false,
+  "enables_1006h": true,
+  "title_ok": true,
+  "ok": true
+}

@@ -1,3 +1,54 @@
+import { normalizeObjectiveText } from "../pathcode-cli/normalize-text.mjs";
+
+/**
+ * Detect PATH launch / preflight shell blocks (mirrors engineering-report helper
+ * without importing it — avoids a state ↔ report cycle).
+ * @param {string} text
+ */
+function looksLikeLauncherShell(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return false;
+  if (/rm\s+-rf\s+.*path-code\/runtime/i.test(raw)) return true;
+  if (
+    /PATHCODE_RUNTIME_ROOT|runtime-klar/i.test(raw) &&
+    /^(cd |export |rm )/m.test(raw)
+  ) {
+    return true;
+  }
+  const lines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return false;
+  const shellish = lines.filter((l) =>
+    /^(cd |echo |rm |export |unset |mkdir |chmod |open |node scripts\/|PATHCODE_|git status)/i.test(
+      l,
+    ),
+  );
+  if (shellish.length >= Math.max(2, Math.ceil(lines.length * 0.6))) return true;
+  if (
+    lines.length <= 6 &&
+    shellish.length === lines.length &&
+    /cd |git status|rm -rf/i.test(raw)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Loose preference score when choosing between objective candidates at lock time.
+ * @param {string} text
+ */
+function scoreLooseObjective(text) {
+  const t = String(text || "").trim();
+  if (!t) return -1;
+  let score = Math.min(t.length, 2000);
+  if (looksLikeLauncherShell(t)) score -= 5000;
+  if (/inspect|typecheck|test|assess|repair|find|risk|solid/i.test(t)) score += 200;
+  return score;
+}
+
 /**
  * Path Studio — pure state reducer (PS1).
  *
@@ -44,6 +95,69 @@ export const STUDIO_CARD_ORDER = Object.freeze([
  *   ignoredForeignCount: number,
  * }}
  */
+
+function pushStreamHistory(state, entry) {
+  if (!state?.product) return;
+  if (!Array.isArray(state.product.streamHistory)) state.product.streamHistory = [];
+  state.product.streamHistory.push(entry);
+  state.product.lastActivityAt = Date.now();
+  // Large enough for a full engineering session to remain scrollable after COMPLETE.
+  if (state.product.streamHistory.length > 2000) {
+    state.product.streamHistory = state.product.streamHistory.slice(-2000);
+  }
+}
+
+/** Tool ids / tokens that must never appear as operator-facing path or command. */
+const GARBAGE_TOKEN =
+  /^(Code|View|Edit|Create|bash|sh|zsh|run_command|view_file|edit_file|create_file|list_directory|list_dir|find_file|search_directory|search_dir|inspect|tool|file|mcp)$/i;
+
+function isGarbageToken(value) {
+  return !value || GARBAGE_TOKEN.test(String(value).trim());
+}
+
+/**
+ * Convert session timingMarks ("name:msFromStart") into report buckets.
+ * @param {unknown[]} marks
+ */
+function summarizeTimingMarks(marks) {
+  /** @type {Record<string, number>} */
+  const buckets = {
+    providerWait: 0,
+    environment: 0,
+    validation: 0,
+    steering: 0,
+    engineHandoff: 0,
+    unclassified: 0,
+    total: 0,
+  };
+  let prev = 0;
+  for (const raw of marks) {
+    const s = String(raw || "");
+    const idx = s.lastIndexOf(":");
+    if (idx <= 0) continue;
+    const name = s.slice(0, idx);
+    const ms = Number(s.slice(idx + 1));
+    if (!Number.isFinite(ms) || ms < 0) continue;
+    const delta = Math.max(0, ms - prev);
+    prev = ms;
+    buckets.total = Math.max(buckets.total, ms);
+    if (/first_engine|provider|bridge|spawn|start/i.test(name)) {
+      buckets.providerWait += delta;
+    } else if (/env|prepar|depend|install/i.test(name)) {
+      buckets.environment += delta;
+    } else if (/valid/i.test(name)) {
+      buckets.validation += delta;
+    } else if (/steer/i.test(name)) {
+      buckets.steering += delta;
+    } else if (/handoff|collab|copilot|antigravity|repair/i.test(name)) {
+      buckets.engineHandoff += delta;
+    } else {
+      buckets.unclassified += delta;
+    }
+  }
+  return buckets;
+}
+
 export function createEmptyStudioState() {
   /** @type {Record<string, { id: string, title: string, status: CardStatus, detail: string, arrived: boolean }>} */
   const cards = {};
@@ -94,6 +208,7 @@ export function createEmptyStudioState() {
       projectEntries: [],
       branch: null,
       dirtySummary: null,
+      unversioned: false,
       projectName: null,
       editableCount: 0,
       contextCount: 0,
@@ -113,8 +228,30 @@ export function createEmptyStudioState() {
       ag1Mutation: false,
       /** @type {string[]} */
       ag1Activities: [],
-      /** @type {Array<{ label: string, detail: string }>} */
+      /** @type {Array<{ label: string, detail: string, path?: string, command?: string, diff?: string, output?: string, ok?: boolean, stat?: string }>} */
       recentOps: [],
+      /** Open-canvas scrollable history (richer than recentOps). */
+      streamHistory: [],
+      shellCommandCount: 0,
+      enginesUsed: [],
+      streamScroll: 0,
+      /** In-flight busy heartbeat (real work only). */
+      busyLabel: null,
+      busyDetail: null,
+      busySince: null,
+      /** Wall-clock of last real stream activity (for quiet-period heartbeat). */
+      lastActivityAt: null,
+      /** Wall-clock start of the active engineering task (for elapsed footer). */
+      taskStartedAt: null,
+      /** Accumulated user-facing narration for the final report. */
+      narrationExcerpts: [],
+      taskId: null,
+      durationMs: null,
+      enginesUsed: [],
+      timingSummary: null,
+      elapsedLabel: null,
+      lastActivity: null,
+      blockReason: null,
       /** Current observable detail (command/file) from a real tool event. */
       currentDetail: null,
       /** Primary vs task branch clarity. */
@@ -133,8 +270,22 @@ export function createEmptyStudioState() {
       diffPreviewShownFiles: 0,
       inspectCommand: null,
       preservedArtifact: null,
-      /** Engineering handoff text (engine-derived; not shown in primary living UI). */
+      /** Engineering handoff text (engine-derived; also feeds the completion report). */
       engineeringHandoff: null,
+      /** Authoritative completion classification from session.engineering.result. */
+      resultClassification: null,
+      /** Terminal disposition code (VERIFIED / CANCELLED / …). */
+      terminalDisposition: null,
+      /** Plain-text completion report (same as /report + durable file). */
+      engineeringReportPlain: null,
+      /** Path to durable report beside task trace. */
+      engineeringReportPath: null,
+      /** Locked full PATH objective (never launcher shell / truncated preview). */
+      taskObjective: null,
+      /** True when the verified task advances the session base onto a task branch. */
+      advancesSession: false,
+      /** Visible /report confirmation inside the living canvas (not silent). */
+      reportActionNotice: null,
       /** Compact multi-task history inside the session-long cockpit. */
       sessionHistory: /** @type {Array<{ preview: string, classification: string }>} */ ([]),
       /** Idle prompt text rendered inside the cockpit frame. */
@@ -177,7 +328,7 @@ export function classifyTerminalPathPhase(disposition, summary = "") {
   const blob = `${disposition} ${summary}`;
   if (/cancel|declined|CREDENTIAL_CANCELLED/i.test(blob)) return "Cancelled";
   if (
-    /ESCALATION|AUTONOMY_ESCALATION|PRIMARY_MUTATED|cleanup\.pending|CLEANUP_PENDING|AG1_AUTH_REQUIRED|DIRTY_PRIMARY_TREE|DETACHED_HEAD_BLOCKED|GIT_IDENTITY_REQUIRED/i.test(
+    /ESCALATION|AUTONOMY_ESCALATION|PRIMARY_MUTATED|cleanup\.pending|CLEANUP_PENDING|AG1_AUTH_REQUIRED|GIT_IDENTITY_REQUIRED|UNMERGED_INDEX/i.test(
       blob,
     )
   ) {
@@ -390,15 +541,65 @@ export function applyStudioEvent(state, event, opts = {}) {
       if (event.mode === "ag1") {
         state.product.ag1 = true;
       }
+      if (typeof state.product.taskStartedAt !== "number") {
+        state.product.taskStartedAt = Date.now();
+      }
       {
-        const preview =
-          typeof event.task === "string"
+        // Prefer full `task` field; `preview` may be a legacy truncation.
+        const raw =
+          typeof event.task === "string" && event.task.trim()
             ? event.task
             : typeof event.preview === "string"
               ? event.preview
               : null;
-        if (preview) {
-          state.product.taskPreview = preview.slice(0, 200);
+        if (raw) {
+          const normalized = normalizeObjectiveText(raw, { maxChars: 4000 });
+          const locked =
+            typeof state.product.taskObjective === "string"
+              ? state.product.taskObjective
+              : "";
+          // Lock first authoritative objective. Expand only when a longer
+          // version clearly extends a truncated lock (never replace with
+          // unrelated launcher shell).
+          if (!locked) {
+            state.product.taskObjective = normalized;
+          } else if (
+            normalized.length > locked.length &&
+            (normalized.startsWith(locked) ||
+              locked.length <= 220 ||
+              (looksLikeLauncherShell(locked) &&
+                !looksLikeLauncherShell(normalized)))
+          ) {
+            state.product.taskObjective = normalized;
+          } else if (
+            looksLikeLauncherShell(locked) &&
+            !looksLikeLauncherShell(normalized) &&
+            scoreLooseObjective(normalized) > scoreLooseObjective(locked)
+          ) {
+            state.product.taskObjective = normalized;
+          }
+          state.product.taskPreview = state.product.taskObjective.slice(0, 4000);
+          if (!Array.isArray(state.product.streamHistory)) state.product.streamHistory = [];
+          const objectiveDetail = state.product.taskObjective;
+          // Dedupe against any prior objective in this task stream — gateway and
+          // session can both emit task.received with intervening preparing ops.
+          const dup = state.product.streamHistory.some(
+            (entry) =>
+              entry &&
+              entry.kind === "objective" &&
+              typeof entry.detail === "string" &&
+              entry.detail === objectiveDetail,
+          );
+          if (!dup) {
+            state.product.streamHistory.push({
+              kind: "objective",
+              title: "Objective",
+              detail: objectiveDetail,
+            });
+          }
+          if (state.product.streamHistory.length > 200) {
+            state.product.streamHistory = state.product.streamHistory.slice(-200);
+          }
         }
       }
       state.product.awaitingInput = false;
@@ -415,11 +616,20 @@ export function applyStudioEvent(state, event, opts = {}) {
       state.product.branch = branch;
       state.product.primaryBranch = branch;
       state.product.dirtySummary = dirty;
+      state.product.unversioned =
+        event.unversioned === true || branch === "unversioned" || dirty === "unversioned";
       if (typeof event.head === "string" && /^[0-9a-f]{7,40}$/i.test(event.head)) {
         state.product.baselineSha = event.head;
       }
       if (typeof event.projectName === "string" && event.projectName.trim()) {
         state.product.projectName = event.projectName.trim();
+      }
+      if (state.product.unversioned) {
+        pushStreamHistory(state, {
+          kind: "prepare",
+          title: "Unversioned project",
+          detail: "existing project without Git — source control can be established as a task",
+        });
       }
       setPathPhase(state, "Scoping");
       break;
@@ -618,6 +828,33 @@ export function applyStudioEvent(state, event, opts = {}) {
       );
       state.heartbeat = null;
       const classified = classifyTerminalPathPhase(disposition, summary);
+      state.product.terminalSummary = summary || disposition;
+      state.product.blockReason = summary || disposition;
+      state.product.terminalDisposition = disposition;
+      state.product.busyLabel = null;
+      state.product.busyDetail = null;
+      state.product.busySince = null;
+      // Follow latest so the completion report is visible (not buried under scroll).
+      state.product.streamScroll = 0;
+      // Surface the real outcome in the open-canvas stream (never a silent DONE).
+      pushStreamHistory(state, {
+        kind: "terminal",
+        title:
+          classified === "Verified" || classified === "Complete"
+            ? "Complete"
+            : classified === "Cancelled"
+              ? "Stopped"
+              : classified === "Blocked"
+                ? "Blocked"
+                : classified === "Partially verified"
+                  ? "Partial"
+                  : "Failed",
+        detail: summary || disposition,
+        ok:
+          classified === "Verified" ||
+          classified === "Complete" ||
+          classified === "Partially verified",
+      });
       if (classified === "Complete" && state.product.cloudSelected && !state.product.disposed) {
         setPathPhase(state, "Saving result");
       } else if (
@@ -632,6 +869,21 @@ export function applyStudioEvent(state, event, opts = {}) {
       } else {
         setPathPhase(state, classified);
       }
+      break;
+    }
+    case "session.engineering.report": {
+      state.product.ag1 = true;
+      if (typeof event.plain === "string" && event.plain.trim()) {
+        state.product.engineeringReportPlain = event.plain;
+      }
+      if (typeof event.path === "string" && event.path.trim()) {
+        state.product.engineeringReportPath = event.path.trim();
+      }
+      if (typeof event.disposition === "string" && event.disposition.trim()) {
+        state.product.terminalDisposition = event.disposition.trim();
+      }
+      // Pin follow-latest so the report section is on screen.
+      state.product.streamScroll = 0;
       break;
     }
     case "session.finding": {
@@ -751,6 +1003,9 @@ export function applyStudioEvent(state, event, opts = {}) {
           ? `baseline ${event.baselineHead.slice(0, 12)}`
           : "task workspace",
       );
+      if (typeof event.taskId === "string" && event.taskId.trim()) {
+        state.product.taskId = event.taskId.trim();
+      }
       if (typeof event.taskBranch === "string" && event.taskBranch.trim()) {
         state.product.taskBranch = event.taskBranch.trim();
       }
@@ -774,7 +1029,7 @@ export function applyStudioEvent(state, event, opts = {}) {
           ? event.label
           : activity || "Working";
       const detail =
-        typeof event.detail === "string" ? event.detail.slice(0, 96) : null;
+        typeof event.detail === "string" ? event.detail.slice(0, 160) : null;
       // Engine "complete" is activity only — product terminal comes from session.result / checks.
       if (/^complete$/i.test(activity) || /^complete$/i.test(label)) {
         setPathPhase(state, "Finishing");
@@ -795,10 +1050,9 @@ export function applyStudioEvent(state, event, opts = {}) {
         state.product.ag1Mutation = true;
       } else if (/inspect|read|understand/i.test(phaseLabel)) {
         setCard(state, "reading", "active", phaseLabel);
-      } else if (/repair/i.test(phaseLabel)) {
+      } else if (/repair|correct/i.test(phaseLabel)) {
         state.product.ag1Mutation = true;
       } else if (/test/i.test(phaseLabel) && !/verif/i.test(phaseLabel)) {
-        // Engine-time testing is provisional — do not mark final validation cards.
         state.product.engineCheckFeedback = "running";
       }
       if (!Array.isArray(state.product.ag1Activities)) {
@@ -814,9 +1068,147 @@ export function applyStudioEvent(state, event, opts = {}) {
           label: phaseLabel,
           detail: detail || "",
         });
-        if (state.product.recentOps.length > 8) {
-          state.product.recentOps = state.product.recentOps.slice(-8);
+        if (state.product.recentOps.length > 80) {
+          state.product.recentOps = state.product.recentOps.slice(-80);
         }
+        // Prefer real command/path detail over opaque phase labels.
+        const toolishDetail = detail && isGarbageToken(detail);
+        const realEvidence =
+          detail &&
+          !toolishDetail &&
+          (detail.includes(" ") ||
+            detail.includes("/") ||
+            detail.includes(".") ||
+            detail.length > 12);
+        const streamTitle = realEvidence
+          ? /npm\s+(test|run\s+test)|vitest|jest|pytest|go test|cargo test/i.test(
+              detail,
+            )
+            ? "Test"
+            : /tsc|typecheck|mypy/i.test(detail)
+              ? "Typecheck"
+              : /eslint|lint/i.test(detail)
+                ? "Lint"
+                : /build|compile/i.test(detail)
+                  ? "Build"
+                  : /install|pnpm|yarn|pip /i.test(detail)
+                    ? "Install"
+                    : phaseLabel
+          : phaseLabel;
+      const vaguePhase =
+          /^(Researching|Inspecting|Running command|Collaborating|Understanding|Working|Idle|Finishing|Waiting for engineering result)$/i.test(
+            phaseLabel,
+          ) && !realEvidence;
+        if (
+          !vaguePhase &&
+          !toolishDetail &&
+          !/^(Working|Idle)$/i.test(streamTitle) &&
+          (!state.product.streamHistory?.length ||
+            state.product.streamHistory[state.product.streamHistory.length - 1]
+              ?.title !== streamTitle ||
+            state.product.streamHistory[state.product.streamHistory.length - 1]
+              ?.detail !== (detail || ""))
+        ) {
+          pushStreamHistory(state, {
+            kind: "activity",
+            title: streamTitle,
+            detail: detail || "",
+            command: realEvidence ? detail : undefined,
+          });
+        }
+        if (realEvidence) {
+          state.product.busyLabel = streamTitle;
+          state.product.busyDetail = detail;
+          state.product.busySince = Date.now();
+        } else if (
+          /^(Waiting for engineering result|Understanding)$/i.test(phaseLabel)
+        ) {
+          state.product.busyLabel = "Waiting for engineering result";
+          state.product.busyDetail = detail || null;
+          state.product.busySince = state.product.busySince || Date.now();
+        }
+      }
+      break;
+    }
+    case "session.engineering.busy": {
+      state.product.ag1 = true;
+      if (event.clear === true) {
+        state.product.busyLabel = null;
+        state.product.busyDetail = null;
+        state.product.busySince = null;
+        break;
+      }
+      const label =
+        typeof event.label === "string" && event.label.trim()
+          ? event.label.trim()
+          : "Working";
+      const detail =
+        typeof event.detail === "string" ? event.detail.slice(0, 200) : "";
+      state.product.busyLabel = label;
+      state.product.busyDetail = detail || null;
+      state.product.busySince =
+        typeof event.since === "number" ? event.since : Date.now();
+      setPathPhase(state, label);
+      break;
+    }
+    case "session.engineering.narration": {
+      state.product.ag1 = true;
+      const text =
+        typeof event.text === "string"
+          ? event.text.trim()
+          : Array.isArray(event.paragraphs)
+            ? event.paragraphs.filter((p) => typeof p === "string").join("\n\n")
+            : "";
+      if (!text) break;
+      state.product.busyLabel = null;
+      state.product.busyDetail = null;
+      state.product.busySince = null;
+      if (!Array.isArray(state.product.narrationExcerpts)) {
+        state.product.narrationExcerpts = [];
+      }
+      state.product.narrationExcerpts.push(text.slice(0, 1_200));
+      if (state.product.narrationExcerpts.length > 24) {
+        state.product.narrationExcerpts =
+          state.product.narrationExcerpts.slice(-24);
+      }
+      pushStreamHistory(state, {
+        kind: "narration",
+        title: "PATH",
+        detail: text.slice(0, 2_000),
+      });
+      state.product.currentDetail = text.split("\n")[0].slice(0, 120);
+      break;
+    }
+    case "session.operator.note": {
+      state.product.ag1 = true;
+      const text =
+        typeof event.text === "string" ? event.text.trim().slice(0, 400) : "";
+      if (!text) break;
+      pushStreamHistory(state, {
+        kind: "operator",
+        title: "You",
+        detail: text,
+      });
+      break;
+    }
+    case "session.engineering.steer": {
+      state.product.ag1 = true;
+      const phase =
+        typeof event.phase === "string" && event.phase.trim()
+          ? event.phase.trim()
+          : "received";
+      const text =
+        typeof event.text === "string" ? event.text.trim().slice(0, 400) : "";
+      pushStreamHistory(state, {
+        kind: "steer",
+        title: "Guidance",
+        phase,
+        detail: text || phase,
+      });
+      if (phase === "applying") {
+        state.product.busyLabel = "Applying your guidance";
+        state.product.busyDetail = text || null;
+        state.product.busySince = Date.now();
       }
       break;
     }
@@ -828,94 +1220,163 @@ export function applyStudioEvent(state, event, opts = {}) {
           : typeof event.tool === "string"
             ? event.tool
             : "tool";
-      const firstLine = summary.split(/\r?\n/, 1)[0].trim();
-      let detail = firstLine.slice(0, 96);
       const kind = typeof event.kind === "string" ? event.kind : "";
       const tool = typeof event.tool === "string" ? event.tool : "";
+      let streamPath =
+        typeof event.path === "string" && !isGarbageToken(event.path)
+          ? event.path.replace(/^\.\//, "")
+          : "";
+      let streamCommand =
+        typeof event.command === "string" && event.command.trim()
+          ? event.command.trim()
+          : "";
+      let streamOutput =
+        typeof event.output === "string" ? event.output : undefined;
+      const streamQuery =
+        typeof event.query === "string" && event.query.trim()
+          ? event.query.trim()
+          : "";
+      let streamPreview =
+        typeof event.preview === "string" ? event.preview : undefined;
+
       if (
-        kind === "command" ||
-        kind === "test" ||
-        /run_command/i.test(tool) ||
-        /run_command/i.test(summary)
+        !streamCommand &&
+        (kind === "command" ||
+          kind === "test" ||
+          kind === "shell" ||
+          /run_command/i.test(tool) ||
+          /run_command/i.test(summary))
       ) {
         const m =
           summary.match(/CommandLine[=:\s]+([^\n]+)/i) ||
           summary.match(/run_command\s+([^\n]+)/i);
-        let cmd = (m?.[1] || firstLine.replace(/^run_command\s*/i, "")).trim();
-        // Post-tool summaries often carry stdout, not the argv — stay honest.
+        const candidate = (m?.[1] || "").trim();
         const looksLikeOutput =
-          /^[✔✖ℹ✓✗]/.test(cmd) ||
-          /^(PASS|FAIL|ok|tests?\s+\d|suites?\s+\d)/i.test(cmd) ||
-          /^(package\.json|src|test)\b/.test(cmd) ||
+          !candidate ||
+          /^[✔✖ℹ✓✗]/.test(candidate) ||
+          /^(PASS|FAIL|ok|tests?\s+\d|suites?\s+\d|env:)/i.test(candidate) ||
           summary.includes("\n");
-        if (!cmd || looksLikeOutput) {
-          detail =
-            kind === "test" || /test/i.test(state.product.pathPhase || "")
-              ? "cmd tests"
-              : "cmd finished";
-        } else {
-          detail = `cmd ${cmd.slice(0, 90)}`;
-        }
-        setPathPhase(state, kind === "test" ? "Testing" : "Running command");
-        if (kind === "test") state.product.engineCheckFeedback = "running";
-      } else if (kind === "file_edit" || /edit_file|create_file/i.test(tool)) {
-        const pathMatch = summary.match(/(?:^|\s)([^\s]+?\.[A-Za-z0-9]{1,8})\b/);
-        if (pathMatch) {
-          detail = `edit ${pathMatch[1]}`;
-        } else {
-          const note = firstLine
-            .replace(/^(edit_file|create_file)\s*/i, "")
-            .trim();
-          detail = note ? `edit · ${note.slice(0, 80)}` : `edit ${tool || "file"}`;
-        }
-        setCard(state, "edit", "done", detail);
-        state.product.ag1Mutation = true;
-        if (state.cards.applying) {
-          state.cards.applying.arrived = true;
-          state.cards.applying.status = "done";
-          state.cards.applying.detail = detail.slice(0, 80);
-        }
-        if (!state.product.projectFiles.includes(pathMatch?.[1] || "")) {
-          const p = pathMatch?.[1];
-          if (p) {
-            if (!state.product.projectFiles.includes(p)) state.product.projectFiles.push(p);
-            state.product.projectEntries.push({ path: p, role: "modified" });
-            state.product.changedFileTotal = Math.max(
-              state.product.changedFileTotal || 0,
-              state.product.projectFiles.length,
-            );
-          }
-        }
-      } else if (kind === "inspect" || /view_file|list_dir|find_file|search_dir/i.test(tool)) {
-        const pathMatch = summary.match(/(?:^|\s)([^\s]+?\.[A-Za-z0-9]{1,8})\b/);
-        detail = pathMatch ? `read ${pathMatch[1]}` : `inspect ${tool || "files"}`;
-        if (pathMatch?.[1]) {
-          const p = pathMatch[1];
-          if (!state.product.projectFiles.includes(p)) {
-            state.product.projectFiles.push(p);
-          }
-          const entries = Array.isArray(state.product.projectEntries)
-            ? state.product.projectEntries
-            : [];
-          const existing = entries.find((e) => e.path === p);
-          if (existing) {
-            if (existing.role !== "modified") existing.role = "inspecting";
-          } else {
-            entries.push({ path: p, role: "inspecting" });
-          }
-          state.product.projectEntries = entries;
-        }
+        if (!looksLikeOutput) streamCommand = candidate.slice(0, 500);
       }
-      state.product.currentDetail = detail;
+
+      if (!streamPath) {
+        const pathMatch =
+          summary.match(
+            /(?:view_file|edit_file|create_file)\s+(?:View\s+|Edit\s+|Create\s+)?([^\s]+)/i,
+          ) ||
+          summary.match(
+            /(?:^|\s)((?:src|test|tests|lib|scripts|docs|app|packages)\/[^\s]+)/,
+          ) ||
+          summary.match(/(?:^|\s)([^\s]+?\.[A-Za-z0-9]{1,12})\b/);
+        const candidate = pathMatch?.[1] ? String(pathMatch[1]).replace(/^\.\//, "") : "";
+        if (candidate && !isGarbageToken(candidate)) streamPath = candidate;
+      }
+
+      /** Human engineering titles — never abstract tool ids. */
+      let streamTitle = "Working";
+      if (
+        kind === "command" ||
+        kind === "test" ||
+        kind === "shell" ||
+        /run_command/i.test(tool) ||
+        streamCommand
+      ) {
+        const cmdBlob = `${streamCommand} ${summary}`;
+        const shortCmd = (streamCommand || "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 48);
+        streamTitle =
+          kind === "test" ||
+          /npm test|vitest|pytest|jest|go test|cargo test|node --test/i.test(cmdBlob)
+            ? "Test"
+            : /tsc|typecheck|mypy/i.test(cmdBlob)
+              ? "Typecheck"
+              : /eslint|lint|clippy/i.test(cmdBlob)
+                ? "Lint"
+                : /build|compile|cargo build|mvn package/i.test(cmdBlob)
+                  ? "Build"
+                  : shortCmd
+                    ? `Run ${shortCmd}`
+                    : "Run";
+        setPathPhase(
+          state,
+          streamTitle === "Test"
+            ? "Testing"
+            : streamTitle.startsWith("Run ")
+              ? "Running command"
+              : streamTitle,
+        );
+        if (streamTitle === "Test") state.product.engineCheckFeedback = "running";
+        state.product.shellCommandCount =
+          (typeof state.product.shellCommandCount === "number"
+            ? state.product.shellCommandCount
+            : 0) + 1;
+      } else if (kind === "file_edit" || /edit_file|create_file/i.test(tool)) {
+        streamTitle = /create_file/i.test(tool) ? "Create" : "Update";
+        setCard(state, "edit", "done", streamPath || "edit");
+        state.product.ag1Mutation = true;
+        if (streamPath && !state.product.projectFiles.includes(streamPath)) {
+          state.product.projectFiles.push(streamPath);
+          state.product.projectEntries.push({ path: streamPath, role: "modified" });
+        }
+      } else if (/list_dir|list_directory/i.test(tool)) {
+        streamTitle = "Inspect directory";
+      } else if (/find_file|search_dir|search_directory|grep|ripgrep/i.test(tool) || streamQuery) {
+        streamTitle = "Search";
+      } else if (kind === "inspect" || /view_file/i.test(tool)) {
+        streamTitle = "Read";
+        if (streamPath) {
+          if (!state.product.projectFiles.includes(streamPath)) {
+            state.product.projectFiles.push(streamPath);
+          }
+        }
+      } else if (kind === "mcp") {
+        streamTitle = "MCP";
+      }
+
+      const detail =
+        streamCommand ||
+        streamQuery ||
+        streamPath ||
+        (summary.split(/\r?\n/, 1)[0] || "").slice(0, 120);
+
+      state.product.currentDetail = detail.slice(0, 120);
       state.product.pathDetail = detail.slice(0, 80);
       if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
       state.product.recentOps.push({
-        label: state.product.pathPhase || "Working",
-        detail,
+        label: streamTitle,
+        detail: streamCommand || streamPath || detail,
+        path: streamPath || undefined,
+        command: streamCommand || undefined,
       });
-      if (state.product.recentOps.length > 8) {
-        state.product.recentOps = state.product.recentOps.slice(-8);
+      if (state.product.recentOps.length > 80) {
+        state.product.recentOps = state.product.recentOps.slice(-80);
       }
+      pushStreamHistory(state, {
+        kind: kind || "tool",
+        title: streamTitle,
+        detail: streamQuery
+          ? streamQuery
+          : streamCommand
+            ? ""
+            : isGarbageToken(detail)
+              ? ""
+              : detail,
+        path: streamPath || undefined,
+        command: streamCommand || undefined,
+        query: streamQuery || undefined,
+        diff: typeof event.diff === "string" ? event.diff : undefined,
+        preview: streamPreview,
+        output: streamOutput,
+        added: typeof event.added === "number" ? event.added : undefined,
+        removed: typeof event.removed === "number" ? event.removed : undefined,
+        ok: typeof event.ok === "boolean" ? event.ok : undefined,
+        engine: typeof event.engine === "string" ? event.engine : undefined,
+      });
+      state.product.busyLabel = null;
+      state.product.busyDetail = null;
+      state.product.busySince = null;
       break;
     }
     case "session.capability.discovered": {
@@ -940,9 +1401,15 @@ export function applyStudioEvent(state, event, opts = {}) {
         : "capability plane";
       if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
       state.product.recentOps.push({ label: "Capability", detail });
-      if (state.product.recentOps.length > 8) {
-        state.product.recentOps = state.product.recentOps.slice(-8);
+      if (state.product.recentOps.length > 48) {
+        state.product.recentOps = state.product.recentOps.slice(-48);
       }
+      const envBits = [...langs.slice(0, 4), ...tools.slice(0, 4)].filter(Boolean);
+      pushStreamHistory(state, {
+        kind: "environment",
+        title: "Environment ready",
+        detail: envBits.length ? envBits.join(" · ") : detail,
+      });
       break;
     }
     case "session.capability.mcp": {
@@ -954,8 +1421,8 @@ export function applyStudioEvent(state, event, opts = {}) {
         label: "MCP",
         detail: `enabled ${enabled} · denied ${denied}`,
       });
-      if (state.product.recentOps.length > 8) {
-        state.product.recentOps = state.product.recentOps.slice(-8);
+      if (state.product.recentOps.length > 48) {
+        state.product.recentOps = state.product.recentOps.slice(-48);
       }
       break;
     }
@@ -971,8 +1438,8 @@ export function applyStudioEvent(state, event, opts = {}) {
       if (detail) state.product.currentDetail = detail;
       if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
       state.product.recentOps.push({ label, detail });
-      if (state.product.recentOps.length > 8) {
-        state.product.recentOps = state.product.recentOps.slice(-8);
+      if (state.product.recentOps.length > 48) {
+        state.product.recentOps = state.product.recentOps.slice(-48);
       }
       break;
     }
@@ -982,20 +1449,51 @@ export function applyStudioEvent(state, event, opts = {}) {
         typeof event.engine === "string" && event.engine.trim()
           ? event.engine.trim()
           : "peer";
-      const label =
-        typeof event.label === "string" && event.label.trim()
-          ? event.label.trim()
-          : "Collaborative engineering";
+      const phase =
+        typeof event.phase === "string" ? event.phase.trim() : "";
+      // PATH owns the product narrative — provider names stay in detail/trace.
+      const title =
+        phase === "repair" || /repair/i.test(String(event.detail || ""))
+          ? "Repairing"
+          : phase === "done"
+            ? "Repair complete"
+            : phase === "notes"
+              ? "Sharing engineering notes"
+              : phase === "handoff" || phase === "resumed"
+                ? "Continuing"
+                : phase === "fallback" || phase === "error"
+                  ? "Continuing with peer engine"
+                  : "Continuing engineering";
+      const detailRaw =
+        typeof event.detail === "string" ? event.detail.trim() : "";
       const detail =
-        typeof event.detail === "string"
-          ? event.detail.slice(0, 96)
-          : `${engine} turn`;
-      setPathPhase(state, label);
+        detailRaw &&
+        !/engineering turn$/i.test(detailRaw) &&
+        !/^(copilot|antigravity)\b/i.test(detailRaw)
+          ? detailRaw.slice(0, 160)
+          : phase === "repair" || /repair/i.test(detailRaw)
+            ? "repairing validation failures"
+            : phase === "notes"
+              ? "sharing engineering notes"
+              : phase === "turn"
+                ? "inspecting and editing in the task workspace"
+                : detailRaw.slice(0, 160) || "collaborating in the task workspace";
+      setPathPhase(state, title);
       state.product.currentDetail = detail;
       if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
-      state.product.recentOps.push({ label, detail });
-      if (state.product.recentOps.length > 8) {
-        state.product.recentOps = state.product.recentOps.slice(-8);
+      state.product.recentOps.push({ label: title, detail, engine });
+      if (state.product.recentOps.length > 80) {
+        state.product.recentOps = state.product.recentOps.slice(-80);
+      }
+      pushStreamHistory(state, {
+        kind: "collaborate",
+        title,
+        detail,
+        engine,
+      });
+      if (!Array.isArray(state.product.enginesUsed)) state.product.enginesUsed = [];
+      if (!state.product.enginesUsed.includes(engine)) {
+        state.product.enginesUsed.push(engine);
       }
       break;
     }
@@ -1012,9 +1510,14 @@ export function applyStudioEvent(state, event, opts = {}) {
         label: "Preparing environment",
         detail,
       });
-      if (state.product.recentOps.length > 8) {
-        state.product.recentOps = state.product.recentOps.slice(-8);
+      if (state.product.recentOps.length > 48) {
+        state.product.recentOps = state.product.recentOps.slice(-48);
       }
+      pushStreamHistory(state, {
+        kind: "prepare",
+        title: "Preparing environment",
+        detail,
+      });
       break;
     }
     case "session.capability.provisioning": {
@@ -1035,8 +1538,8 @@ export function applyStudioEvent(state, event, opts = {}) {
       state.product.currentDetail = detail;
       if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
       state.product.recentOps.push({ label, detail });
-      if (state.product.recentOps.length > 8) {
-        state.product.recentOps = state.product.recentOps.slice(-8);
+      if (state.product.recentOps.length > 48) {
+        state.product.recentOps = state.product.recentOps.slice(-48);
       }
       break;
     }
@@ -1051,8 +1554,8 @@ export function applyStudioEvent(state, event, opts = {}) {
         label: "Environment ready",
         detail,
       });
-      if (state.product.recentOps.length > 8) {
-        state.product.recentOps = state.product.recentOps.slice(-8);
+      if (state.product.recentOps.length > 48) {
+        state.product.recentOps = state.product.recentOps.slice(-48);
       }
       break;
     }
@@ -1066,15 +1569,40 @@ export function applyStudioEvent(state, event, opts = {}) {
       state.product.currentDetail = detail;
       if (!Array.isArray(state.product.recentOps)) state.product.recentOps = [];
       state.product.recentOps.push({ label: "Indexing", detail });
-      if (state.product.recentOps.length > 8) {
-        state.product.recentOps = state.product.recentOps.slice(-8);
+      if (state.product.recentOps.length > 48) {
+        state.product.recentOps = state.product.recentOps.slice(-48);
       }
       break;
     }
     case "session.engineering.handoff": {
       state.product.ag1 = true;
       if (typeof event.summary === "string" && event.summary.trim()) {
-        state.product.engineeringHandoff = event.summary.trim().slice(0, 400);
+        const summary = event.summary.trim().slice(0, 1_200);
+        state.product.engineeringHandoff = summary.slice(0, 400);
+        // Surface engine handoff on the open canvas when narration did not already.
+        const last = state.product.streamHistory?.[
+          state.product.streamHistory.length - 1
+        ];
+        const already =
+          last &&
+          last.kind === "narration" &&
+          typeof last.detail === "string" &&
+          last.detail.includes(summary.slice(0, 80));
+        if (!already) {
+          if (!Array.isArray(state.product.narrationExcerpts)) {
+            state.product.narrationExcerpts = [];
+          }
+          state.product.narrationExcerpts.push(summary);
+          if (state.product.narrationExcerpts.length > 24) {
+            state.product.narrationExcerpts =
+              state.product.narrationExcerpts.slice(-24);
+          }
+          pushStreamHistory(state, {
+            kind: "narration",
+            title: "PATH",
+            detail: summary,
+          });
+        }
       }
       break;
     }
@@ -1126,6 +1654,28 @@ export function applyStudioEvent(state, event, opts = {}) {
           typeof event.diffPreviewShownFiles === "number"
             ? event.diffPreviewShownFiles
             : Math.min(5, files.length);
+      }
+      if (Array.isArray(event.timingMarks) && event.timingMarks.length > 0) {
+        state.product.timingSummary = summarizeTimingMarks(event.timingMarks);
+      } else if (event.timingSummary && typeof event.timingSummary === "object") {
+        state.product.timingSummary = event.timingSummary;
+      }
+      if (typeof event.durationMs === "number" && event.durationMs >= 0) {
+        state.product.durationMs = event.durationMs;
+      }
+      state.product.resultClassification = classification;
+      if (event.advancesSession === true) {
+        state.product.advancesSession = true;
+      } else if (event.advancesSession === false) {
+        state.product.advancesSession = false;
+      }
+      if (
+        typeof event.engineeringHandoff === "string" &&
+        event.engineeringHandoff.trim()
+      ) {
+        state.product.engineeringHandoff = event.engineeringHandoff
+          .trim()
+          .slice(0, 1_200);
       }
       const phase =
         classification === "VERIFIED"

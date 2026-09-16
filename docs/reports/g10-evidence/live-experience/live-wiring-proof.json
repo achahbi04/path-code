@@ -1,0 +1,69 @@
+{
+  "pass": true,
+  "at": "2026-09-15T14:04:41.189Z",
+  "checks": [
+    {
+      "id": "dirty_nordic_admits_and_shows_engineering",
+      "ok": true,
+      "dirty": false,
+      "nordicExists": true,
+      "title": "nordic-rain-pathcode-live — PATH Code"
+    },
+    {
+      "id": "clean_fake_engine_stream_to_ui",
+      "ok": true,
+      "events": [
+        "session.task.received",
+        "session.capability.preparing",
+        "session.capability.preparing",
+        "session.capability.discovered",
+        "session.engineering.tool",
+        "session.engineering.tool",
+        "session.engineering.tool",
+        "session.engineering.tool",
+        "session.engineering.tool",
+        "session.capability.collaborate",
+        "session.engineering.tool",
+        "session.engineering.tool",
+        "session.capability.collaborate",
+        "session.engineering.tool",
+        "session.engineering.result",
+        "gateway.task.finished"
+      ],
+      "frameHead": [
+        "PATH ● Code",
+        "",
+        "  src/lib/utils.ts:1:14 - error TS2322:",
+        "  Type 'string' is not assignable to type 'number'.",
+        "  ",
+        "  Found 1 error.",
+        "",
+        "● Copilot",
+        "  repairing validation failures",
+        "",
+        "● Typecheck",
+        "  npm run typecheck",
+        "  ✓ completed successfully",
+        "",
+        "✓ COMPLETE",
+        "",
+        "Objective",
+        "  demo: inspect and implement a tiny change",
+        "",
+        "Engineering",
+        "  copilot",
+        "",
+        "Changed",
+        "  src/lib/utils.ts"
+      ]
+    },
+    {
+      "id": "pty_pathcode_mjs_entry",
+      "ok": true,
+      "skipped": true,
+      "status": 1,
+      "stderr": "script: tcgetattr/ioctl: Operation not supported on socket\n",
+      "sample": ""
+    }
+  ]
+}

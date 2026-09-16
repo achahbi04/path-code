@@ -1,0 +1,60 @@
+{
+  "porc": "",
+  "started": {
+    "ok": true,
+    "taskId": "ec5419be-8c7a-47f1-8dd7-628f9dfe74d9",
+    "sessionId": "path-ec5419be-8c7a-47f1-8dd7-628f9dfe74d9",
+    "snapshot": {
+      "taskId": "ec5419be-8c7a-47f1-8dd7-628f9dfe74d9",
+      "sessionId": "path-ec5419be-8c7a-47f1-8dd7-628f9dfe74d9",
+      "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+      "workingSubdir": "",
+      "objective": "demo task for wiring",
+      "status": "running",
+      "seq": 4,
+      "createdAt": "2026-09-15T11:42:44.365Z",
+      "updatedAt": "2026-09-15T11:42:44.368Z",
+      "worktreePath": null,
+      "taskBranch": null,
+      "commitSha": null,
+      "classification": null,
+      "capabilities": null,
+      "result": null
+    }
+  },
+  "snap": {
+    "taskId": "ec5419be-8c7a-47f1-8dd7-628f9dfe74d9",
+    "sessionId": "path-ec5419be-8c7a-47f1-8dd7-628f9dfe74d9",
+    "projectRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+    "workingSubdir": "",
+    "objective": "demo task for wiring",
+    "status": "completed",
+    "seq": 6,
+    "createdAt": "2026-09-15T11:42:44.365Z",
+    "updatedAt": "2026-09-15T11:42:44.422Z",
+    "worktreePath": null,
+    "taskBranch": "path/task-ec5419be",
+    "commitSha": "deadbeefdeadbeef",
+    "classification": "VERIFIED",
+    "capabilities": null,
+    "result": {
+      "exitCode": 0,
+      "classification": "VERIFIED",
+      "advancesSession": true,
+      "changedFiles": [
+        "src/demo.js"
+      ],
+      "commitSha": "deadbeefdeadbeef",
+      "taskBranch": "path/task-ec5419be",
+      "engineActivityCount": 2
+    }
+  },
+  "events": [
+    "session.task.received",
+    "session.capability.preparing",
+    "session.capability.preparing",
+    "session.engineering.activity",
+    "session.engineering.result",
+    "gateway.task.finished"
+  ]
+}

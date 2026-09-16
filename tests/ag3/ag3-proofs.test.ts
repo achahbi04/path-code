@@ -255,8 +255,9 @@ describe("AG3 narrow + non-TTY + cancel wiring", () => {
     const narrow = buildInlineCardLines(state, { rows: 24, columns: 40 });
     const text = narrow.join("\n");
     expect(text).toContain("PATH ● Code");
-    expect(text).toMatch(/Inspecting|◆/);
-    expect(text).toContain("╭");
+    expect(text).toMatch(/Inspecting|◆|●/);
+    // Open-canvas product surface — no outer frame box.
+    expect(text).not.toContain("╭");
     expect(text).not.toContain("PATH STUDIO");
     // Default is no longer a permanent three-column dashboard.
     expect(text).not.toMatch(/^\s*PROJECT\s*$/m);

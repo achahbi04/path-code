@@ -3,7 +3,8 @@
 
 **Stage:** S0 only (S1 Gateway Extract not begun)  
 **Automated verdict:** MECHANICAL_GREEN_PENDING_OPERATOR_UI  
-**MANUAL_UI_ACCEPTANCE:** PENDING_OPERATOR_REVIEW
+**MANUAL_UI_ACCEPTANCE:** FAILED (operator Terminal.app re-review required after
+full-height + title ownership fixes; do not self-declare PASS)
 
 Cursor must not self-declare operator visual acceptance.
 

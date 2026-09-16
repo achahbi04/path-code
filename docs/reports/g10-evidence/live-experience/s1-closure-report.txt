@@ -1,0 +1,69 @@
+PATH ● Code — Engineering report
+◐ PARTIAL
+
+Asked
+  Fix the failing typecheck
+
+What PATH did
+  Guidance received. I'll apply it at the next safe engineering step.
+
+Important discoveries
+  Guidance received. I'll apply it at the next safe engineering step.
+
+Changed
+  src/a.ts
+
+Commands / tool activity
+  ✓ echo line-6
+  ✓ echo line-7
+  ✓ echo line-8
+  ✓ echo line-9
+  ✓ echo line-10
+  ✓ echo line-11
+  ✓ echo line-12
+  ✓ echo line-13
+  ✓ echo line-14
+  ✓ echo line-15
+  ✓ echo line-16
+  ✓ echo line-17
+  ✓ echo line-18
+  ✓ echo line-19
+  ✓ echo line-20
+  ✓ echo line-21
+  ✓ echo line-22
+  ✓ echo line-23
+  ✓ echo line-24
+  ✓ echo line-25
+  ✓ echo line-26
+  ✓ echo line-27
+  ✓ echo line-28
+  ✓ echo line-29
+
+Checks
+  ✓ npm-test
+
+Duration
+  1m 30s
+
+Timing
+  providerWait   1m 25s
+  environment    0ms
+  validation     5s
+  steering       0ms
+  engineHandoff  0ms
+  unclassified   0ms
+  total          1m 30s
+
+Git / result state
+  branch  path/task-demo
+  commit  abcdef12
+  No push performed
+
+Not completed
+  Some validation checks passed; the result is only partially verified.
+
+Remaining / operator action
+  Review failing checks and continue engineering if needed.
+
+Type /report to copy this engineering report again.
+

@@ -1,0 +1,102 @@
+{
+  "phase": "S1_FREEZE_REPAIR",
+  "ok": false,
+  "passed": 11,
+  "failed": 5,
+  "checks": [
+    {
+      "id": "title_format_clean",
+      "ok": true,
+      "title": "Klarapp — PATH Code"
+    },
+    {
+      "id": "title_owned_product_string",
+      "ok": true,
+      "owned": "Klarapp — PATH Code"
+    },
+    {
+      "id": "process_title_inert_not_product_or_runtime",
+      "ok": true,
+      "processTitleCodepoints": [
+        8203
+      ]
+    },
+    {
+      "id": "osc_child_title_stripped",
+      "ok": true,
+      "leaked": "helloworld"
+    },
+    {
+      "id": "child_lifecycle_title_unchanged",
+      "ok": true,
+      "midOwned": "Klarapp — PATH Code",
+      "reclaimAttempted": true,
+      "reclaimOk": false
+    },
+    {
+      "id": "ro_worktree_ok",
+      "ok": true
+    },
+    {
+      "id": "ro_lockfile_dirty_before_restore",
+      "ok": false,
+      "changedFiles": []
+    },
+    {
+      "id": "ro_objective_classified",
+      "ok": true
+    },
+    {
+      "id": "ro_restore_applied",
+      "ok": false,
+      "restore": {
+        "applied": false,
+        "restored": [],
+        "reason": "no_baseline"
+      }
+    },
+    {
+      "id": "ro_diff_clean_after_restore",
+      "ok": true,
+      "changedFiles": [],
+      "diffLen": 0
+    },
+    {
+      "id": "ro_no_setup_only_task_commit",
+      "ok": false,
+      "committed": {
+        "ok": false,
+        "commitSha": null,
+        "code": "GIT_STATUS_FAILED"
+      }
+    },
+    {
+      "id": "ro_primary_untouched",
+      "ok": true
+    },
+    {
+      "id": "upgrade_objective_not_read_only",
+      "ok": true
+    },
+    {
+      "id": "upgrade_no_restore",
+      "ok": true,
+      "restore": {
+        "applied": false,
+        "restored": [],
+        "reason": "not_read_only"
+      }
+    },
+    {
+      "id": "upgrade_lockfile_retained",
+      "ok": false,
+      "changedFiles": []
+    },
+    {
+      "id": "upgrade_task_commit_keeps_lockfile",
+      "ok": false,
+      "commitSha": null
+    }
+  ],
+  "s2": "NOT_STARTED"
+}

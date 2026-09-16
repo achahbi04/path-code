@@ -3,10 +3,10 @@
  *
  * PATH_PACKAGE_ROOT  — installed package (read-only assets)
  * PATH_RUNTIME_ROOT  — user-writable PATH state (venv, caches, diag)
- * TARGET_PROJECT_ROOT — user's Git repository (cwd discovery)
+ * TARGET_PROJECT_ROOT — user's existing project (Git or unversioned)
  */
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -25,6 +25,127 @@ function resolveHereDir() {
 }
 
 const HERE = resolveHereDir();
+
+/** Markers that identify an existing (possibly unversioned) software project. */
+const PROJECT_FILE_MARKERS = Object.freeze([
+  "package.json",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "bun.lockb",
+  "Cargo.toml",
+  "go.mod",
+  "pyproject.toml",
+  "requirements.txt",
+  "Pipfile",
+  "poetry.lock",
+  "pom.xml",
+  "build.gradle",
+  "build.gradle.kts",
+  "settings.gradle",
+  "settings.gradle.kts",
+  "composer.json",
+  "Gemfile",
+  "mix.exs",
+  "CMakeLists.txt",
+  "Makefile",
+  "meson.build",
+  "tsconfig.json",
+  "jsconfig.json",
+  "vite.config.ts",
+  "vite.config.js",
+  "vite.config.mjs",
+  "next.config.js",
+  "next.config.mjs",
+  "next.config.ts",
+  "deno.json",
+  "deno.jsonc",
+]);
+
+const PROJECT_DIR_MARKERS = Object.freeze([
+  "src",
+  "app",
+  "apps",
+  "lib",
+  "server",
+  "packages",
+  "cmd",
+  "internal",
+  "public",
+  "migrations",
+]);
+
+/**
+ * True when `dir` looks like an existing product/project — not merely an empty folder.
+ * @param {string} dir
+ */
+export function looksLikeExistingProject(dir) {
+  const root = resolve(dir);
+  if (!existsSync(root)) return false;
+  try {
+    if (!statSync(root).isDirectory()) return false;
+  } catch {
+    return false;
+  }
+  for (const name of PROJECT_FILE_MARKERS) {
+    if (existsSync(join(root, name))) return true;
+  }
+  let hitDirs = 0;
+  for (const name of PROJECT_DIR_MARKERS) {
+    const p = join(root, name);
+    try {
+      if (existsSync(p) && statSync(p).isDirectory()) {
+        const entries = readdirSync(p);
+        if (entries.length > 0) hitDirs += 1;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  // Two+ populated source-ish directories is enough (e.g. src/ + public/).
+  if (hitDirs >= 2) return true;
+  // Or one source dir plus any sibling config/dotfile that looks intentional.
+  if (hitDirs >= 1) {
+    try {
+      const top = readdirSync(root);
+      if (
+        top.some(
+          (n) =>
+            /^(README|readme|License|LICENSE|\.env\.example|Dockerfile)/.test(n) ||
+            n.endsWith(".json") ||
+            n.endsWith(".toml") ||
+            n.endsWith(".yml") ||
+            n.endsWith(".yaml"),
+        )
+      ) {
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return false;
+}
+
+/**
+ * Walk upward from cwd for an existing-project root (Git optional).
+ * Stops at the user's home directory.
+ * @param {string} cwd
+ * @returns {string | null}
+ */
+function findUnversionedProjectRoot(cwd) {
+  let cur = resolve(cwd);
+  const home = resolve(homedir());
+  const stopAt = new Set([home, resolve("/")]);
+  for (let i = 0; i < 48; i += 1) {
+    if (looksLikeExistingProject(cur)) return cur;
+    if (stopAt.has(cur)) return null;
+    const parent = dirname(cur);
+    if (parent === cur) return null;
+    cur = parent;
+  }
+  return null;
+}
 
 /**
  * Absolute PATH package root (contains package.json). Never process.cwd().
@@ -76,17 +197,20 @@ export function resolvePathRuntimeRoot(opts = {}) {
 }
 
 /**
- * Discover the Git project root for the operator's cwd.
- * Also records TARGET_WORKING_SUBDIR when invoked from a repository subdirectory.
+ * Discover the operator's project root for cwd.
+ * Prefers a Git toplevel when present; otherwise admits an existing unversioned
+ * project directory (source/config markers). Not-yet-Git is project context,
+ * not a launch blocker.
  *
  * @param {string} [cwd]
  * @returns {{
  *   ok: true,
  *   projectRoot: string,
- *   gitRepositoryRoot: string,
+ *   gitRepositoryRoot: string | null,
  *   workingSubdir: string,
  *   invocationCwd: string,
- *   gitDir: string,
+ *   gitDir: string | null,
+ *   unversioned: boolean,
  * } | { ok: false, code: string, message: string }}
  */
 export function resolveTargetProjectRoot(cwd = process.cwd()) {
@@ -101,26 +225,6 @@ export function resolveTargetProjectRoot(cwd = process.cwd()) {
       timeout: 10_000,
     },
   );
-  if (probe.status !== 0) {
-    return {
-      ok: false,
-      code: "NOT_A_GIT_REPO",
-      message: "PATH requires a Git repository. cd into a project and try again.",
-    };
-  }
-  let projectRoot = resolve((probe.stdout || "").trim());
-  try {
-    projectRoot = realpathSync(projectRoot);
-  } catch {
-    // keep resolved
-  }
-  if (!projectRoot || !existsSync(projectRoot)) {
-    return {
-      ok: false,
-      code: "NOT_A_GIT_REPO",
-      message: "PATH could not resolve the Git project root.",
-    };
-  }
 
   let invocationCwd = start;
   try {
@@ -129,13 +233,69 @@ export function resolveTargetProjectRoot(cwd = process.cwd()) {
     // keep resolved
   }
 
+  if (probe.status === 0) {
+    let projectRoot = resolve((probe.stdout || "").trim());
+    try {
+      projectRoot = realpathSync(projectRoot);
+    } catch {
+      // keep resolved
+    }
+    if (!projectRoot || !existsSync(projectRoot)) {
+      return {
+        ok: false,
+        code: "NOT_A_GIT_REPO",
+        message: "PATH could not resolve the Git project root.",
+      };
+    }
+
+    const rel = relative(projectRoot, invocationCwd);
+    if (rel.startsWith("..") || rel.includes(`..${sep}`)) {
+      return {
+        ok: false,
+        code: "INVALID_WORKING_SUBDIR",
+        message:
+          "Invocation directory is outside the Git repository root. cd into the project and try again.",
+      };
+    }
+    const workingSubdir =
+      rel === "" || rel === "."
+        ? ""
+        : rel.split(/[/\\]/).filter(Boolean).join("/");
+
+    return {
+      ok: true,
+      projectRoot,
+      gitRepositoryRoot: projectRoot,
+      workingSubdir,
+      invocationCwd,
+      gitDir: join(projectRoot, ".git"),
+      unversioned: false,
+    };
+  }
+
+  // Unversioned existing project — Git is not a launch prerequisite.
+  const found = findUnversionedProjectRoot(invocationCwd);
+  if (!found) {
+    return {
+      ok: false,
+      code: "NOT_A_PROJECT",
+      message:
+        "PATH needs an existing project directory (source or config markers). cd into a project and try again.",
+    };
+  }
+  let projectRoot = found;
+  try {
+    projectRoot = realpathSync(found);
+  } catch {
+    // keep
+  }
   const rel = relative(projectRoot, invocationCwd);
   if (rel.startsWith("..") || rel.includes(`..${sep}`)) {
     return {
       ok: false,
       code: "INVALID_WORKING_SUBDIR",
       message:
-        "Invocation directory is outside the Git repository root. cd into the project and try again.",
+        "Invocation directory is outside the project root. cd into the project and try again.",
     };
   }
   const workingSubdir =
@@ -146,10 +306,11 @@ export function resolveTargetProjectRoot(cwd = process.cwd()) {
   return {
     ok: true,
     projectRoot,
-    gitRepositoryRoot: projectRoot,
+    gitRepositoryRoot: null,
     workingSubdir,
     invocationCwd,
-    gitDir: join(projectRoot, ".git"),
+    gitDir: null,
+    unversioned: true,
   };
 }
 

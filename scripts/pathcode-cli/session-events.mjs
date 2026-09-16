@@ -56,8 +56,13 @@ export const SESSION_EVENT_TYPES = Object.freeze([
   "session.engineering.workspace",
   "session.engineering.activity",
   "session.engineering.tool",
+  "session.engineering.narration",
+  "session.engineering.busy",
+  "session.engineering.steer",
   "session.engineering.result",
+  "session.engineering.report",
   "session.engineering.bridge",
+  "session.operator.note",
   // AG4 — GitHub delivery (post-VERIFIED; not engineering authority).
   "session.delivery.phase",
   "session.delivery.approval",
@@ -389,6 +394,19 @@ export function renderSessionEventHuman(event) {
       const summary = s(event.summary, s(event.tool, "tool"));
       return `Tool: ${summary}\n`;
     }
+    case "session.engineering.narration": {
+      const text = s(event.text, "");
+      return text ? `${text}\n` : "";
+    }
+    case "session.operator.note": {
+      const text = s(event.text, "");
+      return text ? `Operator: ${text}\n` : "";
+    }
+    case "session.engineering.busy": {
+      const label = s(event.label, "Working");
+      const detail = s(event.detail, "");
+      return detail ? `${label}: ${detail}\n` : `${label}\n`;
+    }
     case "session.engineering.result": {
       const classification = s(event.classification, "NOT_VERIFIED");
       const files = Array.isArray(event.changedFiles)
@@ -396,6 +414,13 @@ export function renderSessionEventHuman(event) {
         : 0;
       const untouched = event.primaryUntouched === true ? "yes" : "no";
       return `Engineering result: ${classification} · ${files} file(s) · primary untouched: ${untouched}\n`;
+    }
+    case "session.engineering.report": {
+      const disposition = s(event.disposition, "BLOCKED");
+      const path = s(event.path, "");
+      return path
+        ? `Engineering report (${disposition}): ${path}\n`
+        : `Engineering report ready (${disposition})\n`;
     }
     case "session.engineering.bridge": {
       // Development evidence only — never print engine branding to the living UI.

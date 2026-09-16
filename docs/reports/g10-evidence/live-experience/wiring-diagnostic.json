@@ -1,0 +1,33 @@
+{
+  "pass": true,
+  "at": "2026-09-15T11:42:44.456Z",
+  "checks": [
+    {
+      "id": "dirty_shows_blocked_not_done",
+      "ok": true
+    },
+    {
+      "id": "fake_engine_emits_stream_events",
+      "ok": true,
+      "events": [
+        "session.task.received",
+        "session.capability.preparing",
+        "session.capability.preparing",
+        "session.engineering.activity",
+        "session.engineering.result",
+        "gateway.task.finished"
+      ],
+      "status": "completed",
+      "porcelain": ""
+    },
+    {
+      "id": "nordic_rain_dirty_detected",
+      "ok": true,
+      "dirty": true,
+      "porcelain": [
+        "M src/lib/utils.ts"
+      ],
+      "note": "Operator must commit/stash before PATH can engineer this checkout"
+    }
+  ]
+}

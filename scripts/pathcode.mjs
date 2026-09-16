@@ -58,8 +58,17 @@ import {
   startGatewayServer,
   ensureGateway,
 } from "./pathcode-cli/gateway/index.mjs";
+import { normalizeObjectiveText } from "./pathcode-cli/normalize-text.mjs";
+import { isTaskStopCommand } from "./pathcode-cli/task-control.mjs";
 
 const root = resolvePathPackageRoot();
+
+// Keep Terminal.app from showing argv / TMPDIR in the title bar.
+try {
+  process.title = "pathcode";
+} catch {
+  // ignore
+}
 
 /**
  * @param {readonly string[]} argv
@@ -250,9 +259,16 @@ async function delegateLegacy(args) {
  */
 function renderQuietStartup(info) {
   const name = info.unicode && !info.plain ? COMPACT_NAME : ASCII_NAME;
-  const branch = info.branch || "detached";
-  const clean =
-    info.clean === true ? "clean" : info.clean === false ? "dirty" : "unknown";
+  const branch = info.unversioned
+    ? "unversioned"
+    : info.branch || "detached";
+  const clean = info.unversioned
+    ? "unversioned"
+    : info.clean === true
+      ? "clean"
+      : info.clean === false
+        ? "dirty"
+        : "unknown";
   // Identity only — the session-long cockpit owns the live prompt.
   return `${name}\n${info.projectName} · ${branch} · ${clean}\n\n`;
 }
@@ -374,18 +390,18 @@ export async function runPathcodeMain(argv, testIo = {}) {
     typeof project.workingSubdir === "string" ? project.workingSubdir : "";
   const projectName = basename(projectRoot);
 
-  /** @type {{ branch: string | null, clean: boolean | null }} */
+  /** @type {{ branch: string | null, clean: boolean | null, unversioned?: boolean }} */
   let gitSummary = { branch: null, clean: null };
   const admission = admitPrimaryCheckout(projectRoot);
   if (admission.ok) {
-    gitSummary = { branch: admission.branch, clean: true };
-  } else if (admission.code === "DIRTY_PRIMARY_TREE") {
-    gitSummary = {
-      branch: typeof admission.branch === "string" ? admission.branch : null,
-      clean: false,
-    };
-  } else if (admission.code === "DETACHED_HEAD_BLOCKED") {
-    gitSummary = { branch: null, clean: null };
+    if (admission.unversioned) {
+      gitSummary = { branch: "unversioned", clean: null, unversioned: true };
+    } else {
+      gitSummary = {
+        branch: admission.detached ? null : admission.branch,
+        clean: admission.dirty !== true,
+      };
+    }
   }
 
   // Quiet runtime bootstrap (venv under PATH_RUNTIME_ROOT). Failures surface later.
@@ -413,6 +429,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
         projectName,
         branch: gitSummary.branch,
         clean: gitSummary.clean,
+        unversioned: gitSummary.unversioned === true,
       }).replace(/\nPATH [●*] Code > $/, "\n"),
     );
     stdout.write(
@@ -421,15 +438,9 @@ export async function runPathcodeMain(argv, testIo = {}) {
     return 0;
   }
 
-  stdout.write(
-    renderQuietStartup({
-      unicode,
-      plain,
-      projectName,
-      branch: gitSummary.branch,
-      clean: gitSummary.clean,
-    }),
-  );
+  // Do NOT write brand/startup identity to the normal scrollback buffer here.
+  // The living cockpit enters alternate screen first and renders splash + PATH ● Code
+  // inside that screen. Writing before alt-screen made the brand appear only after /exit.
 
   /** Session-scoped settings — persist; authority does not. */
   let modelId = args.model ?? process.env.PATHCODE_OPENAI_MODEL ?? null;
@@ -536,8 +547,19 @@ export async function runPathcodeMain(argv, testIo = {}) {
     projectName,
   });
 
-  // Non-cockpit TTY (e.g. NDJSON on stdout): traditional scrollback prompt.
+  // Non-cockpit TTY (e.g. NDJSON on stdout): traditional scrollback identity + prompt.
+  // Living cockpit owns brand inside alternate screen — never pre-paint it here.
   if (!ttyInline) {
+    stdout.write(
+      renderQuietStartup({
+        unicode,
+        plain,
+        projectName,
+        branch: gitSummary.branch,
+        clean: gitSummary.clean,
+        unversioned: gitSummary.unversioned === true,
+      }),
+    );
     stdout.write(promptPrefix(unicode, plain));
   }
 
@@ -601,6 +623,20 @@ export async function runPathcodeMain(argv, testIo = {}) {
 
   const prompt = createPromptSession(streams, {
     onSteering: (text) => {
+      // Stop commands are intercepted in terminal.pushSteering → requestCycleCancel.
+      // Keep a defensive cancel here for any direct onSteering callers.
+      if (isTaskStopCommand(text)) {
+        if (activeGatewayTaskId) {
+          if (gatewayClient) gatewayClient.cancelTask(activeGatewayTaskId);
+          else if (gatewayRuntime) gatewayRuntime.cancelTask(activeGatewayTaskId);
+        }
+        try {
+          cycleAbort?.abort();
+        } catch {
+          // ignore
+        }
+        return;
+      }
       if (activeGatewayTaskId) {
         if (gatewayClient) gatewayClient.steerTask(activeGatewayTaskId, text);
         else if (gatewayRuntime) gatewayRuntime.steerTask(activeGatewayTaskId, text);
@@ -618,6 +654,11 @@ export async function runPathcodeMain(argv, testIo = {}) {
       onChange: (composerState) => {
         if (typeof inlineStudio.setComposerState === "function") {
           inlineStudio.setComposerState(composerState);
+        }
+      },
+      onStreamScroll: (delta) => {
+        if (typeof inlineStudio.adjustStreamScroll === "function") {
+          inlineStudio.adjustStreamScroll(delta);
         }
       },
     });
@@ -872,9 +913,25 @@ export async function runPathcodeMain(argv, testIo = {}) {
       typeof cycleNote.durableSummary === "string" &&
       cycleNote.durableSummary.trim()
     ) {
-      // Session-long cockpit keeps the result inside the frame — no scrollback dump.
+      // Living cockpit: prefer the rematerialized studio report (stream-rich).
+      // Still print a plain copy into the normal buffer when leaving alt-screen,
+      // and after each task when not in ttyInline mode.
+      let plainReport = cycleNote.durableSummary;
+      if (ttyInline && typeof inlineStudio.getState === "function") {
+        const product = inlineStudio.getState()?.product || {};
+        if (
+          typeof product.engineeringReportPlain === "string" &&
+          product.engineeringReportPlain.trim()
+        ) {
+          plainReport = product.engineeringReportPlain;
+          cycleNote.durableSummary = plainReport;
+          if (typeof product.engineeringReportPath === "string") {
+            cycleNote.engineeringReportPath = product.engineeringReportPath;
+          }
+        }
+      }
       if (!ttyInline) {
-        prompt.write(`\n${cycleNote.durableSummary}`);
+        prompt.write(`\n${plainReport}`);
       }
     }
     return cycleNote;
@@ -948,14 +1005,18 @@ export async function runPathcodeMain(argv, testIo = {}) {
       inlineStudio.onEvent({
         type: "session.preflight",
         sessionId,
-        branch: gitSummary.branch || "unknown",
-        dirtySummary:
-          gitSummary.clean === true
+        branch: gitSummary.unversioned
+          ? "unversioned"
+          : gitSummary.branch || "unknown",
+        dirtySummary: gitSummary.unversioned
+          ? "unversioned"
+          : gitSummary.clean === true
             ? "clean"
             : gitSummary.clean === false
               ? "dirty"
               : "unknown",
         projectName,
+        unversioned: gitSummary.unversioned === true,
       });
       redrawPrompt(prompt, unicode, plain, sessionStats, inlineStudio);
     }
@@ -973,9 +1034,179 @@ export async function runPathcodeMain(argv, testIo = {}) {
         continue;
       }
       if (cmd === "/exit" || cmd === "/quit") {
+        let lastReport = "";
+        if (ttyInline && typeof inlineStudio.getState === "function") {
+          const product = inlineStudio.getState()?.product || {};
+          if (
+            typeof product.engineeringReportPlain === "string" &&
+            product.engineeringReportPlain.trim()
+          ) {
+            lastReport = product.engineeringReportPlain.trim();
+          }
+        }
         if (ttyInline) inlineStudio.finish();
+        if (lastReport) {
+          prompt.write(`\n${lastReport}\n`);
+        }
         prompt.write("Goodbye.\n");
         return 0;
+      }
+      if (cmd === "/stop" || isTaskStopCommand(cmd)) {
+        if (activeGatewayTaskId) {
+          if (gatewayClient) await gatewayClient.cancelTask(activeGatewayTaskId);
+          else if (gatewayRuntime) gatewayRuntime.cancelTask(activeGatewayTaskId);
+          prompt.write("Stop requested for the active task.\n");
+        } else {
+          prompt.write("No active engineering task to stop.\n");
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+      if (cmd === "/log" || cmd === "/task") {
+        const id = activeGatewayTaskId;
+        if (!id) {
+          prompt.write("No active task. Start an engineering task first.\n");
+        } else {
+          try {
+            const { readTaskTrace } = await import("./pathcode-cli/task-trace.mjs");
+            const pack = readTaskTrace(id);
+            prompt.write(`Task trace: ${pack.path}\n`);
+            for (const row of pack.lines.slice(-20)) {
+              prompt.write(
+                `  ${row.t || ""} ${row.type || ""} ${row.detail || row.command || ""}\n`,
+              );
+            }
+          } catch (err) {
+            prompt.write(
+              `Trace unavailable: ${err instanceof Error ? err.message : String(err)}\n`,
+            );
+          }
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+      if (cmd === "/report") {
+        try {
+          const {
+            materializeEngineeringReport,
+            dispositionFromOutcome,
+            formatEngineeringReportPlain,
+            buildEngineeringReportModel,
+          } = await import("./pathcode-cli/engineering-report.mjs");
+          const studioState =
+            typeof inlineStudio.getState === "function"
+              ? inlineStudio.getState()
+              : null;
+          const product = studioState?.product || {};
+          const disposition = dispositionFromOutcome(
+            typeof product.resultClassification === "string"
+              ? product.resultClassification
+              : "",
+            typeof product.pathPhase === "string" ? product.pathPhase : "",
+            typeof product.terminalDisposition === "string"
+              ? product.terminalDisposition
+              : "",
+          );
+          // Always rematerialize so clipboard / durable / canvas stay identical.
+          const pack = materializeEngineeringReport(product, {
+            session: {
+              classification: product.resultClassification || undefined,
+              disposition,
+              objective:
+                typeof product.taskObjective === "string"
+                  ? product.taskObjective
+                  : typeof product.taskPreview === "string"
+                    ? product.taskPreview
+                    : undefined,
+              advancesSession: product.advancesSession === true,
+              engineeringHandoff: product.engineeringHandoff || undefined,
+              terminalSummary: product.terminalSummary || undefined,
+              durationMs:
+                typeof product.durationMs === "number"
+                  ? product.durationMs
+                  : undefined,
+              taskBranch: product.taskBranch || undefined,
+              commitSha: product.resultSha || undefined,
+              baselineSha: product.baselineSha || undefined,
+              inspectCommand: product.inspectCommand || undefined,
+              preservedPath: product.preservedArtifact || undefined,
+              changedFiles: Array.isArray(product.projectFiles)
+                ? product.projectFiles
+                : undefined,
+            },
+          });
+          let report = pack.plain || "";
+          let outPath = pack.reportPath || product.engineeringReportPath || null;
+          if (studioState?.product) {
+            studioState.product.engineeringReportPlain = pack.plain;
+            if (pack.reportPath) {
+              studioState.product.engineeringReportPath = pack.reportPath;
+            }
+          }
+          if (!report.trim()) {
+            report = formatEngineeringReportPlain(
+              buildEngineeringReportModel(product, { disposition }),
+            );
+          }
+          if (!report.trim()) {
+            const miss = "No engineering report yet. Complete a task first.";
+            if (typeof inlineStudio.setReportActionNotice === "function") {
+              inlineStudio.setReportActionNotice(miss);
+            } else {
+              prompt.write(`${miss}\n`);
+            }
+          } else {
+            const { writeFileSync, mkdtempSync } = await import("node:fs");
+            const { join } = await import("node:path");
+            const { tmpdir } = await import("node:os");
+            const { spawnSync } = await import("node:child_process");
+            let copied = false;
+            let copyError = "";
+            if (process.platform === "darwin") {
+              const r = spawnSync("pbcopy", [], {
+                input: report.endsWith("\n") ? report : `${report}\n`,
+                encoding: "utf8",
+              });
+              copied = r.status === 0;
+              if (!copied) {
+                copyError =
+                  (r.stderr && String(r.stderr).trim()) ||
+                  `pbcopy exit ${r.status}`;
+              }
+            } else {
+              copyError = "Clipboard copy is only automated on macOS (pbcopy).";
+            }
+            if (!outPath) {
+              const dir = mkdtempSync(join(tmpdir(), "pathcode-report-"));
+              outPath = join(dir, "pathcode-engineering-report.txt");
+              writeFileSync(
+                outPath,
+                report.endsWith("\n") ? report : `${report}\n`,
+                "utf8",
+              );
+            }
+            const notice = copied
+              ? `✓ Engineering report copied to clipboard\nSaved:\n  ${outPath}`
+              : `Clipboard copy failed${copyError ? ` (${copyError})` : ""}\nSaved:\n  ${outPath}`;
+            if (studioState?.product) {
+              studioState.product.reportActionNotice = notice;
+            }
+            if (typeof inlineStudio.setReportActionNotice === "function") {
+              inlineStudio.setReportActionNotice(notice);
+            } else {
+              prompt.write(`${notice}\n`);
+            }
+          }
+        } catch (err) {
+          const msg = `Report unavailable: ${err instanceof Error ? err.message : String(err)}`;
+          if (typeof inlineStudio.setReportActionNotice === "function") {
+            inlineStudio.setReportActionNotice(msg);
+          } else {
+            prompt.write(`${msg}\n`);
+          }
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
       }
       if (cmd === "/help") {
         prompt.write(renderHelpText({ unicode, plain }));
@@ -1105,7 +1336,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
           continue;
         }
       }
-      await runEngineeringTask(cmd);
+      await runEngineeringTask(normalizeObjectiveText(cmd));
       redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
       void lastExitCode;
     }

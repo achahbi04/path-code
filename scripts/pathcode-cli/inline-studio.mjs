@@ -29,8 +29,17 @@ import {
   reassertPathTitle,
   stripOscTitleSequences,
 } from "./terminal-title.mjs";
+import { normalizeObjectiveText } from "./normalize-text.mjs";
+import {
+  renderStreamOp,
+  renderTaskReport,
+  renderJumpChip,
+  fitCanvasLine,
+  formatDuration,
+} from "./engineering-stream.mjs";
+import { materializeEngineeringReport } from "./engineering-report.mjs";
 
-const ANSI_RE = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)|\u001b./g;
+const ANSI_RE = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)|\u001b#[0-9]|\u001b./g;
 
 const HIDE_CURSOR = "\u001b[?25l";
 const SHOW_CURSOR = "\u001b[?25h";
@@ -40,6 +49,8 @@ const ENTER_ALT = "\u001b[?1049h";
 const EXIT_ALT = "\u001b[?1049l";
 const HOME = "\u001b[H";
 const RESET_GRAPHICS = "\u001b[0m";
+/** DEC single-width — clears any leftover double-width attribute from older splash. */
+const DEC_SINGLE_WIDTH = "\u001b#5";
 const CR = "\r";
 const MAX_FPS = 24;
 const FRAME_MIN_MS = Math.floor(1000 / MAX_FPS);
@@ -405,11 +416,61 @@ function padVisible(text, width) {
 }
 
 /**
- * Required PATH branding: PATH white, ● yellow, Code white.
+ * Required PATH branding: PATH bright-white, ● yellow, Code bright-white.
+ * Always visible on dark terminals (avoid dim/37 stacking).
  * @returns {string}
  */
 export function brandPathCode() {
-  return `${style.bold(style.white("PATH"))} ${style.yellow("●")} ${style.bold(style.white("Code"))}`;
+  // Same paint family as splash (37/33) — bright-white 97 was invisible on some
+  // Terminal.app profiles, so the persistent brand looked "missing" in alt-screen.
+  return `${style.bold(style.white("PATH"))} ${style.bold(style.yellow("●"))} ${style.bold(style.white("Code"))}`;
+}
+
+/**
+ * Opening splash mark — one identity only: PATH ● Code.
+ * Stronger presence than live UI text without DEC double-width/height.
+ * @param {number} [tick]
+ */
+export function brandPathLogoLarge(tick = 0) {
+  const pulse = tick % 2 === 0;
+  const path = pulse
+    ? style.bold(style.white("PATH"))
+    : style.bold(style.white("PATH"));
+  const dot = style.bold(style.yellow("●"));
+  const code = style.bold(style.white("Code"));
+  // Extra letter spacing reads larger on Terminal.app without DEC hacks.
+  return [`${path}  ${dot}  ${code}`];
+}
+
+/**
+ * Full-viewport splash frames for session open.
+ * @param {{ rows: number, columns: number }} viewport
+ * @param {number} [tick]
+ * @returns {string[]}
+ */
+export function buildSplashLines(viewport, tick = 0) {
+  const columns =
+    typeof viewport.columns === "number" && viewport.columns > 0
+      ? Math.floor(viewport.columns)
+      : 80;
+  const rows =
+    typeof viewport.rows === "number" && viewport.rows > 0
+      ? Math.floor(viewport.rows)
+      : 24;
+  const frameRows = Math.max(12, rows);
+  const mark = brandPathLogoLarge(tick).map((line) => {
+    const w = visibleWidth(line);
+    const pad = Math.max(0, Math.floor((columns - w) / 2));
+    return fitLine(`${" ".repeat(pad)}${line}`, columns);
+  });
+  /** @type {string[]} */
+  const lines = [];
+  // Slightly above geometric center — stronger first-impression presence.
+  const topPad = Math.max(2, Math.floor((frameRows - mark.length) / 2) - 1);
+  for (let i = 0; i < topPad; i += 1) lines.push(fitLine("", columns));
+  for (const row of mark) lines.push(row);
+  while (lines.length < frameRows) lines.push(fitLine("", columns));
+  return lines.slice(0, frameRows);
 }
 
 /**
@@ -438,6 +499,75 @@ function activityLabel(phase) {
 }
 
 /**
+ * Idle home canvas — fills the empty middle so the product never looks blank.
+ * @param {Record<string, unknown>} product
+ * @param {number} columns
+ */
+function buildIdleHomeLines(product, columns) {
+  /** @type {string[]} */
+  const lines = [];
+  const project =
+    typeof product.projectName === "string" && product.projectName
+      ? product.projectName
+      : "this project";
+  const branch =
+    typeof product.branch === "string" && product.branch
+      ? product.branch
+      : null;
+
+  lines.push(fitCanvasLine(style.bold(style.white("Ready for engineering")), columns));
+  lines.push("");
+  lines.push(
+    fitCanvasLine(
+      style.dim(
+        branch
+          ? `Project  ${project}  ·  ${branch}`
+          : `Project  ${project}`,
+      ),
+      columns,
+    ),
+  );
+  lines.push("");
+  lines.push(fitCanvasLine(style.white("Type an engineering objective below, then Enter."), columns));
+  lines.push(fitCanvasLine(style.dim("PATH will inspect, edit, test, and report in this canvas."), columns));
+  lines.push("");
+  lines.push(fitCanvasLine(style.dim("Examples"), columns));
+  lines.push(
+    fitCanvasLine(
+      style.dim('  > Add clamp(value, min, max) with node:test coverage'),
+      columns,
+    ),
+  );
+  lines.push(
+    fitCanvasLine(
+      style.dim('  > Fix the package.json files list for distribution'),
+      columns,
+    ),
+  );
+  lines.push(
+    fitCanvasLine(
+      style.dim('  > Investigate failing tests and repair them'),
+      columns,
+    ),
+  );
+  lines.push("");
+  lines.push(fitCanvasLine(style.dim("While a task runs"), columns));
+  lines.push(fitCanvasLine(style.dim("  ■ Stop / Ctrl-C / /stop   cancel immediately"), columns));
+  lines.push(fitCanvasLine(style.dim("  type guidance             steer the engines"), columns));
+  lines.push(fitCanvasLine(style.dim("  /log                      inspect task trace"), columns));
+  lines.push(fitCanvasLine(style.dim("  /exit                     leave PATH"), columns));
+  lines.push("");
+  lines.push(
+    fitCanvasLine(
+      style.dim("Engineering stream appears here as soon as work starts."),
+      columns,
+    ),
+  );
+  lines.push("");
+  return lines;
+}
+
+/**
  * Aggregate recent ops into meaningful engineering stream lines.
  * @param {Array<{ label?: string, detail?: string }>} ops
  * @param {number} max
@@ -463,8 +593,8 @@ function livingStreamLines(ops, max) {
 }
 
 /**
- * G10.5 living engineering surface — full-height, simple, event-driven.
- * Header · Goal · Stream · Compact state · Composer (not a three-column dashboard).
+ * Open-canvas living engineering surface (no outer/side boxes).
+ * Header · scrollable stream · composer separator · Stop/status.
  *
  * @param {ReturnType<typeof createEmptyStudioState>} state
  * @param {{ rows: number, columns: number }} viewport
@@ -479,109 +609,32 @@ export function buildMinimalLivingLines(state, viewport) {
     typeof viewport.rows === "number" && viewport.rows > 0
       ? Math.floor(viewport.rows)
       : 24;
-  const maxHeight = Math.max(10, rows - 2);
-  const inner = Math.max(16, columns - 2);
+  const frameRows = Math.max(12, rows);
   const product = state.product || {};
   const pathPhase = projectAuthoritativePathPhase(state);
   const projectName =
     typeof product.projectName === "string" && product.projectName
       ? product.projectName
       : "";
-  const taskBranch =
-    typeof product.taskBranch === "string" && product.taskBranch
-      ? product.taskBranch
-      : typeof product.branch === "string"
-        ? String(product.branch).replace(/\s+@\s+\S+/, "")
+  const taskIdShort =
+    typeof product.taskId === "string" && product.taskId
+      ? product.taskId.slice(0, 8)
+      : typeof product.taskBranch === "string" && product.taskBranch.includes("task-")
+        ? product.taskBranch.replace(/^.*task-/, "").slice(0, 8)
         : "";
-  const headerRight = style.dim(
-    safeDisplay([projectName, taskBranch].filter(Boolean).join(" · ")),
-  );
-  const headerLeft = brandPathCode();
-  const headerGap = Math.max(
-    1,
-    inner - visibleWidth(headerLeft) - visibleWidth(headerRight) - 2,
-  );
-  const headerInner = ` ${headerLeft}${" ".repeat(headerGap)}${headerRight} `;
+  const running =
+    pathPhase !== "Idle" &&
+    pathPhase !== "Verified" &&
+    pathPhase !== "Complete" &&
+    pathPhase !== "Failed" &&
+    pathPhase !== "Blocked" &&
+    pathPhase !== "Cancelled" &&
+    pathPhase !== "Not verified" &&
+    pathPhase !== "Partially verified" &&
+    pathPhase !== "Infrastructure failure" &&
+    product.awaitingInput !== true &&
+    state.cards?.terminal?.arrived !== true;
 
-  const goalRaw =
-    typeof product.taskPreview === "string" && product.taskPreview.trim()
-      ? product.taskPreview.trim()
-      : pathPhase === "Idle" || product.awaitingInput
-        ? "Waiting for the next engineering objective"
-        : "Engineering in progress";
-  const goalLine = safeDisplay(goalRaw).slice(0, Math.max(12, inner - 4));
-
-  const mark = pathGlyph(pathPhase);
-  const label = activityLabel(pathPhase);
-  const phaseTone =
-    pathPhase === "Verified"
-      ? style.green
-      : pathPhase === "Failed" || pathPhase === "Not verified"
-        ? style.red
-        : pathPhase === "Partially verified"
-          ? style.yellow
-          : style.white;
-  const currentActivity = phaseTone(`${mark} ${safeDisplay(label)}`);
-
-  const fileN =
-    typeof product.changedFileTotal === "number" && product.changedFileTotal > 0
-      ? product.changedFileTotal
-      : Array.isArray(product.projectFiles)
-        ? product.projectFiles.length
-        : 0;
-  const feedback =
-    typeof product.engineCheckFeedback === "string" &&
-    product.engineCheckFeedback
-      ? product.engineCheckFeedback
-      : null;
-  let testsBit = "Tests —";
-  const ag1Checks = Array.isArray(product.ag1Checks) ? product.ag1Checks : [];
-  if (ag1Checks.length > 0) {
-    const testChecks = ag1Checks.filter(
-      (c) =>
-        c &&
-        (c.kind === "TARGETED_TEST" ||
-          /test/i.test(String(c.kind || "")) ||
-          /test/i.test(String(c.id || ""))),
-    );
-    const use = testChecks.length > 0 ? testChecks : ag1Checks;
-    const ok = use.filter((c) => c && c.ok === true).length;
-    testsBit = `Tests ${ok}/${use.length}`;
-  } else if (feedback && feedback !== "running") {
-    testsBit = safeDisplay(feedback).slice(0, 28);
-  } else if (feedback === "running" || state.cards?.validationRunning?.arrived) {
-    testsBit = "Tests running";
-  } else if (state.cards?.validationResult?.arrived) {
-    testsBit = "Tests done";
-  }
-  let buildBit = "Build —";
-  const buildChecks = ag1Checks.filter(
-    (c) =>
-      c &&
-      (c.kind === "BUILD" ||
-        /build|typecheck/i.test(String(c.kind || "")) ||
-        /build|typecheck/i.test(String(c.id || ""))),
-  );
-  if (buildChecks.length > 0) {
-    buildBit = buildChecks.every((c) => c.ok === true)
-      ? "Build passed"
-      : "Build failed";
-  } else if (/build/i.test(String(product.currentDetail || "")) || /build/i.test(label)) {
-    buildBit = pathPhase === "Failed" ? "Build failed" : "Build running";
-  }
-  if (pathPhase === "Verified" && buildBit === "Build —") buildBit = "Build passed";
-  let serviceBit = "";
-  if (
-    typeof product.pathDetail === "string" &&
-    /service|redis|compose|docker/i.test(product.pathDetail)
-  ) {
-    serviceBit = ` · Service ${safeDisplay(product.pathDetail).slice(0, 20)}`;
-  }
-  const status = style.dim(
-    `${fileN} file${fileN === 1 ? "" : "s"} · ${buildBit} · ${testsBit}${serviceBit}`,
-  );
-
-  // Budget rows: borders + header + goal block + status + composer + stream.
   const composerState = {
     text: typeof product.composerText === "string" ? product.composerText : "",
     cursor: 0,
@@ -589,147 +642,366 @@ export function buildMinimalLivingLines(state, viewport) {
     scroll:
       typeof product.composerScroll === "number" ? product.composerScroll : 0,
   };
-  const composerWidth = Math.max(8, inner - 4);
+  const composerWidth = Math.max(8, columns - 4);
   const vis = composerVisibleLines(
     composerState,
     composerWidth,
     COMPOSER_MAX_ROWS,
   );
-  const composerRows =
-    Math.max(1, vis.lines.length) + (vis.total > vis.lines.length ? 1 : 0);
-  // Fixed chrome ≈ 10 lines (borders/sections) + composer.
-  const streamBudget = Math.max(3, maxHeight - (10 + composerRows));
-  const stream = livingStreamLines(product.recentOps, streamBudget);
-
-  /** @type {string[]} */
-  const lines = [];
-  lines.push(fitLine(`╭${"─".repeat(inner)}╮`, columns));
-  lines.push(fitLine(`│${padVisible(headerInner.trimEnd(), inner)}│`, columns));
-  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
-  lines.push(
-    fitLine(
-      `│${padVisible(` ${style.dim("GOAL")}`, inner)}│`,
-      columns,
-    ),
-  );
-  lines.push(fitLine(`│${padVisible(` ${goalLine}`, inner)}│`, columns));
-  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
-  lines.push(
-    fitLine(
-      `│${padVisible(` ${currentActivity}`, inner)}│`,
-      columns,
-    ),
-  );
-  if (stream.length === 0 && !state.cards?.terminal?.arrived) {
-    lines.push(
-      fitLine(
-        `│${padVisible(` ${style.dim("· waiting for engineering activity")}`, inner)}│`,
-        columns,
-      ),
-    );
-  } else if (!state.cards?.terminal?.arrived) {
-    for (const row of stream) {
-      lines.push(
-        fitLine(
-          `│${padVisible(` ${style.dim(`· ${safeDisplay(row)}`)}`, inner)}│`,
-          columns,
-        ),
-      );
-    }
-  }
-
-  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
-  lines.push(fitLine(`│${padVisible(` ${status}`, inner)}│`, columns));
-
-  if (state.cards?.terminal?.arrived) {
-    lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
-    const sha =
-      typeof product.resultSha === "string" ? product.resultSha.slice(0, 8) : "";
-    const complete =
-      pathPhase === "Verified"
-        ? "COMPLETE"
-        : pathPhase === "Failed"
-          ? "FAILED"
-          : pathPhase === "Partially verified"
-            ? "PARTIAL"
-            : pathPhase === "Cancelled"
-              ? "CANCELLED"
-              : "DONE";
-    const tone =
-      pathPhase === "Verified"
-        ? style.green
-        : pathPhase === "Failed" || pathPhase === "Not verified"
-          ? style.red
-          : style.yellow;
-    const resultMark =
-      pathPhase === "Verified" ? "✓" : pathPhase === "Failed" ? "✕" : "·";
-    lines.push(
-      fitLine(
-        `│${padVisible(` ${tone(`${resultMark} ${complete}`)}`, inner)}│`,
-        columns,
-      ),
-    );
-    lines.push(
-      fitLine(
-        `│${padVisible(
-          ` ${style.dim(`${fileN} files changed`)}`,
-          inner,
-        )}│`,
-        columns,
-      ),
-    );
-    lines.push(
-      fitLine(
-        `│${padVisible(` ${style.dim(testsBit)}`, inner)}│`,
-        columns,
-      ),
-    );
-    lines.push(
-      fitLine(
-        `│${padVisible(` ${style.dim(buildBit)}`, inner)}│`,
-        columns,
-      ),
-    );
-    if (sha) {
-      lines.push(
-        fitLine(
-          `│${padVisible(` ${style.dim(`Commit ${sha}`)}`, inner)}│`,
-          columns,
-        ),
-      );
-    }
-  }
-
-  lines.push(fitLine(`├${"─".repeat(inner)}┤`, columns));
-
   const showPrompt =
     product.awaitingInput === true ||
     (typeof product.composerText === "string" &&
-      product.composerText.length > 0);
-  const promptPrefix = showPrompt ? "> " : "  ";
+      product.composerText.length > 0) ||
+    !running;
+  const promptPrefix = "> ";
+
+  /** @type {string[]} */
+  const footer = [];
+  if (
+    typeof product.reportActionNotice === "string" &&
+    product.reportActionNotice.trim()
+  ) {
+    for (const n of product.reportActionNotice.trim().split("\n").slice(0, 4)) {
+      footer.push(
+        fitCanvasLine(style.green(safeDisplay(n).slice(0, columns)), columns),
+      );
+    }
+  }
+  footer.push(fitCanvasLine(style.dim("─".repeat(Math.max(20, columns))), columns));
   if (vis.lines.length === 0) {
-    lines.push(fitLine(`│${padVisible(` ${promptPrefix}`, inner)}│`, columns));
+    footer.push(fitCanvasLine(showPrompt ? promptPrefix : "  ", columns));
   } else {
     for (let i = 0; i < vis.lines.length; i += 1) {
       const prefix = i === 0 ? promptPrefix : "  ";
-      const row = `${prefix}${safeDisplay(vis.lines[i])}`;
-      lines.push(fitLine(`│${padVisible(` ${row}`, inner)}│`, columns));
+      footer.push(
+        fitCanvasLine(
+          `${prefix}${safeDisplay(vis.lines[i])}`,
+          columns,
+        ),
+      );
     }
   }
   if (vis.total > vis.lines.length) {
-    lines.push(
-      fitLine(
-        `│${padVisible(
-          ` ${style.dim(`… ${vis.total - vis.lines.length} more`)}`,
-          inner,
-        )}│`,
+    footer.push(
+      fitCanvasLine(
+        style.dim(`… ${vis.total - vis.lines.length} more`),
+        columns,
+      ),
+    );
+  }
+  footer.push(fitCanvasLine(style.dim("─".repeat(Math.max(20, columns))), columns));
+  const stopBit = running
+    ? `${style.yellow("■")} Stop   Ctrl-C`
+    : style.dim("■ idle");
+  const taskElapsedMs =
+    typeof product.taskStartedAt === "number" && product.taskStartedAt > 0
+      ? Math.max(0, Date.now() - product.taskStartedAt)
+      : typeof product.durationMs === "number"
+        ? product.durationMs
+        : null;
+  const busySecs =
+    running &&
+    typeof product.busySince === "number" &&
+    product.busyLabel
+      ? Math.max(0, Math.floor((Date.now() - product.busySince) / 1000))
+      : null;
+  const lastActivitySecs =
+    running &&
+    typeof product.lastActivityAt === "number" &&
+    product.lastActivityAt > 0
+      ? Math.max(0, Math.floor((Date.now() - product.lastActivityAt) / 1000))
+      : null;
+  const modeBit = style.dim(
+    [
+      "auto",
+      projectName || null,
+      taskIdShort ? `task ${taskIdShort}` : null,
+      running ? "running" : null,
+      taskElapsedMs != null && running
+        ? `elapsed ${formatDuration(taskElapsedMs)}`
+        : null,
+      busySecs != null && product.busyLabel
+        ? `${String(product.busyLabel).slice(0, 28)} · ${busySecs}s`
+        : null,
+      lastActivitySecs != null ? `last ${lastActivitySecs}s ago` : null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  );
+  footer.push(fitCanvasLine(`${stopBit}   ${modeBit}`, columns));
+  // Sticky quiet-period line above the status row when waiting on the provider.
+  if (
+    running &&
+    busySecs != null &&
+    product.busyLabel &&
+    /waiting for engineering result/i.test(String(product.busyLabel))
+  ) {
+    const frames = ["◐", "◓", "◑", "◒"];
+    const frame = frames[Math.floor(Date.now() / 220) % frames.length];
+    footer.splice(
+      footer.length - 1,
+      0,
+      fitCanvasLine(
+        style.bold(
+          `${frame} ${product.busyLabel} · ${busySecs}s`,
+        ),
         columns,
       ),
     );
   }
 
-  lines.push(fitLine(`╰${"─".repeat(inner)}╯`, columns));
-  return lines.slice(0, maxHeight);
+  // Persistent compact identity — always row 0, never scrolls away.
+  // PATH white · ● yellow · Code white. No box. No underline border.
+  const brand = brandPathCode();
+  const brandPlain = "PATH ● Code";
+  // Phase only — never "Ran N shell" / tool-id abstracts in the brand row.
+  const rightMeta = style.dim(running ? pathPhase : "");
+  const brandVis = visibleWidth(brandPlain);
+  const metaVis = visibleWidth(rightMeta.replace(/\u001b\[[0-9;]*m/g, ""));
+  const gap = Math.max(1, columns - brandVis - metaVis);
+  const headerLine =
+    rightMeta && metaVis > 0 && brandVis + metaVis + 1 < columns
+      ? `${brand}${" ".repeat(gap)}${rightMeta}`
+      : brand;
+
+  /** @type {string[]} */
+  const header = [];
+  header.push(fitCanvasLine(headerLine, columns));
+  header.push("");
+
+  /** @type {string[]} */
+  const body = [];
+  const history = Array.isArray(product.streamHistory)
+    ? product.streamHistory
+    : [];
+  const ops = Array.isArray(product.recentOps) ? product.recentOps : [];
+
+  // Idle / objective prelude only when nothing is in the stream yet and the
+  // task has not already terminated. Never paint "Ready for engineering" over
+  // a BLOCKED/COMPLETE report (that clipped Result/commit lines off-screen).
+  if (
+    history.length === 0 &&
+    ops.length === 0 &&
+    state.cards?.terminal?.arrived !== true
+  ) {
+    const objective = normalizeObjectiveText(product.taskPreview || "");
+    if (objective) {
+      body.push(...renderStreamOp({ kind: "objective", detail: objective }, columns));
+    } else {
+      body.push(...buildIdleHomeLines(product, columns));
+    }
+  }
+
+  const scrollRaw =
+    typeof product.streamScroll === "number" && product.streamScroll > 0
+      ? Math.floor(product.streamScroll)
+      : 0;
+
+  /** @type {string[]} */
+  const streamLines = [];
+  if (history.length > 0) {
+    for (const entry of history) {
+      if (entry && typeof entry === "object") {
+        streamLines.push(...renderStreamOp(entry, columns));
+      } else if (typeof entry === "string") {
+        streamLines.push(fitCanvasLine(entry, columns));
+      }
+    }
+  } else {
+    for (const op of ops) {
+      streamLines.push(
+        ...renderStreamOp(
+          {
+            kind: op.label || "activity",
+            title: op.label || "Activity",
+            detail: op.detail || "",
+            path: op.path,
+            command: op.command,
+            diff: op.diff,
+            preview: op.preview,
+            output: op.output,
+            stat: op.stat,
+            added: op.added,
+            removed: op.removed,
+            ok: op.ok,
+            engine: op.engine,
+          },
+          columns,
+        ),
+      );
+    }
+  }
+
+  if (state.cards?.terminal?.arrived) {
+    const terminalDetail =
+      typeof state.cards.terminal.detail === "string"
+        ? state.cards.terminal.detail
+        : "";
+    const terminalParts = terminalDetail.split(" — ");
+    const rawDisposition = String(terminalParts[0] || "").trim();
+    const terminalSummary =
+      typeof product.terminalSummary === "string" && product.terminalSummary
+        ? product.terminalSummary
+        : terminalParts.slice(1).join(" — ") ||
+          (typeof product.blockReason === "string" ? product.blockReason : null);
+    // Prefer authoritative path phase, but never collapse a real admission /
+    // auth / infra code into a silent "DONE" (operator-observed live failure).
+    let disposition =
+      pathPhase === "Verified" || pathPhase === "Complete"
+        ? "COMPLETE"
+        : pathPhase === "Cancelled"
+          ? "STOPPED"
+          : pathPhase === "Blocked" ||
+              pathPhase === "Failed" ||
+              pathPhase === "Not verified" ||
+              pathPhase === "Infrastructure failure"
+            ? "BLOCKED"
+            : pathPhase === "Partially verified"
+              ? "PARTIAL"
+              : null;
+    if (!disposition) {
+      if (/AG1_AUTH|UNMERGED_INDEX|AUTH_REQUIRED|GIT_IDENTITY/i.test(rawDisposition)) {
+        disposition = "BLOCKED";
+      } else if (/CANCEL/i.test(rawDisposition)) {
+        disposition = "STOPPED";
+      } else if (/VERIFIED/i.test(rawDisposition) && !/NOT_VERIFIED|PARTIAL/i.test(rawDisposition)) {
+        disposition = "COMPLETE";
+      } else if (/PARTIAL/i.test(rawDisposition)) {
+        disposition = "PARTIAL";
+      } else if (rawDisposition) {
+        disposition = rawDisposition;
+      } else {
+        disposition = "BLOCKED";
+      }
+    }
+    streamLines.push(
+      ...renderTaskReport(
+        {
+          ...product,
+          durationMs: product.durationMs,
+          lastActivity: product.currentDetail || product.pathDetail || null,
+          blockReason: terminalSummary,
+          terminalSummary,
+        },
+        disposition,
+        columns,
+      ),
+    );
+  } else if (running && streamLines.length === 0) {
+    const mark = pathGlyph(pathPhase);
+    const label = activityLabel(pathPhase);
+    streamLines.push(fitCanvasLine(`${style.white(mark)} ${style.bold(label)}`, columns));
+    if (product.currentDetail) {
+      streamLines.push(
+        fitCanvasLine(style.dim(`  ${String(product.currentDetail).slice(0, columns - 4)}`), columns),
+      );
+    }
+    streamLines.push("");
+  }
+
+  // Live busy heartbeat — real in-flight work only (no fake percentages).
+  if (
+    running &&
+    typeof product.busyLabel === "string" &&
+    product.busyLabel &&
+    typeof product.busySince === "number"
+  ) {
+    const frames = ["◐", "◓", "◑", "◒"];
+    const frame = frames[Math.floor(Date.now() / 220) % frames.length];
+    const secs = Math.max(0, Math.floor((Date.now() - product.busySince) / 1000));
+    const busyLine = `${frame} ${product.busyLabel} · ${secs}s`;
+    streamLines.push(fitCanvasLine(style.bold(busyLine), columns));
+    if (typeof product.busyDetail === "string" && product.busyDetail) {
+      streamLines.push(
+        fitCanvasLine(
+          style.dim(`  ${String(product.busyDetail).slice(0, columns - 4)}`),
+          columns,
+        ),
+      );
+    }
+    const taskElapsed =
+      typeof product.taskStartedAt === "number" && product.taskStartedAt > 0
+        ? Math.max(0, Math.floor((Date.now() - product.taskStartedAt) / 1000))
+        : null;
+    const lastAgo =
+      typeof product.lastActivityAt === "number" && product.lastActivityAt > 0
+        ? Math.max(0, Math.floor((Date.now() - product.lastActivityAt) / 1000))
+        : null;
+    if (taskElapsed != null || lastAgo != null) {
+      const bits = [];
+      if (taskElapsed != null) {
+        const m = Math.floor(taskElapsed / 60);
+        const s = taskElapsed % 60;
+        bits.push(
+          m > 0
+            ? `Task elapsed · ${m}m ${String(s).padStart(2, "0")}s`
+            : `Task elapsed · ${s}s`,
+        );
+      }
+      if (lastAgo != null) bits.push(`Last activity · ${lastAgo}s ago`);
+      streamLines.push(
+        fitCanvasLine(style.dim(`  ${bits.join("   ")}`), columns),
+      );
+    }
+    streamLines.push("");
+  }
+
+  // Follow newest unless operator scrolled up (streamScroll = lines above bottom).
+  // After completion: pin the engineering report into the visible frame so the
+  // operator always sees the dedicated finish write-up without hunting.
+  const budget = Math.max(3, frameRows - header.length - footer.length);
+  const maxScroll = Math.max(0, streamLines.length - budget);
+  const scrollOffset = Math.max(0, Math.min(scrollRaw, maxScroll));
+  // Keep product scroll clamped so Jump-to-latest / deltas stay truthful.
+  if (
+    typeof product.streamScroll === "number" &&
+    product.streamScroll !== scrollOffset
+  ) {
+    product.streamScroll = scrollOffset;
+  }
+  let window = streamLines;
+  const completed = state.cards?.terminal?.arrived === true;
+  if (completed && scrollOffset === 0) {
+    // Find start of completion report (✓ COMPLETE / ■ BLOCKED / etc.).
+    let reportAt = -1;
+    for (let i = streamLines.length - 1; i >= 0; i -= 1) {
+      const plain = String(streamLines[i]).replace(/\u001b\[[0-9;]*m/g, "");
+      if (/^(✓ COMPLETE|◐ PARTIAL|■ STOPPED|■ BLOCKED|■ )/.test(plain.trim())) {
+        reportAt = i;
+        break;
+      }
+    }
+    if (reportAt >= 0) {
+      const reportTail = streamLines.slice(reportAt);
+      // Document layout: show the report from the top of the body. History
+      // remains reachable by scrolling up — do not bury a short report under
+      // empty padding or a long live stream.
+      window =
+        reportTail.length > budget ? reportTail.slice(0, budget) : reportTail;
+    } else if (streamLines.length > budget) {
+      window = streamLines.slice(streamLines.length - budget);
+    }
+  } else if (streamLines.length > budget || scrollOffset > 0) {
+    const fromEnd = scrollOffset;
+    const end = streamLines.length - fromEnd;
+    const start = Math.max(0, end - budget);
+    window = streamLines.slice(start, Math.max(start, end));
+  }
+  body.push(...window);
+  // Completed reports are documents — do not vertically pad a short report
+  // into a giant blank canvas. Idle/running views may still fill the frame.
+  if (!completed) {
+    while (body.length < budget) body.push("");
+  }
+
+  if (scrollOffset > 0 && streamLines.length > budget) {
+    body[body.length - 1] = renderJumpChip(columns);
+  }
+
+  /** @type {string[]} */
+  const lines = [...header, ...body.slice(0, budget), ...footer];
+  while (lines.length < frameRows) lines.push("");
+  return lines.slice(0, frameRows).map((l) => fitLine(l, columns));
 }
 
 /**
@@ -1459,11 +1731,9 @@ export function buildInlineCardLines(state, viewport) {
       ? Math.floor(viewport.columns)
       : 80;
 
-  // G10: AG1 / local engineering product uses the minimal living surface.
-  if (
-    process.env.PATHCODE_LEGACY_THREE_COLUMN !== "1" &&
-    state.product?.ag1 === true
-  ) {
+  // Default product surface is always the open-canvas living UI.
+  // Legacy three-column only when explicitly requested.
+  if (process.env.PATHCODE_LEGACY_THREE_COLUMN !== "1") {
     return buildMinimalLivingLines(state, viewport);
   }
 
@@ -1713,6 +1983,13 @@ export function createInlineStudioRenderer(options = {}) {
   let lastFrameAt = 0;
   let dirty = false;
   let forceFull = false;
+  /** @type {number} */
+  let splashUntil = 0;
+  /** @type {ReturnType<typeof setInterval> | null} */
+  let splashTimer = null;
+  let splashTick = 0;
+  /** @type {ReturnType<typeof setInterval> | null} */
+  let heartbeatTimer = null;
 
   function readViewport() {
     const rows =
@@ -1722,6 +1999,42 @@ export function createInlineStudioRenderer(options = {}) {
         ? stdout.columns
         : 80;
     return { rows, columns };
+  }
+
+  function stopSplash() {
+    if (splashTimer != null) {
+      clearInterval(splashTimer);
+      splashTimer = null;
+    }
+    splashUntil = 0;
+  }
+
+  function stopHeartbeat() {
+    if (heartbeatTimer != null) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+
+  function syncHeartbeat() {
+    const busy =
+      typeof state.product?.busySince === "number" &&
+      typeof state.product?.busyLabel === "string" &&
+      state.product.busyLabel;
+    if (!active || !enabled || !busy) {
+      stopHeartbeat();
+      return;
+    }
+    if (heartbeatTimer != null) return;
+    heartbeatTimer = setInterval(() => {
+      if (!active || !enabled || !state.product?.busySince) {
+        stopHeartbeat();
+        return;
+      }
+      dirty = true;
+      scheduleFrame();
+    }, 220);
+    if (typeof heartbeatTimer.unref === "function") heartbeatTimer.unref();
   }
 
   function detachResize() {
@@ -1771,6 +2084,8 @@ export function createInlineStudioRenderer(options = {}) {
    */
   function restoreTerminalState() {
     clearPending();
+    stopSplash();
+    stopHeartbeat();
     detachResize();
     exitAltScreen();
     try {
@@ -1804,9 +2119,12 @@ export function createInlineStudioRenderer(options = {}) {
     if (!enabled || !active) return;
     dirty = false;
     const viewport = readViewport();
-    const lines = buildInlineCardLines(state, viewport);
+    const inSplash = useAltScreen && Date.now() < splashUntil;
+    const lines = inSplash
+      ? buildSplashLines(viewport, splashTick)
+      : buildInlineCardLines(state, viewport);
     const text = `${lines.join("\n")}\n`;
-    assertNoFabricatedProgress(text);
+    if (!inSplash) assertNoFabricatedProgress(text);
     for (const line of lines) {
       if (visibleWidth(line) > viewport.columns) {
         throw new Error("PI-I: visible width exceeds columns");
@@ -1815,7 +2133,7 @@ export function createInlineStudioRenderer(options = {}) {
 
     if (useAltScreen) {
       if (!altScreenActive) {
-        emitFrame(`${ENTER_ALT}${HIDE_CURSOR}${HOME}`);
+        emitFrame(`${ENTER_ALT}${HIDE_CURSOR}${HOME}${ERASE_BELOW}`);
         altScreenActive = true;
         cursorHidden = true;
         forceFull = true;
@@ -1824,7 +2142,9 @@ export function createInlineStudioRenderer(options = {}) {
         columns: viewport.columns,
         forceFull: forceFull || needsReanchor || prevLines.length === 0,
       });
-      emitFrame(frame);
+      // Always assert single-width cells before paint (guards Terminal.app
+      // against a prior DEC #3/#6 attribute leaking into the live canvas).
+      emitFrame(`${DEC_SINGLE_WIDTH}${frame}`);
       prevLines = lines.slice();
       prevHeight = lines.length;
       needsReanchor = false;
@@ -1916,6 +2236,46 @@ export function createInlineStudioRenderer(options = {}) {
     } catch {
       // ignore
     }
+
+    // CRITICAL lifecycle: enter alternate screen BEFORE any splash/brand paint.
+    // Brand written to the normal buffer is hidden for the whole session and
+    // only reappears after EXIT_ALT — that was the operator-visible bug.
+    if (enabled && useAltScreen && !altScreenActive) {
+      emitFrame(`${ENTER_ALT}${HIDE_CURSOR}${HOME}${ERASE_BELOW}`);
+      altScreenActive = true;
+      cursorHidden = true;
+      forceFull = true;
+      prevLines = [];
+      prevHeight = 0;
+    }
+
+    // Opening presence: large animated PATH logo (~2.2s) INSIDE alt-screen,
+    // then compact PATH ● Code stays on row 0 of every living frame.
+    if (enabled && useAltScreen && splashUntil === 0) {
+      splashTick = 0;
+      splashUntil = Date.now() + 2000;
+      splashTimer = setInterval(() => {
+        if (!active) {
+          stopSplash();
+          return;
+        }
+        splashTick += 1;
+        forceFull = true;
+        if (Date.now() >= splashUntil) {
+          stopSplash();
+          forceFull = true;
+          paintNow();
+          return;
+        }
+        paintNow();
+      }, 120);
+      if (typeof splashTimer.unref === "function") splashTimer.unref();
+      forceFull = true;
+      paintNow();
+    } else if (enabled && !useAltScreen) {
+      forceFull = true;
+      paintNow();
+    }
     if (enabled && typeof stdout.on === "function" && resizeListener === null) {
       resizeListener = () => {
         if (!active) return;
@@ -1932,6 +2292,7 @@ export function createInlineStudioRenderer(options = {}) {
    * and compact session history.
    */
   function startTask() {
+    stopSplash();
     const keep = {
       sessionHistory: Array.isArray(state.product?.sessionHistory)
         ? state.product.sessionHistory.slice()
@@ -1954,6 +2315,15 @@ export function createInlineStudioRenderer(options = {}) {
     state.product.ag1 = keep.ag1;
     state.product.awaitingInput = false;
     state.product.cockpitPrompt = null;
+    state.product.taskStartedAt = Date.now();
+    state.product.streamScroll = 0;
+    state.product.streamHistory = [
+      {
+        kind: "activity",
+        title: "Starting",
+        detail: "Admitting project and preparing the engineering session",
+      },
+    ];
     forceFull = true;
     dirty = true;
     try {
@@ -1962,7 +2332,9 @@ export function createInlineStudioRenderer(options = {}) {
     } catch {
       // ignore
     }
-    scheduleFrame();
+    // Paint immediately so PATH ● Code never disappears between tasks.
+    clearPending();
+    paintNow();
   }
 
   /**
@@ -1973,6 +2345,8 @@ export function createInlineStudioRenderer(options = {}) {
    */
   function setIdlePrompt(promptText) {
     if (!sessionOwned) begin();
+    // Do not kill the opening splash — let it finish, then idle home appears.
+    // Stopping splash here made the logo flash and vanish.
     active = true;
     state.product.ag1 = true;
     state.product.awaitingInput = true;
@@ -1981,9 +2355,13 @@ export function createInlineStudioRenderer(options = {}) {
         ? promptText
         : "PATH ● Code > ";
     forceFull = true;
+    if (Date.now() < splashUntil) {
+      // Splash owns the frame; idle content paints when splash ends.
+      dirty = true;
+      return;
+    }
     clearPending();
     paintNow();
-    // Keep cursor hidden; PATH renderer owns the composer row.
     try {
       stdout.write(HIDE_CURSOR);
       cursorHidden = true;
@@ -2011,6 +2389,26 @@ export function createInlineStudioRenderer(options = {}) {
     if (typeof next.pasteActive === "boolean") {
       state.product.composerPasteActive = next.pasteActive;
     }
+    if (sessionOwned && active) {
+      dirty = true;
+      scheduleFrame();
+    }
+  }
+
+  /**
+   * Pause auto-follow when delta > 0 (scroll up into history).
+   * delta < 0 moves toward latest; 0 resets follow.
+   * @param {number} delta
+   */
+  function adjustStreamScroll(delta) {
+    if (!state.product) return;
+    const cur =
+      typeof state.product.streamScroll === "number"
+        ? state.product.streamScroll
+        : 0;
+    // Cap by an upper bound; paint clamps to available stream lines.
+    const next = Math.max(0, Math.min(50_000, cur + Math.floor(delta || 0)));
+    state.product.streamScroll = next;
     if (sessionOwned && active) {
       dirty = true;
       scheduleFrame();
@@ -2062,7 +2460,102 @@ export function createInlineStudioRenderer(options = {}) {
     if (!active) {
       begin();
     }
+    const type = typeof event?.type === "string" ? event.type : "";
+    // Soft lifecycle events must NOT kill the opening splash — otherwise
+    // session.started/preflight (fired immediately after begin) erase it.
+    const softLifecycle =
+      type === "session.started" ||
+      type === "session.preflight" ||
+      type === "session.disclosure" ||
+      type === "session.authority";
+    if (!softLifecycle) {
+      stopSplash();
+    }
     applyStudioEvent(state, event, { decorateGate2Accepted });
+
+    // Authoritative completion report from full living product state (stream + checks).
+    if (
+      type === "session.terminal" ||
+      type === "session.engineering.result" ||
+      type === "session.cancelled"
+    ) {
+      try {
+        const pack = materializeEngineeringReport(state.product, {
+          session: {
+            classification:
+              typeof state.product.resultClassification === "string"
+                ? state.product.resultClassification
+                : undefined,
+            disposition:
+              typeof state.product.terminalDisposition === "string"
+                ? state.product.terminalDisposition
+                : typeof event.disposition === "string"
+                  ? event.disposition
+                  : undefined,
+            objective:
+              typeof state.product.taskObjective === "string"
+                ? state.product.taskObjective
+                : typeof state.product.taskPreview === "string"
+                  ? state.product.taskPreview
+                  : undefined,
+            terminalSummary:
+              typeof state.product.terminalSummary === "string"
+                ? state.product.terminalSummary
+                : undefined,
+            engineeringHandoff:
+              typeof state.product.engineeringHandoff === "string"
+                ? state.product.engineeringHandoff
+                : undefined,
+            durationMs:
+              typeof state.product.durationMs === "number"
+                ? state.product.durationMs
+                : undefined,
+            timingSummary:
+              state.product.timingSummary &&
+              typeof state.product.timingSummary === "object"
+                ? state.product.timingSummary
+                : undefined,
+            taskBranch:
+              typeof state.product.taskBranch === "string"
+                ? state.product.taskBranch
+                : undefined,
+            commitSha:
+              typeof state.product.resultSha === "string"
+                ? state.product.resultSha
+                : undefined,
+            baselineSha:
+              typeof state.product.baselineSha === "string"
+                ? state.product.baselineSha
+                : undefined,
+            inspectCommand:
+              typeof state.product.inspectCommand === "string"
+                ? state.product.inspectCommand
+                : undefined,
+            preservedPath:
+              typeof state.product.preservedArtifact === "string"
+                ? state.product.preservedArtifact
+                : undefined,
+            changedFiles: Array.isArray(state.product.projectFiles)
+              ? state.product.projectFiles
+              : undefined,
+            advancesSession: state.product.advancesSession === true,
+          },
+        });
+        state.product.engineeringReportPlain = pack.plain;
+        if (pack.reportPath) {
+          state.product.engineeringReportPath = pack.reportPath;
+        }
+        // Snap to report only when the operator was already following latest.
+        if (
+          typeof state.product.streamScroll !== "number" ||
+          state.product.streamScroll === 0
+        ) {
+          state.product.streamScroll = 0;
+        }
+      } catch {
+        // Report materialization must never crash the living UI.
+      }
+    }
 
     if (!enabled) {
       const plain = renderSessionEventHuman(event);
@@ -2077,6 +2570,12 @@ export function createInlineStudioRenderer(options = {}) {
       return;
     }
 
+    // While splash owns the screen, keep applying state but do not paint over it.
+    if (Date.now() < splashUntil) {
+      dirty = true;
+      return;
+    }
+    syncHeartbeat();
     scheduleFrame();
   }
 
@@ -2103,6 +2602,17 @@ export function createInlineStudioRenderer(options = {}) {
     return state;
   }
 
+  /**
+   * Show a durable in-canvas notice (e.g. /report confirmation) without
+   * blanking the completion report.
+   * @param {string} text
+   */
+  function setReportActionNotice(text) {
+    state.product.reportActionNotice =
+      typeof text === "string" && text.trim() ? text.trim() : null;
+    scheduleFrame();
+  }
+
   /** Test / proof introspection. */
   function stats() {
     return {
@@ -2126,6 +2636,7 @@ export function createInlineStudioRenderer(options = {}) {
     startTask,
     setIdlePrompt,
     setComposerState,
+    adjustStreamScroll,
     onEvent,
     noteExternalWrite,
     noteDiagnostic,
@@ -2134,6 +2645,7 @@ export function createInlineStudioRenderer(options = {}) {
     restoreTerminalState,
     isActive,
     getState,
+    setReportActionNotice,
     stats,
     restoreCursor,
     detachResize,

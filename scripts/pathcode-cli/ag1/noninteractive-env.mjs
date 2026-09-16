@@ -14,11 +14,12 @@ export function buildNoninteractiveEngineeringEnv(base = process.env) {
   env.GCM_INTERACTIVE = "never";
   // Hint for PATH-owned wrappers / diagnostics — not a project CI mode.
   env.PATHCODE_NONINTERACTIVE = "1";
-  // Discourage child shells from rewriting the Terminal window title while
-  // PATH owns the living session (OSC leakage → "node" / script names).
+  // Discourage child shells / scripts from rewriting the Terminal window title
+  // while PATH owns the living session (OSC leakage → "node" / script names).
   env.PROMPT_COMMAND = "";
   env.TERMINAL_TITLE = "";
-  // Never attach a controlling TTY to autonomous engineering children.
+  // Python / misc CLIs sometimes surface argv fragments in Terminal.app titles.
+  env.PYTHONEXECUTABLE = env.PYTHONEXECUTABLE || "";
   delete env.FORCE_COLOR;
   // Do not invent global CI mode.
   // Callers that need project-defined CI should set it explicitly per command.

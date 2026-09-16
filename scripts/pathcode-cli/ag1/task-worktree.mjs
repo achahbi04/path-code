@@ -2,8 +2,8 @@
  * AG1/AG2 — isolated Git task worktree (primary checkout must remain untouched).
  */
 
-import { mkdirSync, existsSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { mkdirSync, existsSync, rmSync, readFileSync, copyFileSync, statSync } from "node:fs";
+import { join, resolve, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 
@@ -40,22 +40,47 @@ function git(cwd, args, opts = {}) {
  * @param {string} repoRoot
  */
 export function capturePrimaryFingerprint(repoRoot) {
+  const inside = git(repoRoot, ["rev-parse", "--is-inside-work-tree"]);
+  if (inside.status !== 0 || inside.stdout.trim() !== "true") {
+    return {
+      head: null,
+      branch: null,
+      porcelain: null,
+      ok: true,
+      unversioned: true,
+    };
+  }
   const head = git(repoRoot, ["rev-parse", "HEAD"]);
   const status = git(repoRoot, ["status", "--porcelain=v1", "-uall"]);
   const branch = git(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  // Unborn repo (init without commit) — still fingerprintable as unversioned bootstrap.
+  if (head.status !== 0) {
+    return {
+      head: null,
+      branch: branch.status === 0 ? branch.stdout.trim() : null,
+      porcelain: status.status === 0 ? status.stdout : null,
+      ok: true,
+      unversioned: true,
+    };
+  }
   return {
-    head: head.status === 0 ? head.stdout.trim() : null,
+    head: head.stdout.trim(),
     branch: branch.status === 0 ? branch.stdout.trim() : null,
     porcelain: status.status === 0 ? status.stdout : null,
-    ok: head.status === 0 && status.status === 0,
+    ok: status.status === 0,
+    unversioned: false,
   };
 }
 
 /**
- * @param {{ head: string | null, porcelain: string | null, ok?: boolean }} before
- * @param {{ head: string | null, porcelain: string | null, ok?: boolean }} after
+ * @param {{ head: string | null, porcelain: string | null, ok?: boolean, unversioned?: boolean }} before
+ * @param {{ head: string | null, porcelain: string | null, ok?: boolean, unversioned?: boolean }} after
  */
 export function primaryUntouched(before, after) {
+  // Unversioned / bootstrap in-place: primary IS the engineering workspace.
+  if (before?.unversioned === true || after?.unversioned === true) {
+    return true;
+  }
   return (
     before.ok !== false &&
     after.ok !== false &&
@@ -88,10 +113,156 @@ export function allocateTaskIdentity(primaryRoot, preferredId) {
 }
 
 /**
+ * Copy primary working-tree state into an isolated task worktree without
+ * mutating the primary checkout.
+ *
+ * Tracked edits: `git stash create` (no primary side effects) + apply in WT.
+ * Untracked project files: copied by porcelain path.
+ *
+ * @param {{
+ *   primaryRoot: string,
+ *   worktreePath: string,
+ * }} input
+ * @returns {{
+ *   ok: true,
+ *   adoptedTracked: boolean,
+ *   adoptedUntracked: number,
+ * } | {
+ *   ok: false,
+ *   code: string,
+ *   message: string,
+ * }}
+ */
+export function materializePrimaryWorkingTree(input) {
+  const primaryRoot = resolve(input.primaryRoot);
+  const worktreePath = resolve(input.worktreePath);
+  const before = capturePrimaryFingerprint(primaryRoot);
+  if (!before.ok) {
+    return {
+      ok: false,
+      code: "AG1_PRIMARY_GIT_UNAVAILABLE",
+      message: `Cannot read primary Git state under ${primaryRoot}`,
+    };
+  }
+  if (!before.porcelain || before.porcelain.trim() === "") {
+    return { ok: true, adoptedTracked: false, adoptedUntracked: 0 };
+  }
+
+  let adoptedTracked = false;
+  const stash = git(primaryRoot, ["stash", "create"]);
+  const stashSha =
+    stash.status === 0 && /^[0-9a-f]{40}$/i.test(stash.stdout.trim())
+      ? stash.stdout.trim()
+      : null;
+  if (stashSha) {
+    // Prefer keeping index state when present; fall back to working-tree only.
+    let apply = git(worktreePath, [
+      "stash",
+      "apply",
+      "--quiet",
+      "--index",
+      stashSha,
+    ]);
+    if (apply.status !== 0) {
+      apply = git(worktreePath, ["stash", "apply", "--quiet", stashSha]);
+    }
+    if (apply.status !== 0) {
+      // Last resort: apply the stash patch as a plain diff.
+      const patch = git(primaryRoot, [
+        "stash",
+        "show",
+        "-p",
+        "--include-untracked",
+        stashSha,
+      ]);
+      if (patch.status === 0 && patch.stdout) {
+        const applied = spawnSync("git", ["apply", "--whitespace=nowarn", "-"], {
+          cwd: worktreePath,
+          input: patch.stdout,
+          encoding: "utf8",
+          timeout: 60_000,
+          env: {
+            ...process.env,
+            GIT_TERMINAL_PROMPT: "0",
+            GIT_OPTIONAL_LOCKS: "0",
+          },
+        });
+        if ((applied.status ?? 1) !== 0) {
+          return {
+            ok: false,
+            code: "AG1_ADOPT_WORKING_TREE_FAILED",
+            message:
+              apply.stderr ||
+              applied.stderr ||
+              "Failed to adopt primary working-tree changes into the task workspace",
+          };
+        }
+      } else {
+        return {
+          ok: false,
+          code: "AG1_ADOPT_WORKING_TREE_FAILED",
+          message:
+            apply.stderr ||
+            apply.stdout ||
+            "Failed to adopt primary working-tree changes into the task workspace",
+        };
+      }
+    }
+    adoptedTracked = true;
+  }
+
+  let adoptedUntracked = 0;
+  for (const line of before.porcelain.split("\n")) {
+    if (!line || line.length < 4) continue;
+    const code = line.slice(0, 2);
+    if (code !== "??" && code !== "A " && code[0] !== "?") continue;
+    // Porcelain path; handle renames sparingly — untracked are simple.
+    let rel = line.slice(3);
+    if (rel.startsWith('"') && rel.endsWith('"')) {
+      // Best-effort unescape of quoted paths.
+      rel = rel.slice(1, -1).replace(/\\([\\"ntr])/g, (_, c) => {
+        if (c === "n") return "\n";
+        if (c === "t") return "\t";
+        if (c === "r") return "\r";
+        return c;
+      });
+    }
+    if (!rel || rel.endsWith("/")) continue;
+    const src = join(primaryRoot, rel);
+    const dest = join(worktreePath, rel);
+    try {
+      if (!existsSync(src) || !statSync(src).isFile()) continue;
+      mkdirSync(dirname(dest), { recursive: true });
+      if (!existsSync(dest)) {
+        copyFileSync(src, dest);
+        adoptedUntracked += 1;
+      }
+    } catch {
+      // Skip unreadable paths; tracked adopt already carried the durable edits.
+    }
+  }
+
+  const after = capturePrimaryFingerprint(primaryRoot);
+  if (!primaryUntouched(before, after)) {
+    return {
+      ok: false,
+      code: "AG1_PRIMARY_TOUCHED",
+      message:
+        "Primary checkout changed while adopting working-tree state into the task workspace.",
+    };
+  }
+
+  return { ok: true, adoptedTracked, adoptedUntracked };
+}
+
+/**
  * Create an isolated linked worktree for one engineering task.
  *
- * AG2: checks out a unique local branch `path/task-<id>` at baselineCommit
- * (sessionBaseCommit or admitted primary HEAD).
+ * Checks out a unique local branch `path/task-<id>` at baselineCommit
+ * (sessionBaseCommit or primary HEAD). Detached primary HEAD is fine — the
+ * task branch is created at that commit. When the primary working tree is
+ * dirty and the baseline is the primary HEAD, current modifications are
+ * adopted into the task workspace without mutating the primary.
  *
  * @param {{
  *   primaryRoot: string,
@@ -100,6 +271,7 @@ export function allocateTaskIdentity(primaryRoot, preferredId) {
  *   tasksParent?: string,
  *   checkoutRoot?: string,
  *   runtimeRoot?: string,
+ *   adoptPrimaryWorkingTree?: boolean,
  * }} input
  */
 export function createTaskWorktree(input) {
@@ -112,15 +284,37 @@ export function createTaskWorktree(input) {
   // installed package tree, which must remain a relocatable read-only asset).
   const tasksParent =
     input.tasksParent ?? join(runtimeRoot, "ag1-tasks");
+  const adoptPrimaryWorkingTree = input.adoptPrimaryWorkingTree !== false;
 
   mkdirSync(tasksParent, { recursive: true });
 
   const before = capturePrimaryFingerprint(primaryRoot);
-  if (!before.ok || !before.head) {
+  if (!before.ok) {
     return {
       ok: false,
       code: "AG1_PRIMARY_GIT_UNAVAILABLE",
       message: `Cannot read primary Git state under ${primaryRoot}`,
+    };
+  }
+
+  // Unversioned existing project: engineer in-place on the primary until Git
+  // exists. Do not invent a fake .git, and never delete the primary on cleanup.
+  if (before.unversioned === true || !before.head) {
+    const { taskId } = allocateTaskIdentity(primaryRoot, input.taskId);
+    return {
+      ok: true,
+      taskId,
+      taskBranch: null,
+      worktreePath: resolve(primaryRoot),
+      baseline: {
+        head: null,
+        branch: null,
+        porcelain: before.porcelain,
+        unversioned: true,
+      },
+      primaryBefore: before,
+      adoptedWorkingTree: null,
+      bootstrapMode: "unversioned_inplace",
     };
   }
 
@@ -151,6 +345,7 @@ export function createTaskWorktree(input) {
   }
 
   // Named branch at the session baseline — durable artifact; worktree is ephemeral.
+  // Works from detached HEAD: -b creates path/task-* at the exact commit.
   const add = git(primaryRoot, [
     "worktree",
     "add",
@@ -165,6 +360,27 @@ export function createTaskWorktree(input) {
       code: "AG1_WORKTREE_ADD_FAILED",
       message: add.stderr || add.stdout || "git worktree add failed",
     };
+  }
+
+  /** @type {{ ok: true, adoptedTracked: boolean, adoptedUntracked: number } | null} */
+  let adopted = null;
+  const shouldAdopt =
+    adoptPrimaryWorkingTree &&
+    typeof before.porcelain === "string" &&
+    before.porcelain.trim() !== "" &&
+    baselineCommit === before.head;
+
+  if (shouldAdopt) {
+    const materialize = materializePrimaryWorkingTree({
+      primaryRoot,
+      worktreePath,
+    });
+    if (!materialize.ok) {
+      git(primaryRoot, ["worktree", "remove", "--force", worktreePath]);
+      git(primaryRoot, ["branch", "-D", taskBranch]);
+      return materialize;
+    }
+    adopted = materialize;
   }
 
   const after = capturePrimaryFingerprint(primaryRoot);
@@ -189,6 +405,8 @@ export function createTaskWorktree(input) {
       porcelain: before.porcelain,
     },
     primaryBefore: before,
+    adoptedWorkingTree: adopted,
+    bootstrapMode: null,
   };
 }
 
@@ -198,20 +416,31 @@ export function createTaskWorktree(input) {
  * @param {string} baselineHead
  */
 export function collectWorktreeResult(worktreePath, baselineHead) {
+  const inside = git(worktreePath, ["rev-parse", "--is-inside-work-tree"]);
+  if (inside.status !== 0 || inside.stdout.trim() !== "true") {
+    return {
+      ok: true,
+      porcelain: "",
+      diff: "",
+      diffStat: "",
+      changedFiles: [],
+      unversioned: true,
+    };
+  }
+
   const status = git(worktreePath, ["status", "--porcelain=v1", "-uall"]);
-  const diff = git(worktreePath, ["diff", "--no-ext-diff", baselineHead]);
-  const diffStat = git(worktreePath, [
-    "diff",
-    "--stat",
-    "--no-ext-diff",
-    baselineHead,
-  ]);
-  const nameOnly = git(worktreePath, [
-    "diff",
-    "--name-only",
-    "--no-ext-diff",
-    baselineHead,
-  ]);
+  const hasBaseline =
+    typeof baselineHead === "string" && /^[0-9a-f]{7,40}$/i.test(baselineHead);
+
+  const diff = hasBaseline
+    ? git(worktreePath, ["diff", "--no-ext-diff", baselineHead])
+    : git(worktreePath, ["diff", "--no-ext-diff", "HEAD"]);
+  const diffStat = hasBaseline
+    ? git(worktreePath, ["diff", "--stat", "--no-ext-diff", baselineHead])
+    : git(worktreePath, ["diff", "--stat", "--no-ext-diff", "HEAD"]);
+  const nameOnly = hasBaseline
+    ? git(worktreePath, ["diff", "--name-only", "--no-ext-diff", baselineHead])
+    : git(worktreePath, ["diff", "--name-only", "--no-ext-diff", "HEAD"]);
   const untracked = git(worktreePath, [
     "ls-files",
     "--others",
@@ -235,6 +464,168 @@ export function collectWorktreeResult(worktreePath, baselineHead) {
     diff: diff.status === 0 ? diff.stdout : "",
     diffStat: diffStat.status === 0 ? diffStat.stdout : "",
     changedFiles,
+    unversioned: false,
+  };
+}
+
+/** Basenames that dependency/setup tooling commonly mutates without intent. */
+export const INCIDENTAL_SETUP_BASENAMES = Object.freeze([
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "npm-shrinkwrap.json",
+  "Cargo.lock",
+  "poetry.lock",
+  "composer.lock",
+  "Gemfile.lock",
+  "go.sum",
+  "bun.lockb",
+  "bun.lock",
+]);
+
+/**
+ * True when the objective is a read-only assessment / inspect / report and
+ * must not produce incidental setup churn as the engineering result.
+ * Explicit dependency-upgrade / lockfile-update intents return false.
+ *
+ * @param {string} text
+ */
+export function isReadOnlyAssessmentObjective(text) {
+  const t = String(text || "");
+  if (!t.trim()) return false;
+  if (
+    /\b(upgrade|update|bump|refresh|pin)\b[\s\S]{0,40}\b(dependenc|lockfile|package-lock|pnpm-lock|yarn\.lock)\b/i.test(
+      t,
+    ) ||
+    /\b(dependenc|lockfile|package-lock)\b[\s\S]{0,40}\b(upgrade|update|bump|refresh)\b/i.test(
+      t,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /\bdo not (modify|change|edit|write|alter|touch)\b/i.test(t) ||
+    /\bwithout (modifying|changing|editing|altering|writing)\b/i.test(t) ||
+    /\bread-?only\b/i.test(t) ||
+    /\bno (file |code )?changes?\b/i.test(t)
+  ) {
+    return true;
+  }
+  const assess =
+    /\b(assess|inspect|check|review|audit|report|identify|findings?|investigate)\b/i.test(
+      t,
+    );
+  const modify =
+    /\b(fix|repair|implement|refactor|migrate|add |create |delete |remove |edit |modify|write |change )\b/i.test(
+      t,
+    );
+  return assess && !modify;
+}
+
+/**
+ * @param {string} filePath
+ */
+function isIncidentalSetupPath(filePath) {
+  const base = String(filePath || "").split(/[\\/]/).pop() || "";
+  return INCIDENTAL_SETUP_BASENAMES.some(
+    (name) => name.toLowerCase() === base.toLowerCase(),
+  );
+}
+
+/**
+ * Restore known setup-only files in the task worktree to the baseline commit
+ * so read-only assessments do not produce lockfile-only task commits.
+ *
+ * @param {{
+ *   worktreePath: string,
+ *   baselineHead: string,
+ *   objective: string,
+ * }} input
+ * @returns {{
+ *   applied: boolean,
+ *   restored: string[],
+ *   reason: string,
+ * }}
+ */
+export function restoreIncidentalSetupChurn(input) {
+  const worktreePath = resolve(input.worktreePath);
+  const baselineHead = String(input.baselineHead || "").trim();
+  if (!isReadOnlyAssessmentObjective(input.objective || "")) {
+    return { applied: false, restored: [], reason: "not_read_only" };
+  }
+  if (!/^[0-9a-f]{7,40}$/i.test(baselineHead)) {
+    return { applied: false, restored: [], reason: "no_baseline" };
+  }
+
+  const nameOnly = git(worktreePath, [
+    "diff",
+    "--name-only",
+    "--no-ext-diff",
+    baselineHead,
+  ]);
+  const untracked = git(worktreePath, [
+    "ls-files",
+    "--others",
+    "--exclude-standard",
+  ]);
+  const dirty = [
+    ...(nameOnly.status === 0
+      ? nameOnly.stdout.split("\n").map((s) => s.trim()).filter(Boolean)
+      : []),
+    ...(untracked.status === 0
+      ? untracked.stdout.split("\n").map((s) => s.trim()).filter(Boolean)
+      : []),
+  ];
+  const incidental = [...new Set(dirty.filter(isIncidentalSetupPath))];
+  if (incidental.length === 0) {
+    return { applied: false, restored: [], reason: "no_incidental" };
+  }
+  // Only restore when EVERY dirty path is incidental setup — never hide real edits.
+  const intentional = dirty.filter((p) => !isIncidentalSetupPath(p));
+  if (intentional.length > 0) {
+    return {
+      applied: false,
+      restored: [],
+      reason: "intentional_changes_present",
+    };
+  }
+
+  /** @type {string[]} */
+  const restored = [];
+  for (const rel of incidental) {
+    const tracked = git(worktreePath, [
+      "ls-tree",
+      "--name-only",
+      baselineHead,
+      "--",
+      rel,
+    ]);
+    if (tracked.status === 0 && tracked.stdout.trim()) {
+      const co = git(worktreePath, [
+        "checkout",
+        "-f",
+        baselineHead,
+        "--",
+        rel,
+      ]);
+      if (co.status === 0) restored.push(rel);
+    } else {
+      // Untracked setup artifact — remove from the task worktree.
+      try {
+        const abs = resolve(worktreePath, rel);
+        if (existsSync(abs)) {
+          rmSync(abs, { force: true });
+          restored.push(rel);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return {
+    applied: restored.length > 0,
+    restored,
+    reason: restored.length > 0 ? "restored" : "restore_failed",
   };
 }
 
@@ -274,11 +665,28 @@ export function reopenTaskWorktree(input) {
       : join(tasksParent, taskId),
   );
   const before = capturePrimaryFingerprint(primaryRoot);
-  if (!before.ok || !before.head) {
+  if (!before.ok) {
     return {
       ok: false,
       code: "AG1_PRIMARY_GIT_UNAVAILABLE",
       message: `Cannot read primary Git state under ${primaryRoot}`,
+    };
+  }
+  if (before.unversioned === true || !before.head) {
+    // Resume into in-place unversioned bootstrap (primary is the workspace).
+    return {
+      ok: true,
+      taskId,
+      taskBranch: null,
+      worktreePath: resolve(primaryRoot),
+      baseline: {
+        head: null,
+        branch: null,
+        porcelain: before.porcelain,
+        unversioned: true,
+      },
+      primaryBefore: before,
+      bootstrapMode: "unversioned_inplace",
     };
   }
 
@@ -365,6 +773,17 @@ export function reopenTaskWorktree(input) {
  * @param {{ prune?: boolean }} [opts]
  */
 export function removeTaskWorktree(primaryRoot, worktreePath, opts = {}) {
+  const primary = resolve(primaryRoot);
+  const target = resolve(worktreePath);
+  // Never delete an in-place unversioned bootstrap workspace (primary itself).
+  if (target === primary) {
+    return {
+      ok: true,
+      code: "BOOTSTRAP_INPLACE_KEPT",
+      primaryUntouched: true,
+      worktreePath: target,
+    };
+  }
   const before = capturePrimaryFingerprint(primaryRoot);
   const rm = git(primaryRoot, ["worktree", "remove", "--force", worktreePath]);
   if (rm.status !== 0 && existsSync(worktreePath)) {
@@ -419,4 +838,93 @@ export function listWorktrees(primaryRoot) {
   }
   if (cur.path) entries.push(/** @type {any} */ (cur));
   return { ok: true, entries, raw: listed.stdout };
+}
+
+/**
+ * Capture a bounded per-file unified diff for the living engineering surface.
+ * Falls back to an all-additions preview for new untracked files.
+ *
+ * @param {string} worktreePath
+ * @param {string} baselineHead
+ * @param {string} relPath
+ * @param {{ maxBytes?: number }} [opts]
+ * @returns {{ path: string, diff: string, added: number, removed: number }}
+ */
+export function captureFileDiffForUi(worktreePath, baselineHead, relPath, opts = {}) {
+  const maxBytes =
+    typeof opts.maxBytes === "number" && opts.maxBytes > 0
+      ? opts.maxBytes
+      : 12_000;
+  const path = String(relPath || "").replace(/^\.\//, "").trim();
+  if (!path || path.includes("\0")) {
+    return { path: "", diff: "", added: 0, removed: 0 };
+  }
+  const root = resolve(worktreePath);
+  let diffText = "";
+  if (baselineHead) {
+    const d = git(root, [
+      "diff",
+      "--no-ext-diff",
+      "--no-color",
+      "-U3",
+      baselineHead,
+      "--",
+      path,
+    ], { timeoutMs: 8_000 });
+    if (d.status === 0 && d.stdout.trim()) diffText = d.stdout;
+  }
+  if (!diffText) {
+    // Untracked / new file — synthesize an additions-only hunk.
+    try {
+      const abs = resolve(root, path);
+      if (existsSync(abs)) {
+        const body = readFileSync(abs, "utf8").slice(0, maxBytes);
+        const bodyLines = body.split("\n");
+        const hunk = [
+          `diff --git a/${path} b/${path}`,
+          `--- /dev/null`,
+          `+++ b/${path}`,
+          `@@ -0,0 +1,${bodyLines.length} @@`,
+          ...bodyLines.map((l) => `+${l}`),
+        ];
+        diffText = hunk.join("\n");
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (diffText.length > maxBytes) {
+    diffText = `${diffText.slice(0, maxBytes)}\n…`;
+  }
+  let added = 0;
+  let removed = 0;
+  for (const line of diffText.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) added += 1;
+    else if (line.startsWith("-") && !line.startsWith("---")) removed += 1;
+  }
+  return { path, diff: diffText, added, removed };
+}
+
+/**
+ * Bounded plaintext preview of a file for Read ops.
+ * @param {string} worktreePath
+ * @param {string} relPath
+ * @param {{ maxLines?: number }} [opts]
+ */
+export function captureFilePreviewForUi(worktreePath, relPath, opts = {}) {
+  const maxLines =
+    typeof opts.maxLines === "number" && opts.maxLines > 0
+      ? opts.maxLines
+      : 8;
+  const path = String(relPath || "").replace(/^\.\//, "").trim();
+  if (!path) return { path: "", preview: "" };
+  try {
+    const abs = resolve(worktreePath, path);
+    if (!existsSync(abs)) return { path, preview: "" };
+    const text = readFileSync(abs, "utf8");
+    const preview = text.split("\n").slice(0, maxLines).join("\n");
+    return { path, preview: preview.slice(0, 4_000) };
+  } catch {
+    return { path, preview: "" };
+  }
 }

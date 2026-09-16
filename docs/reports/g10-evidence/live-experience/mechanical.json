@@ -1,0 +1,39 @@
+{
+  "phase": "LIVE_ENGINEERING_SURFACE",
+  "at": "2026-09-15T14:03:35.108Z",
+  "startingHead": "9f9db58c918b4ee690f0a5053aa8ebfd8bc15cfe",
+  "checks": [
+    {
+      "id": "objective_crlf",
+      "ok": true,
+      "sample": "Inspect this project.\n\nFind the CLI entry.\nFix distribution."
+    },
+    {
+      "id": "stop_vs_steering",
+      "ok": true
+    },
+    {
+      "id": "open_canvas",
+      "ok": true,
+      "rows": 36,
+      "hasStop": true
+    },
+    {
+      "id": "title_format",
+      "ok": true,
+      "title": "path-code — PATH Code"
+    },
+    {
+      "id": "process_group_kill",
+      "ok": true,
+      "pid": 46147,
+      "results": [
+        {
+          "cleanup": "ok",
+          "cancelled": true
+        }
+      ]
+    }
+  ],
+  "pass": true
+}

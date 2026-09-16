@@ -2,17 +2,41 @@
  * Stable native Terminal window title for living PATH sessions.
  * Dynamic engineering status must never mutate the title.
  *
- * Child processes (node, copilot-runtime, harness scripts) often emit OSC 0/2
- * title sequences or change process.title — PATH reasserts ownership on paint
- * and strips leaked OSC title bytes from TTY writes while the session is owned.
+ * Root causes of title leakage (operator-proven):
+ * 1. Setting process.title to the same string as the OSC window title makes
+ *    Terminal.app show both → duplicated "<project> — PATH Code".
+ * 2. Child runtimes (Python bridge / Copilot) that become the tty foreground
+ *    process cause Terminal.app to append process name + argv (e.g. Python,
+ *    TMPDIR=...) when "Active process name / Arguments" are enabled.
+ * 3. Child OSC ]0;/]2; sequences on shared stdout/stderr overwrite the title.
+ *
+ * Fix:
+ * - OSC window title only: "<project> — PATH Code"
+ * - process.title kept to a non-informative placeholder (never product title,
+ *   never "node"/"python"/"copilot") so Terminal's process-name append is inert
+ * - Reclaim tty foreground process group while owned (tcsetpgrp) so children
+ *   cannot win the "active process" slot Terminal.app appends
+ * - Strip leaked OSC from stdout/stderr
+ * - Fast watchdog reassert while owned
+ * - Prefer raw fd writes for our OSC so stream guards cannot strip them
  */
+
+import { writeSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 
 const OSC = "\u001b]";
 const BEL = "\u0007";
-const ST = "\u001b\\";
 
 /** Matches OSC 0/1/2 title sequences terminated by BEL or ST. */
 export const OSC_TITLE_RE = /\u001b\][012];[^\u0007\u001b]*(?:\u0007|\u001b\\)/g;
+
+/**
+ * Placeholder process name while PATH owns the session.
+ * Must NOT be the product title (duplicates) and must not look like a provider
+ * or runtime (`node` / `python` / `copilot`). Zero-width space keeps Terminal's
+ * optional "active process name" append visually empty.
+ */
+const PROCESS_TITLE = "\u200b";
 
 /** @type {string | null} */
 let previousTitle = null;
@@ -34,6 +58,8 @@ let prevStderrWrite = null;
 let titleWatchdog = null;
 /** @type {boolean} */
 let writingOwnedTitle = false;
+/** @type {boolean | null} */
+let reclaimAvailable = null;
 
 /**
  * @param {string} projectName
@@ -54,6 +80,61 @@ export function stripOscTitleSequences(text) {
   if (typeof text !== "string" || text.length === 0) return text;
   if (!text.includes("\u001b]")) return text;
   return text.replace(OSC_TITLE_RE, "");
+}
+
+/**
+ * Force PATH's process group to own the tty foreground.
+ * Terminal.app appends the *foreground* process name/argv to the window title
+ * when that preference is enabled — OSC reassert alone cannot clear a child
+ * that has stolen the foreground (copilot / python / bridge).
+ *
+ * Children keep pipes/stdio; we only restore which process group Terminal
+ * considers "active". Safe no-op when /dev/tty is unavailable.
+ *
+ * @returns {boolean} true when reclaim was attempted successfully
+ */
+export function reclaimTtyForeground() {
+  if (process.platform === "win32") return false;
+  if (reclaimAvailable === false) return false;
+  let pgrp;
+  try {
+    pgrp =
+      typeof process.getpgrp === "function" ? process.getpgrp() : process.pid;
+  } catch {
+    pgrp = process.pid;
+  }
+  if (typeof pgrp !== "number" || pgrp <= 0) return false;
+
+  const py =
+    (typeof process.env.PATHCODE_PYTHON === "string" &&
+      process.env.PATHCODE_PYTHON.trim()) ||
+    "python3";
+  const script = [
+    "import os, sys",
+    "try:",
+    "  fd = os.open('/dev/tty', os.O_RDWR | os.O_NOCTTY)",
+    `  os.tcsetpgrp(fd, ${Math.floor(pgrp)})`,
+    "  os.close(fd)",
+    "  sys.exit(0)",
+    "except Exception:",
+    "  sys.exit(1)",
+  ].join("\n");
+  try {
+    const r = spawnSync(py, ["-c", script], {
+      timeout: 250,
+      stdio: "ignore",
+      env: {
+        PATH: process.env.PATH,
+        PATHCODE_NONINTERACTIVE: "1",
+      },
+    });
+    const ok = r.status === 0;
+    if (reclaimAvailable == null) reclaimAvailable = ok;
+    return ok;
+  } catch {
+    reclaimAvailable = false;
+    return false;
+  }
 }
 
 /**
@@ -81,8 +162,14 @@ export function setStablePathTitle(opts = {}) {
   installStreamTitleGuards();
   writeOwnedTitle();
   try {
-    // Terminal.app often shows process.title when children run; keep it stable.
-    process.title = title.slice(0, 64);
+    // Do NOT mirror the product title into process.title — Terminal.app would
+    // render OSC title + process title as a duplicated string.
+    process.title = PROCESS_TITLE;
+  } catch {
+    // ignore
+  }
+  try {
+    reclaimTtyForeground();
   } catch {
     // ignore
   }
@@ -122,6 +209,9 @@ function installStreamTitleGuards() {
     if (typeof process.stderr?.write === "function") {
       prevStderrWrite = process.stderr.write.bind(process.stderr);
       process.stderr.write = function pathTitleStderrWrite(chunk, encoding, cb) {
+        if (writingOwnedTitle) {
+          return prevStderrWrite(chunk, encoding, cb);
+        }
         let next = chunk;
         if (typeof chunk === "string" && chunk.includes("\u001b]")) {
           next = stripOscTitleSequences(chunk);
@@ -141,11 +231,21 @@ function installStreamTitleGuards() {
     titleWatchdog = setInterval(() => {
       if (!titleOwned) return;
       try {
+        process.title = PROCESS_TITLE;
+      } catch {
+        // ignore
+      }
+      try {
+        reclaimTtyForeground();
+      } catch {
+        // ignore
+      }
+      try {
         reassertPathTitle();
       } catch {
         // ignore
       }
-    }, 1500);
+    }, 200);
     if (typeof titleWatchdog.unref === "function") titleWatchdog.unref();
   }
 }
@@ -182,7 +282,7 @@ export function reassertPathTitle() {
   if (!titleOwned || !ownedTitle) return;
   writeOwnedTitle();
   try {
-    process.title = ownedTitle.slice(0, 64);
+    process.title = PROCESS_TITLE;
   } catch {
     // ignore
   }
@@ -190,22 +290,28 @@ export function reassertPathTitle() {
 
 function writeOwnedTitle() {
   if (!ownedTitle) return;
-  const payload = `${OSC}0;${ownedTitle}${BEL}`;
+  // Clear then set window title (OSC 2). Avoid leaving stale icon/title fragments.
+  const payload = `${OSC}0;${BEL}${OSC}2;${ownedTitle}${BEL}`;
+  writingOwnedTitle = true;
   try {
+    try {
+      if (typeof process.stdout?.fd === "number") {
+        writeSync(process.stdout.fd, payload);
+        return;
+      }
+    } catch {
+      // fall through to stream write
+    }
     const stdout = ownedStdout ?? process.stdout;
     if (!stdout || typeof stdout.write !== "function") return;
-    writingOwnedTitle = true;
-    try {
-      // Prefer raw process.stdout write so stream guards do not strip our title.
-      if (stdout === process.stdout && prevStdoutWrite) {
-        prevStdoutWrite(payload);
-      } else {
-        stdout.write(payload);
-      }
-    } finally {
-      writingOwnedTitle = false;
+    if (stdout === process.stdout && prevStdoutWrite) {
+      prevStdoutWrite(payload);
+    } else {
+      stdout.write(payload);
     }
   } catch {
+    // ignore
+  } finally {
     writingOwnedTitle = false;
   }
 }
@@ -216,24 +322,28 @@ function writeOwnedTitle() {
  */
 export function restoreTerminalTitle(opts = {}) {
   if (!titleOwned) return;
-  const stdout = opts.stdout ?? ownedStdout ?? process.stdout;
   const restorePayload = previousTitle
-    ? `${OSC}0;${previousTitle}${BEL}`
-    : `${OSC}0;${ST}${OSC}0;${BEL}`;
+    ? `${OSC}0;${BEL}${OSC}2;${previousTitle}${BEL}`
+    : `${OSC}0;${BEL}${OSC}2;${BEL}`;
+  writingOwnedTitle = true;
   try {
-    if (stdout && typeof stdout.write === "function") {
-      writingOwnedTitle = true;
-      try {
-        if (stdout === process.stdout && prevStdoutWrite) {
-          prevStdoutWrite(restorePayload);
-        } else {
-          stdout.write(restorePayload);
+    try {
+      if (typeof process.stdout?.fd === "number") {
+        writeSync(process.stdout.fd, restorePayload);
+      } else {
+        const stdout = opts.stdout ?? ownedStdout ?? process.stdout;
+        if (stdout && typeof stdout.write === "function") {
+          if (stdout === process.stdout && prevStdoutWrite) {
+            prevStdoutWrite(restorePayload);
+          } else {
+            stdout.write(restorePayload);
+          }
         }
-      } finally {
-        writingOwnedTitle = false;
       }
+    } catch {
+      // ignore
     }
-  } catch {
+  } finally {
     writingOwnedTitle = false;
   }
   try {
@@ -251,6 +361,7 @@ export function restoreTerminalTitle(opts = {}) {
   ownedTitle = "";
   previousProcessTitle = null;
   ownedStdout = null;
+  reclaimAvailable = null;
 }
 
 export function isPathTitleOwned() {

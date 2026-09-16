@@ -82,39 +82,77 @@ afterAll(() => {
   }
 });
 
-describe("AG2 A — dirty primary refused", () => {
-  it("DIRTY_PRIMARY_TREE and no worktree created", async () => {
+describe("AG2 A — dirty primary admitted and adopted", () => {
+  it("admits dirty tree; task worktree receives working-tree state; primary untouched", async () => {
     const { admitPrimaryCheckout } = await load("admission.mjs");
-    const { createTaskWorktree, listWorktrees } = await load("task-worktree.mjs");
+    const {
+      createTaskWorktree,
+      capturePrimaryFingerprint,
+      primaryUntouched,
+      removeTaskWorktree,
+    } = await load("task-worktree.mjs");
     const root = makeScratch("ag2-dirty-");
     const primary = join(root, "primary");
     initRepo(primary);
     writeFileSync(join(primary, "DIRTY.txt"), "x\n", "utf8");
+    writeFileSync(join(primary, "src", "sum.js"), "export function sum(a, b) { return a + b + 1; }\n", "utf8");
+    const before = capturePrimaryFingerprint(primary);
     const admission = admitPrimaryCheckout(primary);
-    expect(admission.ok).toBe(false);
-    if (!admission.ok) {
-      expect(admission.code).toBe("DIRTY_PRIMARY_TREE");
+    expect(admission.ok).toBe(true);
+    if (admission.ok) {
+      expect(admission.dirty).toBe(true);
+      expect(admission.detached).toBe(false);
     }
-    // Caller must not create worktree after refusal — prove create would still
-    // be gated by product session; here we assert admission blocks first.
-    const before = listWorktrees(primary);
-    expect(before.ok).toBe(true);
-    expect(before.entries.length).toBe(1); // primary only
-    void createTaskWorktree;
+    const wt = createTaskWorktree({
+      primaryRoot: primary,
+      tasksParent: join(root, "tasks"),
+      checkoutRoot: CHECKOUT_ROOT,
+    });
+    expect(wt.ok).toBe(true);
+    expect(existsSync(join(wt.worktreePath, "DIRTY.txt"))).toBe(true);
+    expect(readFileSync(join(wt.worktreePath, "src", "sum.js"), "utf8")).toContain("a + b + 1");
+    const after = capturePrimaryFingerprint(primary);
+    expect(primaryUntouched(before, after)).toBe(true);
+    expect(existsSync(join(primary, "DIRTY.txt"))).toBe(true);
+    removeTaskWorktree(primary, wt.worktreePath);
   });
 });
 
-describe("AG2 B — detached HEAD blocked", () => {
-  it("DETACHED_HEAD_BLOCKED", async () => {
+describe("AG2 B — detached HEAD admitted", () => {
+  it("creates internal task branch from detached commit; primary untouched", async () => {
     const { admitPrimaryCheckout } = await load("admission.mjs");
+    const {
+      createTaskWorktree,
+      capturePrimaryFingerprint,
+      primaryUntouched,
+      removeTaskWorktree,
+    } = await load("task-worktree.mjs");
     const root = makeScratch("ag2-detach-");
     const primary = join(root, "primary");
     initRepo(primary);
     const head = git(primary, ["rev-parse", "HEAD"]).stdout.trim();
     git(primary, ["checkout", "--detach", head]);
+    const before = capturePrimaryFingerprint(primary);
     const admission = admitPrimaryCheckout(primary);
-    expect(admission.ok).toBe(false);
-    if (!admission.ok) expect(admission.code).toBe("DETACHED_HEAD_BLOCKED");
+    expect(admission.ok).toBe(true);
+    if (admission.ok) {
+      expect(admission.detached).toBe(true);
+      expect(admission.branch).toBeNull();
+      expect(admission.head).toBe(head);
+    }
+    const wt = createTaskWorktree({
+      primaryRoot: primary,
+      tasksParent: join(root, "tasks"),
+      checkoutRoot: CHECKOUT_ROOT,
+    });
+    expect(wt.ok).toBe(true);
+    expect(wt.taskBranch).toMatch(/^path\/task-/);
+    expect(git(primary, ["rev-parse", wt.taskBranch]).stdout.trim()).toBe(head);
+    const after = capturePrimaryFingerprint(primary);
+    expect(primaryUntouched(before, after)).toBe(true);
+    // Still detached on primary
+    expect(git(primary, ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.trim()).toBe("HEAD");
+    removeTaskWorktree(primary, wt.worktreePath);
   });
 });
 

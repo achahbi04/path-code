@@ -24,6 +24,7 @@ import {
 import { buildNoninteractiveEngineeringEnv } from "./noninteractive-env.mjs";
 import { sanitizeEngineEnvForPublication } from "../ag4/credential-isolation.mjs";
 import { sanitizeProjectCommandEnv } from "../ag5/project-env.mjs";
+import { registerProcess } from "../process-registry.mjs";
 
 /**
  * @typedef {{
@@ -209,7 +210,20 @@ export function createAntigravityEngineeringAgent(options = {}) {
       child = spawn(pythonPath, [bridgeScript], {
         stdio: ["pipe", "pipe", "pipe"],
         env: childEnv,
+        // New process group so the bridge cannot become Terminal.app's
+        // foreground tty process (avoids "Python" / argv / TMPDIR title leak).
+        detached: process.platform !== "win32",
       });
+      try {
+        registerProcess({
+          taskId: input.taskId,
+          kind: "antigravity_bridge",
+          command: `${pythonPath} ${bridgeScript}`,
+          child,
+        });
+      } catch {
+        // ignore registry failures
+      }
     } catch (err) {
       const message = err && /** @type {any} */ (err).message ? String(err.message) : "spawn threw";
       noteDiagnostic("spawn_throw", message);
@@ -220,6 +234,13 @@ export function createAntigravityEngineeringAgent(options = {}) {
       "spawn_ok",
       JSON.stringify({ pid: child.pid ?? null, pythonPath, bridgeScript }),
     );
+
+    try {
+      const { reclaimTtyForeground } = await import("../terminal-title.mjs");
+      reclaimTtyForeground();
+    } catch {
+      // Title reclaim is best-effort; bridge must still run.
+    }
 
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -349,7 +370,16 @@ export function createAntigravityEngineeringAgent(options = {}) {
             // ignore
           }
         }
-        proc.kill("SIGTERM");
+        // Detached spawn → kill the whole process group when possible.
+        if (typeof proc.pid === "number" && process.platform !== "win32") {
+          try {
+            process.kill(-proc.pid, "SIGTERM");
+          } catch {
+            proc.kill("SIGTERM");
+          }
+        } else {
+          proc.kill("SIGTERM");
+        }
       } catch {
         // ignore
       }
@@ -374,7 +404,15 @@ export function createAntigravityEngineeringAgent(options = {}) {
     await new Promise((resolve) => {
       const timer = setTimeout(() => {
         try {
-          proc.kill("SIGKILL");
+          if (typeof proc.pid === "number" && process.platform !== "win32") {
+            try {
+              process.kill(-proc.pid, "SIGKILL");
+            } catch {
+              proc.kill("SIGKILL");
+            }
+          } else {
+            proc.kill("SIGKILL");
+          }
         } catch {
           // ignore
         }

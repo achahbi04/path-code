@@ -24,6 +24,12 @@ export {
 } from "./copilot.mjs";
 
 export { extractEngineeringHandoff } from "./handoff.mjs";
+export {
+  extractEngineeringNarration,
+  busyLabelFromDetail,
+  isOperatorQuestion,
+  buildSteeringContinuePrompt,
+} from "./narration.mjs";
 
 export {
   AG8_MAX_REPAIR_ATTEMPTS,

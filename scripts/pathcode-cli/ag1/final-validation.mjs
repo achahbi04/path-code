@@ -17,6 +17,11 @@ import {
 import { discoverNativeValidationCandidates } from "../ag5/native-validation.mjs";
 import { buildTrialChildEnvironment } from "../child-env.mjs";
 import { sanitizeProjectCommandEnv } from "../ag5/project-env.mjs";
+import {
+  getCurrentTaskId,
+  killProcessTree,
+  registerProcess,
+} from "../process-registry.mjs";
 
 /**
  * @typedef {"VERIFIED" | "PARTIALLY_VERIFIED" | "FAILED" | "NOT_VERIFIED"} Ag1ResultClass
@@ -52,25 +57,31 @@ function runPreparedRequest(request, signal) {
       cwd: request.cwd,
       env: childEnv,
       stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
+    try {
+      registerProcess({
+        taskId: getCurrentTaskId(),
+        kind: "final_validation",
+        command: [request.executable, ...request.argv].join(" "),
+        child,
+      });
+    } catch {
+      // ignore
+    }
     let stdout = "";
     let stderr = "";
     let settled = false;
     const timer = setTimeout(() => {
       if (settled) return;
-      try {
-        child.kill("SIGKILL");
-      } catch {
-        // ignore
-      }
+      // Detached children form a process group — kill the group, not only the shell.
+      killProcessTree(child, "SIGKILL");
+      setTimeout(() => killProcessTree(child, "SIGKILL"), 250);
     }, request.timeoutMs);
 
     const onAbort = () => {
-      try {
-        child.kill("SIGTERM");
-      } catch {
-        // ignore
-      }
+      killProcessTree(child, "SIGTERM");
+      setTimeout(() => killProcessTree(child, "SIGKILL"), 500);
     };
     if (signal) {
       if (signal.aborted) onAbort();

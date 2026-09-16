@@ -1,0 +1,36 @@
+PATH ● Code                                                                                  Testing
+
+> Inspect
+
+> package distribution for ag8/ag9/ag10
+
+● Environment ready
+  typescript · javascript · node · npm
+
+● Read package.json
+
+● Update(package.json)
+  Added 1 line · removed 1 line
+  @@
+   0    0    "files": [
+   1      -    "scripts/pathcode-cli/ag7/**",
+        1 +    "scripts/pathcode-cli/ag8/**",
+   2    2  
+
+● Test
+  npm test
+  ✓ 1430 passed
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+> 
+────────────────────────────────────────────────────────────────────────────────────────────────────
+■ Stop   Ctrl-C   auto · path-code · running

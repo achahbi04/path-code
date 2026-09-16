@@ -1,0 +1,115 @@
+{
+  "pass": true,
+  "at": "2026-09-15T13:09:40.101Z",
+  "root": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-admit-live-EG6V2y",
+  "checks": [
+    {
+      "id": "clean_named_branch",
+      "ok": true,
+      "admission": {
+        "detached": false,
+        "dirty": false,
+        "branch": "main"
+      },
+      "taskBranch": "path/task-36a253ff-58ac-4066-b1b8-1c7f35d20950",
+      "preserved": true,
+      "reachedEngineering": true,
+      "events": [
+        "session.task.received",
+        "session.capability.preparing",
+        "session.capability.preparing",
+        "session.capability.discovered",
+        "session.engineering.tool",
+        "session.engineering.activity",
+        "session.engineering.tool",
+        "session.engineering.tool",
+        "session.engineering.result",
+        "gateway.task.finished"
+      ],
+      "status": "completed",
+      "classification": "VERIFIED"
+    },
+    {
+      "id": "clean_detached_head",
+      "ok": true,
+      "admission": {
+        "detached": true,
+        "dirty": false,
+        "branch": null
+      },
+      "taskBranch": "path/task-128bba94-0512-4ae3-a66f-61f1d24a5221",
+      "preserved": true,
+      "reachedEngineering": true,
+      "events": [
+        "session.task.received",
+        "session.capability.preparing",
+        "session.capability.preparing",
+        "session.capability.discovered",
+        "session.engineering.tool",
+        "session.engineering.activity",
+        "session.engineering.tool",
+        "session.engineering.tool",
+        "session.engineering.result",
+        "gateway.task.finished"
+      ],
+      "status": "completed",
+      "classification": "VERIFIED"
+    },
+    {
+      "id": "dirty_working_tree",
+      "ok": true,
+      "admission": {
+        "detached": false,
+        "dirty": true,
+        "branch": "main"
+      },
+      "taskBranch": "path/task-74c54b93-2c68-4a7f-b1b9-6bbab13b0d9b",
+      "preserved": true,
+      "reachedEngineering": true,
+      "events": [
+        "session.task.received",
+        "session.capability.preparing",
+        "session.capability.preparing",
+        "session.capability.discovered",
+        "session.engineering.tool",
+        "session.engineering.activity",
+        "session.engineering.tool",
+        "session.engineering.tool",
+        "session.engineering.result",
+        "gateway.task.finished"
+      ],
+      "status": "completed",
+      "classification": "VERIFIED"
+    },
+    {
+      "id": "dirty_primary_wip_preserved",
+      "ok": true
+    },
+    {
+      "id": "nordic_style_detached_worktree",
+      "ok": true,
+      "admission": {
+        "detached": true,
+        "dirty": false,
+        "branch": null
+      },
+      "taskBranch": "path/task-b2b4f67b-b00d-48da-a225-228e91c2d14d",
+      "preserved": true,
+      "reachedEngineering": true,
+      "events": [
+        "session.task.received",
+        "session.capability.preparing",
+        "session.capability.preparing",
+        "session.capability.discovered",
+        "session.engineering.tool",
+        "session.engineering.activity",
+        "session.engineering.tool",
+        "session.engineering.tool",
+        "session.engineering.result",
+        "gateway.task.finished"
+      ],
+      "status": "completed",
+      "classification": "VERIFIED"
+    }
+  ]
+}

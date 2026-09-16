@@ -1,0 +1,28 @@
+PATH ● Code                                                                          Running command
+
+  line-14
+
+● Run echo line-15
+  echo line-15
+  line-15
+
+● Run echo line-16
+  echo line-16
+  line-16
+
+● Run echo line-17
+  echo line-17
+  line-17
+
+● Run echo line-18
+  echo line-18
+  line-18
+
+● Run echo line-19
+  echo line-19
+  line-19
+                                  ↓ Jump to latest  ·  End / wheel
+────────────────────────────────────────────────────────────────────────────────────────────────────
+> 
+────────────────────────────────────────────────────────────────────────────────────────────────────
+■ Stop   Ctrl-C   auto · demo · running · elapsed 1m 00s

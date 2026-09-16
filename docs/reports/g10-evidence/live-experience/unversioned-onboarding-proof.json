@@ -1,0 +1,124 @@
+{
+  "phase": "NON_GIT_PROJECT_ONBOARDING",
+  "at": "2026-09-15T16:41:31.723Z",
+  "pass": true,
+  "checks": [
+    {
+      "id": "empty_dir_refused",
+      "ok": true,
+      "code": "NOT_A_PROJECT"
+    },
+    {
+      "id": "fixture_has_no_git",
+      "ok": true
+    },
+    {
+      "id": "looks_like_project",
+      "ok": true
+    },
+    {
+      "id": "resolve_unversioned_ok",
+      "ok": true,
+      "discovered": {
+        "ok": true,
+        "projectRoot": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-klarapp-shape-Huj5OC",
+        "gitRepositoryRoot": null,
+        "workingSubdir": "",
+        "invocationCwd": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-klarapp-shape-Huj5OC",
+        "gitDir": null,
+        "unversioned": true
+      },
+      "projReal": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-klarapp-shape-Huj5OC"
+    },
+    {
+      "id": "admit_unversioned_ok",
+      "ok": true,
+      "admission": {
+        "ok": true,
+        "head": null,
+        "branch": null,
+        "detached": false,
+        "dirty": true,
+        "porcelain": "",
+        "unversioned": true
+      }
+    },
+    {
+      "id": "bootstrap_inplace_worktree",
+      "ok": true,
+      "wt": {
+        "bootstrapMode": "unversioned_inplace",
+        "worktreePath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-klarapp-shape-Huj5OC",
+        "taskId": "7dfd3f14-433e-476e-ba50-7edc8cd1ab77"
+      }
+    },
+    {
+      "id": "cleanup_keeps_primary",
+      "ok": true,
+      "cleaned": {
+        "ok": true,
+        "code": "BOOTSTRAP_INPLACE_KEPT",
+        "primaryUntouched": true,
+        "worktreePath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-klarapp-shape-Huj5OC"
+      }
+    },
+    {
+      "id": "gateway_binds_unversioned",
+      "ok": true,
+      "bound": {
+        "ok": true,
+        "projectRoot": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-klarapp-shape-Huj5OC",
+        "workingSubdir": "",
+        "projectName": "path-klarapp-shape-Huj5OC",
+        "branch": "unversioned",
+        "clean": null,
+        "unversioned": true,
+        "runtimeRoot": "/Users/achahbi/.path-code/runtime/v1.0.1",
+        "packageRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+        "gatewayId": "gw-29a29f8c-bea0-4547-81d1-4f2be52563a9",
+        "protocolVersion": 1
+      }
+    },
+    {
+      "id": "ui_shows_unversioned_and_engineering",
+      "ok": true,
+      "productBranch": "unversioned",
+      "productUnversioned": true,
+      "frameHead": [
+        "PATH ● Code",
+        "",
+        "  src/lib/utils.ts:1:14 - error TS2322:",
+        "  Type 'string' is not assignable to type 'number'.",
+        "  ",
+        "  Found 1 error.",
+        "",
+        "● Copilot",
+        "  repairing validation failures",
+        "",
+        "● Typecheck",
+        "  npm run typecheck",
+        "  ✓ completed successfully",
+        "",
+        "✓ COMPLETE",
+        "",
+        "Objective",
+        "  Inspect this unversioned project and prepare source control (.gitignore, git init) when appropria…",
+        "",
+        "Engineering",
+        "  copilot",
+        "",
+        "Changed",
+        "  src/lib/utils.ts"
+      ]
+    },
+    {
+      "id": "klarapp_operator_path",
+      "ok": true,
+      "hasGit": false,
+      "looks": true,
+      "discoveredOk": true,
+      "unversioned": true,
+      "projectRoot": "/Users/achahbi/Downloads/Klarapp"
+    }
+  ]
+}

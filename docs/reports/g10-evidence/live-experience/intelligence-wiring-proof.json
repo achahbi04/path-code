@@ -1,0 +1,94 @@
+{
+  "ok": true,
+  "checks": [
+    {
+      "id": "copilot_assistant_maps_to_narration",
+      "ok": true,
+      "sessionType": "session.engineering.narration"
+    },
+    {
+      "id": "copilot_tool_start_carries_command",
+      "ok": true,
+      "toolSession": {
+        "type": "session.engineering.tool",
+        "kind": "command",
+        "tool": "run_command",
+        "summary": "run_command npm test",
+        "command": "npm test"
+      }
+    },
+    {
+      "id": "copilot_edit_maps_to_stream_tool",
+      "ok": true,
+      "editSession": {
+        "type": "session.engineering.tool",
+        "kind": "file_edit",
+        "tool": "edit_file",
+        "summary": "edit_file src/lib/utils.ts",
+        "path": "src/lib/utils.ts"
+      }
+    },
+    {
+      "id": "narration_strips_cot_keeps_explanation",
+      "ok": true,
+      "excerpt": "I'm checking the failing tests now. The production clamp helper already returns a number."
+    },
+    {
+      "id": "busy_heartbeat_from_real_state",
+      "ok": true,
+      "busyLabel": "Running tests"
+    },
+    {
+      "id": "stream_carries_narration_operator_tools",
+      "ok": true,
+      "historyKinds": [
+        "objective",
+        "narration",
+        "operator",
+        "narration",
+        "file_edit",
+        "collaborate",
+        "command"
+      ]
+    },
+    {
+      "id": "history_scrollable_after_complete",
+      "ok": true
+    },
+    {
+      "id": "collaborate_uses_path_labels",
+      "ok": true
+    },
+    {
+      "id": "timing_summary_on_result",
+      "ok": true,
+      "timingSummary": {
+        "providerWait": 45000,
+        "environment": 0,
+        "validation": 7000,
+        "steering": 0,
+        "engineHandoff": 0,
+        "unclassified": 0,
+        "total": 52000
+      }
+    },
+    {
+      "id": "plain_report_copyable",
+      "ok": true,
+      "reportChars": 719
+    },
+    {
+      "id": "gateway_fake_emits_narration_and_steer",
+      "ok": true,
+      "steered": {
+        "ok": true,
+        "taskId": "131456bf-6f91-4301-ab39-e90a45aec500",
+        "queued": true
+      },
+      "narrationCount": 2,
+      "noteCount": 2
+    }
+  ],
+  "failed": [],
+  "at": "2026-09-16T09:02:00.240Z"
+}

@@ -1,0 +1,78 @@
+{
+  "ok": true,
+  "phase": "S1_FINAL_CLOSURE",
+  "s2": "NOT_STARTED",
+  "checks": [
+    {
+      "id": "splash_no_dec_double_width",
+      "ok": true,
+      "mark": "PATH ● Code"
+    },
+    {
+      "id": "splash_centered_normal_cells",
+      "ok": true,
+      "pad": 34,
+      "brandW": 11
+    },
+    {
+      "id": "mouse_fragment_not_in_composer",
+      "ok": true,
+      "text": "",
+      "pendingEsc": ""
+    },
+    {
+      "id": "bare_mouse_digits_stripped",
+      "ok": true,
+      "text": "hello"
+    },
+    {
+      "id": "sgr_wheel_scrolls_history",
+      "ok": true,
+      "delta": 3
+    },
+    {
+      "id": "pageup_scrolls_history",
+      "ok": true,
+      "delta": 8
+    },
+    {
+      "id": "heartbeat_busy_label_present",
+      "ok": true,
+      "busyLabel": "Waiting for engineering result"
+    },
+    {
+      "id": "scroll_away_from_tail_shows_jump_or_older",
+      "ok": true
+    },
+    {
+      "id": "steering_ack_in_history",
+      "ok": true
+    },
+    {
+      "id": "partial_not_complete",
+      "ok": true,
+      "pathPhase": "Partially verified"
+    },
+    {
+      "id": "report_has_timing_and_objective",
+      "ok": true,
+      "reportChars": 1219
+    },
+    {
+      "id": "title_is_path_code_product",
+      "ok": true,
+      "title": "klarapp — PATH Code"
+    },
+    {
+      "id": "renderer_splash_geometry_clean",
+      "ok": true
+    },
+    {
+      "id": "alt_screen_enter_before_content",
+      "ok": true,
+      "note": "lifecycle covered by buffer-lifecycle proof; geometry asserted above"
+    }
+  ],
+  "failed": [],
+  "at": "2026-09-16T06:36:30.706Z"
+}

@@ -1,0 +1,20 @@
+■ BLOCKED
+
+PATH ● Code — Engineering report
+
+Asked
+  Do the thing
+
+Important discoveries
+  npm-test failed.
+
+Checks
+  ✕ npm-test
+
+Not completed
+  Task exceeded wall-clock budget.
+
+Remaining / operator action
+  Wall-clock budget was reached before verification completed — continue with a focused follow-up task.
+
+Type /report to copy this engineering report again.

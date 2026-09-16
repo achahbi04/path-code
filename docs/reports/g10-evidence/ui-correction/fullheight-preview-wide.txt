@@ -1,0 +1,42 @@
+PATH ● Code                                                                                               Peer
+
+● Preparing environment
+  toolchains
+
+● Peer
+  collaborating in the task workspace
+  via peer
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+> 
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+■ Stop   Ctrl-C   auto · pathcode-g10-operator-demo · running

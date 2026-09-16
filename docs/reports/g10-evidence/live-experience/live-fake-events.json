@@ -1,0 +1,21 @@
+{
+  "events": [
+    "session.task.received",
+    "session.capability.preparing",
+    "session.capability.preparing",
+    "session.capability.discovered",
+    "session.engineering.tool",
+    "session.engineering.tool",
+    "session.engineering.tool",
+    "session.engineering.tool",
+    "session.engineering.tool",
+    "session.capability.collaborate",
+    "session.engineering.tool",
+    "session.engineering.tool",
+    "session.capability.collaborate",
+    "session.engineering.tool",
+    "session.engineering.result",
+    "gateway.task.finished"
+  ],
+  "status": "completed"
+}

@@ -1,0 +1,40 @@
+PATH ● Code
+
+◐ PARTIAL
+
+PATH ● Code — Engineering report
+
+Asked
+  Fix the failing typecheck
+
+What PATH did
+  Guidance received. I'll apply it at the next safe engineering step.
+
+Important discoveries
+  Guidance received. I'll apply it at the next safe engineering step.
+
+Duration
+  1m 30s
+
+Changed
+  src/a.ts
+
+Commands
+  ✓ echo line-18
+  ✓ echo line-19
+  ✓ echo line-20
+  ✓ echo line-21
+  ✓ echo line-22
+  ✓ echo line-23
+  ✓ echo line-24
+  ✓ echo line-25
+  ✓ echo line-26
+  ✓ echo line-27
+  ✓ echo line-28
+  ✓ echo line-29
+
+Checks
+────────────────────────────────────────────────────────────────────────────────────────────────────
+> 
+────────────────────────────────────────────────────────────────────────────────────────────────────
+■ idle   auto · demo · task demo

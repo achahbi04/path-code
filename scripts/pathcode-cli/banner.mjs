@@ -99,8 +99,18 @@ Usage:
 
 At the prompt:
   <task>         Describe an engineering change in plain language
+  /stop          Cancel the active engineering task (not steering)
+  /report        Copy/export the plain-text engineering report
+  /log, /task    Show recent structured task trace lines
   /help          Show commands
   /exit          Leave
+
+While a task is running:
+  type naturally  steer the active session (not a command queue)
+  ■ Stop / Ctrl-C / /stop   cancel immediately
+  PageUp / wheel            scroll engineering history
+  PageDown                  follow latest again
+  /report                   copy the engineering report after completion
 
 Flags:
   --issue <n>    Load GitHub issue #n as task context; after VERIFIED,
@@ -114,5 +124,7 @@ Notes:
   - Verified work lands on a path/task-* branch for you to merge when ready
   - GitHub CLI auth is required only for --issue publication
   - First run bootstraps a private engine runtime automatically
+  - Client disconnect from an external Gateway does not cancel the task;
+    only explicit Stop / /stop / Ctrl-C does
 `;
 }

@@ -1,0 +1,101 @@
+PATH * Code
+path-pty2-ngtqo835 · main · clean
+
+[?2004l[?1049h[?25l[?25l
+
+
+
+
+
+
+                                        
+                       ██████╗  █████╗ ████████╗██╗  ██╗
+                       ██╔══██╗██╔══██╗╚══██╔══╝██║  ██║
+                       ██████╔╝███████║   ██║   ███████║
+                       ██╔═══╝ ██╔══██║   ██║   ██╔══██║
+                       ██║     ██║  ██║   ██║   ██║  ██║
+                       ╚═╝     ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝
+                                        
+                                  PATH ● Code
+                              engineering gateway
+
+
+
+
+
+
+
+[?25lPATH ● Code
+
+Ready for engineering
+
+Project  path-pty2-ngtqo835  ·  main
+
+Type an engineering objective below, then Enter.
+PATH will inspect, edit, test, and report in this canvas.
+
+Examples
+  > Add clamp(value, min, max) with node:test coverage
+  > Fix the package.json files list for distribution
+  > Investigate failing tests and repair them
+
+While a task runs
+  ■ Stop / Ctrl-C / /stop   cancel immediately
+  type guidance             steer the engines
+  /log                      inspect task trace
+  /exit                     leave PATH
+
+────────────────────────────────────────────────────────────────────────────────
+> 
+────────────────────────────────────────────────────────────────────────────────
+■ idle   auto · path-pty2-ngtqo835
+[?25l[?2004h[?1006h[?1007h[?1015h[?1000h[?2004l[?1000l[?1006l[?1007l[?1015l[?2004h[?1006h[?1007h[?1015h[?1000h[?25l[?25lPATH ● Code
+
+● Starting
+  Admitting project and preparing the engineering session
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+> 
+────────────────────────────────────────────────────────────────────────────────
+■ idle   auto · path-pty2-ngtqo835
+[?25lPATH ● Code                                                Testing · Ran 1 shell  │ ● Implementing● Update(src/demo.js)  Added 1 line · removed 1 line  @@ -1,3 +1,4 @@   1    1  export function demo() {   2      -  return 1;        2 +  return 2;   3    3  }   4    4  ● Test  npm test  cmd npm test  ✓ 1 passed■ Stop   Ctrl-C   auto · path-pty2-ngtqo835 · running[?2004l[?1000l[?1006l[?1007l[?1015l[?25lPATH ● Code                                                          Ran 1 shell
+
+
+Changed
+  src/demo.js
+
+Last activity
+  1 file(s) changed
+
+Reason
+  1 file(s)
+
+Checks
+  ✓ test
+
+Result
+  path/task-0064263b
+  commit deadbeef
+  No push performed
+
+────────────────────────────────────────────────────────────────────────────────
+> 
+────────────────────────────────────────────────────────────────────────────────
+■ idle   auto · path-pty2-ngtqo835 · task 0064263b
+[?25l[?2004h[?1006h[?1007h[?1015h[?1000h[?2004l[?1000l[?1006l[?1007l[?1015l[?25l[?25h[?1049l[?2004lGoodbye.
+[?2004l[?25h[?1049l[?2004l

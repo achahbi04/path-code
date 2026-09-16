@@ -1,0 +1,114 @@
+{
+  "eventTypes": [
+    "session.task.received",
+    "session.capability.preparing",
+    "session.capability.preparing",
+    "session.capability.discovered",
+    "session.engineering.tool",
+    "session.engineering.tool",
+    "session.engineering.tool",
+    "session.engineering.tool",
+    "session.engineering.tool",
+    "session.capability.collaborate",
+    "session.engineering.tool",
+    "session.engineering.tool",
+    "session.capability.collaborate",
+    "session.engineering.tool",
+    "session.engineering.result",
+    "gateway.task.finished"
+  ],
+  "history": [
+    {
+      "title": "Objective",
+      "hasPreview": false,
+      "hasDiff": false,
+      "hasOutput": false
+    },
+    {
+      "title": "Preparing environment",
+      "hasPreview": false,
+      "hasDiff": false,
+      "hasOutput": false
+    },
+    {
+      "title": "Preparing environment",
+      "hasPreview": false,
+      "hasDiff": false,
+      "hasOutput": false
+    },
+    {
+      "title": "Environment ready",
+      "hasPreview": false,
+      "hasDiff": false,
+      "hasOutput": false
+    },
+    {
+      "title": "Inspect directory",
+      "path": "src/lib/",
+      "hasPreview": true,
+      "hasDiff": false,
+      "hasOutput": false
+    },
+    {
+      "title": "Search",
+      "query": "\"__pathcodeTrial\" in src/",
+      "hasPreview": true,
+      "hasDiff": false,
+      "hasOutput": false
+    },
+    {
+      "title": "Read",
+      "path": "src/lib/utils.ts",
+      "hasPreview": true,
+      "hasDiff": false,
+      "hasOutput": false
+    },
+    {
+      "title": "Run",
+      "command": "node --version",
+      "hasPreview": false,
+      "hasDiff": false,
+      "hasOutput": true
+    },
+    {
+      "title": "Run",
+      "command": "/opt/homebrew/bin/node --version",
+      "hasPreview": false,
+      "hasDiff": false,
+      "hasOutput": true
+    },
+    {
+      "title": "Copilot",
+      "hasPreview": false,
+      "hasDiff": false,
+      "hasOutput": false
+    },
+    {
+      "title": "Update",
+      "path": "src/lib/utils.ts",
+      "hasPreview": false,
+      "hasDiff": true,
+      "hasOutput": false
+    },
+    {
+      "title": "Typecheck",
+      "command": "npm run typecheck",
+      "hasPreview": false,
+      "hasDiff": false,
+      "hasOutput": true
+    },
+    {
+      "title": "Copilot",
+      "hasPreview": false,
+      "hasDiff": false,
+      "hasOutput": false
+    },
+    {
+      "title": "Typecheck",
+      "command": "npm run typecheck",
+      "hasPreview": false,
+      "hasDiff": false,
+      "hasOutput": true
+    }
+  ]
+}

@@ -15,6 +15,8 @@ import {
   DISABLE_BRACKETED_PASTE,
   IDLE_COMPOSER_READY,
 } from "./composer.mjs";
+import { isTaskStopCommand } from "./task-control.mjs";
+import { normalizeObjectiveText } from "./normalize-text.mjs";
 
 /**
  * @typedef {{
@@ -133,6 +135,8 @@ export function createPromptSession(streams, options = {}) {
   let livingComposerEnabled = false;
   /** @type {((state: import("./composer.mjs").ComposerState) => void) | null} */
   let onComposerChange = null;
+  /** @type {((delta: number) => void) | null} */
+  let onStreamScroll = null;
   /** @type {import("./composer.mjs").ComposerState} */
   let composer = createComposerState();
   /** @type {((line: string | null) => void) | null} */
@@ -198,8 +202,14 @@ export function createPromptSession(streams, options = {}) {
   }
 
   function pushSteering(text) {
-    const trimmed = typeof text === "string" ? text.trim() : "";
+    const trimmed =
+      typeof text === "string" ? normalizeObjectiveText(text).trim() : "";
     if (!trimmed) return;
+    // Task Stop is control, never steering.
+    if (isTaskStopCommand(trimmed)) {
+      requestCycleCancel();
+      return;
+    }
     steeringQueue.push(trimmed.slice(0, 4_000));
     if (steeringQueue.length > 16) {
       steeringQueue = steeringQueue.slice(-16);
@@ -217,12 +227,15 @@ export function createPromptSession(streams, options = {}) {
    * Enable PATH-owned composer for living TUI (no terminal echo into frame).
    * @param {{
    *   onChange?: (state: import("./composer.mjs").ComposerState) => void,
+   *   onStreamScroll?: (delta: number) => void,
    * }} [opts]
    */
   function enableLivingComposer(opts = {}) {
     livingComposerEnabled = true;
     onComposerChange =
       typeof opts.onChange === "function" ? opts.onChange : null;
+    onStreamScroll =
+      typeof opts.onStreamScroll === "function" ? opts.onStreamScroll : null;
     composer = createComposerState();
     notifyComposer();
   }
@@ -254,6 +267,7 @@ export function createPromptSession(streams, options = {}) {
     }
     try {
       write(DISABLE_BRACKETED_PASTE);
+      write("\u001b[?1000l\u001b[?1006l\u001b[?1007l\u001b[?1015l");
     } catch {
       // ignore
     }
@@ -290,6 +304,10 @@ export function createPromptSession(streams, options = {}) {
     }
     try {
       write(ENABLE_BRACKETED_PASTE);
+      // Mouse: SGR (1006) + alternate-scroll (1007) + basic tracking (1000).
+      // 1000+1006 yields SGR wheel reports; 1007 maps wheel→CSI A/B in alt-screen.
+      // Never enable urxvt 1015 alone — fragmented digits leaked into composer.
+      write("\u001b[?1000h\u001b[?1006h\u001b[?1007h");
       if (opts.awaitSubmit) {
         // Distinct from mid-cycle steering arm — harnesses feed on this mark.
         write(IDLE_COMPOSER_READY);
@@ -303,6 +321,17 @@ export function createPromptSession(streams, options = {}) {
       const result = applyComposerInput(composer, buf);
       composer = result.state;
       notifyComposer();
+      if (
+        typeof result.streamScrollDelta === "number" &&
+        result.streamScrollDelta !== 0 &&
+        typeof onStreamScroll === "function"
+      ) {
+        try {
+          onStreamScroll(result.streamScrollDelta);
+        } catch {
+          // ignore
+        }
+      }
 
       if (result.cancel) {
         if (!cycleActive) {

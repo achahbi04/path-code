@@ -1,0 +1,28 @@
+PATH ● Code
+
+Ready for engineering
+
+Project  cursor-pathcode-antigravity-v1  ·  cursor/pathcode-antigravity-v1
+
+Type an engineering objective below, then Enter.
+PATH will inspect, edit, test, and report in this canvas.
+
+Examples
+  > Add clamp(value, min, max) with node:test coverage
+  > Fix the package.json files list for distribution
+  > Investigate failing tests and repair them
+
+While a task runs
+  ■ Stop / Ctrl-C / /stop   cancel immediately
+  type guidance             steer the engines
+  /log                      inspect task trace
+  /exit                     leave PATH
+
+Engineering stream appears here as soon as work starts.
+
+
+
+──────────────────────────────────────────────────────────────────────────────────────────
+> 
+──────────────────────────────────────────────────────────────────────────────────────────
+■ idle   auto · cursor-pathcode-antigravity-v1

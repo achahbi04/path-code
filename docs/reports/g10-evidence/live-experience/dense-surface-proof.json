@@ -1,0 +1,119 @@
+{
+  "phase": "LIVE_ENGINEERING_SURFACE_DENSE",
+  "at": "2026-09-15T14:04:19.937Z",
+  "pass": true,
+  "checks": [
+    {
+      "id": "brand_pinned",
+      "ok": true
+    },
+    {
+      "id": "no_abstract_tool_ids_as_primary",
+      "ok": true,
+      "sample": [
+        "PATH ● Code",
+        "",
+        "        1 +export const __pathcodeTrial: number = 0;",
+        "   2    2  export function clamp(n: number) {",
+        "   3    3    return Math.max(0, n);",
+        "   4    4  }",
+        "   5    5  ",
+        "",
+        "✕ Typecheck",
+        "  npm run typecheck",
+        "  src/lib/utils.ts:1:14 - error TS2322:",
+        "  Type 'string' is not assignable to type 'number'.",
+        "  ",
+        "  Found 1 error.",
+        "",
+        "● Copilot",
+        "  repairing validation failures",
+        "",
+        "● Typecheck",
+        "  npm run typecheck",
+        "  ✓ completed successfully",
+        "",
+        "✓ COMPLETE",
+        "",
+        "Objective",
+        "  Fix __pathcodeTrial type error in src/lib/utils.ts and run typecheck.",
+        "",
+        "Engineering",
+        "  copilot",
+        ""
+      ]
+    },
+    {
+      "id": "environment_visible",
+      "ok": true
+    },
+    {
+      "id": "file_read_with_code",
+      "ok": true
+    },
+    {
+      "id": "search_visible",
+      "ok": true
+    },
+    {
+      "id": "real_commands",
+      "ok": true,
+      "commands": [
+        "node --version",
+        "/opt/homebrew/bin/node --version",
+        "npm run typecheck",
+        "npm run typecheck"
+      ]
+    },
+    {
+      "id": "failure_and_recovery_output",
+      "ok": true
+    },
+    {
+      "id": "live_diff",
+      "ok": true
+    },
+    {
+      "id": "collaboration_useful",
+      "ok": true
+    },
+    {
+      "id": "completion_report",
+      "ok": true
+    },
+    {
+      "id": "wide_uses_canvas",
+      "ok": true,
+      "maxLine": 140
+    },
+    {
+      "id": "scroll_after_complete",
+      "ok": true,
+      "historyLen": 14,
+      "titles": [
+        "Objective",
+        "Preparing environment",
+        "Preparing environment",
+        "Environment ready",
+        "Inspect directory",
+        "Search",
+        "Read",
+        "Run",
+        "Run",
+        "Copilot",
+        "Update",
+        "Typecheck",
+        "Copilot",
+        "Typecheck"
+      ]
+    },
+    {
+      "id": "narrow_still_readable",
+      "ok": true
+    },
+    {
+      "id": "title_format_clean",
+      "ok": true
+    }
+  ]
+}

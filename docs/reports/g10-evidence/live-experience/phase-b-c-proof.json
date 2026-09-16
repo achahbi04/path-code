@@ -1,0 +1,71 @@
+{
+  "ok": true,
+  "phase": "S1_PHASE_B_C_LIVE_FEEL",
+  "s2": "NOT_STARTED",
+  "checks": [
+    {
+      "id": "ansi_residue_stripped_before_paint",
+      "ok": true,
+      "plain": "const x = \"hi\";"
+    },
+    {
+      "id": "fit_canvas_no_csi_residue",
+      "ok": true,
+      "line": "const msg = \"hello world\";"
+    },
+    {
+      "id": "provider_names_scrubbed_from_stream_titles",
+      "ok": true,
+      "text": "● Inspecting\n  looking at tests\n"
+    },
+    {
+      "id": "narration_strips_provider_names",
+      "ok": true,
+      "text": "found the bug. agrees the fix belongs in the test."
+    },
+    {
+      "id": "operator_question_detection",
+      "ok": true
+    },
+    {
+      "id": "steering_question_prompt_asks_for_evidence",
+      "ok": true
+    },
+    {
+      "id": "pageup_scrolls_even_with_composer_text",
+      "ok": true,
+      "pageUp": 8,
+      "wheel": 3
+    },
+    {
+      "id": "scroll_preserves_offset_while_running",
+      "ok": true,
+      "scroll": 12
+    },
+    {
+      "id": "steer_status_visible_in_stream",
+      "ok": true
+    },
+    {
+      "id": "follow_latest_shows_steer_and_heartbeat",
+      "ok": true
+    },
+    {
+      "id": "splash_is_centered_path_code_only",
+      "ok": true,
+      "mark": "PATH  ●  Code"
+    },
+    {
+      "id": "title_format_project_path_code",
+      "ok": true
+    },
+    {
+      "id": "assessment_hides_lockfile_churn_and_merge",
+      "ok": true,
+      "remaining": [],
+      "files": []
+    }
+  ],
+  "failed": [],
+  "at": "2026-09-16T09:00:58.472Z"
+}

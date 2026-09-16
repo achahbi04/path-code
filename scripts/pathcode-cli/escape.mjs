@@ -28,7 +28,9 @@ export function escapeForTerminalDisplay(text) {
       continue;
     }
     if (cp === 0x0d) {
-      out += "\\r";
+      // Carriage return is a line break, not a visible escape. Callers that need
+      // a single-line preview flatten newlines after escaping.
+      out += "\n";
       continue;
     }
     if (cp === 0x1b) {
@@ -65,4 +67,4 @@ export function prefixUntrustedLines(text, prefix = "| ") {
 }
 
 export const ESCAPE_LEGEND =
-  "Legend: controls shown as \\uXXXX; tabs as \\t; CR as \\r; ESC as \\u001b.";
+  "Legend: controls shown as \\uXXXX; tabs as \\t; CR/LF as newlines; ESC as \\u001b.";

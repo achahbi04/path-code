@@ -1,0 +1,106 @@
+{
+  "ok": true,
+  "phase": "S1_PHASE_A1_REPORT_CONTRACT",
+  "s2": "NOT_STARTED",
+  "phaseB": "NOT_STARTED",
+  "phaseC": "NOT_STARTED",
+  "checks": [
+    {
+      "id": "disposition_truthful",
+      "ok": true,
+      "d1": "COMPLETE",
+      "d2": "PARTIAL",
+      "d3": "STOPPED",
+      "d4": "BLOCKED"
+    },
+    {
+      "id": "launcher_shell_detected",
+      "ok": true
+    },
+    {
+      "id": "asked_prefers_real_objective_not_launcher",
+      "ok": true,
+      "asked": "Inspect Klarapp: run tests and typecheck; identify one solid point and one concr"
+    },
+    {
+      "id": "no_transient_npm_install_running_in_report",
+      "ok": true,
+      "plainSample": "✓ COMPLETE\n\nPATH ● Code — Engineering report\n\nAsked\n  Inspect Klarapp: run tests and typecheck; identify one solid point and one concrete risk with evidence.\n\nWhat PATH did\n  Installed project dependencies required by the existing workflows.\n  Ran npm test.\n  Ran typecheck via npx tsc --noEmit.\n  Inspected package.json and project configuration.\n\nImportant discoveries\n  Dependency install reported"
+    },
+    {
+      "id": "what_path_did_describes_completed_work",
+      "ok": true,
+      "whatPathDid": [
+        "Installed project dependencies required by the existing workflows.",
+        "Ran npm test.",
+        "Ran typecheck via npx tsc --noEmit.",
+        "Inspected package.json and project configuration."
+      ]
+    },
+    {
+      "id": "discoveries_are_findings_not_activity_dupes",
+      "ok": true,
+      "discoveries": [
+        "Dependency install reported security vulnerabilities.",
+        "Tests passed (npm test).",
+        "Solid: existing Vitest suite is green. Risk: npm install reported 1 high-severity vulnerability."
+      ]
+    },
+    {
+      "id": "no_generic_merge_when_session_did_not_advance",
+      "ok": true,
+      "remaining": []
+    },
+    {
+      "id": "canvas_shows_dedicated_report",
+      "ok": true,
+      "hasReportHint": false
+    },
+    {
+      "id": "asked_is_submitted_objective",
+      "ok": true
+    },
+    {
+      "id": "compact_layout_no_giant_blank_before_report",
+      "ok": true,
+      "reportIdx": 13,
+      "blankRun": 12
+    },
+    {
+      "id": "report_action_notice_visible",
+      "ok": true
+    },
+    {
+      "id": "plain_report_sections",
+      "ok": true,
+      "reportChars": 1125
+    },
+    {
+      "id": "report_file_beside_trace",
+      "ok": true,
+      "reportPath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-report-t9Usrg/metadata/tasks/phase-a1-report-demo.report.txt"
+    },
+    {
+      "id": "durable_matches_canonical_plain",
+      "ok": true
+    },
+    {
+      "id": "formatPlainReport_same_artifact",
+      "ok": true
+    },
+    {
+      "id": "scroll_snapped_to_latest",
+      "ok": true
+    },
+    {
+      "id": "wall_clock_is_blocked_not_complete",
+      "ok": true
+    },
+    {
+      "id": "merge_advice_only_when_advances_session",
+      "ok": true
+    }
+  ],
+  "failed": [],
+  "at": "2026-09-16T09:01:24.471Z"
+}

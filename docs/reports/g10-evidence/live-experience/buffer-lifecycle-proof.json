@@ -1,0 +1,39 @@
+{
+  "pass": true,
+  "at": "2026-09-15T21:01:27.982Z",
+  "checks": [
+    {
+      "id": "enter_alt_before_any_brand",
+      "ok": true,
+      "enterIdx": 8,
+      "splashIdx": 191,
+      "brandBeforeAlt": false,
+      "hasAsciiArt": false
+    },
+    {
+      "id": "splash_survives_soft_lifecycle_events",
+      "ok": true,
+      "splashIdx": 191,
+      "hasAsciiArt": false
+    },
+    {
+      "id": "blocked_frame_keeps_brand_inside_alt",
+      "ok": true,
+      "hasBrandInAlt": true,
+      "hasBlocked": true
+    },
+    {
+      "id": "exit_does_not_dump_brand_to_normal_buffer",
+      "ok": true,
+      "postExitSample": "\u001b[?1049l\u001b[0m\u001b[?2004l"
+    },
+    {
+      "id": "pty_pathcode_brand_only_inside_alt_screen",
+      "ok": true,
+      "skipped": true,
+      "parsed": {},
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 13, in <module>\n    master, slave = pty.openpty()\n                    ~~~~~~~~~~~^^\n  File \"/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pty.py\", line 34, in openpty\n    master_fd, slave_na",
+      "status": 1
+    }
+  ]
+}

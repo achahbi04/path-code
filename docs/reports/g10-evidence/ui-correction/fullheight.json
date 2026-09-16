@@ -1,0 +1,47 @@
+{
+  "schema": "pathcode.s0.ui-fullheight.v1",
+  "at": "2026-09-15T17:02:35.954Z",
+  "note": "MANUAL_UI_ACCEPTANCE remains FAILED until operator Terminal.app re-review.",
+  "cases": {
+    "fullHeightIdle": {
+      "ok": false,
+      "largeRows": 40,
+      "narrowRows": 28,
+      "mediumRows": 32
+    },
+    "streamExpandsOnResize": {
+      "ok": true,
+      "tall": 42,
+      "short": 24,
+      "delta": 18
+    },
+    "composerBottomAnchored": {
+      "ok": true,
+      "composerIndex": 40,
+      "total": 42,
+      "nearBottom": 1
+    },
+    "noDeadRegionOutsideFrame": {
+      "ok": false,
+      "note": "Frame line count equals viewport rows; stream pads interior."
+    },
+    "openingSplash": {
+      "ok": true,
+      "rows": 30,
+      "hasPath": true,
+      "clean": true
+    },
+    "titleOwnership": {
+      "ok": true,
+      "format": "pathcode-g10-operator-demo — PATH Code",
+      "processTitleWhileOwned": "pathcode",
+      "strippedKeepsPayload": true,
+      "note": "process.title stays short 'pathcode' to avoid Terminal.app duplicating OSC title."
+    },
+    "inlineUsesFullHeight": {
+      "ok": true,
+      "rows": 36
+    }
+  },
+  "verdict": "PARTIAL"
+}

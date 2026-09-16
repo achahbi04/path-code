@@ -42,7 +42,7 @@ non-fixture project (isolated copy of the operator demo), including:
 - **Prior S1 PARTIAL tip:** `aa684eaf3a45e3617ba5f6a7b9d9b75046df1840`
 - **Live-gap implementation commit:** `dfe5abd47a8845cba30eff93d584cbd8e1c7aaf2`
 - **Report commit:** `7661523005451d65afe4b4e9030a3a70c9b30ef0`
-- **Current HEAD:** `f2f067aa27988e1be3231b3971e816360ab0bf29`
+- **Current HEAD:** `9f9db58c918b4ee690f0a5053aa8ebfd8bc15cfe`
 - **Branch:** `cursor/pathcode-antigravity-v1`
 - **Working tree:** clean after freeze
 

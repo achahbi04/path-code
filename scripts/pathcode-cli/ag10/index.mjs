@@ -279,7 +279,7 @@ export async function createG10Fabric(options) {
           emitG10({
             family: "collaboration.handoff",
             engine: "copilot",
-            detail: "Copilot engineering turn",
+            detail: "continuing repair in the task workspace",
           });
           const result = await copilot.runEngineeringTurn({
             prompt,
@@ -375,7 +375,7 @@ export async function createG10Fabric(options) {
           emitG10({
             family: "collaboration.handoff",
             engine: "antigravity",
-            detail: "Antigravity engineering turn",
+            detail: "continuing engineering in the task workspace",
           });
           return turn.runTurn();
         },
@@ -410,10 +410,16 @@ export async function createG10Fabric(options) {
   }
 
   /**
-   * Map AG bridge message into G10 events (idempotent).
+   * Map AG bridge message into G10 events.
+   * Skip activity/tool — AG1 session already emits the rich session.* path.
+   * Remapping those produces duplicate weak labels (Inspecting / file modified).
    * @param {object} msg
    */
   function onAntigravityBridgeEvent(msg) {
+    const type = typeof msg?.type === "string" ? msg.type : "";
+    if (type === "activity" || type === "tool" || type === "started") {
+      return;
+    }
     const mapped = mapAntigravityBridgeEvent(msg);
     if (mapped && idempotency.accept(mapped.id)) {
       emitSession(toSessionEvent(mapped));

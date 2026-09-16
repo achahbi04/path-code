@@ -100,8 +100,10 @@ describe("G7 B — failure truth", () => {
     expect(evidence).toMatch(/Result\s+✕/);
     expect(evidence).not.toMatch(/Result\s+✓/);
     const frame = buildInlineCardLines(state, { rows: 40, columns: 140 }).join("\n");
-    expect(frame).toMatch(/Failed/);
+    // Open canvas uses ■ BLOCKED (not a bare "Failed" label).
+    expect(frame).toMatch(/BLOCKED|Failed/);
     expect(frame).not.toMatch(/✓ Verified/);
+    expect(frame).not.toMatch(/✓ COMPLETE/);
   });
 });
 
@@ -162,14 +164,22 @@ describe("G7 D — large result bounded preview", () => {
     });
     const wide = buildInlineCardLines(state, { rows: 50, columns: 140 }).join("\n");
     expect(wide).toMatch(/COMPLETE/);
-    expect(wide).toMatch(/9 files/);
-    expect(wide).toMatch(/Commit 2222222b/);
+    // Open-canvas report lists changed files (and may say "9 file(s)" in last activity).
+    expect(wide).toMatch(/pkg\/file-0\.ts/);
+    expect(wide).toMatch(/9 file/);
+    expect(wide).toMatch(/commit 2222222b/i);
     // Primary surface must not dump raw inspect commands.
     expect(wide).not.toMatch(/git diff --no-ext-diff/);
     const narrow = buildInlineCardLines(state, { rows: 40, columns: 72 }).join("\n");
     expect(narrow).toMatch(/COMPLETE/);
     expect(narrow).toMatch(/PATH ● Code/);
-    expect(narrow).toMatch(/GOAL/);
+    // Open canvas: objective lives in the stream, not a permanent GOAL box.
+    expect(narrow).not.toMatch(/\bGOAL\b/);
+    expect(narrow).not.toMatch(/╭|╰/);
+    expect(narrow).toMatch(/Stop|idle/);
+    // Full-height: frame occupies the entire viewport row count.
+    expect(wide.split("\n").length).toBe(50);
+    expect(narrow.split("\n").length).toBe(40);
     // Legacy three-column still discloses inspect command when asked explicitly.
     const legacy = buildLivingProductLines(state, { rows: 50, columns: 140 }).join(
       "\n",

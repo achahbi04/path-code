@@ -25,6 +25,12 @@ import {
 import { admitPrimaryCheckout } from "../ag1/admission.mjs";
 import { ensureAg1Runtime } from "../ag1/runtime-bootstrap.mjs";
 import { recoverPathOwnedStaleWorktrees } from "../ag5/orphan-recovery.mjs";
+import { normalizeObjectiveText } from "../normalize-text.mjs";
+import {
+  cancelTaskProcesses,
+  runWithTaskContext,
+} from "../process-registry.mjs";
+import { appendTaskTrace } from "../task-trace.mjs";
 
 /**
  * @typedef {{
@@ -80,6 +86,7 @@ export function createGatewayRuntime(options = {}) {
     projectName: null,
     branch: null,
     clean: null,
+    unversioned: false,
     boundAt: null,
   };
 
@@ -103,6 +110,43 @@ export function createGatewayRuntime(options = {}) {
     const envelope = makeEventEnvelope(task.taskId, task.seq, event);
     bus.emit("event", envelope);
     bus.emit(`task:${task.taskId}`, envelope);
+    try {
+      if (
+        type === "session.task.received" ||
+        type === "session.cancelled" ||
+        type === "gateway.task.finished" ||
+        type === "session.engineering.result" ||
+        type === "session.engineering.tool" ||
+        type === "session.capability.preparing" ||
+        type === "session.internal_error"
+      ) {
+        appendTaskTrace({
+          taskId: task.taskId,
+          runtimeRoot,
+          type,
+          phase: typeof fields.label === "string" ? fields.label : undefined,
+          tool: typeof fields.tool === "string" ? fields.tool : undefined,
+          path: typeof fields.path === "string" ? fields.path : undefined,
+          command: typeof fields.command === "string" ? fields.command : undefined,
+          detail:
+            typeof fields.detail === "string"
+              ? fields.detail
+              : typeof fields.preview === "string"
+                ? fields.preview
+                : typeof fields.summary === "string"
+                  ? fields.summary
+                  : typeof fields.message === "string"
+                    ? fields.message
+                    : undefined,
+          meta: {
+            status: task.status,
+            classification: fields.classification ?? task.classification,
+          },
+        });
+      }
+    } catch {
+      // never break engineering for observability
+    }
     return envelope;
   }
 
@@ -145,16 +189,18 @@ export function createGatewayRuntime(options = {}) {
       typeof discovered.workingSubdir === "string" ? discovered.workingSubdir : "";
     let branch = null;
     let clean = null;
+    let unversioned = discovered.unversioned === true;
     const admission = admitPrimaryCheckout(projectRoot);
     if (admission.ok) {
-      branch = admission.branch;
-      clean = true;
-    } else if (admission.code === "DIRTY_PRIMARY_TREE") {
-      branch = typeof admission.branch === "string" ? admission.branch : null;
-      clean = false;
-    } else if (admission.code === "DETACHED_HEAD_BLOCKED") {
-      branch = null;
-      clean = null;
+      if (admission.unversioned) {
+        branch = "unversioned";
+        clean = null;
+        unversioned = true;
+      } else {
+        branch = admission.detached ? null : admission.branch;
+        clean = admission.dirty !== true;
+        unversioned = false;
+      }
     }
 
     try {
@@ -181,6 +227,7 @@ export function createGatewayRuntime(options = {}) {
       projectName: basename(projectRoot),
       branch,
       clean,
+      unversioned,
       boundAt: new Date().toISOString(),
     };
     return {
@@ -190,6 +237,7 @@ export function createGatewayRuntime(options = {}) {
       projectName: project.projectName,
       branch,
       clean,
+      unversioned,
       runtimeRoot,
       packageRoot,
       gatewayId,
@@ -265,6 +313,7 @@ export function createGatewayRuntime(options = {}) {
             workingSubdir: project.workingSubdir,
             branch: project.branch,
             clean: project.clean,
+            unversioned: project.unversioned === true,
           }
         : null,
     };
@@ -280,12 +329,13 @@ export function createGatewayRuntime(options = {}) {
       });
       if (!bound.ok) return bound;
     }
-    const objective =
+    const objective = normalizeObjectiveText(
       typeof params.objective === "string" && params.objective.trim()
         ? params.objective.trim()
         : typeof params.taskText === "string" && params.taskText.trim()
           ? params.taskText.trim()
-          : "";
+          : "",
+    );
     if (!objective) {
       return { ok: false, code: "OBJECTIVE_REQUIRED", message: "objective required" };
     }
@@ -335,23 +385,137 @@ export function createGatewayRuntime(options = {}) {
 
     emitTaskEvent(task, "session.task.received", {
       mode: "ag1",
-      preview: objective.slice(0, 200),
+      task: objective.slice(0, 4000),
+      preview: objective.slice(0, 4000),
+    });
+    emitTaskEvent(task, "session.capability.preparing", {
+      detail: "Admitting project and preparing environment",
     });
 
     const sessionEventEmit = (type, fields = {}) => {
       emitTaskEvent(task, type, fields && typeof fields === "object" ? fields : {});
     };
 
-    task.runPromise = (async () => {
+    task.runPromise = runWithTaskContext(taskId, () =>
+      (async () => {
       prompt.beginCycle();
       try {
         if (process.env.PATHCODE_GATEWAY_FAKE_ENGINE === "1") {
+          // Yield so mid-cycle steer can enqueue before the scripted turn finishes.
+          await new Promise((r) => setTimeout(r, 40));
           emitTaskEvent(task, "session.capability.preparing", {
-            detail: "Preparing environment",
+            detail: "resolving node · npm · typescript toolchain",
           });
-          emitTaskEvent(task, "session.engineering.activity", {
-            activity: "implementing",
-            label: "Implementing",
+          emitTaskEvent(task, "session.capability.discovered", {
+            matrix: {
+              languages: [
+                { id: "typescript", status: "ready" },
+                { id: "javascript", status: "ready" },
+              ],
+              toolchains: [
+                { id: "node", status: "ready" },
+                { id: "npm", status: "ready" },
+              ],
+            },
+          });
+          emitTaskEvent(task, "session.engineering.tool", {
+            kind: "inspect",
+            tool: "list_directory",
+            summary: "list_directory src/lib",
+            path: "src/lib/",
+            preview: "utils.ts\nindex.ts\n",
+          });
+          emitTaskEvent(task, "session.engineering.tool", {
+            kind: "inspect",
+            tool: "find_file",
+            summary: 'find_file "__pathcodeTrial"',
+            query: '"__pathcodeTrial" in src/',
+            preview: "src/lib/utils.ts:1\nsrc/lib/utils.test.ts:4\n",
+          });
+          emitTaskEvent(task, "session.engineering.tool", {
+            kind: "inspect",
+            tool: "view_file",
+            summary: "view_file src/lib/utils.ts",
+            path: "src/lib/utils.ts",
+            preview:
+              'export const __pathcodeTrial: number = "not a number";\nexport function clamp(n: number) {\n  return Math.max(0, n);\n}\n',
+          });
+          emitTaskEvent(task, "session.engineering.narration", {
+            text: [
+              "The production clamp helper already returns a number.",
+              "The type error is isolated to the trial constant, so I'm correcting that assignment rather than changing clamp behavior.",
+            ].join("\n\n"),
+          });
+          emitTaskEvent(task, "session.engineering.busy", {
+            label: "Waiting for engineering result",
+            detail: "planning the fix",
+            since: Date.now(),
+          });
+          emitTaskEvent(task, "session.engineering.tool", {
+            kind: "command",
+            tool: "run_command",
+            summary: "run_command node --version",
+            command: "node --version",
+            output: "env: node: Operation not permitted",
+            ok: false,
+          });
+          emitTaskEvent(task, "session.engineering.tool", {
+            kind: "command",
+            tool: "run_command",
+            summary: "run_command /opt/homebrew/bin/node --version",
+            command: "/opt/homebrew/bin/node --version",
+            output: "v22.14.0",
+            ok: true,
+          });
+          emitTaskEvent(task, "session.capability.collaborate", {
+            engine: "copilot",
+            phase: "turn",
+            detail: "editing src/lib/utils.ts",
+          });
+          // Drain any mid-cycle operator guidance into the live stream.
+          if (typeof task.prompt?.drainSteering === "function") {
+            for (const line of task.prompt.drainSteering()) {
+              const text = String(line || "").trim();
+              if (!text) continue;
+              emitTaskEvent(task, "session.operator.note", {
+                text: text.slice(0, 400),
+              });
+              emitTaskEvent(task, "session.engineering.narration", {
+                text: "Taking that into the active engineering session now.",
+              });
+            }
+          }
+          emitTaskEvent(task, "session.engineering.tool", {
+            kind: "file_edit",
+            tool: "edit_file",
+            summary: "edit_file src/lib/utils.ts",
+            path: "src/lib/utils.ts",
+            diff:
+              '@@ -1,3 +1,3 @@\n-export const __pathcodeTrial: number = "not a number";\n+export const __pathcodeTrial: number = 0;\n export function clamp(n: number) {\n   return Math.max(0, n);\n }\n',
+            added: 1,
+            removed: 1,
+          });
+          emitTaskEvent(task, "session.engineering.tool", {
+            kind: "command",
+            tool: "run_command",
+            summary: "run_command npm run typecheck",
+            command: "npm run typecheck",
+            output:
+              "src/lib/utils.ts:1:14 - error TS2322:\nType 'string' is not assignable to type 'number'.\n\nFound 1 error.",
+            ok: false,
+          });
+          emitTaskEvent(task, "session.capability.collaborate", {
+            engine: "copilot",
+            phase: "repair",
+            detail: "repairing validation failures",
+          });
+          emitTaskEvent(task, "session.engineering.tool", {
+            kind: "command",
+            tool: "run_command",
+            summary: "run_command npm run typecheck",
+            command: "npm run typecheck",
+            output: "✓ completed successfully",
+            ok: true,
           });
           await new Promise((r) => setTimeout(r, 50));
           if (abort.signal.aborted || prompt.isCycleCancelRequested()) {
@@ -367,16 +531,27 @@ export function createGatewayRuntime(options = {}) {
               exitCode: 0,
               classification: "VERIFIED",
               advancesSession: true,
-              changedFiles: ["src/demo.js"],
+              changedFiles: ["src/lib/utils.ts"],
               commitSha: task.commitSha,
               taskBranch: task.taskBranch,
-              engineActivityCount: 2,
+              engineActivityCount: 10,
             };
             emitTaskEvent(task, "session.engineering.result", {
               classification: "VERIFIED",
-              changedFiles: ["src/demo.js"],
+              changedFiles: ["src/lib/utils.ts"],
               commitSha: task.commitSha,
               taskBranch: task.taskBranch,
+              checks: [
+                { id: "typecheck-local-tsc", kind: "TYPECHECK", ok: true },
+              ],
+              engineeringHandoff:
+                "Corrected the trial constant type so typecheck and tests pass.",
+            });
+            emitTaskEvent(task, "session.terminal", {
+              disposition: "VERIFIED",
+              summary: "Independent validation passed.",
+              taskBranch: task.taskBranch,
+              commitSha: task.commitSha,
             });
           }
         } else {
@@ -395,6 +570,8 @@ export function createGatewayRuntime(options = {}) {
           unicode: true,
           checkoutRoot: packageRoot,
           sessionEventEmit,
+          // Gateway already emitted session.task.received for this task.
+          suppressTaskReceived: true,
           cardsOwnProgress: true,
           sessionBaseCommit:
             typeof params.sessionBaseCommit === "string"
@@ -429,9 +606,16 @@ export function createGatewayRuntime(options = {}) {
           task.status = "cancelled";
         } else if (
           sessionResult?.classification === "VERIFIED" ||
-          sessionResult?.classification === "PARTIALLY_VERIFIED" ||
-          sessionResult?.exitCode === 0
+          sessionResult?.classification === "PARTIALLY_VERIFIED"
         ) {
+          task.status = "completed";
+        } else if (
+          sessionResult?.exitCode === 0 &&
+          sessionResult?.blocked !== true &&
+          sessionResult?.classification !== "NOT_VERIFIED"
+        ) {
+          // Only treat exit 0 as completed when the session did not explicitly
+          // report a blocked / not-verified admission outcome.
           task.status = "completed";
         } else {
           task.status = "failed";
@@ -449,8 +633,15 @@ export function createGatewayRuntime(options = {}) {
           status: task.status,
           classification: task.classification,
         });
+        // Always attempt cleanup of any leftover task-owned children.
+        try {
+          cancelTaskProcesses(taskId);
+        } catch {
+          // ignore
+        }
       }
-    })();
+    })(),
+    );
 
     // Do not await engineering here — clients subscribe while it runs.
     return {
@@ -479,10 +670,13 @@ export function createGatewayRuntime(options = {}) {
     }
     const accepted = task.prompt.enqueueSteering(text);
     if (accepted) {
-      emitTaskEvent(task, "session.engineering.activity", {
-        activity: "steering",
-        label: "Steering pending",
-        detail: String(text || "").slice(0, 80),
+      const trimmed = String(text || "").trim();
+      emitTaskEvent(task, "session.operator.note", {
+        text: trimmed.slice(0, 400),
+      });
+      emitTaskEvent(task, "session.engineering.steer", {
+        phase: "queued",
+        text: trimmed.slice(0, 400),
       });
     }
     return { ok: accepted, taskId, queued: accepted };
@@ -496,14 +690,33 @@ export function createGatewayRuntime(options = {}) {
     if (!task) {
       return { ok: false, code: "TASK_NOT_FOUND", message: `unknown task ${taskId}` };
     }
+    if (task.status === "running") {
+      task.status = "stopping";
+      task.updatedAt = new Date().toISOString();
+    }
     task.prompt.requestCycleCancel();
     try {
       task.abort.abort();
     } catch {
       // ignore
     }
-    emitTaskEvent(task, "session.cancelled", { reason: "gateway_cancel" });
-    return { ok: true, taskId, status: task.status };
+    const cleaned = cancelTaskProcesses(taskId);
+    try {
+      appendTaskTrace({
+        taskId,
+        type: "task.stop",
+        detail: `cancelled; processes=${cleaned.length}`,
+        meta: { processes: cleaned },
+        runtimeRoot,
+      });
+    } catch {
+      // ignore
+    }
+    emitTaskEvent(task, "session.cancelled", {
+      reason: "operator_stop",
+      cleanedProcesses: cleaned.length,
+    });
+    return { ok: true, taskId, status: task.status, cleanedProcesses: cleaned.length };
   }
 
   /**

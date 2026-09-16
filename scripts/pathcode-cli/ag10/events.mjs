@@ -17,6 +17,7 @@ export const G10_EVENT_FAMILIES = Object.freeze([
   "indexing.completed",
   "engine.inspecting",
   "engine.researching",
+  "engine.narrating",
   "code-intelligence.query",
   "file.read",
   "file.modified",
@@ -162,13 +163,43 @@ export function toSessionEvent(event) {
         label: "Inspecting",
         detail,
       };
-    case "engine.researching":
+    case "engine.narrating":
+      return {
+        type: "session.engineering.narration",
+        text: detail,
+        paragraphs: detail
+          ? String(detail)
+              .split(/\n\s*\n/)
+              .map((p) => p.trim())
+              .filter(Boolean)
+              .slice(0, 6)
+          : [],
+      };
+    case "engine.researching": {
+      // Substantial prose from engines is narration, not a vague "Researching" label.
+      const prose = String(detail || "").trim();
+      if (
+        prose.length >= 40 &&
+        /[a-zA-Z]{4,}/.test(prose) &&
+        !/^(run_command|view_file|edit_file|bash|sh)\b/i.test(prose)
+      ) {
+        return {
+          type: "session.engineering.narration",
+          text: prose.slice(0, 2_000),
+          paragraphs: prose
+            .split(/\n\s*\n/)
+            .map((p) => p.trim())
+            .filter(Boolean)
+            .slice(0, 6),
+        };
+      }
       return {
         type: "session.engineering.activity",
         activity: "researching",
-        label: "Researching",
+        label: "Waiting for engineering result",
         detail,
       };
+    }
     case "code-intelligence.query":
       return {
         type: "session.engineering.activity",
@@ -176,30 +207,95 @@ export function toSessionEvent(event) {
         label: "Code intelligence",
         detail,
       };
-    case "file.read":
+    case "file.read": {
+      const path =
+        typeof event.payload?.path === "string"
+          ? event.payload.path
+          : Array.isArray(event.payload?.files) &&
+              typeof event.payload.files[0] === "string"
+            ? event.payload.files[0]
+            : "";
+      const query =
+        typeof event.payload?.query === "string" ? event.payload.query : "";
+      const tool =
+        typeof event.payload?.tool === "string" ? event.payload.tool : "view_file";
+      if (path || query) {
+        return {
+          type: "session.engineering.tool",
+          kind:
+            typeof event.payload?.kind === "string"
+              ? event.payload.kind
+              : query
+                ? "search"
+                : "inspect",
+          tool,
+          summary: path
+            ? `${tool} ${path}`
+            : query
+              ? `${tool} ${query}`
+              : detail || tool,
+          ...(path ? { path } : {}),
+          ...(query ? { query } : {}),
+        };
+      }
       return {
         type: "session.reading",
         files: Array.isArray(event.payload?.files) ? event.payload.files : [],
       };
-    case "file.modified":
+    }
+    case "file.modified": {
+      const path =
+        typeof event.payload?.path === "string"
+          ? event.payload.path
+          : Array.isArray(event.payload?.files) &&
+              typeof event.payload.files[0] === "string"
+            ? event.payload.files[0]
+            : "";
+      const tool =
+        typeof event.payload?.tool === "string" ? event.payload.tool : "edit_file";
+      if (path) {
+        return {
+          type: "session.engineering.tool",
+          kind: "file_edit",
+          tool,
+          summary: `${tool} ${path}`,
+          path,
+        };
+      }
       return {
         type: "session.applying",
         summary: detail || "file modified",
       };
+    }
     case "command.started":
+    case "command.completed": {
+      const cmd =
+        typeof event.payload?.command === "string"
+          ? event.payload.command
+          : typeof event.payload?.CommandLine === "string"
+            ? event.payload.CommandLine
+            : "";
+      const output =
+        typeof event.payload?.output === "string"
+          ? event.payload.output
+          : typeof event.payload?.stdout === "string"
+            ? event.payload.stdout
+            : "";
       return {
         type: "session.engineering.tool",
-        kind: "shell",
-        tool: "command",
-        summary: detail || "command started",
+        kind: "command",
+        tool: "run_command",
+        summary: cmd
+          ? `run_command ${cmd}`
+          : detail ||
+            (event.family === "command.started"
+              ? "command started"
+              : "command completed"),
+        ...(cmd ? { command: cmd } : {}),
+        ...(output ? { output } : {}),
+        ...(typeof event.payload?.ok === "boolean" ? { ok: event.payload.ok } : {}),
       };
-    case "command.completed":
-      return {
-        type: "session.engineering.tool",
-        kind: "shell",
-        tool: "command",
-        summary: detail || "command completed",
-      };
+    }
     case "build.started":
     case "build.completed":
     case "build.failed":
@@ -311,6 +407,57 @@ export function toSessionEvent(event) {
 }
 
 /**
+ * Pull path / command / query / output from Copilot SDK tool payloads (best-effort).
+ * @param {any} data
+ */
+function extractCopilotToolFields(data) {
+  const args =
+    data?.arguments && typeof data.arguments === "object"
+      ? data.arguments
+      : data?.input && typeof data.input === "object"
+        ? data.input
+        : data?.args && typeof data.args === "object"
+          ? data.args
+          : {};
+  const path = String(
+    args.path ||
+      args.filePath ||
+      args.file_path ||
+      args.filename ||
+      args.target ||
+      data?.path ||
+      "",
+  )
+    .trim()
+    .replace(/^\.\//, "");
+  const command = String(
+    args.command ||
+      args.cmd ||
+      args.CommandLine ||
+      args.shell_command ||
+      data?.command ||
+      "",
+  ).trim();
+  const query = String(
+    args.query || args.pattern || args.grep || args.search || data?.query || "",
+  ).trim();
+  const output = String(
+    data?.result ||
+      data?.output ||
+      data?.content ||
+      data?.stdout ||
+      (typeof data?.text === "string" ? data.text : "") ||
+      "",
+  ).trim();
+  return {
+    path: path.slice(0, 240),
+    command: command.slice(0, 500),
+    query: query.slice(0, 240),
+    output: output.slice(0, 4_000),
+  };
+}
+
+/**
  * Map Copilot SDK session event → G10 family (best-effort, truthful).
  * @param {{ type?: string, data?: any }} sdkEvent
  */
@@ -318,46 +465,121 @@ export function mapCopilotSdkEvent(sdkEvent) {
   const type = typeof sdkEvent?.type === "string" ? sdkEvent.type : "";
   if (!type) return null;
   if (type === "assistant.message") {
+    const content = String(
+      sdkEvent.data?.content ||
+        sdkEvent.data?.text ||
+        sdkEvent.data?.message ||
+        "",
+    ).trim();
+    if (!content) return null;
     return normalizeG10Event({
-      family: "engine.researching",
+      family: "engine.narrating",
       engine: "copilot",
-      detail: String(sdkEvent.data?.content || "").slice(0, 120),
+      detail: content.slice(0, 2_000),
       providerEventId: sdkEvent.data?.id,
     });
   }
+
+  const fields = extractCopilotToolFields(sdkEvent.data || {});
+  const name = String(
+    sdkEvent.data?.toolName || sdkEvent.data?.name || sdkEvent.data?.tool || "tool",
+  );
+  const providerEventId =
+    sdkEvent.data?.callId || sdkEvent.data?.id || sdkEvent.data?.toolCallId;
+
   if (type.includes("tool") && type.includes("start")) {
-    const name = String(sdkEvent.data?.toolName || sdkEvent.data?.name || "tool");
-    if (/shell|bash|terminal|exec/i.test(name)) {
+    if (/shell|bash|terminal|exec|run_command/i.test(name)) {
       return normalizeG10Event({
         family: "command.started",
         engine: "copilot",
-        detail: name,
-        providerEventId: sdkEvent.data?.callId || sdkEvent.data?.id,
+        detail: fields.command || name,
+        providerEventId,
+        payload: {
+          ...(fields.command ? { command: fields.command } : {}),
+        },
       });
     }
     if (/edit|write|create|apply|patch/i.test(name)) {
       return normalizeG10Event({
         family: "file.modified",
         engine: "copilot",
-        detail: name,
-        providerEventId: sdkEvent.data?.callId || sdkEvent.data?.id,
+        detail: fields.path || name,
+        providerEventId,
+        payload: {
+          ...(fields.path ? { path: fields.path, files: [fields.path] } : {}),
+          tool: name,
+          kind: "file_edit",
+        },
       });
     }
-    if (/read|search|grep|glob/i.test(name)) {
+    if (/read|view|search|grep|glob|list/i.test(name)) {
       return normalizeG10Event({
         family: "file.read",
         engine: "copilot",
-        detail: name,
-        providerEventId: sdkEvent.data?.callId || sdkEvent.data?.id,
+        detail: fields.path || fields.query || name,
+        providerEventId,
+        payload: {
+          ...(fields.path ? { path: fields.path, files: [fields.path] } : {}),
+          ...(fields.query ? { query: fields.query } : {}),
+          tool: name,
+          kind: /search|grep|glob/i.test(name) ? "search" : "inspect",
+        },
       });
     }
     return normalizeG10Event({
       family: "engine.inspecting",
       engine: "copilot",
-      detail: name,
-      providerEventId: sdkEvent.data?.callId || sdkEvent.data?.id,
+      detail: fields.path || fields.query || name,
+      providerEventId,
+      payload: {
+        ...(fields.path ? { path: fields.path } : {}),
+        ...(fields.query ? { query: fields.query } : {}),
+        tool: name,
+      },
     });
   }
+
+  if (
+    type.includes("tool") &&
+    (type.includes("end") ||
+      type.includes("complete") ||
+      type.includes("result") ||
+      type.includes("finish"))
+  ) {
+    if (/shell|bash|terminal|exec|run_command/i.test(name) || fields.command) {
+      const ok =
+        typeof sdkEvent.data?.ok === "boolean"
+          ? sdkEvent.data.ok
+          : typeof sdkEvent.data?.success === "boolean"
+            ? sdkEvent.data.success
+            : undefined;
+      return normalizeG10Event({
+        family: "command.completed",
+        engine: "copilot",
+        detail: fields.command || name,
+        providerEventId,
+        payload: {
+          ...(fields.command ? { command: fields.command } : {}),
+          ...(fields.output ? { output: fields.output } : {}),
+          ...(typeof ok === "boolean" ? { ok } : {}),
+        },
+      });
+    }
+    if (/edit|write|create|apply|patch/i.test(name) || fields.path) {
+      return normalizeG10Event({
+        family: "file.modified",
+        engine: "copilot",
+        detail: fields.path || name,
+        providerEventId,
+        payload: {
+          ...(fields.path ? { path: fields.path, files: [fields.path] } : {}),
+          tool: name,
+          kind: "file_edit",
+        },
+      });
+    }
+  }
+
   if (type.includes("session.idle") || type === "session.idle") {
     return null;
   }
