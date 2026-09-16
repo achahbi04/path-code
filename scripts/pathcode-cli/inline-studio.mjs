@@ -635,6 +635,17 @@ export function buildMinimalLivingLines(state, viewport) {
     product.awaitingInput !== true &&
     state.cards?.terminal?.arrived !== true;
 
+  const completed =
+    !running &&
+    (state.cards?.terminal?.arrived === true ||
+      pathPhase === "Verified" ||
+      pathPhase === "Complete" ||
+      pathPhase === "Failed" ||
+      pathPhase === "Blocked" ||
+      pathPhase === "Cancelled" ||
+      pathPhase === "Not verified" ||
+      pathPhase === "Partially verified");
+
   const composerState = {
     text: typeof product.composerText === "string" ? product.composerText : "",
     cursor: 0,
@@ -692,7 +703,9 @@ export function buildMinimalLivingLines(state, viewport) {
   footer.push(fitCanvasLine(style.dim("─".repeat(Math.max(20, columns))), columns));
   const stopBit = running
     ? `${style.yellow("■")} Stop   Ctrl-C`
-    : style.dim("■ idle");
+    : completed
+      ? style.dim("■ idle · complete")
+      : style.dim("■ idle");
   const taskElapsedMs =
     typeof product.taskStartedAt === "number" && product.taskStartedAt > 0
       ? Math.max(0, Date.now() - product.taskStartedAt)
@@ -716,10 +729,12 @@ export function buildMinimalLivingLines(state, viewport) {
       "auto",
       projectName || null,
       taskIdShort ? `task ${taskIdShort}` : null,
-      running ? "running" : null,
+      running ? "running" : completed ? "complete" : null,
       taskElapsedMs != null && running
         ? `elapsed ${formatDuration(taskElapsedMs)}`
-        : null,
+        : completed && typeof product.durationMs === "number"
+          ? `took ${formatDuration(product.durationMs)}`
+          : null,
       busySecs != null && product.busyLabel
         ? `${String(product.busyLabel).slice(0, 28)} · ${busySecs}s`
         : null,
@@ -775,6 +790,48 @@ export function buildMinimalLivingLines(state, viewport) {
     ? product.streamHistory
     : [];
   const ops = Array.isArray(product.recentOps) ? product.recentOps : [];
+
+  // S2 slash-command responses — painted in-canvas so alt-screen redraw cannot hide them.
+  // When set, the panel owns the body (stream/report stay reachable after clear).
+  const operatorPanel =
+    typeof product.operatorPanel === "string" && product.operatorPanel.trim()
+      ? product.operatorPanel.trim()
+      : "";
+  if (operatorPanel) {
+    body.push(fitCanvasLine(style.bold("PATH · command"), columns));
+    body.push("");
+    const panelBudget = Math.max(12, frameRows - 8);
+    for (const rawLine of operatorPanel.split("\n").slice(0, panelBudget)) {
+      body.push(fitCanvasLine(safeDisplay(rawLine), columns));
+    }
+    // Panel is the deliverable for /history /inspect /prefs /report /merge.
+    const footerReserve = 6;
+    while (body.length + footerReserve < frameRows) body.push("");
+    const brand = brandPathCode();
+    const header = [fitCanvasLine(brand, columns), ""];
+    const stopBit = completed
+      ? style.dim("■ idle · complete")
+      : running
+        ? `${style.yellow("■")} Stop   Ctrl-C`
+        : style.dim("■ idle");
+    const modeBit = style.dim(
+      ["auto", projectName || null, completed ? "complete" : null]
+        .filter(Boolean)
+        .join(" · "),
+    );
+    const panelFooter = [
+      fitCanvasLine(style.dim("─".repeat(Math.max(20, columns))), columns),
+      fitCanvasLine(`${stopBit}   ${modeBit}`, columns),
+    ];
+    /** @type {string[]} */
+    const panelLines = [
+      ...header,
+      ...body.slice(0, Math.max(3, frameRows - header.length - panelFooter.length)),
+      ...panelFooter,
+    ];
+    while (panelLines.length < frameRows) panelLines.push("");
+    return panelLines.slice(0, frameRows).map((l) => fitLine(l, columns));
+  }
 
   // Idle / objective prelude only when nothing is in the stream yet and the
   // task has not already terminated. Never paint "Ready for engineering" over
@@ -960,8 +1017,8 @@ export function buildMinimalLivingLines(state, viewport) {
     product.streamScroll = scrollOffset;
   }
   let window = streamLines;
-  const completed = state.cards?.terminal?.arrived === true;
-  if (completed && scrollOffset === 0) {
+  const reportPinned = state.cards?.terminal?.arrived === true;
+  if (reportPinned && scrollOffset === 0) {
     // Find start of completion report (✓ COMPLETE / ■ BLOCKED / etc.).
     let reportAt = -1;
     for (let i = streamLines.length - 1; i >= 0; i -= 1) {
@@ -990,7 +1047,7 @@ export function buildMinimalLivingLines(state, viewport) {
   body.push(...window);
   // Completed reports are documents — do not vertically pad a short report
   // into a giant blank canvas. Idle/running views may still fill the frame.
-  if (!completed) {
+  if (!reportPinned) {
     while (body.length < budget) body.push("");
   }
 
@@ -2613,6 +2670,17 @@ export function createInlineStudioRenderer(options = {}) {
     scheduleFrame();
   }
 
+  /**
+   * S2 operator command panel — multi-line response painted in the living
+   * canvas (history / inspect / prefs / merge). Survives alt-screen redraw.
+   * @param {string | null} text
+   */
+  function setOperatorPanel(text) {
+    state.product.operatorPanel =
+      typeof text === "string" && text.trim() ? text.trim() : null;
+    scheduleFrame();
+  }
+
   /** Test / proof introspection. */
   function stats() {
     return {
@@ -2646,6 +2714,7 @@ export function createInlineStudioRenderer(options = {}) {
     isActive,
     getState,
     setReportActionNotice,
+    setOperatorPanel,
     stats,
     restoreCursor,
     detachResize,

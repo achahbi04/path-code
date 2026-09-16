@@ -191,8 +191,8 @@ describe("R2 living session loop (shell)", { timeout: 20_000 }, () => {
       ["--model", "gpt-first-model", "--autonomy", "review"],
     );
     expect(seen).toEqual(["task-one", "task-two"]);
-    expect(output).toContain("Model set to gpt-next-model for subsequent tasks.");
-    expect(output).toContain("Autonomy set to bounded for subsequent tasks.");
+    expect(output).toContain("Model set to gpt-next-model for subsequent tasks");
+    expect(output).toContain("Autonomy set to bounded for subsequent tasks");
   });
 
   it("R2-E: local AG1 path does not require OpenAI credential prompts", async () => {

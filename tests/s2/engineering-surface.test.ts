@@ -100,6 +100,53 @@ describe("engineering surface — open canvas", () => {
     expect(text).toMatch(/Update\(package\.json\)/);
     expect(text).toMatch(/Added 2 lines/);
   });
+
+  it("paints S2 operator panel in-canvas and shows idle · complete after result", async () => {
+    const { createEmptyStudioState, applyStudioEvent } = await load(STUDIO);
+    const { buildMinimalLivingLines } = await load(INLINE);
+    const state = createEmptyStudioState();
+    applyStudioEvent(state, { type: "session.started", sessionId: "es2" });
+    state.product.ag1 = true;
+    state.product.projectName = "Klarapp";
+    applyStudioEvent(state, {
+      type: "session.task.received",
+      sessionId: "es2",
+      preview: "Assess packaging",
+    });
+    applyStudioEvent(state, {
+      type: "session.engineering.busy",
+      label: "Waiting for engineering result",
+    });
+    applyStudioEvent(state, {
+      type: "session.engineering.result",
+      classification: "VERIFIED",
+      changedFiles: [],
+      durationMs: 4200,
+    });
+    expect(state.product.busyLabel).toBeNull();
+    expect(state.product.awaitingInput).toBe(true);
+    expect(state.heartbeat).toBeNull();
+
+    const idle = buildMinimalLivingLines(state, { rows: 28, columns: 90 });
+    const idlePlain = idle.join("\n").replace(/\u001b\[[0-9;]*m/g, "");
+    expect(idlePlain).toMatch(/idle · complete/);
+    expect(idlePlain).not.toMatch(/Waiting for engineering result/);
+    expect(idlePlain).not.toMatch(/\brunning\b/);
+
+    state.product.operatorPanel = [
+      "Durable task history (1 shown, newest first)",
+      "",
+      "taskId  demo-task-1",
+      "  project   Klarapp",
+      "  outcome   VERIFIED",
+    ].join("\n");
+    const panel = buildMinimalLivingLines(state, { rows: 28, columns: 90 });
+    const panelPlain = panel.join("\n").replace(/\u001b\[[0-9;]*m/g, "");
+    expect(panelPlain).toMatch(/PATH · command/);
+    expect(panelPlain).toMatch(/Durable task history/);
+    expect(panelPlain).toMatch(/demo-task-1/);
+    expect(panelPlain).toMatch(/idle · complete/);
+  });
 });
 
 describe("engineering surface — process registry", () => {

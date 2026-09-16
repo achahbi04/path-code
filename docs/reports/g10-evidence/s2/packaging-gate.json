@@ -1,0 +1,92 @@
+{
+  "schema": "pathcode.s2.packaging-gate.v1",
+  "at": "2026-09-16T14:26:52.345Z",
+  "checkout": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/",
+  "s1FreezeTip": "eac5f8620fea8c75070cd27421643bb167864294",
+  "steps": {
+    "locate_tarball": {
+      "ok": true,
+      "path": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/s2/path-code-1.0.1.tgz",
+      "bytes": 753375
+    },
+    "tarball_contents": {
+      "ok": true,
+      "fileCount": 1058,
+      "requiredOk": true,
+      "forbiddenOk": true
+    },
+    "audit_release": {
+      "ok": true,
+      "status": 0
+    },
+    "isolated_install": {
+      "ok": true,
+      "binPath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/prefix/bin/pathcode",
+      "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/prefix/lib/node_modules/path-code"
+    },
+    "no_checkout_coupling": {
+      "ok": true,
+      "binReal": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/prefix/lib/node_modules/path-code/scripts/pathcode.mjs",
+      "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/prefix/lib/node_modules/path-code"
+    },
+    "version": {
+      "ok": true,
+      "out": "PATH * Code 1.0.1"
+    },
+    "doctor": {
+      "ok": true,
+      "status": 1,
+      "outHead": "PATH Code doctor\n\n  ✓ PATH Code      1.0.1\n  ✓ Platform       macOS Apple Silicon\n  ✓ Node           Node.js 26.5.0\n  ✓ Git            git version 2.50.1 (Apple Git-155)\n  ✗ Runtime        PATH engine runtime not ready. PATH will attempt automatic repair on next startup.\n  ✓ Engineering    Vertex/Enterprise env configured (ADC expected).\n  ✓ Project        /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/project\n  ✓ GitHub         gh authenticated\n"
+    },
+    "bootstrap_module_resolve": {
+      "ok": true,
+      "status": 0,
+      "result": {
+        "ok": true,
+        "code": null,
+        "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/runtime",
+        "message": null
+      },
+      "markerExists": true,
+      "venvExists": true,
+      "note": "runtime bootstrap succeeded from installed package"
+    },
+    "gateway_fake_smoke": {
+      "ok": true,
+      "bind": true,
+      "start": true,
+      "taskId": "d74df6d7-a770-4f1f-8d8a-0fe546086d84",
+      "steer": true,
+      "cancel": true,
+      "engines": [
+        {
+          "id": "antigravity",
+          "status": "available"
+        },
+        {
+          "id": "copilot",
+          "status": "available"
+        },
+        {
+          "id": "cursor",
+          "status": "slot_reserved"
+        }
+      ],
+      "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/prefix/lib/node_modules/path-code"
+    },
+    "entry_load": {
+      "ok": true,
+      "status": 0,
+      "note": "installed scripts/pathcode.mjs resolves"
+    }
+  },
+  "ok": true,
+  "isolated": {
+    "home": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/home",
+    "prefix": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/prefix",
+    "project": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/project",
+    "runtime": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/runtime",
+    "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/prefix/lib/node_modules/path-code",
+    "bin": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s2-iso-azuGR1/prefix/bin/pathcode"
+  }
+}

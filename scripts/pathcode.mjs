@@ -80,6 +80,7 @@ function parseArgs(argv) {
    *   doctor: boolean,
    *   model: string | null,
    *   autonomy: "review" | "bounded",
+   *   autonomyExplicit: boolean,
    *   events: null | "ndjson",
    *   eventsOut: string | null,
    *   execution: "local" | "cloud",
@@ -92,6 +93,7 @@ function parseArgs(argv) {
     doctor: false,
     model: null,
     autonomy: "review",
+    autonomyExplicit: false,
     events: null,
     eventsOut: null,
     execution: "local",
@@ -140,6 +142,7 @@ function parseArgs(argv) {
         return { ok: false, message: parsedAutonomy.message };
       }
       out.autonomy = parsedAutonomy.mode;
+      out.autonomyExplicit = true;
       i += 1;
       continue;
     }
@@ -314,6 +317,25 @@ function redrawPrompt(prompt, unicode, plain, sessionStats, inlineStudio = null)
 }
 
 /**
+ * S2 command replies must be visible under alt-screen. Prefer the in-canvas
+ * operator panel; fall back to prompt.write for non-TTY / tests.
+ * @param {{ write: (t: string) => void }} prompt
+ * @param {any} inlineStudio
+ * @param {string} text
+ */
+function showOperatorReply(prompt, inlineStudio, text) {
+  const body = String(text || "").replace(/\s+$/, "");
+  if (
+    inlineStudio &&
+    typeof inlineStudio.setOperatorPanel === "function"
+  ) {
+    inlineStudio.setOperatorPanel(body);
+    return;
+  }
+  prompt.write(body.endsWith("\n") ? body : `${body}\n`);
+}
+
+/**
  * @param {readonly string[]} argv
  * @param {{
  *   stdin?: any,
@@ -442,11 +464,22 @@ export async function runPathcodeMain(argv, testIo = {}) {
   // The living cockpit enters alternate screen first and renders splash + PATH ● Code
   // inside that screen. Writing before alt-screen made the brand appear only after /exit.
 
-  /** Session-scoped settings — persist; authority does not. */
-  let modelId = args.model ?? process.env.PATHCODE_OPENAI_MODEL ?? null;
-  let autonomyMode = args.autonomy;
+  /** Session-scoped settings — persist via preferences.json; authority does not. */
+  const { readPreferences, writePreferences } = await import(
+    "./pathcode-cli/preferences.mjs"
+  );
+  const prefsAtLaunch = readPreferences();
+  let modelId =
+    args.model ??
+    prefsAtLaunch.modelId ??
+    process.env.PATHCODE_OPENAI_MODEL ??
+    null;
+  let autonomyMode = args.autonomyExplicit
+    ? args.autonomy
+    : prefsAtLaunch.autonomy ?? args.autonomy;
   /** @type {string | null} */
   let sessionCredential = null;
+  const runtimeRoot = resolvePathRuntimeRoot({ packageRoot: root });
   const sessionStats = {
     taskCount: 0,
     modelCallCount: 0,
@@ -1085,7 +1118,114 @@ export async function runPathcodeMain(argv, testIo = {}) {
         redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }
-      if (cmd === "/report") {
+      if (cmd === "/history" || cmd.startsWith("/history ")) {
+        try {
+          const {
+            listTaskHistory,
+            formatTaskHistoryListing,
+          } = await import("./pathcode-cli/task-history.mjs");
+          const parts = cmd.split(/\s+/);
+          const nRaw = parts[1];
+          const n =
+            nRaw && /^\d+$/.test(nRaw) ? Math.min(40, Number(nRaw)) : 12;
+          const rows = listTaskHistory(runtimeRoot, { limit: n });
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            formatTaskHistoryListing(rows),
+          );
+        } catch (err) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            `History unavailable: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+      if (cmd === "/report" || cmd.startsWith("/report ")) {
+        const reportArg = cmd === "/report" ? "" : cmd.slice("/report".length).trim();
+        if (reportArg && !reportArg.startsWith("/")) {
+          try {
+            const {
+              getTaskHistoryEntry,
+              formatMissingTaskHelp,
+              formatReportPanel,
+              isPlaceholderTaskId,
+            } = await import("./pathcode-cli/task-history.mjs");
+            if (isPlaceholderTaskId(reportArg)) {
+              showOperatorReply(
+                prompt,
+                ttyInline ? inlineStudio : null,
+                formatMissingTaskHelp(reportArg, runtimeRoot),
+              );
+              redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+              continue;
+            }
+            const entry = getTaskHistoryEntry(runtimeRoot, reportArg);
+            if (!entry || !entry.hasReport || !entry.reportText) {
+              showOperatorReply(
+                prompt,
+                ttyInline ? inlineStudio : null,
+                formatMissingTaskHelp(reportArg, runtimeRoot),
+              );
+            } else {
+              const report = entry.reportText;
+              const outPath = entry.reportPath;
+              const { spawnSync } = await import("node:child_process");
+              let copied = false;
+              let copyError = "";
+              if (process.platform === "darwin") {
+                const r = spawnSync("pbcopy", [], {
+                  input: report.endsWith("\n") ? report : `${report}\n`,
+                  encoding: "utf8",
+                });
+                copied = r.status === 0;
+                if (!copied) {
+                  copyError =
+                    (r.stderr && String(r.stderr).trim()) ||
+                    `pbcopy exit ${r.status}`;
+                }
+              } else {
+                copyError = "Clipboard copy is only automated on macOS (pbcopy).";
+              }
+              const studioState =
+                typeof inlineStudio.getState === "function"
+                  ? inlineStudio.getState()
+                  : null;
+              if (studioState?.product) {
+                studioState.product.engineeringReportPlain = report;
+                if (outPath) {
+                  studioState.product.engineeringReportPath = outPath;
+                }
+              }
+              showOperatorReply(
+                prompt,
+                ttyInline ? inlineStudio : null,
+                formatReportPanel(entry, {
+                  copied,
+                  copyError: copied ? undefined : copyError || "not copied",
+                }),
+              );
+              if (typeof inlineStudio.setReportActionNotice === "function") {
+                inlineStudio.setReportActionNotice(
+                  copied
+                    ? `✓ Durable report opened for ${entry.taskId}\nSaved:\n  ${outPath}`
+                    : `Durable report opened for ${entry.taskId}\nSaved:\n  ${outPath}`,
+                );
+              }
+            }
+          } catch (err) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              `Report unavailable: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
         try {
           const {
             materializeEngineeringReport,
@@ -1109,6 +1249,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
           );
           // Always rematerialize so clipboard / durable / canvas stay identical.
           const pack = materializeEngineeringReport(product, {
+            runtimeRoot,
             session: {
               classification: product.resultClassification || undefined,
               disposition,
@@ -1149,12 +1290,17 @@ export async function runPathcodeMain(argv, testIo = {}) {
             );
           }
           if (!report.trim()) {
-            const miss = "No engineering report yet. Complete a task first.";
-            if (typeof inlineStudio.setReportActionNotice === "function") {
-              inlineStudio.setReportActionNotice(miss);
-            } else {
-              prompt.write(`${miss}\n`);
-            }
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                "No engineering report yet.",
+                "",
+                "Complete a task first, or reopen a past one:",
+                "  /history",
+                "  /report <taskId>",
+              ].join("\n"),
+            );
           } else {
             const { writeFileSync, mkdtempSync } = await import("node:fs");
             const { join } = await import("node:path");
@@ -1193,17 +1339,289 @@ export async function runPathcodeMain(argv, testIo = {}) {
             }
             if (typeof inlineStudio.setReportActionNotice === "function") {
               inlineStudio.setReportActionNotice(notice);
-            } else {
+            }
+            // Clear any prior command panel so the live completion report shows.
+            if (typeof inlineStudio.setOperatorPanel === "function") {
+              inlineStudio.setOperatorPanel(null);
+            }
+            if (!ttyInline) {
               prompt.write(`${notice}\n`);
+              prompt.write(`${report}\n`);
             }
           }
         } catch (err) {
-          const msg = `Report unavailable: ${err instanceof Error ? err.message : String(err)}`;
-          if (typeof inlineStudio.setReportActionNotice === "function") {
-            inlineStudio.setReportActionNotice(msg);
-          } else {
-            prompt.write(`${msg}\n`);
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            `Report unavailable: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+      if (cmd === "/inspect" || cmd.startsWith("/inspect ")) {
+        try {
+          const {
+            getTaskHistoryEntry,
+            listTaskHistory,
+            formatInspectPanel,
+            formatMissingTaskHelp,
+            isPlaceholderTaskId,
+          } = await import("./pathcode-cli/task-history.mjs");
+          const idArg =
+            cmd === "/inspect" ? "" : cmd.slice("/inspect".length).trim();
+          if (idArg && isPlaceholderTaskId(idArg)) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              formatMissingTaskHelp(idArg, runtimeRoot),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
           }
+          const taskId = idArg || activeGatewayTaskId || "";
+          let entry = taskId
+            ? getTaskHistoryEntry(runtimeRoot, taskId)
+            : null;
+          if (!entry && !idArg) {
+            const rows = listTaskHistory(runtimeRoot, { limit: 1 });
+            entry = rows[0] || null;
+          }
+          if (!entry && idArg) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              formatMissingTaskHelp(idArg, runtimeRoot),
+            );
+          } else if (!entry) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                "No inspect target yet.",
+                "",
+                "Complete a verified task, or pass a real id:",
+                "  /history",
+                "  /inspect <taskId>",
+              ].join("\n"),
+            );
+          } else {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              formatInspectPanel(entry),
+            );
+          }
+        } catch (err) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            `Inspect unavailable: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+      if (
+        cmd === "/merge" ||
+        cmd.startsWith("/merge ") ||
+        cmd === "/adopt" ||
+        cmd.startsWith("/adopt ")
+      ) {
+        try {
+          const {
+            getTaskHistoryEntry,
+            listTaskHistory,
+            taskHasAdoptableChanges,
+            formatMissingTaskHelp,
+            isPlaceholderTaskId,
+          } = await import("./pathcode-cli/task-history.mjs");
+          const { spawnSync } = await import("node:child_process");
+          const isAdopt = cmd === "/adopt" || cmd.startsWith("/adopt ");
+          const idArg = (
+            isAdopt
+              ? cmd === "/adopt"
+                ? ""
+                : cmd.slice("/adopt".length)
+              : cmd === "/merge"
+                ? ""
+                : cmd.slice("/merge".length)
+          ).trim();
+          if (idArg && isPlaceholderTaskId(idArg)) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              formatMissingTaskHelp(idArg, runtimeRoot),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          let entry = idArg ? getTaskHistoryEntry(runtimeRoot, idArg) : null;
+          if (!entry && idArg) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              formatMissingTaskHelp(idArg, runtimeRoot),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          if (!entry && !idArg) {
+            const rows = listTaskHistory(runtimeRoot, { limit: 8 });
+            entry =
+              rows.find((r) => r && taskHasAdoptableChanges(r)) ||
+              rows.find(
+                (r) =>
+                  r &&
+                  (r.finalState === "VERIFIED" ||
+                    r.finalState === "COMPLETE" ||
+                    Boolean(r.branch)),
+              ) ||
+              rows[0] ||
+              null;
+          }
+          const studioState =
+            typeof inlineStudio.getState === "function"
+              ? inlineStudio.getState()
+              : null;
+          const product = studioState?.product || {};
+          const branch =
+            entry?.branch ||
+            (typeof product.taskBranch === "string" ? product.taskBranch : null) ||
+            sessionStats.lastVerifiedBranch;
+          if (!entry && !branch) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                "Nothing to merge.",
+                "",
+                "Complete a task that changes files, then:",
+                "  /history",
+                "  /inspect <taskId>",
+                "  /merge <taskId>",
+              ].join("\n"),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          if (entry && !taskHasAdoptableChanges(entry)) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                `Refused: task ${entry.taskId} has nothing meaningful to adopt.`,
+                "",
+                `  disposition   ${entry.finalState || "unknown"}`,
+                `  branch        ${entry.branch || "(none)"}`,
+                `  commit        ${entry.sha || "(none)"}`,
+                `  changed       ${(entry.changedFiles && entry.changedFiles.length) || 0} file(s)`,
+                "",
+                "Read-only / no-change results do not alter the primary project.",
+                `Review with: /inspect ${entry.taskId}`,
+                `Report:       /report ${entry.taskId}`,
+              ].join("\n"),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          if (!branch || !/^path\/task-/.test(branch)) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                "No adoptable path/task-* branch found.",
+                "",
+                "Pass a real task id after a verified task that changed files:",
+                "  /history",
+                "  /merge <taskId>",
+              ].join("\n"),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          const dirty = spawnSync(
+            "git",
+            ["status", "--porcelain=v1", "-uall"],
+            {
+              cwd: projectRoot,
+              encoding: "utf8",
+              env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+            },
+          );
+          if (dirty.status === 0 && dirty.stdout && dirty.stdout.trim()) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                "Primary checkout is dirty.",
+                "",
+                "Commit or stash your work before merging a PATH task branch.",
+                `Primary: ${projectRoot}`,
+              ].join("\n"),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          const plan = [
+            "Adopt task branch into primary (confirmation required)",
+            "",
+            entry ? `  taskId   ${entry.taskId}` : null,
+            `  branch   ${branch}`,
+            entry?.sha ? `  commit   ${entry.sha}` : null,
+            `  command  git merge --no-edit ${branch}`,
+            `  primary  ${projectRoot}`,
+            "",
+            "This will change the primary project checkout.",
+          ]
+            .filter(Boolean)
+            .join("\n");
+          showOperatorReply(prompt, ttyInline ? inlineStudio : null, plan);
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          const answer = await prompt.askLine(
+            "merge-confirm",
+            "Type y to run the merge now (N to cancel): ",
+          );
+          const ok =
+            typeof answer === "string" &&
+            /^(y|yes)$/i.test(answer.trim());
+          if (!ok) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              "Merge cancelled — primary project unchanged.",
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          const merged = spawnSync("git", ["merge", "--no-edit", branch], {
+            cwd: projectRoot,
+            encoding: "utf8",
+            env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+          });
+          if (merged.status === 0) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                `Merged ${branch} into the primary checkout.`,
+                "",
+                `Primary: ${projectRoot}`,
+              ].join("\n"),
+            );
+          } else {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              `Merge failed:\n${(merged.stderr || merged.stdout || "git merge failed").trim()}`,
+            );
+          }
+        } catch (err) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            `Merge unavailable: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
         redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
@@ -1214,17 +1632,39 @@ export async function runPathcodeMain(argv, testIo = {}) {
         continue;
       }
 
-      // Session settings — affect SUBSEQUENT tasks only.
+      // Session settings — affect SUBSEQUENT tasks; persist to preferences.json.
       if (cmd.startsWith("/model")) {
         const parts = cmd.split(/\s+/);
         const next = parts[1];
         if (parts.length !== 2 || !next || next.startsWith("-")) {
-          prompt.write("Usage: /model <id>\n");
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            "Usage: /model <id>\n\nExample: /model gpt-5",
+          );
           redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
           continue;
         }
         modelId = next.trim();
-        prompt.write(`Model set to ${modelId} for subsequent tasks.\n`);
+        const saved = writePreferences({ modelId, autonomy: autonomyMode });
+        showOperatorReply(
+          prompt,
+          ttyInline ? inlineStudio : null,
+          saved.ok
+            ? [
+                `Model set to ${modelId}`,
+                "",
+                "Applies to subsequent tasks.",
+                `Persisted: ${saved.path || "preferences.json"}`,
+                "",
+                "Confirm with /prefs. Survives PATH restart.",
+              ].join("\n")
+            : [
+                `Model set to ${modelId} for this session only.`,
+                "",
+                `Could not persist: ${saved.message || saved.code}`,
+              ].join("\n"),
+        );
         redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }
@@ -1232,18 +1672,64 @@ export async function runPathcodeMain(argv, testIo = {}) {
         const parts = cmd.split(/\s+/);
         const next = parts[1];
         if (parts.length !== 2 || !next) {
-          prompt.write("Usage: /autonomy <review|bounded>\n");
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            "Usage: /autonomy <review|bounded>",
+          );
           redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
           continue;
         }
         const parsedAutonomy = parseAutonomyMode(next);
         if (!parsedAutonomy.ok) {
-          prompt.write(`${parsedAutonomy.message}\n`);
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            parsedAutonomy.message || "Invalid autonomy mode.",
+          );
           redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
           continue;
         }
         autonomyMode = parsedAutonomy.mode;
-        prompt.write(`Autonomy set to ${autonomyMode} for subsequent tasks.\n`);
+        const saved = writePreferences({ modelId, autonomy: autonomyMode });
+        showOperatorReply(
+          prompt,
+          ttyInline ? inlineStudio : null,
+          saved.ok
+            ? [
+                `Autonomy set to ${autonomyMode}`,
+                "",
+                "Applies to subsequent tasks.",
+                `Persisted: ${saved.path || "preferences.json"}`,
+                "",
+                "Confirm with /prefs. Survives PATH restart.",
+              ].join("\n")
+            : [
+                `Autonomy set to ${autonomyMode} for this session only.`,
+                "",
+                `Could not persist: ${saved.message || saved.code}`,
+              ].join("\n"),
+        );
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+      if (cmd === "/prefs") {
+        const {
+          resolveEffectivePreferences,
+          formatPreferencesPanel,
+        } = await import("./pathcode-cli/preferences.mjs");
+        const eff = resolveEffectivePreferences({
+          modelFlag: args.model,
+          autonomyFlag: args.autonomy,
+          autonomyExplicit: args.autonomyExplicit === true,
+          sessionModel: modelId,
+          sessionAutonomy: autonomyMode,
+        });
+        showOperatorReply(
+          prompt,
+          ttyInline ? inlineStudio : null,
+          formatPreferencesPanel(eff, { persisted: true }),
+        );
         redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }

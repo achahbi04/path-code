@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "steps": [
+    "locate_tarball",
+    "tarball_contents",
+    "audit_release",
+    "isolated_install",
+    "no_checkout_coupling",
+    "version",
+    "doctor",
+    "bootstrap_module_resolve",
+    "gateway_fake_smoke",
+    "entry_load"
+  ]
+}

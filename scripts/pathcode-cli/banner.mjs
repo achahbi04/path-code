@@ -100,8 +100,15 @@ Usage:
 At the prompt:
   <task>         Describe an engineering change in plain language
   /stop          Cancel the active engineering task (not steering)
-  /report        Copy/export the plain-text engineering report
+  /history [n]   List durable tasks (id · project · outcome · when)
+  /report        Copy/export the current engineering report
+  /report <id>   Open the durable report for a real taskId
+  /inspect [id]  Disposition · branch · commit · changes · adoptable?
+  /merge [id]    Adopt only when files changed (confirm before merge)
   /log, /task    Show recent structured task trace lines
+  /model <id>    Set model for subsequent tasks (persisted)
+  /autonomy …    Set review|bounded for subsequent tasks (persisted)
+  /prefs         Show durable model + autonomy and their sources
   /help          Show commands
   /exit          Leave
 

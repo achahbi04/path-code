@@ -1,0 +1,10 @@
+status=0
+
+added 30 packages in 22s
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   koffi@3.3.0 (install: node ./cnoke.cjs -P . -D src/koffi --prebuild --release)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm install -g --allow-scripts=koffi` to allow these scripts once, or `npm config set allow-scripts=koffi --location=user` to allow them for all global installs.

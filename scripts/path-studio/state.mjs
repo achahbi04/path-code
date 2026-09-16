@@ -286,6 +286,8 @@ export function createEmptyStudioState() {
       advancesSession: false,
       /** Visible /report confirmation inside the living canvas (not silent). */
       reportActionNotice: null,
+      /** S2 slash-command reply panel (history / inspect / prefs / merge). */
+      operatorPanel: null,
       /** Compact multi-task history inside the session-long cockpit. */
       sessionHistory: /** @type {Array<{ preview: string, classification: string }>} */ ([]),
       /** Idle prompt text rendered inside the cockpit frame. */
@@ -1713,6 +1715,22 @@ export function applyStudioEvent(state, event, opts = {}) {
         state.product.sessionHistory = state.product.sessionHistory.slice(-8);
       }
       setPathPhase(state, phase);
+      // Completion must look idle — clear in-flight busy/heartbeat residue.
+      state.heartbeat = null;
+      state.product.busyLabel = null;
+      state.product.busyDetail = null;
+      state.product.busySince = null;
+      state.product.awaitingInput = true;
+      if (
+        typeof state.product.taskStartedAt === "number" &&
+        state.product.taskStartedAt > 0 &&
+        typeof state.product.durationMs !== "number"
+      ) {
+        state.product.durationMs = Math.max(
+          0,
+          Date.now() - state.product.taskStartedAt,
+        );
+      }
       break;
     }
     case "session.environment.unavailable":
