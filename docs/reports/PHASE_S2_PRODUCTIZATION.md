@@ -2,7 +2,7 @@
 # REAL-PROJECT WORKFLOW PRODUCTIZATION
 
 **S2 RESULT:** FIRST SLICE FROZEN / OPERATOR ACCEPTED — Balanced MVP (packaging + history/result/prefs)  
-**S2 freeze tip:** _(filled after freeze commit)_  
+**S2 freeze tip:** `a1bab1070d0f9bfd627fbbfdec6265a90b20a2c8`  
 **S1:** FROZEN / OPERATOR ACCEPTED — tip `eac5f8620fea8c75070cd27421643bb167864294` — **do not reopen**
 
 **Prior stage:** S1 Gateway Extract + Live Engineering Surface — **FROZEN / OPERATOR ACCEPTED**  
