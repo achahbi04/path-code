@@ -2,8 +2,8 @@
 # REAL-PROJECT WORKFLOW PRODUCTIZATION
 
 **S2 RESULT:** **FROZEN / OPERATOR ACCEPTED**  
-**S2 / S2.3 freeze tip:**   
-**S2.3 tip record:**   
+**S2 / S2.3 freeze tip:** `8fd3367a155d70e0bb2d84bde4576fe22635ff05`  
+**S2.3 tip record:** _(set in following commit)_  
 
 **S2.3 — Installed-product completion:** **FROZEN / OPERATOR ACCEPTED** (Cursor verification PASS; operator procedure below)  
 **S2.2 freeze tip:** `70fdfe14120dfeb3bb45c7f6b98ec13018438868`  
