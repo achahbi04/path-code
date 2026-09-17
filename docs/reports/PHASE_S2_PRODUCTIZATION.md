@@ -2,7 +2,7 @@
 # REAL-PROJECT WORKFLOW PRODUCTIZATION
 
 **S2 RESULT:** S2.1 FROZEN / OPERATOR ACCEPTED · **S2.2 FROZEN / OPERATOR ACCEPTED**  
-**S2.2 freeze tip:** _(recorded at freeze commit)_  
+**S2.2 freeze tip:**   
 **S2.1 freeze tip:** `a1bab1070d0f9bfd627fbbfdec6265a90b20a2c8`  
 **S2.1 tip record:** `1f120c8bb275001f83317535bf8de45c430b8441`  
 **S1:** FROZEN / OPERATOR ACCEPTED — tip `eac5f8620fea8c75070cd27421643bb167864294` — **do not reopen**
