@@ -2,97 +2,40 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
 
  RUN  v3.2.7 /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
 
- ❯ |default| tests/s2/result-lifecycle.test.ts (3 tests | 1 failed) 32463ms
-   × S2.2 result lifecycle > discards worktree/branch, keeps report, marks DISCARDED, primary untouched 20624ms
-     → Test timed out in 20000ms.
-If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
-   ✓ S2.2 result lifecycle > refuses PR for read-only / no-change and discarded tasks  5084ms
-   ✓ S2.2 result lifecycle > formats PR preview/result panels and marks MERGED lifecycle  5587ms
- ❯ |default| tests/s2/worktree-title-repair.test.ts (4 tests | 1 failed) 43136ms
-   × S2.3 worktree Git parity repair > preserves healthy live PATH worktrees during orphan recovery 25583ms
-     → Test timed out in 20000ms.
-If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
-   ✓ S2.3 worktree Git parity repair > repairs a dangling gitdir pointer when admin metadata was removed  12180ms
-   ✓ S2.3 worktree Git parity repair > read-only assessment with empty validation candidates is VERIFIED  4278ms
-   ✓ S2.3 installed-path title reclaim > keeps product title owned and reclaim callable after SDK-boundary hooks  1053ms
- ✓ |default| tests/s3/cursor-executor.test.ts (3 tests) 10805ms
-   ✓ S3.1 cursor executor > loadCursorSdk returns ok when @cursor/sdk is installed  9630ms
-   ✓ S3.1 cursor executor > detectCursorEngine without key → auth_required / unavailable  570ms
-   ✓ S3.1 cursor executor > classifyCursorFailure marks auth errors  552ms
- ✓ |default| tests/s2/engineering-surface.test.ts (8 tests) 18066ms
-   ✓ engineering surface — paste / objective normalize > normalizes CRLF and lone CR before durable use  456ms
-   ✓ engineering surface — paste / objective normalize > bare Esc dismisses overlays without requiring Ctrl-D  445ms
-   ✓ engineering surface — paste / objective normalize > composer paste normalizes CR before buffer insert  3476ms
-   ✓ engineering surface — stop vs steering > recognizes stop control phrases and ignores long steering  1267ms
-   ✓ engineering surface — open canvas > renders full-height open canvas without GOAL box or outer frame  8196ms
-   ✓ engineering surface — open canvas > paints S2 operator panel in-canvas and shows idle · complete after result  3385ms
-   ✓ engineering surface — process registry > tracks and cancels task-owned processes without killing live children when marked ended  311ms
-   ✓ engineering surface — process registry > inherits task ownership from AsyncLocalStorage context  449ms
- ❯ |default| tests/s2/installed-product.test.ts (4 tests | 1 failed) 95323ms
-   ✓ S2.3 command discoverability > help lists the accepted S2 product command surface  356ms
-   ✓ S2.3 command discoverability > idle home surfaces compact command discovery  5703ms
-   × S2.3 doctor install identity > reports package install location 78336ms
-     → Test timed out in 20000ms.
-If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
-   ✓ S2.3 gateway listTasks client > exposes listTasks beside attachTask  10913ms
- ✓ |default| tests/s2/history-prefs.test.ts (5 tests) 17245ms
-   ✓ S2 task history > lists durable checkpoints/reports and reopens report text  10308ms
-   ✓ S2 task history > detects placeholder ids and explains missing reports  2020ms
-   ✓ S2 task history > marks tasks with changed files as adoptable  1613ms
-   ✓ S2 preferences > persists model and autonomy and resolves load order  2836ms
-   ✓ S2 preferences > formats an unmistakable prefs panel  422ms
- ✓ |default| tests/s3/engine-fabric.test.ts (6 tests) 5918ms
-   ✓ S3.1 engine fabric contract > normalizeEngineId accepts aliases without inventing engines  426ms
-   ✓ S3.1 engine fabric contract > buildEngineCapabilityList reports honest cursor statuses  1000ms
-   ✓ S3.1 engine fabric contract > chooseCollabEngine includes cursor when ready  2658ms
-   ✓ S3.1 engine fabric contract > mapCursorSdkEvent maps assistant and tool_call families  834ms
-   ✓ S3.1 engine fabric contract > formatCollabHandoff renders cursor engine journal entries  750ms
+ ✓ |default| tests/s2/result-lifecycle.test.ts (3 tests) 22109ms
+   ✓ S2.2 result lifecycle > discards worktree/branch, keeps report, marks DISCARDED, primary untouched  18491ms
+   ✓ S2.2 result lifecycle > refuses PR for read-only / no-change and discarded tasks  2635ms
+   ✓ S2.2 result lifecycle > formats PR preview/result panels and marks MERGED lifecycle  940ms
+ ✓ |default| tests/s2/installed-product.test.ts (4 tests) 27859ms
+   ✓ S2.3 command discoverability > help lists the accepted S2 product command surface  737ms
+   ✓ S2.3 command discoverability > idle home surfaces compact command discovery  6102ms
+   ✓ S2.3 doctor install identity > reports package install location  17595ms
+   ✓ S2.3 gateway listTasks client > exposes listTasks beside attachTask  3401ms
+ ✓ |default| tests/s3/cursor-executor.test.ts (3 tests) 8805ms
+   ✓ S3.1 cursor executor > loadCursorSdk returns ok when @cursor/sdk is installed  8034ms
+   ✓ S3.1 cursor executor > detectCursorEngine without key → auth_required / unavailable  595ms
+ ✓ |default| tests/s2/worktree-title-repair.test.ts (4 tests) 24936ms
+   ✓ S2.3 worktree Git parity repair > preserves healthy live PATH worktrees during orphan recovery  14220ms
+   ✓ S2.3 worktree Git parity repair > repairs a dangling gitdir pointer when admin metadata was removed  9389ms
+   ✓ S2.3 worktree Git parity repair > read-only assessment with empty validation candidates is VERIFIED  704ms
+   ✓ S2.3 installed-path title reclaim > keeps product title owned and reclaim callable after SDK-boundary hooks  615ms
+ ✓ |default| tests/s2/engineering-surface.test.ts (8 tests) 2716ms
+   ✓ engineering surface — open canvas > renders full-height open canvas without GOAL box or outer frame  899ms
+   ✓ engineering surface — open canvas > paints S2 operator panel in-canvas and shows idle · complete after result  447ms
+   ✓ engineering surface — process registry > tracks and cancels task-owned processes without killing live children when marked ended  366ms
+   ✓ engineering surface — process registry > inherits task ownership from AsyncLocalStorage context  557ms
+ ✓ |default| tests/s2/history-prefs.test.ts (5 tests) 3115ms
+   ✓ S2 task history > lists durable checkpoints/reports and reopens report text  1103ms
+   ✓ S2 task history > detects placeholder ids and explains missing reports  496ms
+   ✓ S2 task history > marks tasks with changed files as adoptable  581ms
+   ✓ S2 preferences > persists model and autonomy and resolves load order  818ms
+ ✓ |default| tests/s3/engine-fabric.test.ts (6 tests) 1530ms
+   ✓ S3.1 engine fabric contract > normalizeEngineId accepts aliases without inventing engines  339ms
+   ✓ S3.1 engine fabric contract > chooseCollabEngine includes cursor when ready  630ms
 
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  7 passed (7)
+      Tests  33 passed (33)
+   Start at  23:31:27
+   Duration  75.46s (transform 20.59s, setup 0ms, collect 8.76s, tests 91.07s, environment 4ms, prepare 13.84s)
 
- FAIL  |default| tests/s2/installed-product.test.ts > S2.3 doctor install identity > reports package install location
-Error: Test timed out in 20000ms.
-If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
- ❯ tests/s2/installed-product.test.ts:83:3
-     81| 
-     82| describe("S2.3 doctor install identity", () => {
-     83|   it("reports package install location", async () => {
-       |   ^
-     84|     const { runPathcodeDoctor } = await load("ag5/doctor.mjs");
-     85|     const result = runPathcodeDoctor({
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
-
- FAIL  |default| tests/s2/result-lifecycle.test.ts > S2.2 result lifecycle > discards worktree/branch, keeps report, marks DISCARDED, primary untouched
-Error: Test timed out in 20000ms.
-If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
- ❯ tests/s2/result-lifecycle.test.ts:84:3
-     82| 
-     83| describe("S2.2 result lifecycle", () => {
-     84|   it("discards worktree/branch, keeps report, marks DISCARDED, primary…
-       |   ^
-     85|     const projectRoot = initRepo();
-     86|     cleanups.push(projectRoot);
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
-
- FAIL  |default| tests/s2/worktree-title-repair.test.ts > S2.3 worktree Git parity repair > preserves healthy live PATH worktrees during orphan recovery
-Error: Test timed out in 20000ms.
-If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
- ❯ tests/s2/worktree-title-repair.test.ts:85:3
-     83| 
-     84| describe("S2.3 worktree Git parity repair", () => {
-     85|   it("preserves healthy live PATH worktrees during orphan recovery", a…
-       |   ^
-     86|     mkdirSync(SCRATCH_ROOT, { recursive: true });
-     87|     const root = mkdtempSync(join(SCRATCH_ROOT, "s23-wt-"));
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
-
-
- Test Files  3 failed | 4 passed (7)
-      Tests  3 failed | 30 passed (33)
-   Start at  23:16:25
-   Duration  196.36s (transform 50.36s, setup 0ms, collect 23.41s, tests 222.96s, environment 77ms, prepare 47.33s)
-
-VITEST_EXIT:1
+VITEST_EXIT:0

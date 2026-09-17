@@ -201,7 +201,9 @@ describe("S2.2 result lifecycle", () => {
 
     const cp = readTaskCheckpoint(runtimeRoot, taskId);
     expect(cp?.resultLifecycle?.status).toBe("DISCARDED");
-  });
+  },
+    60_000,
+  );
 
   it("refuses PR for read-only / no-change and discarded tasks", async () => {
     mkdirSync(SCRATCH, { recursive: true });

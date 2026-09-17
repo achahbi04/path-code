@@ -43,14 +43,16 @@ async function loadAg9() {
 describe("G9 collaborative engines", () => {
   it("chooseCollabEngine alternates and has no permanent primary", async () => {
     const { chooseCollabEngine } = await loadAg9();
+    // S3 fabric: rotate among ready peers starting with antigravity — never a
+    // permanent Copilot/Cursor specialty hierarchy.
     expect(chooseCollabEngine({ attempt: 0, copilotReady: true })).toBe(
-      "copilot",
-    );
-    expect(chooseCollabEngine({ attempt: 1, copilotReady: true })).toBe(
       "antigravity",
     );
-    expect(chooseCollabEngine({ attempt: 2, copilotReady: true })).toBe(
+    expect(chooseCollabEngine({ attempt: 1, copilotReady: true })).toBe(
       "copilot",
+    );
+    expect(chooseCollabEngine({ attempt: 2, copilotReady: true })).toBe(
+      "antigravity",
     );
     expect(chooseCollabEngine({ attempt: 0, copilotReady: false })).toBe(
       "antigravity",

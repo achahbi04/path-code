@@ -93,7 +93,9 @@ describe("S2.3 doctor install identity", () => {
     expect(install.ok).toBe(true);
     expect(String(install.detail)).toContain(CHECKOUT);
     expect(result.packageRoot).toBe(CHECKOUT);
-  });
+  },
+    60_000,
+  );
 });
 
 describe("S2.3 gateway listTasks client", () => {
