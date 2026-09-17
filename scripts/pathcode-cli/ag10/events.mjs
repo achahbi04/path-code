@@ -587,6 +587,219 @@ export function mapCopilotSdkEvent(sdkEvent) {
 }
 
 /**
+ * Pull path / command / query from Cursor SDK tool_call args (best-effort).
+ * @param {any} args
+ * @param {any} result
+ */
+function extractCursorToolFields(args, result) {
+  const a =
+    args && typeof args === "object"
+      ? args
+      : typeof args === "string"
+        ? { command: args }
+        : {};
+  const path = String(
+    a.path ||
+      a.filePath ||
+      a.file_path ||
+      a.filename ||
+      a.target ||
+      a.target_file ||
+      "",
+  )
+    .trim()
+    .replace(/^\.\//, "");
+  const command = String(
+    a.command || a.cmd || a.CommandLine || a.shell_command || "",
+  ).trim();
+  const query = String(
+    a.query || a.pattern || a.grep || a.search || a.glob || "",
+  ).trim();
+  const output = String(
+    (result && typeof result === "object"
+      ? result.output || result.stdout || result.content || result.text || ""
+      : typeof result === "string"
+        ? result
+        : "") || "",
+  ).trim();
+  return {
+    path: path.slice(0, 240),
+    command: command.slice(0, 500),
+    query: query.slice(0, 240),
+    output: output.slice(0, 4_000),
+  };
+}
+
+/**
+ * Map Cursor SDKMessage → G10 family (best-effort, truthful).
+ * @param {{
+ *   type?: string,
+ *   run_id?: string,
+ *   call_id?: string,
+ *   name?: string,
+ *   status?: string,
+ *   text?: string,
+ *   message?: any,
+ *   args?: unknown,
+ *   result?: unknown,
+ * }} sdkEvent
+ */
+export function mapCursorSdkEvent(sdkEvent) {
+  const type = typeof sdkEvent?.type === "string" ? sdkEvent.type : "";
+  if (!type) return null;
+
+  const providerEventId =
+    (typeof sdkEvent.call_id === "string" && sdkEvent.call_id) ||
+    (typeof sdkEvent.run_id === "string" && sdkEvent.run_id) ||
+    undefined;
+
+  if (type === "assistant") {
+    /** @type {string[]} */
+    const texts = [];
+    const content = sdkEvent.message?.content;
+    if (Array.isArray(content)) {
+      for (const block of content) {
+        if (block?.type === "text" && typeof block.text === "string") {
+          texts.push(block.text);
+        }
+      }
+    }
+    const contentText = texts.join("").trim();
+    if (!contentText) return null;
+    return normalizeG10Event({
+      family: "engine.narrating",
+      engine: "cursor",
+      detail: contentText.slice(0, 2_000),
+      providerEventId,
+    });
+  }
+
+  if (type === "thinking") {
+    const text = String(sdkEvent.text || "").trim();
+    if (!text) return null;
+    // Prefer a short researching label over dumping long fake thoughts.
+    return normalizeG10Event({
+      family: "engine.researching",
+      engine: "cursor",
+      detail: text.slice(0, 160),
+      providerEventId,
+    });
+  }
+
+  if (type === "tool_call") {
+    const name = String(sdkEvent.name || "tool");
+    const status = String(sdkEvent.status || "");
+    const fields = extractCursorToolFields(sdkEvent.args, sdkEvent.result);
+    const shellLike = /shell|bash|terminal|exec|run_command|Shell/i.test(name);
+    const editLike = /edit|write|create|apply|patch|Write|StrReplace/i.test(name);
+    const readLike = /read|view|search|grep|glob|list|Read|Grep|Glob/i.test(name);
+
+    if (status === "running") {
+      if (shellLike) {
+        return normalizeG10Event({
+          family: "command.started",
+          engine: "cursor",
+          detail: fields.command || name,
+          providerEventId,
+          payload: {
+            ...(fields.command ? { command: fields.command } : {}),
+          },
+        });
+      }
+      if (editLike) {
+        return normalizeG10Event({
+          family: "file.modified",
+          engine: "cursor",
+          detail: fields.path || name,
+          providerEventId,
+          payload: {
+            ...(fields.path ? { path: fields.path, files: [fields.path] } : {}),
+            tool: name,
+            kind: "file_edit",
+          },
+        });
+      }
+      if (readLike) {
+        return normalizeG10Event({
+          family: "file.read",
+          engine: "cursor",
+          detail: fields.path || fields.query || name,
+          providerEventId,
+          payload: {
+            ...(fields.path ? { path: fields.path, files: [fields.path] } : {}),
+            ...(fields.query ? { query: fields.query } : {}),
+            tool: name,
+            kind: /search|grep|glob/i.test(name) ? "search" : "inspect",
+          },
+        });
+      }
+      return normalizeG10Event({
+        family: "engine.inspecting",
+        engine: "cursor",
+        detail: fields.path || fields.query || name,
+        providerEventId,
+        payload: {
+          ...(fields.path ? { path: fields.path } : {}),
+          ...(fields.query ? { query: fields.query } : {}),
+          tool: name,
+        },
+      });
+    }
+
+    if (status === "completed" || status === "error") {
+      if (shellLike || fields.command) {
+        return normalizeG10Event({
+          family: "command.completed",
+          engine: "cursor",
+          detail: fields.command || name,
+          providerEventId,
+          payload: {
+            ...(fields.command ? { command: fields.command } : {}),
+            ...(fields.output ? { output: fields.output } : {}),
+            ...(status === "error" ? { ok: false } : { ok: true }),
+          },
+        });
+      }
+      if (editLike || fields.path) {
+        return normalizeG10Event({
+          family: "file.modified",
+          engine: "cursor",
+          detail: fields.path || name,
+          providerEventId,
+          payload: {
+            ...(fields.path ? { path: fields.path, files: [fields.path] } : {}),
+            tool: name,
+            kind: "file_edit",
+          },
+        });
+      }
+      if (readLike) {
+        return normalizeG10Event({
+          family: "file.read",
+          engine: "cursor",
+          detail: fields.path || fields.query || name,
+          providerEventId,
+          payload: {
+            ...(fields.path ? { path: fields.path, files: [fields.path] } : {}),
+            ...(fields.query ? { query: fields.query } : {}),
+            tool: name,
+            kind: /search|grep|glob/i.test(name) ? "search" : "inspect",
+          },
+        });
+      }
+    }
+    return null;
+  }
+
+  // status FINISHED/ERROR/CANCELLED — skip (turn result is handled by executor).
+  if (type === "status") {
+    return null;
+  }
+
+  return null;
+}
+
+/**
  * Map Antigravity bridge activity → G10 family.
  * @param {{ type?: string, activity?: string, tool?: string, detail?: string, kind?: string }} msg
  */

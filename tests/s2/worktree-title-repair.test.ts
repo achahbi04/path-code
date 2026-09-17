@@ -11,13 +11,14 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 
 const CHECKOUT = join(dirname(fileURLToPath(import.meta.url)), "../..");
+/** Workspace-local scratch (not /tmp): Cursor sandboxes often deny git under system temp. */
+const SCRATCH_ROOT = join(CHECKOUT, ".path-code-tmp", "s3-s2-repair-tests");
 const scratchDirs: string[] = [];
 
 afterEach(() => {
@@ -40,7 +41,13 @@ function git(cwd: string, args: string[]) {
   return spawnSync("git", args, {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    env: {
+      ...process.env,
+      GIT_TERMINAL_PROMPT: "0",
+      // Avoid template/hooks that some hosts reject under restricted FS.
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_SYSTEM: "/dev/null",
+    },
   });
 }
 
@@ -55,7 +62,18 @@ function canon(p: string) {
 
 function initRepo(dir: string) {
   mkdirSync(dir, { recursive: true });
-  expect(git(dir, ["init"]).status).toBe(0);
+  // Prefer workspace-local scratch: sandbox hosts often block git under /tmp.
+  const init = git(dir, [
+    "-c",
+    "init.defaultBranch=main",
+    "init",
+    "--template=",
+  ]);
+  if (init.status !== 0) {
+    throw new Error(
+      `git init failed (${init.status}): ${init.stderr || init.stdout}`,
+    );
+  }
   git(dir, ["config", "user.email", "s23@example.com"]);
   git(dir, ["config", "user.name", "S23 Repair"]);
   writeFileSync(join(dir, "README.md"), "fixture\n");
@@ -64,8 +82,13 @@ function initRepo(dir: string) {
 }
 
 describe("S2.3 worktree Git parity repair", () => {
-  it("preserves healthy live PATH worktrees during orphan recovery", async () => {
-    const root = mkdtempSync(join(tmpdir(), "s23-wt-"));
+  // Git worktree + orphan recovery is sequential and can exceed the 20s default
+  // under parallel suite load on this host.
+  it(
+    "preserves healthy live PATH worktrees during orphan recovery",
+    async () => {
+    mkdirSync(SCRATCH_ROOT, { recursive: true });
+    const root = mkdtempSync(join(SCRATCH_ROOT, "s23-wt-"));
     scratchDirs.push(root);
     const primary = join(root, "primary");
     const runtimeRoot = join(root, "runtime");
@@ -114,10 +137,15 @@ describe("S2.3 worktree Git parity repair", () => {
     const branch = git(created.worktreePath, ["branch", "--show-current"]);
     expect(branch.status).toBe(0);
     expect(branch.stdout.trim()).toMatch(/^path\/task-/);
-  });
+  },
+    60_000,
+  );
 
-  it("repairs a dangling gitdir pointer when admin metadata was removed", async () => {
-    const root = mkdtempSync(join(tmpdir(), "s23-repair-"));
+  it(
+    "repairs a dangling gitdir pointer when admin metadata was removed",
+    async () => {
+    mkdirSync(SCRATCH_ROOT, { recursive: true });
+    const root = mkdtempSync(join(SCRATCH_ROOT, "s23-repair-"));
     scratchDirs.push(root);
     const primary = join(root, "primary");
     const runtimeRoot = join(root, "runtime");
@@ -164,7 +192,8 @@ describe("S2.3 worktree Git parity repair", () => {
     const { runIndependentFinalValidation } = await load(
       "ag1/final-validation.mjs",
     );
-    const root = mkdtempSync(join(tmpdir(), "s23-val-"));
+    mkdirSync(SCRATCH_ROOT, { recursive: true });
+    const root = mkdtempSync(join(SCRATCH_ROOT, "s23-val-"));
     scratchDirs.push(root);
     writeFileSync(
       join(root, "package.json"),

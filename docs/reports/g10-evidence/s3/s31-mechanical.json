@@ -1,0 +1,58 @@
+{
+  "schema": "pathcode.s3.engine-fabric.mechanical.v1",
+  "at": "2026-09-17T21:08:12.544Z",
+  "note": "S3.1 mechanical proof. S2 freeze tip preserved. S4 not started. OPERATOR ACCEPTANCE PENDING.",
+  "s2FreezeTip": "67200c1551d7dc6beee9bafb495d133ec11dc0ba",
+  "cases": {
+    "rotation": {
+      "ok": true,
+      "sequence": [
+        "antigravity",
+        "copilot",
+        "cursor"
+      ]
+    },
+    "normalize": {
+      "ok": true
+    },
+    "capabilityList": {
+      "ok": true,
+      "cursorStatus": "auth_required",
+      "hasKey": false
+    },
+    "gatewayCapabilities": {
+      "ok": true,
+      "cursorStatus": "auth_required",
+      "engines": [
+        {
+          "id": "antigravity",
+          "status": "available"
+        },
+        {
+          "id": "copilot",
+          "status": "available"
+        },
+        {
+          "id": "cursor",
+          "status": "auth_required"
+        }
+      ]
+    },
+    "detectCursor": {
+      "ok": true,
+      "ready": false,
+      "reason": "auth_required",
+      "status": "unavailable"
+    },
+    "loadSdk": {
+      "ok": true,
+      "reason": null
+    }
+  },
+  "live": {
+    "attempted": false,
+    "ok": false,
+    "detail": "CURSOR_API_KEY not set"
+  },
+  "verdict": "MECHANICALLY TESTED"
+}

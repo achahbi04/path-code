@@ -15,9 +15,9 @@ import {
 import { join } from "node:path";
 import { withToolLock } from "./locks.mjs";
 import { ensureAg9RuntimeDirs } from "./layout.mjs";
+import { selectEngineForTurn } from "../ag10/engine-contract.mjs";
 
-/** @typedef {'antigravity'|'copilot'} CollabEngine */
-
+/** @typedef {'antigravity'|'copilot'|'cursor'} CollabEngine */
 /**
  * @param {string} runtimeRoot
  * @param {string} taskId
@@ -203,17 +203,34 @@ export async function withCollabTurn(input, fn) {
 
 /**
  * Choose which engine should take the next collaborative repair turn.
- * No permanent primary: alternate starting with Copilot when available.
+ * Capability-aware rotation via the S3 engine contract — no permanent hierarchy.
  *
  * @param {{
  *   attempt: number,
  *   copilotReady: boolean,
+ *   cursorReady?: boolean,
+ *   prefer?: string | null,
+ *   lastEngine?: string | null,
  * }} input
  * @returns {CollabEngine}
  */
-export function chooseCollabEngine({ attempt, copilotReady }) {
-  const n = typeof attempt === "number" && attempt >= 0 ? attempt : 0;
-  if (!copilotReady) return "antigravity";
-  // Even attempts → Copilot; odd → Antigravity (no permanent hierarchy).
-  return n % 2 === 0 ? "copilot" : "antigravity";
+export function chooseCollabEngine({
+  attempt,
+  copilotReady,
+  cursorReady,
+  prefer,
+  lastEngine,
+}) {
+  return selectEngineForTurn({
+    role: "repair",
+    attempt,
+    ready: {
+      antigravity: true,
+      copilot: Boolean(copilotReady),
+      cursor: Boolean(cursorReady),
+    },
+    prefer,
+    lastEngine,
+    preferContinuity: false,
+  });
 }

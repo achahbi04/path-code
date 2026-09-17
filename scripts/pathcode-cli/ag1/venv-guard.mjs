@@ -140,6 +140,8 @@ export function assertAg1VenvReady(options = {}) {
     }
   }
 
+  // Bound the import probe: a wedged google-antigravity install can hang forever
+  // (observed on this host with python3.14 venv → doctor / session startup stalls).
   const probe = spawnSync(
     pythonPath,
     [
@@ -150,14 +152,19 @@ export function assertAg1VenvReady(options = {}) {
       + "import google.antigravity\n"
       + "print('import-ok')\n",
     ],
-    { encoding: "utf8", env: process.env },
+    { encoding: "utf8", env: process.env, timeout: 8_000 },
   );
 
   if (probe.error) {
+    const timedOut =
+      probe.error.code === "ETIMEDOUT" ||
+      /ETIMEDOUT|timed out/i.test(probe.error.message || "");
     return {
       ok: false,
-      code: "AG1_VENV_SPAWN_FAILED",
-      message: `Failed to spawn PATH engine python: ${probe.error.message}`,
+      code: timedOut ? "AG1_VENV_PROBE_TIMEOUT" : "AG1_VENV_SPAWN_FAILED",
+      message: timedOut
+        ? `PATH engine python probe timed out after 8s (${pythonPath}).`
+        : `Failed to spawn PATH engine python: ${probe.error.message}`,
     };
   }
   if (probe.status !== 0) {

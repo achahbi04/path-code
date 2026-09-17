@@ -221,6 +221,9 @@ export function scrubEngineIdentity(text) {
  *   cardsOwnProgress?: boolean,
  *   unicode?: boolean,
  *   sessionBaseCommit?: string | null,
+ *   preferCopilotSdk?: boolean,
+ *   preferredEngine?: string | null,
+ *   suppressTaskReceived?: boolean,
  * }} options
  */
 export async function runAntigravityEngineeringSession(prompt, options = {}) {
@@ -592,6 +595,12 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     // Best-effort Copilot SDK attach (falls back to CLI without failing the task).
     try {
       await g10Fabric.attachCopilot();
+    } catch {
+      /* optional peer */
+    }
+    // Best-effort Cursor SDK attach (auth/unavailable without failing the task).
+    try {
+      await g10Fabric.attachCursor();
     } catch {
       /* optional peer */
     }
@@ -993,69 +1002,181 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     ...(toolEnv ? { toolEnv } : {}),
   };
 
-  const startEnvelope = agBind
-    ? await agBind.startOrRehydrate({
-        workspace: startPayload.workspace,
-        defaultCwd: startPayload.defaultCwd,
-        task: startPayload.task,
-        allowShell: startPayload.allowShell,
-        budget: startPayload.budget,
-        mcpServers: startPayload.mcpServers,
-        capabilityBrief: startPayload.capabilityBrief,
-        toolEnv: startPayload.toolEnv,
-        resumeFromCheckpoint: isResume,
-        resumeBrief: isResume
-          ? g10Fabric?.reconcileResume?.()?.resumeBrief
-          : undefined,
-      })
-    : null;
-  const startResult = startEnvelope
-    ? startEnvelope.result || {
-        ok: false,
-        code: "AG_START_FAILED",
-        message: startEnvelope.detail || "Antigravity start failed",
-      }
-    : await agent.startTask(startPayload);
-  if (!startResult.ok) {
-    clearTimeout(wallTimer);
-    clearInterval(pollCancel);
-    const diagHint =
-      typeof agent.getDiagFile === "function" ? agent.getDiagFile() : "";
-    emit("session.engineering.bridge", {
-      stage: "spawn_failed",
-      detail: scrubEngineIdentity(startResult.message || startResult.code || ""),
-    });
-    emit("session.terminal", {
-      disposition: startResult.code,
-      summary: scrubEngineIdentity(
-        `${startResult.message || "bridge start failed"}${diagHint ? ` (diag: ${diagHint})` : ""}`,
-      ),
+  /** Prefer Cursor as primary when requested and ready — skip AG startTask. */
+  let cursorPrimaryDone = false;
+  /** @type {string} */
+  let cursorPrimarySummary = "";
+  const preferredEngine =
+    typeof g10Fabric?.resolvePreferredEngine === "function"
+      ? g10Fabric.resolvePreferredEngine({ prefer: options.preferredEngine })
+      : null;
+  const cursorReadyAtStart =
+    g10Fabric?.getCursor?.()?.getMode?.() === "native_sdk";
+
+  if (
+    preferredEngine === "cursor" &&
+    cursorReadyAtStart &&
+    typeof g10Fabric?.runCursorCollabTurn === "function"
+  ) {
+    emit("session.capability.collaborate", {
+      engine: "cursor",
+      phase: "primary",
+      label: "Collaborative engineering",
+      detail: "preferred Cursor engine taking the primary turn",
     });
     try {
-      await agent.close();
+      const primaryPrompt = [
+        "You are the primary collaborating engineering engine in this PATH task worktree.",
+        "You may inspect, edit, build, test, and implement inside this workspace.",
+        "Do not push, open PRs, deploy, or leave the worktree.",
+        "",
+        effectiveTaskText,
+        capabilityBrief ? `\nCapability brief:\n${capabilityBrief}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const turnBudgetMs = Math.min(wallMs - 30_000, 300_000);
+      const turn = await g10Fabric.runCursorCollabTurn({
+        prompt: primaryPrompt,
+        timeoutMs: Math.max(45_000, turnBudgetMs),
+        signal: ac.signal,
+      });
+      if (turn?.ok) {
+        cursorPrimaryDone = true;
+        cursorPrimarySummary =
+          typeof turn.text === "string" && turn.text.trim()
+            ? turn.text.trim().slice(0, 8_000)
+            : turn.detail || "Cursor primary turn completed";
+        const turnNarration = extractEngineeringNarration(cursorPrimarySummary);
+        if (turnNarration.text) {
+          emit("session.engineering.narration", {
+            text: turnNarration.text,
+            paragraphs: turnNarration.paragraphs,
+          });
+        }
+        emit("session.capability.collaborate", {
+          engine: "cursor",
+          phase: "done",
+          label: "Primary complete",
+          detail: "Cursor primary turn complete",
+          mode: turn.mode || undefined,
+        });
+      } else if (turn?.code === "AUTH_REQUIRED") {
+        emit("session.terminal", {
+          disposition: "AUTH_REQUIRED",
+          summary: "Cursor authentication required; falling back to PATH engine",
+        });
+        try {
+          g10Fabric?.persist?.({
+            cursorMode: "auth_required",
+            finalState: undefined,
+          });
+        } catch {
+          /* ignore */
+        }
+      } else {
+        emit("session.capability.collaborate", {
+          engine: "cursor",
+          phase: "fallback",
+          label: "Continuing",
+          detail: turn?.detail || "Cursor primary unavailable; starting PATH engine",
+        });
+      }
     } catch {
-      // ignore
+      emit("session.capability.collaborate", {
+        engine: "cursor",
+        phase: "error",
+        label: "Continuing",
+        detail: "Cursor primary error; starting PATH engine",
+      });
     }
-    return {
-      exitCode: 2,
-      outcome: startResult.code,
-      classification: "NOT_VERIFIED",
-      engineActivityCount,
-    };
   }
 
-  emit("session.engineering.bridge", {
-    stage: "start_written",
-    detail: `pid=${startResult.pid ?? "?"} python=ok`,
-  });
-  emit("session.engineering.busy", {
-    label: "Waiting for engineering result",
-    detail: "session started",
-    since: Date.now(),
-  });
+  /** @type {any} */
+  let startResult;
+  /** @type {Record<string, unknown>} */
+  let terminalMsg;
 
-  let terminalMsg = await waitForTerminal;
+  if (cursorPrimaryDone) {
+    agentFinished = true;
+    startResult = { ok: true, pid: null };
+    terminalMsg = {
+      type: "finished",
+      summary: cursorPrimarySummary,
+    };
+    emit("session.engineering.bridge", {
+      stage: "start_written",
+      detail: "cursor primary — Antigravity start skipped",
+    });
+    emit("session.engineering.busy", {
+      label: "Waiting for engineering result",
+      detail: "cursor primary complete",
+      since: Date.now(),
+    });
+  } else {
+    const startEnvelope = agBind
+      ? await agBind.startOrRehydrate({
+          workspace: startPayload.workspace,
+          defaultCwd: startPayload.defaultCwd,
+          task: startPayload.task,
+          allowShell: startPayload.allowShell,
+          budget: startPayload.budget,
+          mcpServers: startPayload.mcpServers,
+          capabilityBrief: startPayload.capabilityBrief,
+          toolEnv: startPayload.toolEnv,
+          resumeFromCheckpoint: isResume,
+          resumeBrief: isResume
+            ? g10Fabric?.reconcileResume?.()?.resumeBrief
+            : undefined,
+        })
+      : null;
+    startResult = startEnvelope
+      ? startEnvelope.result || {
+          ok: false,
+          code: "AG_START_FAILED",
+          message: startEnvelope.detail || "Antigravity start failed",
+        }
+      : await agent.startTask(startPayload);
+    if (!startResult.ok) {
+      clearTimeout(wallTimer);
+      clearInterval(pollCancel);
+      const diagHint =
+        typeof agent.getDiagFile === "function" ? agent.getDiagFile() : "";
+      emit("session.engineering.bridge", {
+        stage: "spawn_failed",
+        detail: scrubEngineIdentity(startResult.message || startResult.code || ""),
+      });
+      emit("session.terminal", {
+        disposition: startResult.code,
+        summary: scrubEngineIdentity(
+          `${startResult.message || "bridge start failed"}${diagHint ? ` (diag: ${diagHint})` : ""}`,
+        ),
+      });
+      try {
+        await agent.close();
+      } catch {
+        // ignore
+      }
+      return {
+        exitCode: 2,
+        outcome: startResult.code,
+        classification: "NOT_VERIFIED",
+        engineActivityCount,
+      };
+    }
 
+    emit("session.engineering.bridge", {
+      stage: "start_written",
+      detail: `pid=${startResult.pid ?? "?"} python=ok`,
+    });
+    emit("session.engineering.busy", {
+      label: "Waiting for engineering result",
+      detail: "session started",
+      since: Date.now(),
+    });
+
+    terminalMsg = await waitForTerminal;
+  }
   // Surface operator steering into the stream immediately while the engine works,
   // and queue it for the next safe continue boundary.
   const steerPoll = setInterval(() => {
@@ -1093,6 +1214,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   /** @type {string} */
   let engineeringHandoffSummary = "";
   let repairAttempts = 0;
+  /** @type {string | null} */
+  let lastCollabEngine = cursorPrimaryDone ? "cursor" : null;
   markTiming("first_engine_terminal");
   /** Steering continues applied before validation (bounded). */
   let steeringContinues = 0;
@@ -1169,6 +1292,29 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
                 text: continuePrompt,
               });
             }
+          } else if (agBind) {
+            await agBind.resumeOrRehydrate({
+              text: continuePrompt,
+              rehydrate: {
+                workspace: worktree.worktreePath,
+                defaultCwd: engineeringCwd,
+                task: effectiveTaskText,
+                allowShell,
+                budget: {
+                  maxModelCalls: AG1_DEFAULT_MAX_MODEL_CALLS,
+                  maxToolCalls: AG1_DEFAULT_MAX_TOOL_CALLS,
+                  wallClockMs: wallMs - (Date.now() - startedAt),
+                },
+                ...(mcpServers.length > 0 ? { mcpServers } : {}),
+                ...(capabilityBrief ? { capabilityBrief } : {}),
+                ...(toolEnv ? { toolEnv } : {}),
+                resumeBrief:
+                  g10Fabric?.reconcileResume?.()?.resumeBrief ||
+                  (cursorPrimaryDone
+                    ? "Peer Cursor already worked this task; apply operator steering from current reality."
+                    : undefined),
+              },
+            });
           } else {
             agent.continueTask({
               text: continuePrompt,
@@ -1254,11 +1400,29 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         g10Fabric?.getCopilot?.()?.getMode?.() === "cli_fallback" ||
         ag9CopilotEngine?.isCopilotEngineeringReady?.(),
     );
+    const cursorReady =
+      g10Fabric?.getCursor?.()?.getMode?.() === "native_sdk";
+    const preferred =
+      typeof g10Fabric?.resolvePreferredEngine === "function"
+        ? g10Fabric.resolvePreferredEngine({ prefer: options.preferredEngine })
+        : preferredEngine;
     const engineChoice =
+      g10Fabric?.chooseCollabEngine?.({
+        attempt: repairAttempts,
+        copilotReady,
+        cursorReady,
+        prefer: preferred,
+        lastEngine: lastCollabEngine,
+      }) ||
       ag9Collab?.chooseCollabEngine?.({
         attempt: repairAttempts,
         copilotReady,
-      }) || "antigravity";
+        cursorReady,
+        prefer: preferred,
+        lastEngine: lastCollabEngine,
+      }) ||
+      "antigravity";
+    lastCollabEngine = engineChoice;
     const journalEntries =
       ag9Collab?.readCollabJournal?.({
         runtimeRoot,
@@ -1272,7 +1436,102 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     /** @type {string | null} */
     let peerNotes = null;
 
-    if (engineChoice === "copilot") {
+    if (engineChoice === "cursor") {
+      emit("session.capability.collaborate", {
+        engine: "cursor",
+        phase: "repair",
+        label: "Repairing",
+        detail: "repairing validation failures in the task workspace",
+      });
+      /** @type {boolean} */
+      let cursorTurnOk = false;
+      try {
+        const turnBudgetMs = Math.min(
+          180_000,
+          Math.max(45_000, wallBudgetRemainingMs - 20_000),
+        );
+        const repairPrompt = [
+          "You are a full collaborating engineering engine in this PATH task worktree.",
+          "You may inspect, edit, build, test, and repair code inside this workspace.",
+          "Do not push, open PRs, deploy, or leave the worktree.",
+          "Fix the independent validation failures below, then stop.",
+          "",
+          baseRepairPrompt,
+        ].join("\n");
+
+        const turn = g10Fabric
+          ? await g10Fabric.runCursorCollabTurn({
+              prompt: repairPrompt,
+              timeoutMs: turnBudgetMs,
+              signal: ac.signal,
+            })
+          : null;
+        if (turn?.ok) {
+          cursorTurnOk = true;
+          peerNotes =
+            typeof turn.text === "string" && turn.text.trim()
+              ? turn.text.trim().slice(0, 2_000)
+              : turn.detail || "repair turn completed";
+          const turnNarration = extractEngineeringNarration(
+            typeof turn.text === "string" ? turn.text : peerNotes || "",
+          );
+          if (turnNarration.text) {
+            emit("session.engineering.narration", {
+              text: turnNarration.text,
+              paragraphs: turnNarration.paragraphs,
+            });
+          }
+          emit("session.capability.collaborate", {
+            engine: "cursor",
+            phase: "done",
+            label: "Repair complete",
+            detail: "repair turn complete",
+            mode: turn.mode || undefined,
+          });
+          if (turn.breaker?.action === "stop_auto_bounce") {
+            emit("session.terminal", {
+              disposition: "NEEDS_DIRECTION",
+              summary: "NO_PROGRESS_COLLABORATION",
+            });
+            break;
+          }
+        } else if (turn?.code === "AUTH_REQUIRED") {
+          emit("session.terminal", {
+            disposition: "AUTH_REQUIRED",
+            summary: "Engineering authentication required; task preserved",
+          });
+          try {
+            g10Fabric?.persist?.({
+              cursorMode: "auth_required",
+              finalState: undefined,
+            });
+          } catch {
+            /* ignore */
+          }
+          // Do not destroy task; fall through to Antigravity peer.
+        } else {
+          emit("session.capability.collaborate", {
+            engine: "cursor",
+            phase: "fallback",
+            label: "Continuing",
+            detail: turn?.detail || "peer unavailable; continuing",
+          });
+        }
+      } catch {
+        emit("session.capability.collaborate", {
+          engine: "cursor",
+          phase: "error",
+          label: "Continuing",
+          detail: "peer turn error; continuing engineering",
+        });
+      }
+
+      if (cursorTurnOk) {
+        repairAttempts += 1;
+        continue;
+      }
+      // Fall through to Antigravity with any peer notes.
+    } else if (engineChoice === "copilot") {
       emit("session.capability.collaborate", {
         engine: "copilot",
         phase: "repair",
@@ -1452,6 +1711,30 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
               },
             });
           }
+        } else if (agBind) {
+          // Cursor primary may have skipped AG start — rehydrate on demand.
+          await agBind.resumeOrRehydrate({
+            text: feedback,
+            rehydrate: {
+              workspace: worktree.worktreePath,
+              defaultCwd: engineeringCwd,
+              task: effectiveTaskText,
+              allowShell,
+              budget: {
+                maxModelCalls: AG1_DEFAULT_MAX_MODEL_CALLS,
+                maxToolCalls: AG1_DEFAULT_MAX_TOOL_CALLS,
+                wallClockMs: wallBudgetRemainingMs,
+              },
+              ...(mcpServers.length > 0 ? { mcpServers } : {}),
+              ...(capabilityBrief ? { capabilityBrief } : {}),
+              ...(toolEnv ? { toolEnv } : {}),
+              resumeBrief:
+                g10Fabric?.reconcileResume?.()?.resumeBrief ||
+                (cursorPrimaryDone
+                  ? "Peer Cursor already worked this task; continue from current PATH/Git reality."
+                  : undefined),
+            },
+          });
         } else {
           agent.continueTask({ text: feedback });
         }

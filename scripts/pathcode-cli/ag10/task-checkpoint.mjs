@@ -29,6 +29,8 @@ import { ensureAg9RuntimeDirs } from "../ag9/layout.mjs";
  * @property {string} [agTaskId]
  * @property {string} [copilotSessionId]
  * @property {'native_sdk'|'cli_fallback'|'auth_required'|'none'} [copilotMode]
+ * @property {string} [cursorSessionId]
+ * @property {'native_sdk'|'auth_required'|'unavailable'|'none'} [cursorMode]
  * @property {string} [latestEngineTurn]
  * @property {string[]} [preparedCapabilities]
  * @property {object} [validation]
@@ -91,6 +93,11 @@ export function createCheckpointSkeleton(partial) {
         ? partial.copilotSessionId
         : undefined,
     copilotMode: partial.copilotMode || "none",
+    cursorSessionId:
+      typeof partial.cursorSessionId === "string"
+        ? partial.cursorSessionId
+        : undefined,
+    cursorMode: partial.cursorMode || "none",
     latestEngineTurn:
       typeof partial.latestEngineTurn === "string"
         ? partial.latestEngineTurn

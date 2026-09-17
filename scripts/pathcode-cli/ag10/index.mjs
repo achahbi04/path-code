@@ -29,12 +29,17 @@ import {
 } from "./guards.mjs";
 import { SteeringQueue } from "./steering.mjs";
 import { createCopilotEngine } from "./copilot-sdk.mjs";
+import { createCursorEngine } from "./cursor-sdk.mjs";
+import {
+  selectEngineForTurn,
+  resolvePreferredEngine,
+} from "./engine-contract.mjs";
 import { bindAntigravitySession } from "./ag-session.mjs";
 import {
   withCollabTurn,
   formatCollabHandoff,
   readCollabJournal,
-  chooseCollabEngine,
+  chooseCollabEngine as chooseCollabEngineBase,
 } from "../ag9/collaborate.mjs";
 
 /**
@@ -117,6 +122,8 @@ export async function createG10Fabric(options) {
 
   /** @type {Awaited<ReturnType<typeof createCopilotEngine>> | null} */
   let copilot = null;
+  /** @type {Awaited<ReturnType<typeof createCursorEngine>> | null} */
+  let cursor = null;
   /** @type {ReturnType<typeof bindAntigravitySession> | null} */
   let agBind = null;
 
@@ -131,6 +138,9 @@ export async function createG10Fabric(options) {
       copilotMode: copilot?.getMode?.() || checkpoint.copilotMode || "none",
       copilotSessionId:
         copilot?.getSessionId?.() || checkpoint.copilotSessionId,
+      cursorMode: cursor?.getMode?.() || checkpoint.cursorMode || "none",
+      cursorSessionId:
+        cursor?.getSessionId?.() || checkpoint.cursorSessionId,
       agSessionMode: agBind?.getMode?.() || checkpoint.agSessionMode || "NONE",
       agTaskId: options.taskId,
       usage: resources.evaluate().metrics,
@@ -173,6 +183,24 @@ export async function createG10Fabric(options) {
         payload: { mode: "cli_fallback" },
       });
     }
+    return connected;
+  }
+
+  async function attachCursor() {
+    cursor = await createCursorEngine({
+      taskId: options.taskId,
+      cwd: options.worktreePath,
+      sessionId: checkpoint.cursorSessionId || `path-cursor-${options.taskId}`,
+      toolEnv: options.toolEnv,
+      emit: emitSession,
+    });
+    const connected = await cursor.ensureConnected({
+      resumeSessionId: checkpoint.cursorSessionId || undefined,
+    });
+    persist({
+      cursorMode: cursor.getMode(),
+      cursorSessionId: cursor.getSessionId() || undefined,
+    });
     return connected;
   }
 
@@ -320,6 +348,112 @@ export async function createG10Fabric(options) {
         progress,
         breaker,
         mode: copilot.getMode(),
+      };
+    } finally {
+      steering.setMutationActive(false);
+      applySteeringBoundary();
+    }
+  }
+
+  /**
+   * Collaborative Cursor turn under mutation lease.
+   * @param {{ prompt: string, timeoutMs?: number, expectedFingerprint?: string, signal?: AbortSignal }} turn
+   */
+  async function runCursorCollabTurn(turn) {
+    if (!cursor) await attachCursor();
+    const budget = resources.evaluate();
+    if (budget.state === "hard") {
+      emitG10({
+        family: "guard.circuit",
+        detail: budget.reason || "resource ceiling",
+      });
+      return {
+        ok: false,
+        code: budget.reason,
+        detail: "resource circuit breaker",
+        changedFiles: [],
+      };
+    }
+
+    const steeringApply = applySteeringBoundary();
+    const prompt = [
+      turn.prompt,
+      steeringApply.combinedText
+        ? `\nOperator steering (apply):\n${steeringApply.combinedText}`
+        : "",
+      formatCollabHandoff(
+        readCollabJournal({
+          runtimeRoot: options.runtimeRoot,
+          taskId: options.taskId,
+          limit: 12,
+        }),
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const before = captureTaskReality(options.worktreePath, options.toolEnv);
+    steering.setMutationActive(true);
+    try {
+      const leased = await withMutationLease(
+        {
+          withCollabTurn,
+          captureTaskReality: (p) => captureTaskReality(p, options.toolEnv),
+          runtimeRoot: options.runtimeRoot,
+          taskId: options.taskId,
+          engine: "cursor",
+          worktreePath: options.worktreePath,
+          timeoutMs: turn.timeoutMs,
+          expectedFingerprint: turn.expectedFingerprint,
+        },
+        async () => {
+          emitG10({
+            family: "collaboration.handoff",
+            engine: "cursor",
+            detail: "continuing repair in the task workspace",
+          });
+          const result = await cursor.runEngineeringTurn({
+            prompt,
+            timeoutMs: turn.timeoutMs,
+            signal: turn.signal,
+          });
+          return result;
+        },
+      );
+      const after = captureTaskReality(options.worktreePath, options.toolEnv);
+      const progress = detectProgress({ before, after });
+      resources.recordHandoff();
+      const breaker = noProgress.recordHandoff({
+        productive: progress.productive || leased?.ok === true,
+      });
+      if (breaker.action === "warn") {
+        emitG10({
+          family: "guard.circuit",
+          detail: "no-progress collaboration warning",
+        });
+      }
+      if (breaker.action === "stop_auto_bounce") {
+        emitG10({
+          family: "task.blocked",
+          detail: "NO_PROGRESS_COLLABORATION — needs direction",
+        });
+      }
+      persist({
+        latestEngineTurn: "cursor",
+        cursorMode: cursor.getMode(),
+        cursorSessionId: cursor.getSessionId() || undefined,
+        collaboration: {
+          noProgress: noProgress.consecutiveNoProgress,
+          handoffs: resources.handoffs,
+          breaker: noProgress.state,
+          lastProgress: progress,
+        },
+      });
+      return {
+        ...leased,
+        progress,
+        breaker,
+        mode: cursor.getMode(),
       };
     } finally {
       steering.setMutationActive(false);
@@ -477,6 +611,30 @@ export async function createG10Fabric(options) {
     } catch {
       /* ignore */
     }
+    try {
+      await cursor?.disconnect?.();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * @param {{
+   *   attempt: number,
+   *   copilotReady: boolean,
+   *   cursorReady?: boolean,
+   *   prefer?: string | null,
+   *   lastEngine?: string | null,
+   * }} input
+   */
+  function chooseCollabEngine(input) {
+    return chooseCollabEngineBase({
+      ...input,
+      cursorReady:
+        typeof input.cursorReady === "boolean"
+          ? input.cursorReady
+          : cursor?.getMode?.() === "native_sdk",
+    });
   }
 
   return {
@@ -484,10 +642,12 @@ export async function createG10Fabric(options) {
     emitSession,
     persist,
     attachCopilot,
+    attachCursor,
     attachAntigravity,
     acceptSteering,
     applySteeringBoundary,
     runCopilotCollabTurn,
+    runCursorCollabTurn,
     runAntigravityCollabTurn,
     onAntigravityBridgeEvent,
     acceptBackgroundResult,
@@ -495,12 +655,15 @@ export async function createG10Fabric(options) {
     markFinal,
     shutdown,
     chooseCollabEngine,
+    selectEngineForTurn,
+    resolvePreferredEngine,
     getCheckpoint: () => checkpoint,
     getSteering: () => steering,
     getNoProgress: () => noProgress,
     getResources: () => resources,
     getExternalActions: () => externalActions,
     getCopilot: () => copilot,
+    getCursor: () => cursor,
     getAgBind: () => agBind,
   };
 }
@@ -527,6 +690,7 @@ export {
   normalizeG10Event,
   toSessionEvent,
   mapCopilotSdkEvent,
+  mapCursorSdkEvent,
   mapAntigravityBridgeEvent,
   makeEventId,
   G10_EVENT_FAMILIES,
@@ -543,3 +707,20 @@ export {
   loadCopilotSdk,
   classifyCopilotFailure,
 } from "./copilot-sdk.mjs";
+
+export {
+  createCursorEngine,
+  loadCursorSdk,
+  detectCursorEngine,
+  classifyCursorFailure,
+  resolveCursorApiKey,
+} from "./cursor-sdk.mjs";
+
+export {
+  selectEngineForTurn,
+  resolvePreferredEngine,
+  normalizeEngineId,
+  buildEngineCapabilityList,
+  withEngineProvenance,
+  ENGINE_CAPABILITY_TEMPLATES,
+} from "./engine-contract.mjs";

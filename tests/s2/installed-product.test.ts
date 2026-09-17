@@ -80,7 +80,9 @@ describe("S2.3 command discoverability", () => {
 });
 
 describe("S2.3 doctor install identity", () => {
-  it("reports package install location", async () => {
+  it(
+    "reports package install location",
+    async () => {
     const { runPathcodeDoctor } = await load("ag5/doctor.mjs");
     const result = runPathcodeDoctor({
       cwd: join(CHECKOUT, "docs/reports/g10-evidence/fixtures/repair-js"),

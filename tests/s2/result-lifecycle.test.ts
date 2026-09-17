@@ -81,7 +81,9 @@ afterEach(() => {
 });
 
 describe("S2.2 result lifecycle", () => {
-  it("discards worktree/branch, keeps report, marks DISCARDED, primary untouched", async () => {
+  it(
+    "discards worktree/branch, keeps report, marks DISCARDED, primary untouched",
+    async () => {
     const projectRoot = initRepo();
     cleanups.push(projectRoot);
     const runtimeRoot = mkdtempSync(join(SCRATCH, "rt-"));

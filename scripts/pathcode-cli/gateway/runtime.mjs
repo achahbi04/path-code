@@ -6,7 +6,8 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
+import { createRequire } from "node:module";
+import { basename, join } from "node:path";
 import { EventEmitter } from "node:events";
 import {
   GATEWAY_PROTOCOL_VERSION,
@@ -31,6 +32,11 @@ import {
   runWithTaskContext,
 } from "../process-registry.mjs";
 import { appendTaskTrace } from "../task-trace.mjs";
+import {
+  buildEngineCapabilityList,
+  resolvePreferredEngine,
+} from "../ag10/engine-contract.mjs";
+import { resolveCursorApiKey } from "../ag10/cursor-sdk.mjs";
 
 /**
  * @typedef {{
@@ -245,46 +251,65 @@ export function createGatewayRuntime(options = {}) {
     };
   }
 
+  /**
+   * Sync Cursor readiness for listCapabilities (no network).
+   * Key present + @cursor/sdk resolvable → available; missing key → auth_required.
+   */
+  function probeCursorCapabilitySync() {
+    /** @type {string[]} */
+    const evidence = [];
+    const apiKey = resolveCursorApiKey(process.env);
+    if (!apiKey) {
+      evidence.push("CURSOR_API_KEY not set");
+      return {
+        ready: false,
+        reason: "auth_required",
+        mode: "none",
+        evidence,
+      };
+    }
+    evidence.push("CURSOR_API_KEY present");
+    try {
+      const require = createRequire(join(packageRoot, "package.json"));
+      require.resolve("@cursor/sdk");
+      evidence.push("@cursor/sdk resolvable");
+      return {
+        ready: true,
+        reason: null,
+        mode: "native_sdk",
+        evidence,
+      };
+    } catch (err) {
+      evidence.push(
+        `sdk resolve failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return {
+        ready: false,
+        reason: "sdk_missing",
+        mode: "none",
+        evidence,
+      };
+    }
+  }
+
   function listCapabilities() {
+    const cursorProbe = probeCursorCapabilitySync();
+    const engines = buildEngineCapabilityList({
+      antigravity: true,
+      copilot: {
+        ready: true,
+        mode: "available",
+        evidence: ["stable collaborator path"],
+      },
+      cursor: {
+        ready: cursorProbe.ready,
+        mode: cursorProbe.mode,
+        reason: cursorProbe.reason || undefined,
+        evidence: cursorProbe.evidence,
+      },
+    });
     return {
-      engines: [
-        {
-          id: "antigravity",
-          role: "engineering_collaborator",
-          status: "available",
-          native: [
-            "bridge",
-            "tools",
-            "mcp",
-            "continue",
-            "repair",
-            "cancel",
-            "hooks",
-          ],
-        },
-        {
-          id: "copilot",
-          role: "engineering_collaborator",
-          status: "available",
-          native: [
-            "sdk",
-            "cli_fallback",
-            "tools",
-            "lsp",
-            "mcp",
-            "continue",
-            "repair",
-            "cancel",
-            "stable_cli_path",
-          ],
-        },
-        {
-          id: "cursor",
-          role: "engineering_collaborator",
-          status: "slot_reserved",
-          note: "S3 integration attaches through the same gateway registry",
-        },
-      ],
+      engines,
       environment: [
         "polyglot",
         "mise",
@@ -391,6 +416,21 @@ export function createGatewayRuntime(options = {}) {
     emitTaskEvent(task, "session.capability.preparing", {
       detail: "Admitting project and preparing environment",
     });
+
+    const preferredEngine = resolvePreferredEngine({
+      prefer:
+        (typeof params.preferredEngine === "string" && params.preferredEngine) ||
+        (typeof params.engine === "string" && params.engine) ||
+        null,
+    });
+    if (preferredEngine) {
+      emitTaskEvent(task, "session.capability.collaborate", {
+        engine: preferredEngine,
+        phase: "routing",
+        label: "Collaborative engineering",
+        detail: `preferred engine: ${preferredEngine}`,
+      });
+    }
 
     const sessionEventEmit = (type, fields = {}) => {
       emitTaskEvent(task, type, fields && typeof fields === "object" ? fields : {});
@@ -578,6 +618,7 @@ export function createGatewayRuntime(options = {}) {
               ? params.sessionBaseCommit
               : null,
           signal: abort.signal,
+          ...(preferredEngine ? { preferredEngine } : {}),
         });
 
         task.result = sessionResult && typeof sessionResult === "object"
