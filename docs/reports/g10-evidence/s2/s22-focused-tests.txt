@@ -1,0 +1,41 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+(node:61366) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:61396) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
+
+(node:61428) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:61427) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+]0;]2;Klarapp — PATH Code]0;]2; ✓ |default| tests/s1/freeze-repair.test.ts (3 tests) 2844ms
+   ✓ S1 freeze repair — read-only setup churn > restores lockfile-only churn for assessment objectives  1346ms
+   ✓ S1 freeze repair — read-only setup churn > keeps lockfile changes for explicit dependency upgrades  1198ms
+(node:62438) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/s2/result-lifecycle.test.ts (3 tests) 3196ms
+   ✓ S2.2 result lifecycle > discards worktree/branch, keeps report, marks DISCARDED, primary untouched  2200ms
+   ✓ S2.2 result lifecycle > refuses PR for read-only / no-change and discarded tasks  493ms
+   ✓ S2.2 result lifecycle > formats PR preview/result panels and marks MERGED lifecycle  500ms
+(node:62473) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/s2/engineering-surface.test.ts (8 tests) 724ms
+   ✓ engineering surface — open canvas > renders full-height open canvas without GOAL box or outer frame  347ms
+ ✓ |default| tests/s2/history-prefs.test.ts (5 tests) 470ms
+
+ Test Files  4 passed (4)
+      Tests  19 passed (19)
+   Start at  07:17:27
+   Duration  4.82s (transform 1.28s, setup 0ms, collect 382ms, tests 7.23s, environment 1ms, prepare 587ms)
+
+(node:62501) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:62518) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm notice
+npm notice New major version of npm available! 11.17.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice

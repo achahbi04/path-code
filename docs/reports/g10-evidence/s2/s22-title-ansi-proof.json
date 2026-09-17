@@ -1,0 +1,126 @@
+{
+  "ok": true,
+  "rootCauses": {
+    "title": "Terminal.app appends the tty-foreground process name/argv (copilot / TMPDIR=…) when PATH lost reclaim. Sticky reclaimAvailable=false after first miss disabled reclaim for the session; reclaim python inherited noisy env.",
+    "ansi": "Incomplete CSI was consumed as ESC+[ only (via \\\\u001b. fallback), leaving visible SGR tails like 38;5;180m after naive mid-sequence slices / re-ingest into paintCodeLine."
+  },
+  "titleChecks": [
+    {
+      "id": "format_clean",
+      "ok": true
+    },
+    {
+      "id": "owned",
+      "ok": true
+    },
+    {
+      "id": "process_inert",
+      "ok": true
+    },
+    {
+      "id": "osc_strip",
+      "ok": true
+    },
+    {
+      "id": "during_child_engine_like",
+      "ok": true,
+      "reclaimOk": false
+    },
+    {
+      "id": "after_python_child",
+      "ok": true,
+      "pyStatus": 0
+    }
+  ],
+  "ansiChecks": [
+    {
+      "id": "strip_incomplete_no_residue",
+      "ok": true,
+      "got": ""
+    },
+    {
+      "id": "scrub_orphan_38_5_180",
+      "ok": true
+    },
+    {
+      "id": "scrub_preserves_200ms",
+      "ok": true
+    },
+    {
+      "id": "fitCanvasLine_20",
+      "ok": true,
+      "vis": "const msg = \"hello world string that is…"
+    },
+    {
+      "id": "fitCanvasLine_28",
+      "ok": true,
+      "vis": "const msg = \"hello world string that is…"
+    },
+    {
+      "id": "fitCanvasLine_36",
+      "ok": true,
+      "vis": "const msg = \"hello world string that is…"
+    },
+    {
+      "id": "fitCanvasLine_48",
+      "ok": true,
+      "vis": "const msg = \"hello world string that is quite l…"
+    },
+    {
+      "id": "fitCanvasLine_64",
+      "ok": true,
+      "vis": "const msg = \"hello world string that is quite long for canvas\";"
+    },
+    {
+      "id": "reslice_ingest_5",
+      "ok": true,
+      "cleaned": "",
+      "vis": "x"
+    },
+    {
+      "id": "reslice_ingest_8",
+      "ok": true,
+      "cleaned": "",
+      "vis": "x"
+    },
+    {
+      "id": "reslice_ingest_10",
+      "ok": true,
+      "cleaned": "",
+      "vis": "x"
+    },
+    {
+      "id": "reslice_ingest_12",
+      "ok": true,
+      "cleaned": "c",
+      "vis": "c"
+    },
+    {
+      "id": "reslice_ingest_15",
+      "ok": true,
+      "cleaned": "cons",
+      "vis": "cons"
+    },
+    {
+      "id": "reslice_ingest_18",
+      "ok": true,
+      "cleaned": "const",
+      "vis": "const"
+    },
+    {
+      "id": "truncateVisible",
+      "ok": true,
+      "truncVis": "const msg = \"hello world stri…"
+    },
+    {
+      "id": "renderDiff_0",
+      "ok": true,
+      "vis": "  @@ -1 +1 @@"
+    },
+    {
+      "id": "renderDiff_1",
+      "ok": true,
+      "vis": "        1 +const s = \"colored string bo…"
+    }
+  ]
+}

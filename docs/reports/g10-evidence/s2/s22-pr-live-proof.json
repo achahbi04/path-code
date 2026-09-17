@@ -1,0 +1,113 @@
+{
+  "ok": true,
+  "klarappRepo": "https://github.com/achahbi04/Klarapp",
+  "taskId": "s22-pr-3919c1ccb8af4ec09d79",
+  "branch": "path/task-s22-pr-3919c1ccb8af4ec09d79",
+  "sha": "02d674b8a6063bb8d7411686d08e22607069280d",
+  "prUrl": "https://github.com/achahbi04/Klarapp/pull/1",
+  "prNumber": 1,
+  "checks": [
+    {
+      "id": "primary_clean_start",
+      "ok": true
+    },
+    {
+      "id": "inspect_verified_adoptable",
+      "ok": true,
+      "inspect": "Inspect task s22-pr-3919c1ccb8af4ec09d79\n\n  lifecycle     VERIFIED · adoptable\n  disposition   VERIFIED\n  project       Klarapp\n  branch        path/task-s22-pr-3919c1ccb8af4ec09d79\n  commit        02d674b8a6063bb8d7411686d08e22607069280d\n  baseline      862ada164a58cf42e42ef082c5ba942b1ed4ee70\n  changed       1 file(s)\n    - S2_PR_ACCEPTANCE.md\n\nRead-only inspect command:\n  git diff --no-ext-diff --no-textconv 862ada164a58cf42e42ef082c5ba942b1ed4ee70 02d674b8a6063bb8d7411686d08e22607069280d --\n\nAdoptable: yes — /merge s22-pr-3919c1ccb8af4ec09d79 or /pr s22-pr-3919c1ccb8af4ec09d79 (confirmation required).\nReport: /report s22-pr-3919c1ccb8af4ec09d79"
+    },
+    {
+      "id": "pr_preview_panel",
+      "ok": true,
+      "previewPanel": "GitHub pull request (confirmation required)\n\n  taskId     s22-pr-3919c1ccb8af4ec09d79\n  branch     path/task-s22-pr-3919c1ccb8af4ec09d79\n  commit     02d674b8a6063bb8d7411686d08e22607069280d\n  remote     origin → achahbi04/Klarapp\n  base       main\n  action     git push + gh pr create (reuse open PR if present)\n  primary    unchanged (push only)\n\nThis contacts GitHub and may create a remote branch + pull request.",
+      "preview": {
+        "ok": true,
+        "target": {
+          "remoteName": "origin",
+          "nameWithOwner": "achahbi04/Klarapp",
+          "baseBranch": "main",
+          "remoteLabel": "origin → achahbi04/Klarapp"
+        },
+        "taskBranch": "path/task-s22-pr-3919c1ccb8af4ec09d79",
+        "commitSha": "02d674b8a6063bb8d7411686d08e22607069280d",
+        "changedFiles": [
+          "S2_PR_ACCEPTANCE.md"
+        ],
+        "classification": "VERIFIED"
+      }
+    },
+    {
+      "id": "pr_N_no_side_effect",
+      "ok": true
+    },
+    {
+      "id": "pr_N_still_adoptable",
+      "ok": true,
+      "lifecycle": "VERIFIED · adoptable"
+    },
+    {
+      "id": "pr_y_published",
+      "ok": true,
+      "published": {
+        "ok": true,
+        "published": true,
+        "reused": false,
+        "push": {
+          "ok": true,
+          "skipped": false,
+          "remoteCommitSha": "02d674b8a6063bb8d7411686d08e22607069280d",
+          "branch": "path/task-s22-pr-3919c1ccb8af4ec09d79"
+        },
+        "pr": {
+          "number": 1,
+          "url": "https://github.com/achahbi04/Klarapp/pull/1",
+          "title": "PATH verified: path/task-s22-pr-3919c1ccb8af4ec09d79"
+        },
+        "target": {
+          "remoteName": "origin",
+          "nameWithOwner": "achahbi04/Klarapp",
+          "baseBranch": "main",
+          "remoteLabel": "origin → achahbi04/Klarapp"
+        },
+        "taskBranch": "path/task-s22-pr-3919c1ccb8af4ec09d79",
+        "commitSha": "02d674b8a6063bb8d7411686d08e22607069280d",
+        "lifecycle": {
+          "status": "PR_OPEN",
+          "discardedAt": null,
+          "mergedAt": null,
+          "prUrl": "https://github.com/achahbi04/Klarapp/pull/1",
+          "prNumber": 1,
+          "prRemote": "achahbi04/Klarapp",
+          "prBase": "main",
+          "updatedAt": "2026-09-17T05:16:52.282Z"
+        }
+      }
+    },
+    {
+      "id": "pr_y_branch_pushed",
+      "ok": true,
+      "remoteBranch": "02d674b8a6063bb8d7411686d08e22607069280d\trefs/heads/path/task-s22-pr-3919c1ccb8af4ec09d79"
+    },
+    {
+      "id": "primary_untouched_after_pr",
+      "ok": true
+    },
+    {
+      "id": "inspect_pr_open",
+      "ok": true,
+      "inspectY": "Inspect task s22-pr-3919c1ccb8af4ec09d79\n\n  lifecycle     PR OPEN · https://github.com/achahbi04/Klarapp/pull/1\n  disposition   VERIFIED\n  project       Klarapp\n  branch        path/task-s22-pr-3919c1ccb8af4ec09d79\n  commit        02d674b8a6063bb8d7411686d08e22607069280d\n  baseline      862ada164a58cf42e42ef082c5ba942b1ed4ee70\n  PR            #1\n  PR url        https://github.com/achahbi04/Klarapp/pull/1\n  PR remote     achahbi04/Klarapp\n  PR base       main\n  changed       1 file(s)\n    - S2_PR_ACCEPTANCE.md\n\nRead-only inspect command:\n  git diff --no-ext-diff --no-textconv 862ada164a58cf42e42ef082c5ba942b1ed4ee70 02d674b8a6063bb8d7411686d08e22607069280d --\n\nAdoptable: no — nothing meaningful to merge into the primary project.\nReport: /report s22-pr-3919c1ccb8af4ec09d79"
+    },
+    {
+      "id": "history_pr_open",
+      "ok": true
+    },
+    {
+      "id": "remote_main_unchanged",
+      "ok": true,
+      "remoteMainBefore": "862ada164a58cf42e42ef082c5ba942b1ed4ee70",
+      "remoteMainAfter": "862ada164a58cf42e42ef082c5ba942b1ed4ee70",
+      "mainBefore": "862ada164a58cf42e42ef082c5ba942b1ed4ee70"
+    }
+  ],
+  "failed": []
+}

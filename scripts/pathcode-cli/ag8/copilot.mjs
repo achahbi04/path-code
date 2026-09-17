@@ -5,6 +5,7 @@
 
 import { spawnSync } from "node:child_process";
 import { whichBinary } from "./discover.mjs";
+import { reclaimTtyForeground } from "../terminal-title.mjs";
 
 export const ADVISORY_REASONS = Object.freeze([
   "repeated_type_failure",
@@ -206,9 +207,19 @@ export function runCopilotAdvisory(input) {
     env: {
       ...process.env,
       CI: "1",
+      PATHCODE_NONINTERACTIVE: "1",
     },
     cwd,
+    stdio: ["ignore", "pipe", "pipe"],
+    // Keep advisory out of Terminal.app's foreground title slot.
+    detached: process.platform !== "win32",
   });
+
+  try {
+    reclaimTtyForeground();
+  } catch {
+    // title reclaim is best-effort
+  }
 
   const text = `${run.stdout || ""}${run.stderr || ""}`.trim();
   const code = typeof run.status === "number" ? run.status : null;

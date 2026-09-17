@@ -22,7 +22,7 @@
  */
 
 import { writeSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 const OSC = "\u001b]";
 const BEL = "\u0007";
@@ -83,6 +83,26 @@ export function stripOscTitleSequences(text) {
 }
 
 /**
+ * @param {string} py
+ * @param {string} script
+ * @param {NodeJS.ProcessEnv} env
+ */
+function spawnAsyncReclaim(py, script, env) {
+  try {
+    const child = spawn(py, ["-c", script], {
+      stdio: "ignore",
+      detached: process.platform !== "win32",
+      env,
+    });
+    child.on("error", () => {});
+    if (typeof child.unref === "function") child.unref();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Force PATH's process group to own the tty foreground.
  * Terminal.app appends the *foreground* process name/argv to the window title
  * when that preference is enabled — OSC reassert alone cannot clear a child
@@ -91,11 +111,13 @@ export function stripOscTitleSequences(text) {
  * Children keep pipes/stdio; we only restore which process group Terminal
  * considers "active". Safe no-op when /dev/tty is unavailable.
  *
- * @returns {boolean} true when reclaim was attempted successfully
+ * @param {{ async?: boolean }} [opts] async=true for watchdog (non-blocking)
+ * @returns {boolean} true when reclaim was attempted successfully (sync) or queued (async)
  */
-export function reclaimTtyForeground() {
+export function reclaimTtyForeground(opts = {}) {
   if (process.platform === "win32") return false;
-  if (reclaimAvailable === false) return false;
+  // Never sticky-disable: a transient /dev/tty miss at startup used to disable
+  // reclaim for the whole session, letting children own Terminal.app's title.
   let pgrp;
   try {
     pgrp =
@@ -109,6 +131,8 @@ export function reclaimTtyForeground() {
     (typeof process.env.PATHCODE_PYTHON === "string" &&
       process.env.PATHCODE_PYTHON.trim()) ||
     "python3";
+  // Keep reclaim argv free of TMPDIR=/path noise Terminal.app may append when
+  // "active process arguments" is enabled — pass only PATH + a quiet flag.
   const script = [
     "import os, sys",
     "try:",
@@ -119,20 +143,26 @@ export function reclaimTtyForeground() {
     "except Exception:",
     "  sys.exit(1)",
   ].join("\n");
+  const childEnv = {
+    PATH: process.env.PATH || "/usr/bin:/bin",
+    PATHCODE_NONINTERACTIVE: "1",
+  };
   try {
+    // Watchdog must not spawnSync — that blocked the event loop and timed out
+    // living-session tests under load.
+    if (opts.async === true) {
+      return spawnAsyncReclaim(py, script, childEnv);
+    }
     const r = spawnSync(py, ["-c", script], {
       timeout: 250,
       stdio: "ignore",
-      env: {
-        PATH: process.env.PATH,
-        PATHCODE_NONINTERACTIVE: "1",
-      },
+      detached: process.platform !== "win32",
+      env: childEnv,
     });
     const ok = r.status === 0;
-    if (reclaimAvailable == null) reclaimAvailable = ok;
+    reclaimAvailable = ok ? true : reclaimAvailable;
     return ok;
   } catch {
-    reclaimAvailable = false;
     return false;
   }
 }
@@ -236,7 +266,7 @@ function installStreamTitleGuards() {
         // ignore
       }
       try {
-        reclaimTtyForeground();
+        reclaimTtyForeground({ async: true });
       } catch {
         // ignore
       }
@@ -245,7 +275,7 @@ function installStreamTitleGuards() {
       } catch {
         // ignore
       }
-    }, 200);
+    }, 250);
     if (typeof titleWatchdog.unref === "function") titleWatchdog.unref();
   }
 }
@@ -286,6 +316,8 @@ export function reassertPathTitle() {
   } catch {
     // ignore
   }
+  // OSC-only here — sync reclaim belongs at child-spawn boundaries, not every
+  // frame (would block the living TUI under load).
 }
 
 function writeOwnedTitle() {

@@ -63,34 +63,77 @@ function clip(text, max) {
  * @param {string} line
  * @param {number} columns
  */
+/**
+ * Consume one ANSI sequence starting at `i` (must be ESC).
+ * Incomplete CSI/OSC at end-of-string is consumed wholly (never left as
+ * `38;5;180m` residue). Returns end index exclusive, or -1 if not ESC.
+ * @param {string} line
+ * @param {number} i
+ */
+function consumeAnsiAt(line, i) {
+  if (line[i] !== "\u001b") return -1;
+  const next = line[i + 1];
+  if (next === "[") {
+    let j = i + 2;
+    while (j < line.length) {
+      const code = line.charCodeAt(j);
+      j += 1;
+      if (code >= 0x40 && code <= 0x7e) break;
+    }
+    return j;
+  }
+  if (next === "]") {
+    let j = i + 2;
+    while (j < line.length) {
+      if (line[j] === "\u0007") return j + 1;
+      if (line[j] === "\u001b" && line[j + 1] === "\\") return j + 2;
+      j += 1;
+    }
+    return j;
+  }
+  if (next === "#" || next === "(" || next === ")") {
+    return Math.min(line.length, i + 3);
+  }
+  if (next != null) return i + 2;
+  return i + 1;
+}
+
 export function fitCanvasLine(line, columns) {
   const cols = Math.max(40, Math.floor(columns || 80));
-  // Full CSI family — not only SGR …m — so width math never drifts and we
-  // never truncate mid-sequence into residue like `38;5;180m`.
-  const ansiRe =
-    /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)|\u001b#[0-9]|\u001b./g;
-  const visible = line.replace(ansiRe, "");
-  if (visible.length <= cols) return line;
+  // ANSI-safe width + truncate: never cut mid-CSI and never drop only the
+  // introducer (which used to leave visible `38;5;180m` tails).
+  let visibleLen = 0;
+  for (let i = 0; i < line.length; ) {
+    if (line[i] === "\u001b") {
+      const end = consumeAnsiAt(line, i);
+      i = end > i ? end : i + 1;
+      continue;
+    }
+    visibleLen += 1;
+    i += 1;
+  }
+  if (visibleLen <= cols) return line;
   let out = "";
   let w = 0;
-  for (let i = 0; i < line.length; i += 1) {
+  for (let i = 0; i < line.length; ) {
     if (line[i] === "\u001b") {
-      ansiRe.lastIndex = i;
-      const m = ansiRe.exec(line);
-      if (m && m.index === i) {
-        out += m[0];
-        i += m[0].length - 1;
+      const end = consumeAnsiAt(line, i);
+      if (end > i) {
+        out += line.slice(i, end);
+        i = end;
         continue;
       }
-      // Orphan ESC — drop it rather than leaking control residue.
+      // Lone ESC — drop rather than leak.
+      i += 1;
       continue;
     }
     if (w >= cols - 1) {
-      out += "…";
+      out += "…\u001b[0m";
       break;
     }
     out += line[i];
     w += 1;
+    i += 1;
   }
   return out;
 }

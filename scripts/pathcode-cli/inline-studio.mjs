@@ -39,8 +39,6 @@ import {
 } from "./engineering-stream.mjs";
 import { materializeEngineeringReport } from "./engineering-report.mjs";
 
-const ANSI_RE = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007]*(?:\u0007|\u001b\\)|\u001b#[0-9]|\u001b./g;
-
 const HIDE_CURSOR = "\u001b[?25l";
 const SHOW_CURSOR = "\u001b[?25h";
 const ERASE_LINE = "\u001b[2K";
@@ -56,15 +54,57 @@ const MAX_FPS = 24;
 const FRAME_MIN_MS = Math.floor(1000 / MAX_FPS);
 
 /**
+ * Consume one ANSI sequence at ESC index. Incomplete CSI/OSC is consumed to
+ * end-of-string so we never leave visible `38;5;180m` tails.
+ * @param {string} text
+ * @param {number} i
+ */
+function consumeAnsiAt(text, i) {
+  if (text[i] !== "\u001b") return -1;
+  const next = text[i + 1];
+  if (next === "[") {
+    let j = i + 2;
+    while (j < text.length) {
+      const code = text.charCodeAt(j);
+      j += 1;
+      if (code >= 0x40 && code <= 0x7e) break;
+    }
+    return j;
+  }
+  if (next === "]") {
+    let j = i + 2;
+    while (j < text.length) {
+      if (text[j] === "\u0007") return j + 1;
+      if (text[j] === "\u001b" && text[j + 1] === "\\") return j + 2;
+      j += 1;
+    }
+    return j;
+  }
+  if (next === "#" || next === "(" || next === ")") {
+    return Math.min(text.length, i + 3);
+  }
+  if (next != null) return i + 2;
+  return i + 1;
+}
+
+/**
  * Visible width with ANSI escape sequences stripped (1b).
  * @param {string} text
  */
 export function visibleWidth(text) {
   if (typeof text !== "string" || text.length === 0) return 0;
-  const stripped = text.replace(ANSI_RE, "");
-  // Count code points roughly as columns (BMP/emoji treated as 1 — good enough
-  // for path truncation; never under-estimate by counting escapes).
-  return Array.from(stripped).length;
+  let width = 0;
+  for (let i = 0; i < text.length; ) {
+    if (text[i] === "\u001b") {
+      const end = consumeAnsiAt(text, i);
+      i = end > i ? end : i + 1;
+      continue;
+    }
+    const cp = text.codePointAt(i) ?? 0;
+    width += 1;
+    i += cp > 0xffff ? 2 : 1;
+  }
+  return width;
 }
 
 /**
@@ -77,19 +117,20 @@ export function truncateVisible(text, maxCols) {
   if (!(maxCols > 0)) return "";
   if (visibleWidth(text) <= maxCols) return text;
   const ellipsis = "…";
-  const budget = Math.max(1, maxCols - visibleWidth(ellipsis));
+  const budget = Math.max(1, maxCols - 1);
   let out = "";
   let width = 0;
   let i = 0;
   while (i < text.length) {
     if (text[i] === "\u001b") {
-      ANSI_RE.lastIndex = i;
-      const m = ANSI_RE.exec(text);
-      if (m && m.index === i) {
-        out += m[0];
-        i += m[0].length;
+      const end = consumeAnsiAt(text, i);
+      if (end > i) {
+        out += text.slice(i, end);
+        i = end;
         continue;
       }
+      i += 1;
+      continue;
     }
     const cp = text.codePointAt(i) ?? 0;
     const ch = String.fromCodePoint(cp);
@@ -99,7 +140,7 @@ export function truncateVisible(text, maxCols) {
     width += 1;
     i += step;
   }
-  return `${out}${ellipsis}`;
+  return `${out}${ellipsis}${RESET_GRAPHICS}`;
 }
 
 /**
@@ -941,7 +982,10 @@ export function buildMinimalLivingLines(state, viewport) {
     streamLines.push(fitCanvasLine(`${style.white(mark)} ${style.bold(label)}`, columns));
     if (product.currentDetail) {
       streamLines.push(
-        fitCanvasLine(style.dim(`  ${String(product.currentDetail).slice(0, columns - 4)}`), columns),
+        fitCanvasLine(
+          style.dim(`  ${truncateVisible(String(product.currentDetail), Math.max(12, columns - 4))}`),
+          columns,
+        ),
       );
     }
     streamLines.push("");
@@ -962,7 +1006,9 @@ export function buildMinimalLivingLines(state, viewport) {
     if (typeof product.busyDetail === "string" && product.busyDetail) {
       streamLines.push(
         fitCanvasLine(
-          style.dim(`  ${String(product.busyDetail).slice(0, columns - 4)}`),
+          style.dim(
+            `  ${truncateVisible(String(product.busyDetail), Math.max(12, columns - 4))}`,
+          ),
           columns,
         ),
       );

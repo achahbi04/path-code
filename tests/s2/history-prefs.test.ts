@@ -86,7 +86,7 @@ describe("S2 task history", () => {
     expect(rows[0]?.finalState).toBe("VERIFIED");
     expect(formatTaskHistoryListing(rows)).toMatch(/Durable task history/);
     expect(formatTaskHistoryListing(rows)).toMatch(/\/report <taskId>/);
-    expect(formatTaskHistoryListing(rows)).toMatch(/outcome/);
+    expect(formatTaskHistoryListing(rows)).toMatch(/lifecycle/);
     expect(formatTaskHistoryListing(rows)).toContain(taskId);
 
     const entry = getTaskHistoryEntry(runtimeRoot, taskId);

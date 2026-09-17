@@ -105,6 +105,8 @@ At the prompt:
   /report <id>   Open the durable report for a real taskId
   /inspect [id]  Disposition · branch · commit · changes · adoptable?
   /merge [id]    Adopt only when files changed (confirm before merge)
+  /discard [id]  Abandon a task result (primary untouched; history kept)
+  /pr [id]       Push task branch + open/reuse a GitHub pull request
   /log, /task    Show recent structured task trace lines
   /model <id>    Set model for subsequent tasks (persisted)
   /autonomy …    Set review|bounded for subsequent tasks (persisted)

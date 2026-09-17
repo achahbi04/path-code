@@ -87,16 +87,79 @@ const KEYWORDS = {
 /**
  * Strip CSI / OSC / DEC sequences from untrusted or pre-colored text so PATH
  * never paints over leftover ANSI and never leaves residue like `38;5;180m`.
+ *
+ * Important: incomplete CSI (ESC [ params without a final byte) must be dropped
+ * entirely. A naive `\u001b.` fallback only consumes ESC+[ and leaves
+ * `38;5;180m` as visible source text.
+ *
  * @param {string} text
  */
 export function stripAnsiSequences(text) {
   if (typeof text !== "string" || text.length === 0) return "";
-  return text
-    .replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "")
-    .replace(/\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g, "")
-    .replace(/\u001b[()][0-9A-Za-z]/g, "")
-    .replace(/\u001b#[0-9]/g, "")
-    .replace(/\u001b./g, "");
+  let out = "";
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch !== "\u001b") {
+      out += ch;
+      continue;
+    }
+    const next = text[i + 1];
+    if (next === "[") {
+      // CSI: consume params/intermediates through final byte, or rest if truncated.
+      i += 2;
+      while (i < text.length) {
+        const code = text.charCodeAt(i);
+        if (code >= 0x40 && code <= 0x7e) {
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      i -= 1;
+      continue;
+    }
+    if (next === "]") {
+      // OSC … BEL or ST
+      i += 2;
+      while (i < text.length) {
+        if (text[i] === "\u0007") {
+          i += 1;
+          break;
+        }
+        if (text[i] === "\u001b" && text[i + 1] === "\\") {
+          i += 2;
+          break;
+        }
+        i += 1;
+      }
+      i -= 1;
+      continue;
+    }
+    if (next === "(" || next === ")") {
+      // Character set designation — ESC ( B etc.
+      i += 2;
+      continue;
+    }
+    if (next === "#") {
+      i += 2;
+      continue;
+    }
+    // Unknown ESC sequence — drop ESC + following byte when present.
+    if (next != null) i += 1;
+  }
+  // Defense: already-orphaned SGR parameter tails (ESC/[ lost upstream).
+  return scrubOrphanSgrResidue(out);
+}
+
+/**
+ * Remove orphan SGR tails such as `38;5;180m` / `[38;5;180m` that remain after
+ * the CSI introducer was lost. Conservative: only classic SGR parameter shapes.
+ * @param {string} text
+ */
+export function scrubOrphanSgrResidue(text) {
+  if (typeof text !== "string" || text.length === 0) return text;
+  // Require at least one `;` so we never eat legitimate source like `200ms`.
+  return text.replace(/\[?\d{1,3}(?:;\d{1,3}){1,8}m/g, "");
 }
 
 /**

@@ -1,0 +1,848 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 check
+> npm run typecheck && npm run build && npm run test && npm run cli:smoke && npm run ledger:verify
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 typecheck
+> tsc -p tsconfig.json --noEmit
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 build
+> tsc -p tsconfig.build.json
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 test
+> vitest run
+
+(node:33214) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ RUN  v3.2.7 /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
+
+(node:33308) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33307) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/ag5/ag5-proofs.test.ts (13 tests) 61370ms
+   ✓ AG5 C — monorepo subdirectory invocation > records workingSubdir and engineering cwd under worktree  3160ms
+   ✓ AG5 D — PATH-owned orphan recovery preserves user worktrees > recovers PATH stale worktree and leaves user linked worktree intact  4107ms
+   ✓ AG5 native validation discovery > Python without pytest is NOT_VERIFIED rather than FAILED  460ms
+   ✓ AG5 runtime self-repair > rebuilds a pip-less interrupted venv  48495ms
+   ✓ AG5 packaging surface > unknown args on incomplete install do not demand checkout restore  452ms
+   ✓ AG5 packaging surface > pathcode doctor runs without secrets  3972ms
+(node:49097) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2; ✓ |default| tests/selfobs/derivation.test.ts (8 tests) 108012ms
+   ✓ selfobs derivation > derives Phase 3 editing capabilities after public authority-surface relink  15713ms
+   ✓ selfobs derivation > phase-promotion falsification — removing phaseAuditEvidence lowers safe-editing to DECLARED/IMPLEMENTED  40158ms
+   ✓ selfobs derivation > relink falsification — removing freezeEvidence lowers trio to IMPLEMENTED  51924ms
+(node:67253) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2; ✓ |default| tests/general-session/session-loop.test.ts (18 tests) 68658ms
+   ✓ R2 living session loop (shell) > R2-A / R2-M: two tasks one session; prompt returns; /exit leaves; counter correct  5566ms
+   ✓ R2 living session loop (shell) > R2-F: declining keeps the session; next task runs  1570ms
+   ✓ R2 living session loop (shell) > R2-H: escalation keeps the session  1344ms
+   ✓ R2 living session loop (shell) > R2-I: /model and /autonomy still update shell settings between tasks  2220ms
+   ✓ R2 living session loop (shell) > R2-E: local AG1 path does not require OpenAI credential prompts  1618ms
+   ✓ R2 living session loop (shell) > R2-L: internal error in cycle 1 does not poison cycle 2  1368ms
+   ✓ R2 living session loop (shell) > R2-J: /recover between tasks returns to the prompt  1527ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-A / R2-B / R2-C: two full cycles; new challenges; no catalog/checkpoint reuse  7408ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-D: dirty-tree continuity — task 2 discloses dirty state; checkpoints differ  5451ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-N / R2-Q: accepted REVIEW cycle emits ordered live events; gate semantics hold  2850ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-N: refused cycle emits refusal and NOT later stages  1004ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-O: no decoration — skipped validation emits skipped, not running/result  2633ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-P: ndjson mode emits identical event content to the live sink  5969ms
+   ✓ R2 fresh authority + no object reuse (host cycles) > R2-Q: bounded mode also renders live events and keeps R1 gate semantics  3869ms
+   ✓ R2-K clean interstitial + credential scrub in validation env > R2-E / R2-K: validation child env excludes secrets; cycle returns modelCalls  3017ms
+   ✓ P1 AUTHORITY-REUSE PROBE > P1: weakening challenge freshness makes R2-B fail open; restore by hash  8434ms
+   ✓ R2-C object identity / staleness refusal across cycles > R2-C: feeding cycle-1 bound objects into cycle-2 is refused by owners  12491ms
+[?25h[?1049l[0m[?2004l[?25h[?1049l[0m[?2004l[?25h[?1049l[0m[?2004l(node:70209) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2;cursor-pathcode-antigravity-v1 — PATH Code]0;]2; ✓ |default| tests/general-session/cli.test.ts (6 tests) 23092ms
+   ✓ 5G-M: a plain line at the prompt is an engineering task > 5G-M: routes the operator's words to the PATH engineering session  8768ms
+   ✓ 5G-M: a plain line at the prompt is an engineering task > 5G-M: an unknown slash command is not treated as a task  6186ms
+   ✓ 5G-AF: /recover routes to the recovery command > 5G-AF: passes the parsed checkpoint id and this directory  4153ms
+   ✓ 5G-AF: /recover routes to the recovery command > 5G-AF: a missing or path-like id is a usage message and the prompt stays open  3967ms
+[?25h[?1049l[0m[?2004l[?25h[?1049l[0m[?2004l[?25h[?1049l[0m[?2004l(node:70843) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/ag2/ag2-proofs.test.ts (9 tests) 51350ms
+   ✓ AG2 A — dirty primary admitted and adopted > admits dirty tree; task worktree receives working-tree state; primary untouched  3549ms
+   ✓ AG2 B — detached HEAD admitted > creates internal task branch from detached commit; primary untouched  14648ms
+   ✓ AG2 C — verified cleanup > task branch + commit remain; worktree removed  5534ms
+   ✓ AG2 D — failed partial work preserved > UNVERIFIED WIP commit; baseline does not advance conceptually  7817ms
+   ✓ AG2 E/F — session success chain + failure isolation > task2 starts from task1 verified commit; failed task2 does not move baseline  6025ms
+   ✓ AG2 G — no worktree leak > repeated create/remove leaves no orphan task paths  3400ms
+   ✓ AG2 H — primary untouched > agent edits stay in worktree  3394ms
+   ✓ AG2 J — cancellation cleanup path exists > removeTaskWorktree works after cancel-style WIP preserve  6588ms
+(node:84895) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/ledger/gap-closure-diagnostics.test.ts (3 tests) 67649ms
+   ✓ gap closure commit diagnostics > accepts a CLOSED gap whose closedByCommit resolves to a real ancestor commit  31728ms
+   ✓ gap closure commit diagnostics > reports schema failure when closedByCommit is absent on a CLOSED gap  14690ms
+   ✓ gap closure commit diagnostics > reports commit-resolution failure when closedByCommit is present but unresolvable  21227ms
+(node:88358) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/general-session/bounded-autonomy.test.ts (15 tests) 45649ms
+   ✓ R1-D: REVIEW mode still solicits the four gates > R1-D: successful REVIEW asks start-consent, scope, apply, check  6832ms
+   ✓ R1-E / R1-R / R1-S / R1-T: BOUNDED success path > R1-E: BOUNDED success asks only run-consent; source mutates; exit 0  2474ms
+   ✓ R1-F: declining RUN spends nothing > R1-F: empty RUN → zero adapter invocations  717ms
+   ✓ R1-G: host mints authority after RUN; model never authorizes > R1-G: architecture — authorize* follows RUN; model text never calls it  2418ms
+   ✓ R1-H / R1-I / R1-L: policy escalation unit surface > R1-H: evaluateScopeAgainstPolicy escalates oversize context  579ms
+   ✓ R1-J: recovery REQUIRED after bounded success > R1-J: GENERAL_SESSION_RECOVERY_PROTECTION + durable checkpoint  5339ms
+   ✓ R1-K: currentness drift before write under BOUNDED > R1-K: afterScopeApproval drift → SCOPE_STALE; zero further calls  2246ms
+   ✓ R1-K: currentness drift before write under BOUNDED > R1-K: disk drift after edit review → MUTATION_STALE; zero writes of model text  5079ms
+   ✓ R1-N: prepared env scrubbed under BOUNDED > R1-N: preparedEnvSnapshots never carry provider secrets  4629ms
+   ✓ R1-O: validation failure retains mutation + checkpoint > R1-O: failing check keeps edit, offers recover, no auto-restore  3368ms
+   ✓ R1-Q already covered with R1-E head oid identity > R1-Q: porcelain dirty, single commit remains  11395ms
+(node:97785) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/ledger/two-commit-freeze-scope.test.ts (11 tests) 46326ms
+   ✓ two-commit freeze productionScopes > T7 — canonical Phase 2F and repository-intelligence still verify  19348ms
+   ✓ Phase 3B relink probe > accepts TWO_COMMIT_FREEZE with src/editing/ scope for ad85c9f → 2b63531  26524ms
+(node:99913) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/general-session/recover.test.ts (6 tests) 32109ms
+   ✓ 5G-AF: /recover is a separate, human-authorized act > 5G-AF: parses the command and refuses anything path-like  301ms
+   ✓ 5G-AF: /recover is a separate, human-authorized act > 5G-AF: shows dispositions, requires RESTORE, and restores the exact bytes  8962ms
+   ✓ 5G-AF: /recover is a separate, human-authorized act > 5G-AF: reports a checkpoint that is not in this store, and restores nothing  853ms
+   ✓ 5G-AF: /recover is a separate, human-authorized act > 5G-AF: a file changed since the checkpoint is reported, not silently overwritten  8848ms
+   ✓ 5G-AG: the checkpoint survives the process that made it > 5G-AG: a fresh process restores from the id alone  12935ms
+(node:2341) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2;]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2; ✓ |default| tests/ag3/ag3-proofs.test.ts (12 tests) 17414ms
+   ✓ AG3 runtime bootstrap lock > two concurrent ensureAg1Runtime calls share one healthy runtime  11403ms
+   ✓ AG3 terminal restore > alternate-screen renderer enters and exits alt buffer  1183ms
+   ✓ AG3 package bin > pathcode --version works via node entry without cwd package root  2986ms
+   ✓ AG3 narrow + non-TTY + cancel wiring > narrow AG1 layout uses minimal living cockpit  748ms
+   ✓ AG3 narrow + non-TTY + cancel wiring > burst alt-screen events coalesce (write count << event count)  374ms
+(node:3098) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/ag1/ag1-proofs.test.ts (11 tests) 41356ms
+   ✓ AG1 C — task worktree leaves primary untouched > creates isolated worktree and does not mutate primary porcelain  6499ms
+   ✓ AG1 E — sandbox canary fail-closed > runs one disposable canary and refuses shell when unproven  16458ms
+   ✓ AG1 F — cancellation terminates owned process > cancel kills the bridge child  4531ms
+   ✓ AG1 G/H/I — finished ≠ VERIFIED; PATH validation owns result > H/I: independent validation determines VERIFIED / FAILED honestly  4926ms
+   ✓ AG1 venv guard — no silent global fallback > 3: rejects wrong/global interpreter; 4: accepts AG1 venv  7879ms
+   ✓ AG1 scrubEngineIdentity > strips engine branding from product strings  324ms
+(node:3178) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/selfobs/phase-audit-shape.test.ts (3 tests) 26683ms
+   ✓ phaseAuditEvidence shape consistency (ledger:verify helper) > accepts truthful matching observations from verified derivation  26673ms
+(node:6865) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/reasoning/gate2.test.ts (26 tests) 41113ms
+   ✓ gate2 evaluation > C07: authentic successful run yields scoped acceptance with CITED_RUN_ONLY  607ms
+   ✓ gate2 evaluation > C08: copied run/IDs/JSON and wrong plan cannot authenticate  1669ms
+   ✓ gate2 evaluation > C09: selected checks passed but another required plan check failed => not accepted  1673ms
+   ✓ gate2 evaluation > C10/C11: failed results remain negative; applicability cannot upgrade failure  357ms
+   ✓ gate2 evaluation > C12: same-size/same-mtime declared byte change invalidates evidence  443ms
+   ✓ gate2 evaluation > C13: changed restrictions / denied applicability never accept  677ms
+   ✓ gate2 evaluation > C14: extra Validation input change blocks via Engineering Run applicability  493ms
+   ✓ gate2 evaluation > C15: pre-edit reasoning with post-edit run refuses; rebind can assess  8496ms
+   ✓ gate2 evaluation > C16: CONTAINS deferred and hypotheses unchanged when execution evidence accepted  954ms
+   ✓ gate2 evaluation > C17: caller mutation of assignment arrays cannot rewrite authoritative mapping  317ms
+   ✓ gate2 evaluation > C18: catalog disposed before/during assessment cannot accept; later applicability refuses  1625ms
+   ✓ gate2 evaluation > C19: historical assessment immutable; clone refuses; stale applicability  1020ms
+   ✓ gate2 evaluation > C20: no process retry/execution from Gate 2; repeated assessment is assessment-only  1212ms
+   ✓ gate2 e2e and diagnostics > C21: real tsc + targeted test -> Gate 2 accept -> byte change reuse refused  3088ms
+   ✓ gate2 e2e and diagnostics > C22: safe assessment metadata does not leak secrets/paths; JSON view informational  492ms
+   ✓ gate2 e2e and diagnostics > C23/C24: architecture markers, counts are configured checks, limitations survive  518ms
+   ✓ gate2 private association seams > C09/C10 private assertInheritedValidationSuccess rejects non-pass aggregate  984ms
+   ✓ gate2 bypass probes > bypass 1: weaken exact plan association — C04/C08 private seam fails open  10338ms
+   ✓ gate2 bypass probes > bypass 2: weaken inherited Validation success — C09/C10 private seam fails open  5213ms
+(node:8330) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/git/baseline.test.ts (20 tests) 25591ms
+   ✓ collectGitStateBaseline — tracked file states > reports a clean tracked file as TRACKED with CLEAN index and worktree  1161ms
+   ✓ collectGitStateBaseline — tracked file states > reports an unstaged modification as index CLEAN and worktree MODIFIED  1076ms
+   ✓ collectGitStateBaseline — tracked file states > reports a staged modification as index MODIFIED and worktree CLEAN  1542ms
+   ✓ collectGitStateBaseline — tracked file states > reports staged plus further unstaged changes on both dimensions  2856ms
+   ✓ collectGitStateBaseline — tracked file states > reports a staged new file as index ADDED  2952ms
+   ✓ collectGitStateBaseline — untracked and ignored > reports an admitted untracked file as UNTRACKED  1578ms
+   ✓ collectGitStateBaseline — untracked and ignored > reports an admitted ignored file as IGNORED when listed in .gitignore  1182ms
+   ✓ collectGitStateBaseline — deletions, renames, and directories > surfaces an unstaged deletion as an unmapped visible observation without a RepositoryEntry  1012ms
+   ✓ collectGitStateBaseline — deletions, renames, and directories > preserves the original path on a rename  1129ms
+   ✓ collectGitStateBaseline — deletions, renames, and directories > labels directories as NOT_APPLICABLE_DIRECTORY rather than UNTRACKED  1412ms
+   ✓ collectGitStateBaseline — repository availability > reports detached HEAD availability  1706ms
+   ✓ collectGitStateBaseline — repository availability > reports an unborn repository with UNBORN head and ATTACHED branch  961ms
+   ✓ collectGitStateBaseline — repository availability > reports a normal attached branch after the initial commit  1199ms
+   ✓ collectGitStateBaseline — inventory coupling > maps annotation.entry to the same inventory entry by reference identity  891ms
+   ✓ collectGitStateBaseline — inventory coupling > uses PRE_EXISTING provenance throughout and never PATH_CODE_MODIFIED  723ms
+   ✓ collectGitStateBaseline — inventory coupling > records unmapped visible Git paths when inventory is PARTIAL  882ms
+   ✓ collectGitStateBaseline — deny-path visibility > excludes denied secrets descendants from annotations and unmapped observations  1367ms
+   ✓ collectGitStateBaseline — deny-path visibility > does not deny secrets-public when only secrets is configured  790ms
+   ✓ collectGitStateBaseline — deny-path visibility > physically denies symlink aliases to configured deny roots  1092ms
+(node:16558) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/integration/phase3-reaudit-public-surface.test.ts (9 tests) 27068ms
+   ✓ Phase 3 re-audit — public authority surface P1–P14 > capability/gap ledger — affected caps PASS_FROZEN; GAP-048/049/050 CLOSED; GAP-051 OPEN; safe-editing IMPLEMENTED  27001ms
+(node:23064) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/general-session/preflight.test.ts (16 tests) 25296ms
+   ✓ 5G-F: preflight composes the read-only owners > 5G-F: reports the project root, Git position, inventory and store root  3059ms
+   ✓ 5G-G / 5G-H / 5G-I: Git states a session refuses > 5G-H: refuses a detached HEAD  4675ms
+   ✓ 5G-G / 5G-H / 5G-I: Git states a session refuses > 5G-I: refuses every in-progress multi-step operation marker  10827ms
+   ✓ 5G-G / 5G-H / 5G-I: Git states a session refuses > 5G-I: resolves a gitdir: pointer file, so linked worktrees are covered  481ms
+   ✓ 5G-J: the runtime checkout is never a target > 5G-J: refuses when the project root is this Path Code checkout  1784ms
+   ✓ 5G-K / 5G-W / 5G-X: the state directory and the store root > 5G-K: refuses a store root that contains the project  372ms
+   ✓ 5G-L: a dirty tree is disclosed and left alone > 5G-L: reports modified and untracked paths without touching them  1758ms
+   ✓ 5G-L: a dirty tree is disclosed and left alone > 5G-L: no general-session host module carries a destructive Git verb  558ms
+(node:27790) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/general-session/session-flow.test.ts (30 tests) 105028ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-M: declining START makes no provider call and reads nothing  7366ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-M: a near-miss phrase is not consent  4491ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: the budget is disclosed before START is solicited  1962ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: a complete run spends exactly three calls, at the declared ceilings  4870ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: a failed scope call is reported, never retried  1390ms
+   ✓ 5G-M / 5G-N: consent and budget precede every provider call > 5G-N: a plan naming a sensitive path is refused without a second call  2737ms
+   ✓ 5G-O / 5G-P: the scope round trip > 5G-O: the scope call carries metadata only, and withholds sensitive paths  2862ms
+   ✓ 5G-O / 5G-P: the scope round trip > 5G-P: declining SCOPE stops before any file is read for the model  1646ms
+   ✓ 5G-O / 5G-P: the scope round trip > 5G-P: the scope review shows exactly the paths that were admitted  1051ms
+   ✓ 5G-Q: currentness is rechecked after the scope approval > 5G-Q: a moved HEAD after scope approval refuses before any file is read  2330ms
+   ✓ 5G-Q: currentness is rechecked after the scope approval > 5G-Q: a branch switch after scope approval is refused too  2333ms
+   ✓ 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-R: the edit call is grounded in the approved paths only  2242ms
+   ✓ 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-S: the edit review shows both sides, and declining writes nothing  1653ms
+   ✓ 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-S: a target id the host never minted is refused, with no APPLY prompt  1308ms
+   ✓ 5G-R / 5G-S: grounding, the edit review, and the APPLY gate > 5G-S: an ungrounded claim subject is refused by Gate 1, not written  1607ms
+   ✓ 5G-T: post-mutation disclosure and the CHECK gate > 5G-T: the validation review discloses argv, cwd, timeout, env and hooks  2642ms
+   ✓ 5G-T: post-mutation disclosure and the CHECK gate > 5G-T: an accepted run reports Gate 2, the checkpoint, and no Git commit  8708ms
+   ✓ 5G-U / 5G-V: recovery protection is REQUIRED, with no downgrade > 5G-U: a successful run leaves exactly one durable checkpoint  4380ms
+   ✓ 5G-U / 5G-V: recovery protection is REQUIRED, with no downgrade > 5G-V: a store that cannot persist refuses the write rather than skipping it  4583ms
+   ✓ 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AI: drift between the review and the write means zero writes  2770ms
+   ✓ 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AJ: a stale review mints no checkpoint at all  2981ms
+   ✓ 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AI: a Git move between the review and the write is refused as well  5681ms
+   ✓ 5G-AI / 5G-AJ: final currentness, then the checkpoint, then the write > 5G-AJ: the checkpoint that is minted carries the bytes present just before the write  9985ms
+   ✓ mission 5G-I SCOPE_STALE — approved file drifts after SCOPE > 5G-I: capture + drift + recheck refuses with SCOPE_STALE  2402ms
+   ✓ mission 5G-I SCOPE_STALE — approved file drifts after SCOPE > 5G-I: an approved scoped file changed after SCOPE refuses before the edit call  2616ms
+   ✓ mission 5G-T post-edit claim score from selected checks > 5G-T: Call #3 carries POST_EDIT_EXECUTION_CLAIM_REQUIREMENTS derived from the plan  7774ms
+   ✓ mission 5G-W validation failure retains mutation and surfaces recovery > 5G-W: a failing check does not auto-recover; checkpoint is offered  8052ms
+(node:27975) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/terminal-trial/banner-entry.test.ts (6 tests) 14140ms
+   ✓ T01 T03 packaging and offline entry > T01: new entry resolves from foreign cwd; legacy smoke entry still works  2586ms
+   ✓ T01 T03 packaging and offline entry > T03: help/version make zero provider calls and write no trial files  716ms
+   ✓ T01 T03 packaging and offline entry > installed symlink entry reaches welcome; naive argv compare would miss  10240ms
+   ✓ T01 T03 packaging and offline entry > imported entry stays side-effect free (no welcome on import)  399ms
+(node:28679) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/g9/g9-scip-fingerprint.test.ts (5 tests) 19926ms
+   ✓ G9 scipFingerprint + shouldBuildScipIndex > shouldBuildScipIndex is true for pnpm-workspace monorepo  565ms
+   ✓ G9 scipFingerprint + shouldBuildScipIndex > shouldBuildScipIndex is false for tiny single package  338ms
+   ✓ G9 scipFingerprint + shouldBuildScipIndex > scipFingerprint is stable for unchanged tree and changes when lockfile changes  513ms
+   ✓ G9 scipFingerprint + shouldBuildScipIndex > ensureScipIndex refuses stale fingerprint directory as current  18395ms
+(node:29568) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/general-session/catalog.test.ts (6 tests) 11993ms
+   ✓ H1-A/B/R1-A: live Nordic shape catalogs exactly three approved paths > H1-A/B/R1-A: catalog + disclosedObservations are exactly the approved trio  2957ms
+   ✓ H1-C/R1-B: siblings, descendants, unrelated, and node_modules stay out > H1-C/R1-B: approving the live three never catalogs ambient neighbors  1951ms
+   ✓ H1-D: read-context stays read-only in permittedTargets > H1-D: context paths are not REPLACE/CREATE edit targets  2255ms
+   ✓ H1-E/R1-C: oversized approved scope hits reference budget > H1-E/R1-C: synthetic approved context >64 files exceeds MAX_CATALOG_RECORDS  2082ms
+   ✓ H1-F: sensitive paths still refused at admission > H1-F: .env and node_modules paths are sensitive / not admitted  1279ms
+   ✓ H1-G: Gate 1 still receives ENTRY+CONTENT for approved files > H1-G: createReferenceCatalog selection carries both evidence kinds  1210ms
+(node:30133) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/terminal-trial/h3-validation-admission.test.ts (5 tests) 14263ms
+   ✓ Phase 5F-H3 validation admission correction > H3-A/C/D/E/F/G/H: live-equivalent DEFINES+BEHAVES reaches strong success with ordered checks  3932ms
+   ✓ Phase 5F-H3 validation admission correction > H3-J: TYPECHECK FAIL blocks TARGETED_TEST; terminal distinguishes honestly  2935ms
+   ✓ Phase 5F-H3 validation admission correction > H3-K/L: host authorizes validation; Gate 2 uses authentic EngineeringRun only  3691ms
+   ✓ Phase 5F-H3 validation admission correction > H3 packet: post-edit Brain request carries provider-neutral claim requirements  3502ms
+(node:30414) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/architecture/public-authority-surface-matrix.test.ts (6 tests) 13589ms
+   ✓ public authority surface — R2-H2 generated falsification matrix (H2-F2) > H2-F2 group A — full DIM-1 x DIM-2 x DIM-3 cross-product (300 cells)  5310ms
+   ✓ public authority surface — R2-H2 generated falsification matrix (H2-F2) > H2-F2 group B — every DIM-4 placement (128 cells)  1917ms
+   ✓ public authority surface — R2-H2 generated falsification matrix (H2-F2) > H2-F2 group C — every DIM-7 root kind (12 cells)  2464ms
+   ✓ public authority surface — R2-H2 generated falsification matrix (H2-F2) > H2-F2 group D — pairwise covering array over ALL seven dimensions  2321ms
+   ✓ public authority surface — R2-H2 generated falsification matrix (H2-F2) > H2-F2 group E — non-callable controls MUST NOT be rejected (300 cells)  1549ms
+(node:30803) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/ag4/ag4-proofs.test.ts (17 tests) 12050ms
+   ✓ AG4 remote selection > prefers remote.pushDefault over origin  3349ms
+   ✓ AG4 remote selection > refuses ambiguous multiple GitHub remotes without pushDefault  2260ms
+   ✓ AG4 credential isolation > bridge child env applies publication sanitization  497ms
+   ✓ AG4 publish idempotency helpers > detects remote branch conflict vs already-published  2365ms
+   ✓ AG4 CLI --issue parse > accepts --issue <number>  2684ms
+(node:31565) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/execution/local-process.test.ts (23 tests) 9566ms
+   ✓ local process execution > prepares a valid request and exits 0  422ms
+   ✓ local process execution > preserves exact argv including spaces, quotes, dashes, and metacharacters  592ms
+   ✓ local process execution > does not interpret shell metacharacters  307ms
+   ✓ local process execution > leaves host cwd and env unchanged  539ms
+   ✓ local process execution > ignores caller mutation after prepare and refuses replay  332ms
+   ✓ local process execution > concurrent replay produces at most one spawn  325ms
+   ✓ local process execution > classifies nonzero exit and captures stdout/stderr  1862ms
+   ✓ local process execution > times out and escalates when SIGTERM is ignored  3409ms
+   ✓ local process execution > terminates on stdout and stderr overflow while continuing drain  498ms
+(node:32045) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/git/check-ignore.test.ts (12 tests) 8764ms
+   ✓ check-ignore exit protocol > TEST A — exit 0: admitted ignored path is reported ignored  986ms
+   ✓ check-ignore exit protocol > TEST B — exit 1: no ignored paths yields successful empty set and successful baseline  1100ms
+   ✓ check-ignore argv batching > merges ignored results across batches and treats empty batches as success  1055ms
+   ✓ check-ignore argv batching > later-batch execution failure fails the whole operation without partial success  1167ms
+   ✓ check-ignore argv batching > later-batch parse failure fails closed  875ms
+   ✓ check-ignore argv batching > live multi-batch ignore observation covers every admitted candidate once  2244ms
+   ✓ check-ignore special pathname data > treats leading-dash and bracket filenames as argv data  570ms
+   ✓ check-ignore special pathname data > preserves space and Unicode pathnames through argv check-ignore  703ms
+(node:33859) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/git/discovery.test.ts (11 tests) 8134ms
+   ✓ discoverGitRepository — normal > succeeds when workspace root equals Git worktree root  1262ms
+   ✓ discoverGitRepository — normal > returns a CanonicalPath equal to the physical repository root  1286ms
+   ✓ discoverGitRepository — normal > succeeds for a repository path containing spaces  814ms
+   ✓ discoverGitRepository — normal > succeeds for a repository path with safe shell metacharacters without shell interpretation  1012ms
+   ✓ discoverGitRepository — normal > succeeds when workspace root is reached through a symlink to the physical Git root  663ms
+   ✓ discoverGitRepository — failures > maps unexpected execution failure to GIT_DISCOVERY_FAILED  910ms
+   ✓ discoverGitRepository — authority > rejects parent Git root outside a subdirectory WorkspaceBoundary  872ms
+   ✓ discoverGitRepository — linked worktree > discovers a linked worktree where .git is a file  982ms
+(node:34254) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/git/environment.test.ts (6 tests) 7029ms
+   ✓ ambient Git env hijack attempts > does not let GIT_DIR redirect discovery to an unrelated repository  1307ms
+   ✓ ambient Git env hijack attempts > does not let GIT_WORK_TREE redirect discovery to an unrelated repository  2289ms
+   ✓ ambient Git env hijack attempts > does not let GIT_CONFIG_COUNT injection redirect discovery  999ms
+   ✓ ambient Git env hijack attempts > leaves process.env unchanged after successful discovery  929ms
+   ✓ GIT_COMMON_DIR sanitation > removes GIT_COMMON_DIR from child env without mutating host  1490ms
+ ✓ |default| tests/brain/brain.test.ts (18 tests) 8359ms
+   ✓ Phase 5D1 bounded falsification probes > budget-cap bypass opens D12 then exact restore  2883ms
+   ✓ Phase 5D1 bounded falsification probes > single-flight reservation reorder opens D11 then exact restore  5135ms
+(node:35385) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35397) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/inventory/adversarial.test.ts (7 tests) 195ms
+(node:35421) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2;]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2;]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2;PATH — PATH Code]0;]2; ✓ |default| tests/g7/g7-proofs.test.ts (8 tests) 4499ms
+   ✓ G7 A — event truth > presentation clock alone cannot change engineering phase or result  1216ms
+   ✓ G7 B — failure truth > failed final validation cannot render Verified; engine checks stay distinct  395ms
+   ✓ G7 D — large result bounded preview > renders compact COMPLETE result in the minimal living frame  532ms
+   ✓ G7 C — terminal restoration helpers remain centralized > inline renderer restoreTerminalState restores cursor/alt-screen without stty sane  705ms
+   ✓ G7 F — final ANSI write boundary > emits real ESC bytes and never literal \\u001b; NO_COLOR has neither  823ms
+   ✓ G7 F — final ANSI write boundary > keeps alt-screen across startTask and shows in-cockpit idle prompt  587ms
+(node:35597) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/terminal-trial/integration.test.ts (3 tests) 9997ms
+   ✓ Trial 1 owner composition integration > T08-T25: mocked provider fixes source through Gate 2; declined paths; env proof  9992ms
+(node:36069) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/snapshot/git-snapshot-membership.test.ts (3 tests) 3897ms
+   ✓ Phase 2G-H1 cross-component membership > binds nested Git baseline into snapshot from the same inventory  1036ms
+   ✓ Phase 2G-H1 cross-component membership > rejects Git baseline from a foreign inventory even with identical lexical paths  1871ms
+   ✓ Phase 2G-H1 cross-component membership > uses canonical membership for Git annotations, map entries, and search corpus authority  986ms
+(node:36620) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1b-hydration.test.ts (9 tests) 4457ms
+   ✓ GC1B-A HYDRATION FILTERING > excludes junk caches/build artifacts; retains source, tests, manifests, lockfiles  950ms
+   ✓ GC1B-B DEFAULT WORKSPACE CWD > remote execution defaults to hydrated workspace; falsify by skipping cd  1086ms
+   ✓ GC1B-C HYDRATION CONFINEMENT > rejects path traversal outside designated remoteRoot  1168ms
+   ✓ GC1B linked-worktree .git pointer > hydrator never ships a gitdir pointer with absolute Mac paths  729ms
+(node:36957) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-session-integration.test.ts (1 test) 3306ms
+   ✓ GC1C session integration (mock cloud, no network) > runs one cloud cycle: lifecycle events in order, primary unchanged  3268ms
+(node:37239) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/s2/result-lifecycle.test.ts (3 tests) 4390ms
+   ✓ S2.2 result lifecycle > discards worktree/branch, keeps report, marks DISCARDED, primary untouched  3312ms
+   ✓ S2.2 result lifecycle > refuses PR for read-only / no-change and discarded tasks  690ms
+   ✓ S2.2 result lifecycle > formats PR preview/result panels and marks MERGED lifecycle  386ms
+(node:37966) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-execution-channel.test.ts (27 tests) 3001ms
+   ✓ GC1-c execution channel R1–R15 > R10: shell metachar argv remain literal (shell:false)  365ms
+   ✓ GC1-c execution channel Layer C — real worker process > real remote-worker.mjs: EOF → parse → shell:false spawn → one response  472ms
+(node:37972) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/recovery/checkpoint.test.ts (10 tests) 528ms
+(node:38031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-authority.test.ts (3 tests) 266ms
+NOT_INSTALLED expected_target=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+Installed:
+  /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-kK5MSb/.local/bin/pathcode -> /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+Development link to this worktree (not an immutable release).
+
+/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-kK5MSb/.local/bin is not on this shell's PATH.
+For this shell only:
+  export PATH="/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-kK5MSb/.local/bin:$PATH"
+Persistent PATH editing is your separate choice; this installer does not edit shell startup files.
+OK link=/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-kK5MSb/.local/bin/pathcode target=/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+IDEMPOTENT already linked:
+  /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-kK5MSb/.local/bin/pathcode -> /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/scripts/pathcode.mjs
+Development link to this worktree (not an immutable release).
+
+/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-kK5MSb/.local/bin is not on this shell's PATH.
+For this shell only:
+  export PATH="/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-home-kK5MSb/.local/bin:$PATH"
+Persistent PATH editing is your separate choice; this installer does not edit shell startup files.
+Refusing to overwrite existing non-symlink at /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-install-collide-mroOVg/.local/bin/pathcode
+ ✓ |default| tests/terminal-trial/fixture-install.test.ts (5 tests) 2268ms
+   ✓ T21 offline seed fails regression > unchanged seed fails real tsc+regression; fixed source passes  2191ms
+(node:38063) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:38064) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/mutation/mutation.test.ts (13 tests) 299ms
+(node:38235) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-backend.test.ts (4 tests) 550ms
+(node:38531) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/integration/phase3-safe-editing-audit.test.ts (21 tests) 2225ms
+   ✓ Phase 3 integration audit — B1 full read/write/re-observe pipeline > bridges Phase 3 after-state fingerprints to fresh Phase 2B observations  456ms
+   ✓ Phase 3 integration audit — B4 git point-in-time > keeps G0 immutable while G1 reports worktree modification  860ms
+(node:38672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/git/baseline-adversarial.test.ts (7 tests) 2084ms
+   ✓ Git baseline adversarial — denied-path parser leak > fails closed with GIT_DENIED_PATH_LEAK_DETECTED without echoing secret paths or raw stdout  364ms
+   ✓ Git baseline adversarial — porcelain parse failures > accepts filenames containing spaces when the filesystem allows them  424ms
+   ✓ Git baseline adversarial — porcelain parse failures > accepts filenames containing newlines when the filesystem allows them  308ms
+(node:39328) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/run-evidence/run-evidence.test.ts (11 tests) 2082ms
+   ✓ run evidence > cannot ingest an older process result as a new check; scope limits remain  374ms
+(node:39365) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/path-studio/inline-studio.test.ts (15 tests) 996ms
+(node:39406) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/path-studio/path-studio.test.ts (15 tests) 2133ms
+   ✓ PS1 parseArgs --events-out > accepts --events ndjson --events-out and requires events mode  307ms
+(node:39416) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/validation/evidence-gaps.test.ts (15 tests) 1272ms
+   ✓ validation evidence-map gap coverage > runs all four kinds preserving order and argv  455ms
+(node:39617) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/general-session/validation-candidates.test.ts (18 tests) 1981ms
+   ✓ 5G-AE: no usable check means no session > 5G-AE: refuses with VALIDATION_PLAN_NOT_AVAILABLE and zero provider calls  1555ms
+(node:39782) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-runtime-delivery.test.ts (18 tests) 1286ms
+   ✓ GC1-c runtime delivery A–L > H: path confinement refuses project / traversal destinations  300ms
+(node:39784) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/g9/g9-resolve.test.ts (9 tests) 3122ms
+   ✓ G9 resolveCapabilityRequirements + classifyRequirement > prefers project gradlew as PROJECT_LOCAL  1339ms
+   ✓ G9 resolveCapabilityRequirements + classifyRequirement > classifies missing cargo as MISSING for rust Cargo.toml projects  626ms
+   ✓ G9 resolveCapabilityRequirements + classifyRequirement > prefers .venv python as PROJECT_LOCAL  775ms
+(node:40399) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/integration/phase2-e2e.test.ts (5 tests) 2532ms
+   ✓ Phase 2G E2E — Repository Intelligence integration > composes config → inventory → git → reader → metadata → search → snapshot freshness  1473ms
+   ✓ Phase 2G E2E — Repository Intelligence integration > binds Git baseline into snapshot for nested directory inventory entries  1038ms
+(node:40532) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-living-product.test.ts (4 tests) 1069ms
+   ✓ GC1-c living product surface > R16: pending hydration visibly changes PATH before terminal  704ms
+(node:40578) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/mutation/mutation-e2e.test.ts (4 tests) 7190ms
+   ✓ mutation E2E M28/M29 > M28: positive replace+create → host auth → apply → reobserve → validate accepted  6977ms
+(node:40697) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/engineering-run/engineering-run.test.ts (8 tests) 2660ms
+   ✓ engineering run composition > refuses foreign plan / consumed authorization and does not invent authority  932ms
+   ✓ engineering run composition > end-to-end: Phase 2 subject → Validation → Run Evidence → Engineering Run → stale  371ms
+(node:40708) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/g8/g8-capability.test.ts (16 tests) 660ms
+ ✓ |default| tests/recovery/execute.test.ts (13 tests) 1297ms
+   ✓ 6A-D authorized replace recovery > restores the exact captured pre-bytes and proves them on disk  417ms
+(node:41448) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:41449) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/lifecycle.test.ts (22 tests) 1346ms
+(node:41827) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/g10/g10-fabric.test.ts (11 tests) 1684ms
+   ✓ G10 fabric guards > reconciles with Git reality outranking stale checkpoint  638ms
+   ✓ G10 fabric guards > createG10Fabric persists and survives reload  600ms
+(node:41999) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/validation/validation.test.ts (12 tests) 646ms
+(node:42038) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/orchestrator/orchestrator-e13-e24.test.ts (12 tests) 931ms
+   ✓ orchestrator E21–E24 end-to-end / stop / architecture hooks > E24: cooperative stop — pre-stop zero checks; stop during first prevents second  507ms
+(node:42044) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/g9/g9-failure-matrix.test.ts (4 tests) 1063ms
+   ✓ G9 failure matrix — corrupt / cancel recovery > prepareEngineeringEnvironment returns abortedResult when signal already aborted  884ms
+ ✓ |default| tests/recovery/mutation-integration.test.ts (7 tests) 1001ms
+   ✓ 6A-B recovery restores the observed pre-state, not Git HEAD > restores the uncommitted working-tree bytes without touching Git  559ms
+(node:42385) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:42386) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/metadata/metadata.test.ts (29 tests) 1085ms
+   ✓ Git enrichment compatibility > attaches Git annotations by inventory entry reference identity  877ms
+ ✓ |default| tests/s1/s1-gateway.test.ts (5 tests) 1195ms
+   ✓ S1 gateway extraction > binds a real git project and serves hello over the Unix socket  1029ms
+(node:42868) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:42869) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/recovery/review.test.ts (10 tests) 565ms
+(node:42997) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/snapshot/snapshot.test.ts (22 tests) 823ms
+   ✓ propagation and honesty > reports bound Git baseline as POINT_IN_TIME only  499ms
+(node:43115) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-lifecycle-terminal.test.ts (3 tests) 964ms
+   ✓ GC1C-J / K freshness + primary unchanged + journal > two snapshots get fresh ids; primary unchanged; journal survives  591ms
+(node:43275) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/editing/multi-file-coordination.test.ts (27 tests) 728ms
+(node:43277) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-scope-snapshot.test.ts (3 tests) 762ms
+   ✓ GC1C-D snapshot currentness > drift / incomplete hydration refused; partial hydration cannot verify  368ms
+ ✓ |default| tests/gc1/gc1c-product-surface.test.ts (15 tests) 421ms
+(node:43540) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:43536) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/s2/engineering-surface.test.ts (8 tests) 579ms
+(node:43585) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/terminal-trial/falsification.test.ts (3 tests) 759ms
+   ✓ P1–P3 falsifications > P1: bypassing START consent exposes broken predicate (subprocess)  350ms
+(node:43588) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/mutation/architecture.test.ts (1 test) 371ms
+   ✓ mutation architecture M30 > M30: allowlisted modules; no fs/mint/provider; not on package root  368ms
+(node:43611) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/orchestrator/orchestrator.test.ts (12 tests) 562ms
+(node:43635) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/config/loader.test.ts (40 tests) 525ms
+   ✓ loadProjectConfig — trust / provenance / non-application > does not alter Git discovery behavior after loading configuration  376ms
+ ✓ |default| tests/engineering-run/architecture.test.ts (4 tests) 133ms
+(node:43809) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:43817) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/config/architecture.test.ts (7 tests) 90ms
+(node:43841) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/mutation/grounding.test.ts (8 tests) 185ms
+(node:43844) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/orchestrator/architecture.test.ts (2 tests) 226ms
+(node:43846) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/g9/g9-mise-layout.test.ts (6 tests) 321ms
+(node:43873) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/editing/replace-existing-file.test.ts (19 tests) 388ms
+(node:43883) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/editing/create-file.test.ts (21 tests) 585ms
+ ✓ |default| tests/recovery/architecture.test.ts (9 tests) 181ms
+(node:43902) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:43903) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/g8/g8-bridge-continue.test.ts (1 test) 233ms
+ ✓ |default| tests/gc1/gc1c-credential-canary.test.ts (3 tests) 331ms
+(node:43938) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:43939) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-h-scope-audit.test.ts (2 tests) 343ms
+(node:44032) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/reasoning/architecture.test.ts (5 tests) 477ms
+(node:44056) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/reasoning/gate.test.ts (18 tests) 386ms
+(node:44062) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/git/baseline-architecture.test.ts (9 tests) 269ms
+(node:44080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-recovery.test.ts (2 tests) 401ms
+(node:44099) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/s2/history-prefs.test.ts (5 tests) 371ms
+(node:44109) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/architecture/public-authority-src-lock.test.ts (7 tests) 212ms
+ ✓ |default| tests/search/search.test.ts (29 tests) 139ms
+(node:44137) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44138) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/search/adversarial.test.ts (11 tests) 114ms
+ ✓ |default| tests/inventory/traverse.test.ts (32 tests) 198ms
+(node:44158) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44159) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/g10/g10-cockpit.test.ts (2 tests) 119ms
+ ✓ |default| tests/reader/adversarial.test.ts (11 tests) 221ms
+(node:44192) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44191) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/adapters/openai/architecture.test.ts (1 test) 141ms
+ ✓ |default| tests/gc1/gc1b-image-contract.test.ts (8 tests) 184ms
+(node:44205) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44206) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-falsify.test.ts (4 tests) 77ms
+ ✓ |default| tests/reader/read.test.ts (20 tests) 134ms
+(node:44227) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44236) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/architecture/write-boundary.test.ts (6 tests) 113ms
+ ✓ |default| tests/g9/g9-collaborate.test.ts (4 tests) 208ms
+(node:44248) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44249) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/editing/creation-verification.test.ts (3 tests) 16ms
+ ✓ |default| tests/brain/architecture.test.ts (3 tests) 123ms
+(node:44269) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44278) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/editing/preparation.test.ts (8 tests) 68ms
+ ✓ |default| tests/metadata/adversarial.test.ts (5 tests) 50ms
+(node:44289) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44290) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/inventory/membership.test.ts (3 tests) 32ms
+ ✓ |default| tests/g9/g9-envelope.test.ts (3 tests) 134ms
+(node:44313) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44314) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/domain/import-side-effects.test.ts (1 test) 126ms
+ ✓ |default| tests/editing/public-authority-malicious.test.ts (3 tests) 150ms
+(node:44335) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44336) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/general-session/architecture.test.ts (11 tests) 106ms
+ ✓ |default| tests/g9/g9-affected.test.ts (5 tests) 166ms
+(node:44421) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44438) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/run-evidence/architecture.test.ts (4 tests) 169ms
+ ✓ |default| tests/terminal-trial/architecture.test.ts (3 tests) 138ms
+(node:44457) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44458) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/ag6/ag6-proofs.test.ts (4 tests) 56ms
+ ✓ |default| tests/adapters/openai/transport.test.ts (7 tests) 49ms
+(node:44481) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44482) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/execution/architecture.test.ts (7 tests) 98ms
+ ✓ |default| tests/editing/authorization.test.ts (8 tests) 57ms
+(node:44493) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44494) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/validation/architecture.test.ts (4 tests) 102ms
+(node:44514) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/adapters/openai/handoff.test.ts (2 tests) 86ms
+ ✓ |default| tests/git/architecture.test.ts (4 tests) 51ms
+(node:44524) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44533) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/search/architecture.test.ts (5 tests) 72ms
+ ✓ |default| tests/integration/phase2-architecture-audit.test.ts (24 tests) 75ms
+(node:44536) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44552) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/adapters/openai/adapter.test.ts (7 tests) 65ms
+ ✓ |default| tests/workspace/boundary.test.ts (23 tests) 80ms
+(node:44569) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44570) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/workspace/brand-encapsulation.test.ts (1 test) 76ms
+ ✓ |default| tests/architecture/boundaries.test.ts (11 tests) 43ms
+(node:44581) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44590) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/general-session/scope-contract.test.ts (15 tests) 26ms
+ ✓ |default| tests/snapshot/adversarial.test.ts (6 tests) 55ms
+(node:44610) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44611) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/g8/g8-repair.test.ts (5 tests) 165ms
+ ✓ |default| tests/metadata/architecture.test.ts (5 tests) 147ms
+(node:44638) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44643) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/snapshot/import-side-effects.test.ts (1 test) 79ms
+ ✓ |default| tests/inventory/import-side-effects.test.ts (1 test) 27ms
+(node:44655) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44656) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/reader/import-side-effects.test.ts (1 test) 40ms
+ ✓ |default| tests/inventory/architecture.test.ts (6 tests) 70ms
+(node:44683) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44687) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/adapters/openai/request.test.ts (7 tests) 23ms
+ ✓ |default| tests/editing/architecture.test.ts (9 tests) 46ms
+(node:44700) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44701) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/selfobs/architecture.test.ts (3 tests) 46ms
+ ✓ |default| tests/platform/detect.test.ts (7 tests) 25ms
+(node:44712) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44713) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/cli/package.test.ts (4 tests) 8ms
+ ✓ |default| tests/reasoning/parse.test.ts (11 tests) 11ms
+(node:44736) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44745) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/snapshot/architecture.test.ts (3 tests) 10ms
+ ✓ |default| tests/selfobs/type-construction.test.ts (3 tests) 5ms
+(node:44748) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44749) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/gc1/gc1c-evidence.test.ts (1 test) 14ms
+ ✓ |default| tests/cli/main.test.ts (12 tests) 12ms
+(node:44760) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44779) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/cli/architecture.test.ts (5 tests) 12ms
+ ✓ |default| tests/adapters/openai/response.test.ts (6 tests) 13ms
+(node:44784) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44785) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/domain/architecture-boundary.test.ts (1 test) 10ms
+ ✓ |default| tests/domain/contracts.test.ts (10 tests) 9ms
+(node:44796) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44805) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/selfobs/bootstrap.test.ts (1 test) 6ms
+ ✓ |default| tests/editing/bounds.test.ts (4 tests) 14ms
+(node:44819) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44837) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/runtime.test.ts (6 tests) 8ms
+ ✓ |default| tests/workspace/path-semantics.test.ts (13 tests) 8ms
+(node:44839) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44849) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/domain/adversarial.test.ts (1 test) 5ms
+(node:44858) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |default| tests/editing/import-side-effects.test.ts (1 test) 4ms
+]0;]2;Klarapp — PATH Code(node:44873) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+]0;]2; ✓ |default| tests/s1/freeze-repair.test.ts (3 tests) 1689ms
+   ✓ S1 freeze repair — read-only setup churn > restores lockfile-only churn for assessment objectives  789ms
+   ✓ S1 freeze repair — read-only setup churn > keeps lockfile changes for explicit dependency upgrades  773ms
+(node:45666) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |src-lock-serial| tests/architecture/public-authority-surface-h2.test.ts (12 tests) 25223ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F1(a) — optional callable on the real AuthorizePreparedChangeOptions MUST fail  2772ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F1(b) — unique-symbol-keyed callable on the real options type MUST fail  2008ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F1(c) — object-valued export with a callable member MUST fail  2535ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F3 — restored `__@` skip and a dropped member both break per-node completeness  2694ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F4 — restored export exclusion makes an object-valued export escape and fails export completeness  2246ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F5 — content-hash cache is fresh in both directions with size+mtime preserved and NO clear call  3023ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F6 — full manifest SHA-256 is identical from the repository root and from a temporary directory  1390ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F7(a) — restoring the un-unwrapped member check makes the optional callable escape  2257ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F7(b) — restoring the `__@` skip makes the symbol-keyed callable escape and breaks completeness  1473ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F7(c) — restoring the export exclusion makes the object-valued export escape  1955ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F8 — clean surface: 0 findings, one reviewed terminal, legitimate members preserved  1256ms
+   ✓ public authority surface — R2-H2 member-shape completeness proofs > H2-F9 — every prior probe is preserved and the historical escapes still reproduce  1611ms
+ ✓ |src-lock-serial| tests/architecture/public-authority-surface-h1.test.ts (7 tests) 12538ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F1 — adversarial name NovelPublishSettings/input is detected  1025ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F2 — name/container variety and unconstrained generic fail for same reason  5049ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F3 — disposition/root completeness, reuse, overload, cycle, suppression  861ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F4 — prior R2 cases + generic-smuggling through external container  1369ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F5 — reviewed terminal registry removal and fail-closed identity rules  1673ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F6 — legitimate inputs pass for structural reasons; external boundary by ownership  1435ms
+   ✓ public authority surface — R2-H1 parameter-graph traversal proofs > H1-F7 — exact R2 naming gate restored makes adversarial roots escape  1124ms
+ ✓ |src-lock-serial| tests/architecture/public-authority-surface-derived.test.ts (7 tests) 7979ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F1 — authorityOps on real AuthorizePreparedChangeOptions fails naming function/type/member  1160ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F2 — future public function with unlisted options type is auto-discovered  602ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F3 — named re-export of options type is followed across modules  427ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F4 — recursive project type graph reaches nested/alias/extends/union/intersection/generic  411ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F5 — false-positive boundary: legitimate data/context PASS; external callable noise fails when ownership corrupted  1434ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F6 — approved exception model: exact member permits; wildcard/broad/missing fields rejected  2628ms
+   ✓ public authority surface — derived walker permanent proofs > 2-F7 — legacy enumerated discovery fails 2-F1, 2-F2, and completeness  1314ms
+ ✓ |src-lock-serial| tests/architecture/public-authority-surface.test.ts (5 tests) 497ms
+   ✓ public authority surface — Amendment 1 standing guard > derived walker covers complete public editing parameter/options surfaces  488ms
+
+ Test Files  161 passed (161)
+      Tests  1449 passed (1449)
+   Start at  07:52:22
+   Duration  641.87s (transform 40.16s, setup 0ms, collect 38.39s, tests 1085.62s, environment 74ms, prepare 32.80s)
+
+(node:47467) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 cli:smoke
+> node -e "import { readFileSync } from 'node:fs'; const t=readFileSync('dist/cli/entry.js','utf8'); if(!t.startsWith('#!/usr/bin/env node\n')) { console.error('missing shebang'); process.exit(1); }" && node dist/cli/entry.js --help && node dist/cli/entry.js && node -e "import { spawnSync } from 'node:child_process'; const r=spawnSync(process.execPath,['dist/cli/entry.js','build-something'],{encoding:'utf8'}); if(r.status===0){console.error('expected non-zero'); process.exit(1);} process.stdout.write(r.stderr);"
+
+Path Code
+
+Usage:
+  pathcode [--help]
+
+Path Code engineering task execution is not enabled in the Foundation Kernel.
+Path Code
+
+Usage:
+  pathcode [--help]
+
+Path Code engineering task execution is not enabled in the Foundation Kernel.
+Unknown argument: build-something
+Run "pathcode --help" for usage.
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> path-code@1.0.1 ledger:verify
+> tsx scripts/ledger-verify.ts
+
+(node:47545) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:47546) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ledger:verify PASS at 1f120c8bb275001f83317535bf8de45c430b8441

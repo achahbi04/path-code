@@ -1614,6 +1614,20 @@ export async function runPathcodeMain(argv, testIo = {}) {
             env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
           });
           if (merged.status === 0) {
+            if (entry?.taskId) {
+              try {
+                const { markTaskMerged } = await import(
+                  "./pathcode-cli/result-lifecycle.mjs"
+                );
+                markTaskMerged({
+                  runtimeRoot,
+                  projectRoot,
+                  entry,
+                });
+              } catch {
+                // merge succeeded; lifecycle mark is best-effort
+              }
+            }
             showOperatorReply(
               prompt,
               ttyInline ? inlineStudio : null,
@@ -1621,7 +1635,12 @@ export async function runPathcodeMain(argv, testIo = {}) {
                 `Merged ${branch} into the primary checkout.`,
                 "",
                 `Primary: ${projectRoot}`,
-              ].join("\n"),
+                entry?.taskId
+                  ? `Lifecycle: MERGED — /inspect ${entry.taskId}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join("\n"),
             );
           } else {
             showOperatorReply(
@@ -1635,6 +1654,301 @@ export async function runPathcodeMain(argv, testIo = {}) {
             prompt,
             ttyInline ? inlineStudio : null,
             `Merge unavailable: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+      if (cmd === "/discard" || cmd.startsWith("/discard ")) {
+        try {
+          const {
+            getTaskHistoryEntry,
+            listTaskHistory,
+            formatMissingTaskHelp,
+            isPlaceholderTaskId,
+            formatLifecycleLabel,
+          } = await import("./pathcode-cli/task-history.mjs");
+          const {
+            discardTaskResult,
+            formatDiscardResultPanel,
+          } = await import("./pathcode-cli/result-lifecycle.mjs");
+          const idArg =
+            cmd === "/discard" ? "" : cmd.slice("/discard".length).trim();
+          if (idArg && isPlaceholderTaskId(idArg)) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              formatMissingTaskHelp(idArg, runtimeRoot),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          let entry = idArg ? getTaskHistoryEntry(runtimeRoot, idArg) : null;
+          if (!entry && idArg) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              formatMissingTaskHelp(idArg, runtimeRoot),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          if (!entry && !idArg) {
+            const rows = listTaskHistory(runtimeRoot, { limit: 8 });
+            entry =
+              rows.find(
+                (r) =>
+                  r &&
+                  r.lifecycleStatus !== "DISCARDED" &&
+                  r.lifecycleStatus !== "MERGED",
+              ) ||
+              rows[0] ||
+              null;
+          }
+          if (!entry) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                "Nothing to discard.",
+                "",
+                "Pass a real task id:",
+                "  /history",
+                "  /discard <taskId>",
+              ].join("\n"),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          if (entry.lifecycleStatus === "DISCARDED") {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              formatDiscardResultPanel(
+                { ok: true, already: true, primaryUntouched: true, steps: [] },
+                entry,
+              ),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          const plan = [
+            "Discard task result (confirmation required)",
+            "",
+            `  taskId     ${entry.taskId}`,
+            `  lifecycle  ${formatLifecycleLabel(entry)}`,
+            `  branch     ${entry.branch || "(none)"}`,
+            `  worktree   ${entry.worktreePath || "(none)"}`,
+            "",
+            "Will:",
+            "  · remove the task worktree (if present)",
+            "  · delete the local path/task-* branch (if present)",
+            "  · mark the durable result DISCARDED",
+            "",
+            "Will NOT:",
+            "  · change the primary project checkout",
+            "  · delete history / report / trace",
+          ].join("\n");
+          showOperatorReply(prompt, ttyInline ? inlineStudio : null, plan);
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          const answer = await prompt.askLine(
+            "discard-confirm",
+            "Type y to discard now (N to cancel): ",
+          );
+          const ok =
+            typeof answer === "string" &&
+            /^(y|yes)$/i.test(answer.trim());
+          if (!ok) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              "Discard cancelled — primary and task result unchanged.",
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          const result = discardTaskResult({
+            runtimeRoot,
+            projectRoot,
+            entry,
+          });
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            formatDiscardResultPanel(result, entry),
+          );
+        } catch (err) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            `Discard unavailable: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+      if (
+        cmd === "/pr" ||
+        cmd.startsWith("/pr ") ||
+        cmd === "/publish" ||
+        cmd.startsWith("/publish ")
+      ) {
+        try {
+          const {
+            getTaskHistoryEntry,
+            listTaskHistory,
+            taskHasAdoptableChanges,
+            formatMissingTaskHelp,
+            isPlaceholderTaskId,
+            formatLifecycleLabel,
+          } = await import("./pathcode-cli/task-history.mjs");
+          const {
+            previewTaskPullRequest,
+            publishTaskPullRequest,
+            formatPrPreviewPanel,
+            formatPrResultPanel,
+          } = await import("./pathcode-cli/result-lifecycle.mjs");
+          const isPublish =
+            cmd === "/publish" || cmd.startsWith("/publish ");
+          const idArg = (
+            isPublish
+              ? cmd === "/publish"
+                ? ""
+                : cmd.slice("/publish".length)
+              : cmd === "/pr"
+                ? ""
+                : cmd.slice("/pr".length)
+          ).trim();
+          if (idArg && isPlaceholderTaskId(idArg)) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              formatMissingTaskHelp(idArg, runtimeRoot),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          let entry = idArg ? getTaskHistoryEntry(runtimeRoot, idArg) : null;
+          if (!entry && idArg) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              formatMissingTaskHelp(idArg, runtimeRoot),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          if (!entry && !idArg) {
+            const rows = listTaskHistory(runtimeRoot, { limit: 8 });
+            entry =
+              rows.find((r) => r && taskHasAdoptableChanges(r)) || null;
+          }
+          if (!entry) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                "Nothing to publish as a pull request.",
+                "",
+                "Complete a verified task that changed files, then:",
+                "  /history",
+                "  /pr <taskId>",
+              ].join("\n"),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          if (entry.lifecycleStatus === "DISCARDED") {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                `Refused: task ${entry.taskId} was discarded.`,
+                "",
+                `  lifecycle  ${formatLifecycleLabel(entry)}`,
+                "",
+                "Discarded results are not published. Inspect history only.",
+              ].join("\n"),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          if (!taskHasAdoptableChanges(entry)) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                `Refused: task ${entry.taskId} has nothing meaningful to publish.`,
+                "",
+                `  lifecycle  ${formatLifecycleLabel(entry)}`,
+                `  changed    ${(entry.changedFiles && entry.changedFiles.length) || 0} file(s)`,
+                "",
+                "Read-only / no-change results do not create pull requests.",
+                `Review with: /inspect ${entry.taskId}`,
+              ].join("\n"),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          const preview = previewTaskPullRequest({
+            projectRoot,
+            entry,
+          });
+          if (!preview.ok) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                `Cannot prepare PR for task ${entry.taskId}`,
+                "",
+                `  code     ${preview.code || "FAILED"}`,
+                preview.message
+                  ? `  detail   ${String(preview.message).slice(0, 300)}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join("\n"),
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            formatPrPreviewPanel(preview, entry),
+          );
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          const answer = await prompt.askLine(
+            "pr-confirm",
+            "Type y to push branch and create/reuse PR (N to cancel): ",
+          );
+          const ok =
+            typeof answer === "string" &&
+            /^(y|yes)$/i.test(answer.trim());
+          if (!ok) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              "PR cancelled — no remote side effects.",
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          const published = publishTaskPullRequest({
+            runtimeRoot,
+            projectRoot,
+            entry,
+          });
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            formatPrResultPanel(published, entry),
+          );
+        } catch (err) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            `PR unavailable: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
         redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);

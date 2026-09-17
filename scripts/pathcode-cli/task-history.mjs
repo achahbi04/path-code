@@ -12,6 +12,7 @@ import {
   engineeringReportExists,
   resolveEngineeringReportPath,
 } from "./engineering-report.mjs";
+import { readLifecycleFromCheckpoint } from "./result-lifecycle.mjs";
 
 /**
  * @param {string} runtimeRoot
@@ -86,17 +87,40 @@ export function parseHintsFromReport(reportText) {
 
 /**
  * Whether this task produced adoptable primary changes.
+ * Discarded / merged results are never adoptable.
  * @param {NonNullable<ReturnType<typeof getTaskHistoryEntry>>} entry
  */
 export function taskHasAdoptableChanges(entry) {
   if (!entry) return false;
-  if (entry.changedFiles && entry.changedFiles.length > 0) return true;
-  if (entry.inspectCommand && entry.sha && entry.baseline) {
-    return entry.sha !== entry.baseline;
+  const life = entry.lifecycleStatus;
+  if (life === "DISCARDED" || life === "MERGED" || life === "PR_OPEN") {
+    return false;
   }
-  // Branch alone is not enough — read-only assessments often keep a task branch
-  // with no intentional file changes.
-  return false;
+  // Adoptable requires recorded file changes — never claim adoptable alongside
+  // "no file changes recorded" (sha≠baseline alone is insufficient).
+  return Array.isArray(entry.changedFiles) && entry.changedFiles.length > 0;
+}
+
+/**
+ * Operator-facing lifecycle label for history / inspect.
+ * @param {NonNullable<ReturnType<typeof getTaskHistoryEntry>>} entry
+ */
+export function formatLifecycleLabel(entry) {
+  if (!entry) return "unknown";
+  const life = entry.lifecycleStatus;
+  if (life === "DISCARDED") return "DISCARDED";
+  if (life === "MERGED") return "MERGED";
+  if (life === "PR_OPEN") {
+    return entry.prUrl ? `PR OPEN · ${entry.prUrl}` : "PR OPEN";
+  }
+  if (taskHasAdoptableChanges(entry)) {
+    const base =
+      entry.finalState === "VERIFIED" || entry.finalState === "COMPLETE"
+        ? "VERIFIED"
+        : entry.finalState || "COMPLETE";
+    return `${base} · adoptable`;
+  }
+  return entry.finalState || "unknown";
 }
 
 /**
@@ -119,6 +143,20 @@ export function getTaskHistoryEntry(runtimeRoot, taskId) {
     }
   }
   const hints = parseHintsFromReport(reportText || "");
+  const cpBranch =
+    checkpoint && typeof checkpoint.branch === "string"
+      ? checkpoint.branch
+      : null;
+  const cpSha =
+    checkpoint && typeof checkpoint.sha === "string" ? checkpoint.sha : null;
+  const cpBaseline =
+    checkpoint && typeof checkpoint.baseline === "string"
+      ? checkpoint.baseline
+      : null;
+  const cpChanged =
+    checkpoint && Array.isArray(checkpoint.changedFiles)
+      ? checkpoint.changedFiles.filter((f) => typeof f === "string" && f.trim())
+      : [];
   let updatedAt =
     (checkpoint && typeof checkpoint.updatedAt === "string"
       ? checkpoint.updatedAt
@@ -152,6 +190,7 @@ export function getTaskHistoryEntry(runtimeRoot, taskId) {
       ? checkpoint.repoRoot
       : null;
   if (!checkpoint && !hasReport) return null;
+  const life = readLifecycleFromCheckpoint(checkpoint);
   return {
     taskId: id,
     updatedAt,
@@ -160,11 +199,12 @@ export function getTaskHistoryEntry(runtimeRoot, taskId) {
     reportPath: hasReport ? reportPath : null,
     hasReport,
     hasCheckpoint: Boolean(checkpoint),
-    branch: hints.branch,
-    sha: hints.sha,
-    baseline: hints.baseline,
+    branch: hints.branch || cpBranch,
+    sha: hints.sha || cpSha,
+    baseline: hints.baseline || cpBaseline,
     inspectCommand: hints.inspectCommand,
-    changedFiles: hints.changedFiles,
+    changedFiles:
+      hints.changedFiles.length > 0 ? hints.changedFiles : cpChanged,
     worktreePath:
       checkpoint && typeof checkpoint.worktreePath === "string"
         ? checkpoint.worktreePath
@@ -172,6 +212,13 @@ export function getTaskHistoryEntry(runtimeRoot, taskId) {
     repoRoot,
     projectName: repoRoot ? basename(repoRoot) : null,
     reportText,
+    lifecycleStatus: life.status,
+    discardedAt: life.discardedAt,
+    mergedAt: life.mergedAt,
+    prUrl: life.prUrl,
+    prNumber: life.prNumber,
+    prRemote: life.prRemote,
+    prBase: life.prBase,
   };
 }
 
@@ -230,6 +277,8 @@ export function formatTaskHistoryListing(rows) {
       "  /report <taskId>   reopen the canonical report",
       "  /inspect <taskId>  summarize branch / commit / changes",
       "  /merge <taskId>    adopt a verified result (only when files changed)",
+      "  /discard <taskId>  abandon a result (primary untouched)",
+      "  /pr <taskId>       open a GitHub pull request",
     ].join("\n");
   }
   const lines = [
@@ -240,7 +289,7 @@ export function formatTaskHistoryListing(rows) {
     const when = row.updatedAt
       ? row.updatedAt.replace("T", " ").replace(/\.\d+Z$/, "Z")
       : "unknown time";
-    const state = row.finalState || "unknown";
+    const lifecycle = formatLifecycleLabel(row);
     const project = row.projectName || "(project unknown)";
     const obj = (row.objective || "(no objective)")
       .replace(/\s+/g, " ")
@@ -252,7 +301,7 @@ export function formatTaskHistoryListing(rows) {
     const report = row.hasReport ? "report on disk" : "no report file";
     lines.push(`taskId  ${row.taskId}`);
     lines.push(`  project   ${project}`);
-    lines.push(`  outcome   ${state}`);
+    lines.push(`  lifecycle ${lifecycle}`);
     lines.push(`  when      ${when}`);
     lines.push(`  result    ${files} · ${report}`);
     lines.push(`  asked     ${obj}`);
@@ -262,6 +311,8 @@ export function formatTaskHistoryListing(rows) {
   lines.push("  /report <taskId>");
   lines.push("  /inspect <taskId>");
   lines.push("  /merge <taskId>     (only when result has file changes)");
+  lines.push("  /discard <taskId>   (abandon result; keep history)");
+  lines.push("  /pr <taskId>        (GitHub pull request)");
   return lines.join("\n");
 }
 
@@ -269,15 +320,29 @@ export function formatTaskHistoryListing(rows) {
  * @param {NonNullable<ReturnType<typeof getTaskHistoryEntry>>} entry
  */
 export function formatInspectPanel(entry) {
+  const lifecycle = formatLifecycleLabel(entry);
   const lines = [
     `Inspect task ${entry.taskId}`,
     "",
+    `  lifecycle     ${lifecycle}`,
     `  disposition   ${entry.finalState || "unknown"}`,
     `  project       ${entry.projectName || "(unknown)"}`,
     `  branch        ${entry.branch || "(none recorded)"}`,
     `  commit        ${entry.sha || "(none recorded)"}`,
     `  baseline      ${entry.baseline || "(none recorded)"}`,
   ];
+  if (entry.lifecycleStatus === "DISCARDED" && entry.discardedAt) {
+    lines.push(`  discarded     ${entry.discardedAt}`);
+  }
+  if (entry.lifecycleStatus === "MERGED" && entry.mergedAt) {
+    lines.push(`  merged        ${entry.mergedAt}`);
+  }
+  if (entry.lifecycleStatus === "PR_OPEN") {
+    if (entry.prNumber != null) lines.push(`  PR            #${entry.prNumber}`);
+    if (entry.prUrl) lines.push(`  PR url        ${entry.prUrl}`);
+    if (entry.prRemote) lines.push(`  PR remote     ${entry.prRemote}`);
+    if (entry.prBase) lines.push(`  PR base       ${entry.prBase}`);
+  }
   const files = entry.changedFiles || [];
   if (files.length > 0) {
     lines.push(`  changed       ${files.length} file(s)`);
@@ -300,8 +365,14 @@ export function formatInspectPanel(entry) {
   lines.push("");
   if (taskHasAdoptableChanges(entry)) {
     lines.push(
-      `Adoptable: yes — use /merge ${entry.taskId} (confirmation required).`,
+      `Adoptable: yes — /merge ${entry.taskId} or /pr ${entry.taskId} (confirmation required).`,
     );
+  } else if (entry.lifecycleStatus === "DISCARDED") {
+    lines.push(
+      "Adoptable: no — discarded. History and report remain for inspection only.",
+    );
+  } else if (entry.lifecycleStatus === "MERGED") {
+    lines.push("Adoptable: no — already merged into the primary project.");
   } else {
     lines.push(
       "Adoptable: no — nothing meaningful to merge into the primary project.",
