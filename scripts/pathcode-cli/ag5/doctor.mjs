@@ -39,6 +39,14 @@ export function runPathcodeDoctor(opts = {}) {
     detail: pkg.ok ? version : pkg.message,
   });
 
+  // Product install location — helps operators confirm they are on the
+  // packaged install, not an accidental development worktree symlink.
+  rows.push({
+    name: "Install",
+    ok: pkg.ok,
+    detail: packageRoot,
+  });
+
   const platform = assertSupportedPlatform();
   rows.push({
     name: "Platform",

@@ -173,6 +173,12 @@ export function createGatewayClient(options = {}) {
     return res.result;
   }
 
+  async function listTasks() {
+    const res = await request(GatewayMethods.TASK_LIST, {});
+    if (res.error) throw new Error(res.error.message);
+    return res.result;
+  }
+
   async function getResult(taskId) {
     const res = await request(GatewayMethods.RESULT_GET, { taskId });
     if (res.error) throw new Error(res.error.message);
@@ -230,6 +236,7 @@ export function createGatewayClient(options = {}) {
     steerTask,
     cancelTask,
     listCapabilities,
+    listTasks,
     getResult,
     awaitTask,
     request,

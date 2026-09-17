@@ -1,0 +1,1 @@
+{"ok":true,"gatewayTaskId":"c97cc206-09f5-48b7-96a4-fc4bd9f821dd","taskId":"7d0bfa95-05b1-4a56-a08b-a27f78a10a8b","status":"failed","classification":"NOT_VERIFIED","taskBranch":"path/task-7d0bfa95-05b1-4a56-a08b-a27f78a10a8b","commitSha":"5e5fc2ff0c98effe093226443b1c410f44b5bfa0","exitCode":1,"note":"durable result on minimal project without validation candidates"}

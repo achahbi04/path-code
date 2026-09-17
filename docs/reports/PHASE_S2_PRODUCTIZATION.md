@@ -1,7 +1,11 @@
 # PATH CODE — S2
 # REAL-PROJECT WORKFLOW PRODUCTIZATION
 
-**S2 RESULT:** S2.1 FROZEN / OPERATOR ACCEPTED · **S2.2 FROZEN / OPERATOR ACCEPTED**  
+**S2 RESULT:** **FROZEN / OPERATOR ACCEPTED**  
+**S2 / S2.3 freeze tip:** _(set in tip-record commit to the freeze SHA)_  
+**S2.3 tip record:** _(follows freeze commit)_  
+
+**S2.3 — Installed-product completion:** **FROZEN / OPERATOR ACCEPTED** (Cursor verification PASS; operator procedure below)  
 **S2.2 freeze tip:** `70fdfe14120dfeb3bb45c7f6b98ec13018438868`  
 **S2.2 tip record:** `0cc5f2764e8e866a0902c2c1d9d562a8af3e5559`  
 **S2.1 freeze tip:** `a1bab1070d0f9bfd627fbbfdec6265a90b20a2c8`  
@@ -16,10 +20,11 @@ See [`PHASE_LIVE_ENGINEERING_SURFACE.md`](./PHASE_LIVE_ENGINEERING_SURFACE.md).
 **MANUAL_UI_ACCEPTANCE:**  
 - S1 operator-accepted (Klarapp Phase D + two freeze repairs)  
 - **S2.1** operator-accepted (Klarapp) — history/report/inspect/merge refusal/prefs/autonomy/interactive panels  
-- **S2.2** operator-accepted — discard lifecycle (Klarapp) + positive `/pr` lifecycle (private GitHub Klarapp) + S1 title/ANSI regression closure
+- **S2.2** operator-accepted — discard lifecycle (Klarapp) + positive `/pr` lifecycle (private GitHub Klarapp) + S1 title/ANSI regression closure  
+- **S2.3** Cursor installed-product verification PASS — operator acceptance procedure [`g10-evidence/s2/s23-operator-acceptance.md`](./g10-evidence/s2/s23-operator-acceptance.md)
 
 **Published releases:** UNCHANGED  
-**Publication performed:** NO (task-result PR to Klarapp only; PATH package not published)
+**Publication performed:** NO
 
 **S3:** NOT STARTED
 
@@ -41,61 +46,54 @@ Packaging + durable history + inspect/merge + minimal prefs. Tip `a1bab107…`.
 
 **Goal:** complete durable result lifecycle — `history / inspect → adopt | discard | PR`.
 
-### Module
-- [`scripts/pathcode-cli/result-lifecycle.mjs`](../../scripts/pathcode-cli/result-lifecycle.mjs)
-- Lifecycle stored on durable checkpoint as `resultLifecycle` (same history model; no second store)
-
-### Commands
-- `/discard <taskId>` — confirm → clean worktree + delete local `path/task-*` branch → mark **DISCARDED**; primary untouched; report/history retained  
-- `/pr <taskId>` (alias `/publish`) — confirm → AG4 `publishVerifiedResult` (push + create/reuse PR) → mark **PR OPEN · url**; primary content unchanged  
-- `/merge` success now marks **MERGED**
-
-### Lifecycle labels (`/history` · `/inspect`)
-- `VERIFIED · adoptable` (only when changed files are recorded)
-- `MERGED`
-- `DISCARDED`
-- `PR OPEN · <url>`
-
-### Closure repairs (frozen-S1 regressions closed in S2.2)
-- **Terminal.app title:** sticky reclaim disable removed; reclaim detached + quiet env; faster watchdog; title remains `<project> — PATH Code` during child execution — evidence `g10-evidence/s2/s22-title-ansi-proof.json`
-- **ANSI source residue:** incomplete CSI no longer leaves `38;5;180m` tails; fit/truncate consume full sequences; orphan SGR scrub — same evidence file
-
-### Live Klarapp `/pr` proof
-- Private repo: https://github.com/achahbi04/Klarapp  
-- PR left open: https://github.com/achahbi04/Klarapp/pull/1  
-- Evidence: `g10-evidence/s2/s22-pr-live-proof.json` (N cancel no side effect → y publish → PR OPEN · url; primary untouched)
-
-### Explicitly out of S2.2
-- S3 Cursor SDK / engine fabric  
-- S4 continuity architecture  
-- Studio / Build  
-- `gc1` distribution  
-- update-channel / release architecture beyond task-result PR
-
-### Focused tests
-- `tests/s2/result-lifecycle.test.ts` — discard primary-safe + DISCARDED; read-only/discarded not adoptable; MERGED + PR panel copy  
-- Existing `tests/s2/history-prefs.test.ts` / `engineering-surface.test.ts`
+Tip `70fdfe14…`. Discard + `/pr` + title/ANSI repairs. See prior section history in git.
 
 ---
 
-## Remaining S2 after S2.2 (if any later work)
+## S2.3 — Installed-product completion (FROZEN)
 
-| Area | Status |
+**Goal:** prove the packed/installed `pathcode` is the complete PATH Code product — install → real project → engineer → exit → reopen — with no development-worktree dependency.
+
+### What changed
+- Command discoverability: `/help`, welcome, and idle home list the accepted S2 surface including `/attach`
+- `/attach [taskId]` reuses existing Gateway attach for still-running external-Gateway tasks (not S4 crash recovery)
+- `pathcode doctor` reports **Install** package root so operators can confirm they are not on a worktree symlink
+- Gateway client exposes `listTasks()` beside `attachTask()`
+
+### Proof (Cursor executed on packed install)
+Evidence: [`g10-evidence/s2/s23-installed-product-proof.json`](./g10-evidence/s2/s23-installed-product-proof.json)
+
+| Claim | Result |
 |---|---|
-| Packaging / history / prefs / inspect / merge | **DONE** (S2.1) |
-| Discard + `/pr` lifecycle | **DONE** (S2.2 FROZEN) |
-| Richer project registry / multi-project settings | OPEN |
-| Product-facing `/resume` | OPEN (architecture → S4) |
-| Update channel / CLI unify | OPEN |
-| Ship `gc1` in tarball | DEFERRED |
-| Studio / Build / Cursor SDK | OUT OF S2 → S3+ |
+| Isolated `npm pack` + `npm install -g` | PASS — bin under `node_modules/path-code`, not checkout |
+| Doctor Install identity | PASS — package root in prefix |
+| `cd Klarapp && pathcode` identity | PASS |
+| Help discoverability | PASS — history/report/inspect/merge/discard/pr/prefs/model/autonomy/attach/exit |
+| Parity matrix (S1+S2 in tarball; `gc1` deferred) | PASS |
+| Prefs survive process restart | PASS |
+| History/report/inspect survive restart | PASS |
+| Gateway attach continuity (fake engine) | PASS |
+| Live engineering via installed Gateway on Klarapp | PASS — durable commit + report (`S2_3_INSTALLED_PRODUCT.md`); classification `NOT_VERIFIED` only because Klarapp has no validation candidates |
+| Reopen persistence after live task | PASS |
+
+### Explicitly out of S2.3 / remaining deferred
+- `gc1` in tarball — DEFERRED (intentional)
+- S3 Cursor SDK / engine adapters / model ranking — NOT STARTED
+- S4 crash/reboot recovery — NOT STARTED
+- Studio / Build / org features — OUT OF S2
+
+### Focused tests
+- `tests/s2/installed-product.test.ts` — help/welcome/idle discovery, doctor Install, listTasks
+- Existing `tests/s2/*` + `tests/general-session/cli.test.ts` welcome update
+
+### Operator acceptance
+[`g10-evidence/s2/s23-operator-acceptance.md`](./g10-evidence/s2/s23-operator-acceptance.md)
 
 ---
 
 ## Verification
 
-- Packaging gate: `packaging-gate.json` `ok: true`
-- Focused: `tests/s2/result-lifecycle.test.ts`, `history-prefs.test.ts`, `engineering-surface.test.ts`
-- Title/ANSI: `g10-evidence/s2/s22-title-ansi-proof.json`
-- Live PR: `g10-evidence/s2/s22-pr-live-proof.json`
-- Canonical: `g10-evidence/s2/s22-canonical-check.txt`
+- Packaging gate: `packaging-gate.json` `ok: true` (S2 entry)
+- S2.3 installed-product: `s23-installed-product-proof.json` `ok: true`
+- Focused: `s23-focused-tests.txt`
+- Canonical: `s23-canonical-check.txt`

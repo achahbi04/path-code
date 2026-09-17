@@ -1,0 +1,583 @@
+[?2004l]0;]2;Klarapp — PATH Code[?1049h[?25l[H[J#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code[?2004h[?1000h[?1006h[?1007h]7878;path-idle-composer#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code[?2004l[?1000l[?1006l[?1007l[?1015lPATH * Code
+
+Local autonomous engineering for a Git project. PATH works in an isolated
+task workspace, independently validates the result, and leaves your primary
+checkout untouched.
+
+Usage:
+  pathcode
+  pathcode --issue <number>
+  pathcode doctor
+  pathcode --help
+  pathcode --version
+
+At the prompt:
+  <task>         Describe an engineering change in plain language
+  /stop          Cancel the active engineering task (not steering)
+  /history [n]   List durable tasks (id · project · outcome · when)
+  /report        Copy/export the current engineering report
+  /report <id>   Open the durable report for a real taskId
+  /inspect [id]  Disposition · branch · commit · changes · adoptable?
+  /merge [id]    Adopt only when files changed (confirm before merge)
+  /discard [id]  Abandon a task result (primary untouched; history kept)
+  /pr [id]       Push task branch + open/reuse a GitHub pull request
+  /attach [id]   Rejoin a Gateway-owned task that is still running
+  /log, /task    Show recent structured task trace lines
+  /model <id>    Set model for subsequent tasks (persisted)
+  /autonomy …    Set review|bounded for subsequent tasks (persisted)
+  /prefs         Show durable model + autonomy and their sources
+  /help          Show commands
+  /exit          Leave
+
+While a task is running:
+  type naturally  steer the active session (not a command queue)
+  ■ Stop / Ctrl-C / /stop   cancel immediately
+  PageUp / wheel            scroll engineering history
+  PageDown                  follow latest again
+  /report                   copy the engineering report after completion
+
+Flags:
+  --issue <n>    Load GitHub issue #n as task context; after VERIFIED,
+                 offer one publication approval (push + pull request)
+  --help, -h     Show this help
+  --version      Show version
+  doctor         Readiness check (install, platform, Node, Git, runtime,
+                 engineering auth; GitHub is optional)
+
+Notes:
+  - Verified work lands on a path/task-* branch for you to merge when ready
+  - GitHub CLI auth is required only for --issue / /pr publication
+  - First run bootstraps a private engine runtime automatically
+  - Normal reopen keeps durable history, reports, and preferences
+  - External Gateway (PATHCODE_GATEWAY_EXTERNAL=1): disconnect ≠ cancel;
+    use /attach to rejoin a still-running task (not crash recovery)
+[?2004h[?1000h[?1006h[?1007h]7878;path-idle-composer#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code#5[?25l[H[2KPATH ● Code
+[2K
+[2KReady for engineering
+[2K
+[2KProject  Klarapp  ·  main
+[2K
+[2KType an engineering objective below, then Enter.
+[2KPATH will inspect, edit, test, and report in this canvas.
+[2K
+[2KExamples
+[2K  > Add clamp(value, min, max) with node:test coverage
+[2K  > Fix the package.json files list for distribution
+[2K  > Investigate failing tests and repair them
+[2K
+[2KCommands
+[2K  /help  ·  /history  ·  /report  ·  /inspect  ·  /prefs
+[2K  /merge  ·  /discard  ·  /pr  ·  /attach  ·  /exit
+[2K
+[2KWhile a task runs
+[2K  ■ Stop / Ctrl-C / /stop   cancel immediately
+[2K────────────────────────────────────────────────────────────────────────────────
+[2K> 
+[2K────────────────────────────────────────────────────────────────────────────────
+[2K■ idle   auto · Klarapp
+[J]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code[?2004l[?1000l[?1006l[?1007l[?1015l#5[?25l[H[2KPATH ● Code
+[2K
+[2KPATH · command
+[2KComposer ready below — type next command · Esc closes
+[2K
+[2KDurable task history (1 shown, newest first)
+[2K
+[2KtaskId  s23-hist-1a0af44f07d
+[2K  project   Klarapp
+[2K  lifecycle VERIFIED · adoptable
+[2K  when      2026-09-17 12:08:45Z
+[2K  result    1 file(s) changed · report on disk
+[2K  asked     S2.3 installed-product history reopen probe
+[2K
+[2KSelect a task by copying its taskId, then:
+[2K  /report <taskId>
+[2K  /inspect <taskId>
+[2K  /merge <taskId>     (only when result has file changes)
+[2K  /discard <taskId>   (abandon result; keep history)
+[2K────────────────────────────────────────────────────────────────────────────────
+[2K> 
+[2K────────────────────────────────────────────────────────────────────────────────
+[2K■ idle   auto · Klarapp
+[2K
+[J]0;]2;Klarapp — PATH Code[?25l[?2004h[?1000h[?1006h[?1007h]7878;path-idle-composer#5[?25l]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code[?2004l[?1000l[?1006l[?1007l[?1015l#5[?25l[H[2KPATH ● Code
+[2K
+[2KPATH · command
+[2KComposer ready below — type next command · Esc closes
+[2K
+[2KDurable preferences
+[2K
+[2K  model     s23-installed-model
+[2K            source: session
+[2K  autonomy  bounded
+[2K            source: session
+[2K  file      /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-R…[0m
+[2K
+[2KChange with:
+[2K  /model <id>
+[2K  /autonomy <review|bounded>
+[2K
+[2KThese values persist across PATH restarts (prefs file).
+[2K────────────────────────────────────────────────────────────────────────────────
+[2K> 
+[2K────────────────────────────────────────────────────────────────────────────────
+[2K■ idle   auto · Klarapp
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code[?25l[?2004h[?1000h[?1006h[?1007h]7878;path-idle-composer#5[?25l]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code[?2004l[?1000l[?1006l[?1007l[?1015l#5[?25l]0;]2;Klarapp — PATH Code[?25h[?1049l[0m[?2004l]0;]2;Goodbye.
+[?2004l[?25h[?1049l[0m[?2004l

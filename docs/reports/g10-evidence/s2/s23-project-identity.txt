@@ -1,0 +1,4 @@
+PATH * Code
+Klarapp · main · clean
+
+(Non-interactive: showing project identity only. Use a TTY for engineering.)

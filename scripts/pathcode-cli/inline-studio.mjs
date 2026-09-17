@@ -592,11 +592,23 @@ function buildIdleHomeLines(product, columns) {
     ),
   );
   lines.push("");
+  lines.push(fitCanvasLine(style.dim("Commands"), columns));
+  lines.push(
+    fitCanvasLine(
+      style.dim("  /help  ·  /history  ·  /report  ·  /inspect  ·  /prefs"),
+      columns,
+    ),
+  );
+  lines.push(
+    fitCanvasLine(
+      style.dim("  /merge  ·  /discard  ·  /pr  ·  /attach  ·  /exit"),
+      columns,
+    ),
+  );
+  lines.push("");
   lines.push(fitCanvasLine(style.dim("While a task runs"), columns));
   lines.push(fitCanvasLine(style.dim("  ■ Stop / Ctrl-C / /stop   cancel immediately"), columns));
   lines.push(fitCanvasLine(style.dim("  type guidance             steer the engines"), columns));
-  lines.push(fitCanvasLine(style.dim("  /log                      inspect task trace"), columns));
-  lines.push(fitCanvasLine(style.dim("  /exit                     leave PATH"), columns));
   lines.push("");
   lines.push(
     fitCanvasLine(

@@ -1,0 +1,358 @@
+{
+  "schema": "pathcode.s2.3.installed-product.v1",
+  "at": "2026-09-17T12:08:24.778Z",
+  "checkout": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+  "s1FreezeTip": "eac5f8620fea8c75070cd27421643bb167864294",
+  "s21FreezeTip": "a1bab1070d0f9bfd627fbbfdec6265a90b20a2c8",
+  "s22FreezeTip": "70fdfe14120dfeb3bb45c7f6b98ec13018438868",
+  "project": "/Users/achahbi/Projects/Klarapp",
+  "steps": {
+    "project_preflight": {
+      "ok": true,
+      "project": "/Users/achahbi/Projects/Klarapp"
+    },
+    "npm_pack": {
+      "ok": true,
+      "tarball": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/s2/path-code-1.0.1.tgz",
+      "bytes": 770756
+    },
+    "audit_release": {
+      "ok": true,
+      "status": 0
+    },
+    "isolated_install": {
+      "ok": true,
+      "binPath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/bin/pathcode",
+      "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code"
+    },
+    "no_checkout_coupling": {
+      "ok": true,
+      "binReal": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code/scripts/pathcode.mjs",
+      "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code"
+    },
+    "version": {
+      "ok": true,
+      "out": "PATH * Code 1.0.1"
+    },
+    "doctor": {
+      "ok": true,
+      "status": 1,
+      "installVisible": true,
+      "outHead": "PATH Code doctor\n\n  ✓ PATH Code      1.0.1\n  ✓ Install        /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code\n  ✓ Platform       macOS Apple Silicon\n  ✓ Node           Node.js 26.5.0\n  ✓ Git            git version 2.50.1 (Apple Git-155)\n  ✗ Runtime        PATH engine runtime not ready. PATH will attempt automatic repair on next startup.\n  ✓ Engineering    Google Cloud project configured (Vertex/ADC expected).\n  ✓ Project        /Users/achahbi/Projects/Klarapp\n  ✗ GitHub         Not authenticated — run: gh auth login (optional)\n"
+    },
+    "bootstrap": {
+      "ok": true,
+      "status": 0,
+      "result": "{\"ok\":true,\"code\":null,\"message\":null,\"runtimeRoot\":\"/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/runtime\"}"
+    },
+    "project_identity": {
+      "ok": true,
+      "status": 0,
+      "out": "PATH * Code\nKlarapp · main · clean\n\n(Non-interactive: showing project identity only. Use a TTY for engineering.)"
+    },
+    "help_discoverability": {
+      "ok": true,
+      "commands": [
+        "/history",
+        "/report",
+        "/inspect",
+        "/merge",
+        "/discard",
+        "/pr",
+        "/prefs",
+        "/model",
+        "/autonomy",
+        "/attach",
+        "/help",
+        "/exit"
+      ]
+    },
+    "parity_matrix": {
+      "ok": true,
+      "requiredOk": true,
+      "deferredAbsent": true,
+      "rows": [
+        {
+          "id": "entry",
+          "path": "package/scripts/pathcode.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "gateway_runtime",
+          "path": "package/scripts/pathcode-cli/gateway/runtime.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "gateway_ensure",
+          "path": "package/scripts/pathcode-cli/gateway/ensure.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "live_surface",
+          "path": "package/scripts/pathcode-cli/inline-studio.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "engineering_report",
+          "path": "package/scripts/pathcode-cli/engineering-report.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "task_history",
+          "path": "package/scripts/pathcode-cli/task-history.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "preferences",
+          "path": "package/scripts/pathcode-cli/preferences.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "result_lifecycle",
+          "path": "package/scripts/pathcode-cli/result-lifecycle.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "ag1_bridge",
+          "path": "package/scripts/pathcode-cli/ag1/python/bridge_main.py",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "ag4_publish",
+          "path": "package/scripts/pathcode-cli/ag4/publish.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "ag5_doctor",
+          "path": "package/scripts/pathcode-cli/ag5/doctor.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "ag8_copilot",
+          "path": "package/scripts/pathcode-cli/ag8/index.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "ag9_prepare",
+          "path": "package/scripts/pathcode-cli/ag9/index.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "ag10_fabric",
+          "path": "package/scripts/pathcode-cli/ag10/index.mjs",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "dist_index",
+          "path": "package/dist/index.js",
+          "required": true,
+          "present": true
+        },
+        {
+          "id": "gc1_cloud",
+          "path": "package/scripts/pathcode-cli/gc1/",
+          "required": false,
+          "note": "DEFERRED — intentionally development/worktree-only until distribution decision",
+          "present": false
+        }
+      ]
+    },
+    "prefs_reopen": {
+      "ok": true,
+      "write": {
+        "writeOk": true,
+        "path": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/home/.path-code/preferences.json",
+        "modelId": "s23-installed-model",
+        "autonomy": "bounded"
+      },
+      "reopen": {
+        "modelId": "s23-installed-model",
+        "autonomy": "bounded",
+        "path": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/home/.path-code/preferences.json",
+        "panelHasModel": true,
+        "panelHasBounded": true
+      }
+    },
+    "history_reopen": {
+      "ok": true,
+      "taskId": "s23-hist-1a0af44f07d",
+      "found": true,
+      "listingHas": true,
+      "inspectHas": true,
+      "reportOk": true,
+      "lifecycle": "VERIFIED"
+    },
+    "pty_command_surface": {
+      "ok": true,
+      "status": 0,
+      "exercised": true
+    },
+    "attach_continuity": {
+      "ok": true,
+      "taskId": "928ba9bf-861e-4cc2-a7ac-cac8ba94211e",
+      "listed": [
+        {
+          "id": "928ba9bf-861e-4cc2-a7ac-cac8ba94211e",
+          "status": "running"
+        }
+      ],
+      "attached": true
+    },
+    "live_engineering": {
+      "ok": true,
+      "gatewayTaskId": "c97cc206-09f5-48b7-96a4-fc4bd9f821dd",
+      "taskId": "7d0bfa95-05b1-4a56-a08b-a27f78a10a8b",
+      "status": "failed",
+      "classification": "NOT_VERIFIED",
+      "taskBranch": "path/task-7d0bfa95-05b1-4a56-a08b-a27f78a10a8b",
+      "commitSha": "5e5fc2ff0c98effe093226443b1c410f44b5bfa0",
+      "exitCode": 1,
+      "note": "durable result on minimal project without validation candidates"
+    },
+    "live_reopen_persistence": {
+      "ok": true,
+      "historyFound": true,
+      "reportExists": true,
+      "reportHasAsked": true,
+      "prefsModel": "s23-installed-model",
+      "prefsAutonomy": "bounded",
+      "inspectHasId": true,
+      "lifecycle": null,
+      "disposition": "FAILED",
+      "historyIds": [
+        "7d0bfa95-05b1-4a56-a08b-a27f78a10a8b"
+      ]
+    },
+    "lifecycle_visibility": {
+      "ok": true,
+      "inspectHasId": true,
+      "lifecycle": null,
+      "disposition": "FAILED",
+      "note": "merge/discard/PR contracts unchanged from S2.2; not re-run destructively"
+    }
+  },
+  "parity": [
+    {
+      "id": "entry",
+      "path": "package/scripts/pathcode.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "gateway_runtime",
+      "path": "package/scripts/pathcode-cli/gateway/runtime.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "gateway_ensure",
+      "path": "package/scripts/pathcode-cli/gateway/ensure.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "live_surface",
+      "path": "package/scripts/pathcode-cli/inline-studio.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "engineering_report",
+      "path": "package/scripts/pathcode-cli/engineering-report.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "task_history",
+      "path": "package/scripts/pathcode-cli/task-history.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "preferences",
+      "path": "package/scripts/pathcode-cli/preferences.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "result_lifecycle",
+      "path": "package/scripts/pathcode-cli/result-lifecycle.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "ag1_bridge",
+      "path": "package/scripts/pathcode-cli/ag1/python/bridge_main.py",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "ag4_publish",
+      "path": "package/scripts/pathcode-cli/ag4/publish.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "ag5_doctor",
+      "path": "package/scripts/pathcode-cli/ag5/doctor.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "ag8_copilot",
+      "path": "package/scripts/pathcode-cli/ag8/index.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "ag9_prepare",
+      "path": "package/scripts/pathcode-cli/ag9/index.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "ag10_fabric",
+      "path": "package/scripts/pathcode-cli/ag10/index.mjs",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "dist_index",
+      "path": "package/dist/index.js",
+      "required": true,
+      "present": true
+    },
+    {
+      "id": "gc1_cloud",
+      "path": "package/scripts/pathcode-cli/gc1/",
+      "required": false,
+      "note": "DEFERRED — intentionally development/worktree-only until distribution decision",
+      "present": false
+    }
+  ],
+  "ok": true,
+  "verdict": "PASS",
+  "isolated": {
+    "home": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/home",
+    "prefix": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix",
+    "runtime": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/runtime",
+    "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code",
+    "bin": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/bin/pathcode",
+    "binReal": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code/scripts/pathcode.mjs",
+    "liveRuntime": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/live-runtime"
+  }
+}

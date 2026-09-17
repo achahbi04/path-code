@@ -511,6 +511,8 @@ export async function runPathcodeMain(argv, testIo = {}) {
   let gatewayClient = null;
   /** @type {string | null} */
   let activeGatewayTaskId = null;
+  /** @type {Array<{ taskId: string, status?: string, objective?: string }>} */
+  let aliveGatewayNotice = [];
   if (useGateway) {
     const runtimeRoot = resolvePathRuntimeRoot({ packageRoot: root });
     if (useExternalGateway) {
@@ -520,6 +522,22 @@ export async function runPathcodeMain(argv, testIo = {}) {
       });
       gatewayClient = ensured.client;
       await gatewayClient.bindProject(projectRoot);
+      try {
+        const listed = await gatewayClient.listTasks();
+        const tasks = Array.isArray(listed?.tasks) ? listed.tasks : [];
+        aliveGatewayNotice = tasks
+          .filter((t) => t && t.status === "running" && typeof t.taskId === "string")
+          .map((t) => ({
+            taskId: t.taskId,
+            status: t.status,
+            objective:
+              typeof t.objective === "string"
+                ? t.objective.slice(0, 120)
+                : undefined,
+          }));
+      } catch {
+        aliveGatewayNotice = [];
+      }
     } else {
       gatewayRuntime = createGatewayRuntime({
         packageRoot: root,
@@ -727,6 +745,120 @@ export async function runPathcodeMain(argv, testIo = {}) {
       if (typeof prompt.endCycle === "function") prompt.endCycle();
       if (typeof prompt.clearStop === "function") prompt.clearStop();
     }
+  }
+
+  /**
+   * Rejoin a Gateway-owned task that is still running (S1 ownership model).
+   * Not crash/reboot resurrection — only live Gateway tasks.
+   * @param {string} taskId
+   */
+  async function followAttachedGatewayTask(taskId) {
+    const id = String(taskId || "").trim();
+    if (!id) {
+      return { ok: false, message: "Usage: /attach <taskId>" };
+    }
+    if (!useGateway || (!gatewayClient && !gatewayRuntime)) {
+      return {
+        ok: false,
+        message:
+          "No PATH Gateway is available in this session. Start a task normally, or launch with PATHCODE_GATEWAY_EXTERNAL=1 to rejoin a detached Gateway.",
+      };
+    }
+    if (activeGatewayTaskId) {
+      return {
+        ok: false,
+        message: `Already attached to task ${activeGatewayTaskId}. /stop it first, or wait for completion.`,
+      };
+    }
+
+    let sessionResult = null;
+    await runCycle(async (signal) => {
+      if (gatewayClient) {
+        const off = gatewayClient.onEvent((envelope) => {
+          const ev = envelope?.event;
+          if (!ev || typeof ev.type !== "string") return;
+          const { type, ...fields } = ev;
+          eventSink.emit(type, fields);
+        });
+        try {
+          const attached = await gatewayClient.attachTask(id);
+          if (!attached?.attached && !attached?.snapshot) {
+            throw new Error(attached?.message || `attach failed for ${id}`);
+          }
+          const snap0 = attached.snapshot || (await gatewayClient.snapshotTask(id));
+          if (!snap0 || snap0.status !== "running") {
+            sessionResult =
+              (snap0 && snap0.result) ||
+              {
+                exitCode: snap0?.status === "completed" ? 0 : 1,
+                classification: snap0?.classification,
+                taskBranch: snap0?.taskBranch,
+                commitSha: snap0?.commitSha,
+              };
+            return;
+          }
+          activeGatewayTaskId = id;
+          for (;;) {
+            if (signal?.aborted) break;
+            await new Promise((r) => setTimeout(r, 750));
+            const full = await gatewayClient.snapshotTask(id);
+            if (!full || full.status !== "running") {
+              sessionResult =
+                (full && full.result) ||
+                {
+                  exitCode: full?.status === "completed" ? 0 : 1,
+                  classification: full?.classification,
+                  taskBranch: full?.taskBranch,
+                  commitSha: full?.commitSha,
+                };
+              break;
+            }
+          }
+        } finally {
+          activeGatewayTaskId = null;
+          off();
+        }
+      } else if (gatewayRuntime) {
+        const off = gatewayRuntime.onEvent((envelope) => {
+          const ev = envelope?.event;
+          if (!ev || typeof ev.type !== "string") return;
+          const { type, ...fields } = ev;
+          eventSink.emit(type, fields);
+        });
+        try {
+          const task = gatewayRuntime.snapshotTask(id);
+          if (!task) {
+            throw new Error(`unknown task ${id}`);
+          }
+          activeGatewayTaskId = id;
+          if (task.status === "running") {
+            await gatewayRuntime.awaitTask(id);
+          }
+          const full = gatewayRuntime.snapshotTask(id);
+          sessionResult =
+            (full && full.result) ||
+            {
+              exitCode: full?.status === "completed" ? 0 : 1,
+              classification: full?.classification,
+              taskBranch: full?.taskBranch,
+              commitSha: full?.commitSha,
+            };
+        } finally {
+          activeGatewayTaskId = null;
+          off();
+        }
+      }
+    });
+
+    if (sessionResult && typeof sessionResult === "object") {
+      sessionStats.taskCount += 1;
+      if (typeof sessionResult.taskBranch === "string" && sessionResult.taskBranch) {
+        sessionStats.lastVerifiedBranch = sessionResult.taskBranch;
+      }
+      lastExitCode =
+        typeof sessionResult.exitCode === "number" ? sessionResult.exitCode : 0;
+    }
+    return { ok: true, sessionResult };
   }
 
   /**
@@ -1060,6 +1192,22 @@ export async function runPathcodeMain(argv, testIo = {}) {
         unversioned: gitSummary.unversioned === true,
       });
       redrawPrompt(prompt, unicode, plain, sessionStats, inlineStudio);
+      if (aliveGatewayNotice.length > 0) {
+        const lines = [
+          "Gateway-owned task(s) still running for this project:",
+          "",
+          ...aliveGatewayNotice.map((t) => {
+            const obj = t.objective ? ` — ${t.objective}` : "";
+            return `  ${t.taskId}${obj}`;
+          }),
+          "",
+          "Rejoin with: /attach <taskId>",
+          "(Disconnect did not cancel them. This is not crash recovery.)",
+        ];
+        showOperatorReply(prompt, inlineStudio, lines.join("\n"));
+        aliveGatewayNotice = [];
+        redrawPrompt(prompt, unicode, plain, sessionStats, inlineStudio);
+      }
     }
 
     while (!prompt.isStopped()) {
@@ -1105,6 +1253,63 @@ export async function runPathcodeMain(argv, testIo = {}) {
           prompt.write("Stop requested for the active task.\n");
         } else {
           prompt.write("No active engineering task to stop.\n");
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+      if (cmd === "/attach" || cmd.startsWith("/attach ")) {
+        const parts = cmd.split(/\s+/);
+        let idArg = parts[1] || "";
+        if (!idArg && aliveGatewayNotice.length === 1) {
+          idArg = aliveGatewayNotice[0].taskId;
+        }
+        if (!idArg && gatewayClient) {
+          try {
+            const listed = await gatewayClient.listTasks();
+            const running = (listed?.tasks || []).filter(
+              (t) => t && t.status === "running" && typeof t.taskId === "string",
+            );
+            if (running.length === 1) idArg = running[0].taskId;
+            else if (running.length > 1) {
+              showOperatorReply(
+                prompt,
+                ttyInline ? inlineStudio : null,
+                [
+                  "Multiple Gateway tasks are still running:",
+                  "",
+                  ...running.map((t) => `  ${t.taskId}`),
+                  "",
+                  "Usage: /attach <taskId>",
+                ].join("\n"),
+              );
+              redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+              continue;
+            }
+          } catch {
+            // fall through to usage
+          }
+        }
+        if (!idArg) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            "Usage: /attach <taskId>\n\nRejoins a Gateway-owned task that is still running (external Gateway).",
+          );
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
+        showOperatorReply(
+          prompt,
+          ttyInline ? inlineStudio : null,
+          `Attaching to Gateway task ${idArg}…`,
+        );
+        const followed = await followAttachedGatewayTask(idArg);
+        if (!followed.ok) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            followed.message || "Attach failed.",
+          );
         }
         redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;

@@ -2,7 +2,7 @@
 
 **S1 RESULT:** FROZEN / OPERATOR ACCEPTED  
 **Freeze tip:** `eac5f8620fea8c75070cd27421643bb167864294`  
-**Deeper S2 productization:** IN PROGRESS (packaging gate PASS; history/result/prefs MVP)
+**Deeper S2 productization:** **FROZEN / OPERATOR ACCEPTED** — see [`PHASE_S2_PRODUCTIZATION.md`](./PHASE_S2_PRODUCTIZATION.md)
 
 **S1 Gateway:** FROZEN / ACCEPTED — tip `9f9db58c918b4ee690f0a5053aa8ebfd8bc15cfe`  
 **S1 live experience:** FROZEN / OPERATOR ACCEPTED (Klarapp Phase D accepted; two bounded freeze repairs closed)
@@ -90,4 +90,4 @@ node …/scripts/pathcode.mjs
 | **D** | Accepted |
 | **Freeze repairs** | Closed |
 | **S1** | **FROZEN / OPERATOR ACCEPTED** |
-| **S2** | **IN PROGRESS** (packaging gate PASS; history/result/prefs MVP) |
+| **S2** | **FROZEN / OPERATOR ACCEPTED** — see PHASE_S2_PRODUCTIZATION.md |

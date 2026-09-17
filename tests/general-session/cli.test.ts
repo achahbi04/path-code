@@ -191,7 +191,9 @@ describe("5G-M / 5G-AF: help and welcome describe what the prompt accepts", () =
     const { renderWelcomeScreen } = await importHost("banner.mjs");
     const welcome = renderWelcomeScreen({ columns: 100, unicode: true, plain: false });
     expect(welcome).toContain("Describe an engineering task in your own words");
-    expect(welcome).toContain("/recover <id>");
+    expect(welcome).toContain("/history");
+    expect(welcome).toContain("/help");
+    expect(welcome).toContain("/attach");
     expect(welcome).toContain("PATH creates an isolated task workspace");
     expect(welcome).toContain("PATH independently validates the final result");
   });

@@ -57,12 +57,14 @@ export function renderWelcomeScreen(opts = {}) {
     "  Describe an engineering task in your own words to start one here.",
     "  PATH creates an isolated task workspace and runs bounded engineering.",
     "  PATH independently validates the final result. The primary checkout stays untouched.",
-    "  No project scan happens just by opening this screen.",
     "",
     "  <task>              Describe what to change, in plain language",
-    "  /recover <id>       Restore a checkpoint from an earlier session",
-    "  /trial              Run Trial 1 in a disposable project",
-    "  /help               Show the commands and current scope",
+    "  /history [n]        Past tasks for this install (durable)",
+    "  /report · /inspect  Open a finished task result",
+    "  /merge · /discard · /pr   Result lifecycle",
+    "  /prefs · /model · /autonomy   Preferences",
+    "  /attach [id]        Rejoin a Gateway-owned task still running",
+    "  /help               Full command list",
     "  /exit               Leave",
     "",
     `${prompt} `,
@@ -107,6 +109,7 @@ At the prompt:
   /merge [id]    Adopt only when files changed (confirm before merge)
   /discard [id]  Abandon a task result (primary untouched; history kept)
   /pr [id]       Push task branch + open/reuse a GitHub pull request
+  /attach [id]   Rejoin a Gateway-owned task that is still running
   /log, /task    Show recent structured task trace lines
   /model <id>    Set model for subsequent tasks (persisted)
   /autonomy …    Set review|bounded for subsequent tasks (persisted)
@@ -131,9 +134,10 @@ Flags:
 
 Notes:
   - Verified work lands on a path/task-* branch for you to merge when ready
-  - GitHub CLI auth is required only for --issue publication
+  - GitHub CLI auth is required only for --issue / /pr publication
   - First run bootstraps a private engine runtime automatically
-  - Client disconnect from an external Gateway does not cancel the task;
-    only explicit Stop / /stop / Ctrl-C does
+  - Normal reopen keeps durable history, reports, and preferences
+  - External Gateway (PATHCODE_GATEWAY_EXTERNAL=1): disconnect ≠ cancel;
+    use /attach to rejoin a still-running task (not crash recovery)
 `;
 }

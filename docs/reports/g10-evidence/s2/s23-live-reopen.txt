@@ -1,0 +1,1 @@
+{"historyFound":true,"reportExists":true,"reportHasAsked":true,"prefsModel":"s23-installed-model","prefsAutonomy":"bounded","inspectHasId":true,"lifecycle":null,"disposition":"FAILED","historyIds":["7d0bfa95-05b1-4a56-a08b-a27f78a10a8b"]}
