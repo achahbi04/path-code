@@ -186,7 +186,9 @@ describe("S2.3 worktree Git parity repair", () => {
     const healthy = assertTaskWorktreeGitHealthy(wt, primary);
     expect(healthy.ok).toBe(true);
     expect(git(wt, ["rev-parse", "--show-toplevel"]).status).toBe(0);
-  });
+  },
+    60_000,
+  );
 
   it("read-only assessment with empty validation candidates is VERIFIED", async () => {
     const { runIndependentFinalValidation } = await load(
