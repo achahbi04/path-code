@@ -15,6 +15,7 @@ import { hydrateAg1CloudEnv } from "./cloud-env.mjs";
 import { admitPrimaryCheckout } from "./admission.mjs";
 import { commitTaskWorktree } from "./task-commit.mjs";
 import {
+  assertTaskWorktreeGitHealthy,
   capturePrimaryFingerprint,
   captureFileDiffForUi,
   captureFilePreviewForUi,
@@ -23,6 +24,7 @@ import {
   primaryUntouched,
   removeTaskWorktree,
   reopenTaskWorktree,
+  repairTaskWorktreeGit,
   restoreIncidentalSetupChurn,
 } from "./task-worktree.mjs";
 import {
@@ -114,7 +116,14 @@ function compactCapabilityMatrix(plane) {
 /**
  * @param {any} validation
  */
-async function runSessionValidation(emit, worktree, engineeringCwd, projectRoot, signal) {
+async function runSessionValidation(
+  emit,
+  worktree,
+  engineeringCwd,
+  projectRoot,
+  signal,
+  objective = "",
+) {
   emit("session.engineering.activity", {
     activity: "verifying",
     label: "Verifying",
@@ -154,6 +163,7 @@ async function runSessionValidation(emit, worktree, engineeringCwd, projectRoot,
       worktreePath: worktree.worktreePath,
       engineeringCwd,
       primaryRoot: projectRoot,
+      objective,
       signal,
     });
     for (const check of validation.checks) {
@@ -408,6 +418,37 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       classification: "NOT_VERIFIED",
       engineActivityCount: 0,
     };
+  }
+
+  // Installed-product invariant: task workspace must be a working Git tree
+  // before engines run. Repair dangling gitdir pointers when possible.
+  if (worktree.bootstrapMode !== "unversioned_inplace") {
+    let health = assertTaskWorktreeGitHealthy(
+      worktree.worktreePath,
+      projectRoot,
+    );
+    if (!health.ok) {
+      const repaired = repairTaskWorktreeGit(
+        projectRoot,
+        worktree.worktreePath,
+      );
+      health = repaired.ok
+        ? assertTaskWorktreeGitHealthy(worktree.worktreePath, projectRoot)
+        : health;
+    }
+    if (!health.ok) {
+      write(`${health.message}\n`);
+      emit("session.terminal", {
+        disposition: health.code || "AG1_WORKTREE_GIT_UNHEALTHY",
+        summary: health.message,
+      });
+      return {
+        exitCode: 2,
+        outcome: health.code || "AG1_WORKTREE_GIT_UNHEALTHY",
+        classification: "NOT_VERIFIED",
+        engineActivityCount: 0,
+      };
+    }
   }
 
   if (isResume) {
@@ -1157,6 +1198,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       engineeringCwd,
       projectRoot,
       ac.signal,
+      effectiveTaskText,
     );
     markTiming(`validation_end_${repairAttempts}`);
 

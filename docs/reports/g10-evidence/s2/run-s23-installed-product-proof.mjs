@@ -233,23 +233,24 @@ process.exit(r.ok ? 0 : 1);
 );
 const boot = run(process.execPath, [bootFile], {
   env: envIso,
-  timeout: 300_000,
+  // Cold pip+venv on a fresh iso runtime can take ~90–180s; allow headroom so
+  // SIGKILL mid-install does not soft-pass and leave project_identity empty.
+  timeout: 600_000,
 });
 writeFileSync(join(outDir, "s23-bootstrap.txt"), `${boot.stdout || ""}${boot.stderr || ""}`);
 if (boot.status !== 0) {
   const err = `${boot.stderr || ""}${boot.stdout || ""}`;
-  if (/Cannot find module|ERR_MODULE_NOT_FOUND/.test(err)) {
-    fail("bootstrap", { err: err.slice(0, 800) });
-  }
-  pass("bootstrap", {
+  fail("bootstrap", {
     status: boot.status,
-    soft: true,
-    note: "bootstrap returned non-zero; module resolution from installed pack still ok",
-    out: (boot.stdout || "").slice(0, 400),
+    signal: boot.signal || null,
+    err: err.slice(0, 800),
+    note:
+      boot.status === null
+        ? "bootstrap timed out — runtime not ready for project_identity"
+        : "ensureAg1Runtime failed from installed pack",
   });
-} else {
-  pass("bootstrap", { status: 0, result: (boot.stdout || "").trim() });
 }
+pass("bootstrap", { status: 0, result: (boot.stdout || "").trim() });
 
 // ── 6. project identity (non-interactive start from real project) ───────────
 const identity = run(binPath, [], {
@@ -616,6 +617,64 @@ pass("attach_continuity", {
   attached: true,
 });
 
+// ── 12b. Installed-package title ownership (OSC + reclaim; no blind timer) ───
+const titleProbe = join(iso, "title-probe.mjs");
+writeFileSync(
+  titleProbe,
+  `
+import { pathToFileURL } from 'node:url';
+const pkg = ${JSON.stringify(pkgRoot)};
+const {
+  formatPathTitle,
+  setStablePathTitle,
+  getOwnedPathTitle,
+  restoreTerminalTitle,
+  reclaimTtyForeground,
+  isPathTitleOwned,
+} = await import(pathToFileURL(pkg + '/scripts/pathcode-cli/terminal-title.mjs').href);
+const chunks = [];
+const stdout = { write(c) { chunks.push(String(c)); return true; } };
+const expected = formatPathTitle('Klarapp');
+setStablePathTitle({ stdout, projectName: 'Klarapp' });
+const reclaimOk = reclaimTtyForeground();
+const joined = chunks.join('');
+const ok =
+  isPathTitleOwned() === true &&
+  getOwnedPathTitle() === expected &&
+  expected === 'Klarapp — PATH Code' &&
+  joined.includes(expected) &&
+  !/copilot/i.test(joined) &&
+  !/TMPDIR=/.test(joined) &&
+  typeof reclaimOk === 'boolean';
+restoreTerminalTitle({ stdout });
+console.log(JSON.stringify({ ok, expected, reclaimOk, ownedAfterRestore: isPathTitleOwned() }));
+process.exit(ok ? 0 : 1);
+`,
+);
+const titleRun = run(process.execPath, [titleProbe], {
+  cwd: klarapp,
+  env: liveEnvForTitle(),
+  timeout: 30_000,
+});
+writeFileSync(
+  join(outDir, "s23-title-installed.txt"),
+  `${titleRun.stdout || ""}${titleRun.stderr || ""}`,
+);
+if (titleRun.status !== 0) {
+  fail("installed_title", {
+    status: titleRun.status,
+    out: `${titleRun.stdout || ""}${titleRun.stderr || ""}`.slice(0, 800),
+  });
+}
+pass("installed_title", JSON.parse((titleRun.stdout || "").trim()));
+
+function liveEnvForTitle() {
+  return {
+    ...envIso,
+    PATHCODE_NONINTERACTIVE: "1",
+  };
+}
+
 // ── 13. LIVE engineering through installed package on Klarapp ────────────────
 const liveRuntime = join(iso, "live-runtime");
 mkdirSync(liveRuntime, { recursive: true });
@@ -639,11 +698,14 @@ if (existsSync(adcPath)) {
 delete liveEnv.PATHCODE_NONINTERACTIVE;
 delete liveEnv.PATHCODE_GATEWAY_FAKE_ENGINE;
 
-// Ensure gateway from installed package, then start a small real task via client.
+// Ensure gateway from installed package, then start a small real read-only task.
 const liveBoot = join(iso, "live-task.mjs");
 writeFileSync(
   liveBoot,
   `
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 const pkg = ${JSON.stringify(pkgRoot)};
 const runtimeRoot = ${JSON.stringify(liveRuntime)};
@@ -656,17 +718,91 @@ ${existsSync(adcPath) ? `process.env.GOOGLE_APPLICATION_CREDENTIALS = ${JSON.str
 delete process.env.PATHCODE_GATEWAY_FAKE_ENGINE;
 delete process.env.PATHCODE_NONINTERACTIVE;
 
+function git(cwd, args) {
+  return spawnSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    timeout: 30_000,
+  });
+}
+
+function probeWorktreeGit(tasksParent) {
+  if (!existsSync(tasksParent)) return { ok: false, reason: 'no_tasks_parent' };
+  const kids = readdirSync(tasksParent).filter((n) => {
+    try { return statSync(join(tasksParent, n)).isDirectory(); } catch { return false; }
+  });
+  if (!kids.length) return { ok: false, reason: 'no_task_dirs', kids };
+  const worktreePath = join(tasksParent, kids[kids.length - 1]);
+  const dotGit = join(worktreePath, '.git');
+  let gitdir = null;
+  try {
+    const text = readFileSync(dotGit, 'utf8');
+    const m = /^gitdir:\\s*(.+?)\\s*$/m.exec(text);
+    gitdir = m ? m[1] : null;
+  } catch (err) {
+    return { ok: false, reason: 'dot_git_unreadable', worktreePath, err: String(err) };
+  }
+  const toplevel = git(worktreePath, ['rev-parse', '--show-toplevel']);
+  const branch = git(worktreePath, ['branch', '--show-current']);
+  const inside = git(worktreePath, ['rev-parse', '--is-inside-work-tree']);
+  const ok =
+    inside.status === 0 &&
+    inside.stdout.trim() === 'true' &&
+    toplevel.status === 0 &&
+    Boolean(toplevel.stdout.trim()) &&
+    branch.status === 0;
+  return {
+    ok,
+    worktreePath,
+    gitdir,
+    gitdirExists: gitdir ? existsSync(gitdir.startsWith('/') ? gitdir : join(worktreePath, gitdir)) : false,
+    toplevel: toplevel.stdout.trim() || null,
+    branch: branch.stdout.trim() || null,
+    stderr: (toplevel.stderr || branch.stderr || inside.stderr || '').slice(0, 400),
+  };
+}
+
 const { ensureGateway } = await import(pathToFileURL(pkg + '/scripts/pathcode-cli/gateway/index.mjs').href);
+const { recoverPathOwnedStaleWorktrees } = await import(pathToFileURL(pkg + '/scripts/pathcode-cli/ag5/orphan-recovery.mjs').href);
 const ensured = await ensureGateway({ packageRoot: pkg, runtimeRoot });
 const client = ensured.client;
 await client.bindProject(project);
 const objective =
-  'Create a new file named S2_3_INSTALLED_PRODUCT.md at the repository root containing exactly one line: PATH Code installed-product acceptance. Do not modify any other files. Then stop.';
-const started = await client.startTask(objective, { sessionId: 's23-live' });
+  'Assess README.md and package.json only. Report what the project is. Do not modify any files, do not create files, and do not run destructive commands. Then stop.';
+const started = await client.startTask(objective, { sessionId: 's23-live-ro' });
 if (!started?.taskId) {
   console.log(JSON.stringify({ ok: false, stage: 'start', started }));
   process.exit(1);
 }
+
+// While the task owns the worktree, orphan recovery must not strip Git metadata.
+const tasksParent = join(runtimeRoot, 'ag1-tasks');
+let earlyGit = null;
+for (let i = 0; i < 40; i += 1) {
+  earlyGit = probeWorktreeGit(tasksParent);
+  if (earlyGit.ok) break;
+  await new Promise((r) => setTimeout(r, 500));
+}
+const preserved = recoverPathOwnedStaleWorktrees({
+  projectRoot: project,
+  checkoutRoot: pkg,
+  runtimeRoot,
+});
+const midGit = probeWorktreeGit(tasksParent);
+if (!midGit.ok) {
+  console.log(JSON.stringify({
+    ok: false,
+    stage: 'worktree_git',
+    earlyGit,
+    midGit,
+    preserved,
+  }));
+  try { await client.cancelTask(started.taskId); } catch {}
+  client.close();
+  process.exit(1);
+}
+
 const finished = await client.awaitTask(started.taskId, 900_000);
 const classification =
   finished?.classification || finished?.result?.classification || null;
@@ -681,15 +817,15 @@ const durableTaskId =
 client.close();
 const classStr = String(classification || '');
 const okVerified = /^(VERIFIED|COMPLETE|PARTIALLY_VERIFIED)$/i.test(classStr);
-// Minimal projects (Klarapp) often have no admissible validation candidates.
-// Installed-product proof still requires a durable task id + commit/report evidence
-// from real engine work; reopen step asserts history/report survival.
-const okDurable = Boolean(durableTaskId) && (
-  okVerified ||
-  (Boolean(finished?.commitSha || finished?.result?.commitSha) && /NOT_VERIFIED|BLOCKED/i.test(classStr))
-);
+const blocked = /BLOCKED/i.test(classStr);
+const ok =
+  Boolean(durableTaskId) &&
+  okVerified &&
+  !blocked &&
+  midGit.ok === true &&
+  Array.isArray(preserved?.preservedLivePathWorktrees);
 console.log(JSON.stringify({
-  ok: okDurable,
+  ok,
   gatewayTaskId: started.taskId,
   taskId: durableTaskId,
   status: finished?.status || null,
@@ -697,11 +833,13 @@ console.log(JSON.stringify({
   taskBranch,
   commitSha: finished?.commitSha || finished?.result?.commitSha || null,
   exitCode: finished?.result?.exitCode ?? finished?.exitCode ?? null,
+  worktreeGit: midGit,
+  preservedLiveCount: (preserved?.preservedLivePathWorktrees || []).length,
   note: okVerified
-    ? 'verified'
-    : 'durable result on minimal project without validation candidates',
+    ? 'read-only assessment verified with healthy task worktree git'
+    : 'expected VERIFIED read-only completion, not BLOCKED',
 }));
-process.exit(okDurable ? 0 : 1);
+process.exit(ok ? 0 : 1);
 `,
 );
 

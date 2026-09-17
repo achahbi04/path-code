@@ -22,6 +22,7 @@ import {
   killProcessTree,
   registerProcess,
 } from "../process-registry.mjs";
+import { isReadOnlyAssessmentObjective } from "./task-worktree.mjs";
 
 /**
  * @typedef {"VERIFIED" | "PARTIALLY_VERIFIED" | "FAILED" | "NOT_VERIFIED"} Ag1ResultClass
@@ -133,6 +134,7 @@ function runPreparedRequest(request, signal) {
  *   worktreePath: string,
  *   engineeringCwd?: string,
  *   primaryRoot?: string,
+ *   objective?: string,
  *   signal?: AbortSignal,
  * }} input
  */
@@ -203,6 +205,17 @@ export async function runIndependentFinalValidation(input) {
   const checksToRun = selection.planned;
 
   if (!Array.isArray(checksToRun) || checksToRun.length === 0) {
+    // Read-only assessments on projects with no test/typecheck scripts (e.g.
+    // Klarapp) must not become BLOCKED solely for empty validation discovery.
+    if (isReadOnlyAssessmentObjective(String(input.objective || ""))) {
+      return {
+        classification: /** @type {Ag1ResultClass} */ ("VERIFIED"),
+        reason:
+          "Read-only assessment complete; no project validation candidates required.",
+        checks: [],
+        refused,
+      };
+    }
     return {
       classification: /** @type {Ag1ResultClass} */ ("NOT_VERIFIED"),
       reason: existsSync(packageJsonPath)

@@ -14,24 +14,28 @@ Use a real project (Klarapp). Confirm the installed product — not the PATH wor
 ## START
 7. `cd /Users/achahbi/Projects/Klarapp && pathcode`
 8. Living PATH Code surface opens; project shows Klarapp / branch context
+9. Confirm Terminal.app title stays on the PATH/Klarapp title (installed path reclaim after Copilot SDK/CLI turns)
 
 ## ENGINEERING
-9. Run one small real task (read-only is fine), e.g. assess README + package.json
-10. Confirm report/result appears; primary checkout untouched
+10. Run one small real task (read-only is fine), e.g. assess README + package.json
+11. Confirm report/result appears; primary checkout untouched
+12. Confirm task worktree git is healthy (no dangling `.git` gitdir; `git -C <task-worktree> status` works)
+13. Read-only assessments with no validation candidates should finish `VERIFIED`
 
 ## REOPEN
-11. `/exit`
-12. `pathcode` again from Klarapp
-13. `/history` shows the task; `/report <id>` opens it; `/prefs` still reflects saved model/autonomy
+14. `/exit`
+15. `pathcode` again from Klarapp
+16. `/history` shows the task; `/report <id>` opens it; `/prefs` still reflects saved model/autonomy
 
 ## RESULT LIFECYCLE
-14. `/inspect <id>` shows disposition/lifecycle
-15. Do not re-run destructive merge/discard/PR unless a regression appears (S2.2 already accepted)
+17. `/inspect <id>` shows disposition/lifecycle
+18. Do not re-run destructive merge/discard/PR unless a regression appears (S2.2 already accepted)
 
 ## HELP
-16. `/help` lists history/report/inspect/merge/discard/pr/prefs/model/autonomy/attach/exit
+19. `/help` lists history/report/inspect/merge/discard/pr/prefs/model/autonomy/attach/exit
 
 ## PARITY
-17. No prompt to use the PATH development checkout; doctor Install ≠ worktree
+20. No prompt to use the PATH development checkout; doctor Install ≠ worktree
 
-Evidence from automated proof: docs/reports/g10-evidence/s2/s23-installed-product-proof.json
+Evidence from automated proof: docs/reports/g10-evidence/s2/s23-installed-product-proof.json  
+Also: `s23-title-installed.txt` (title), proof `worktreeGit` / live `VERIFIED`.

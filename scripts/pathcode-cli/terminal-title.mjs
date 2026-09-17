@@ -326,15 +326,22 @@ function writeOwnedTitle() {
   const payload = `${OSC}0;${BEL}${OSC}2;${ownedTitle}${BEL}`;
   writingOwnedTitle = true;
   try {
-    try {
-      if (typeof process.stdout?.fd === "number") {
-        writeSync(process.stdout.fd, payload);
-        return;
-      }
-    } catch {
-      // fall through to stream write
-    }
     const stdout = ownedStdout ?? process.stdout;
+    // Custom stdout (tests / redirected sinks) must receive the OSC payload.
+    // Raw fd writes are only for the live process.stdout TTY path so stream
+    // guards cannot strip our own reassert sequences.
+    const useCustomStdout =
+      ownedStdout != null && ownedStdout !== process.stdout;
+    if (!useCustomStdout) {
+      try {
+        if (typeof process.stdout?.fd === "number") {
+          writeSync(process.stdout.fd, payload);
+          return;
+        }
+      } catch {
+        // fall through to stream write
+      }
+    }
     if (!stdout || typeof stdout.write !== "function") return;
     if (stdout === process.stdout && prevStdoutWrite) {
       prevStdoutWrite(payload);
@@ -360,16 +367,18 @@ export function restoreTerminalTitle(opts = {}) {
   writingOwnedTitle = true;
   try {
     try {
-      if (typeof process.stdout?.fd === "number") {
+      const stdout = opts.stdout ?? ownedStdout ?? process.stdout;
+      const useCustomStdout =
+        stdout != null &&
+        stdout !== process.stdout &&
+        typeof stdout.write === "function";
+      if (!useCustomStdout && typeof process.stdout?.fd === "number") {
         writeSync(process.stdout.fd, restorePayload);
-      } else {
-        const stdout = opts.stdout ?? ownedStdout ?? process.stdout;
-        if (stdout && typeof stdout.write === "function") {
-          if (stdout === process.stdout && prevStdoutWrite) {
-            prevStdoutWrite(restorePayload);
-          } else {
-            stdout.write(restorePayload);
-          }
+      } else if (stdout && typeof stdout.write === "function") {
+        if (stdout === process.stdout && prevStdoutWrite) {
+          prevStdoutWrite(restorePayload);
+        } else {
+          stdout.write(restorePayload);
         }
       }
     } catch {

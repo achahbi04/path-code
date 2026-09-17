@@ -1,4 +1,4 @@
-{"writeOk":true,"path":"/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/home/.path-code/preferences.json","modelId":"s23-installed-model","autonomy":"bounded"}
+{"writeOk":true,"path":"/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/home/.path-code/preferences.json","modelId":"s23-installed-model","autonomy":"bounded"}
 
 ---
-{"modelId":"s23-installed-model","autonomy":"bounded","path":"/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/home/.path-code/preferences.json","panelHasModel":true,"panelHasBounded":true}
+{"modelId":"s23-installed-model","autonomy":"bounded","path":"/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/home/.path-code/preferences.json","panelHasModel":true,"panelHasBounded":true}

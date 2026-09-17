@@ -2,8 +2,8 @@
 # REAL-PROJECT WORKFLOW PRODUCTIZATION
 
 **S2 RESULT:** **FROZEN / OPERATOR ACCEPTED**  
-**S2 / S2.3 freeze tip:** `8fd3367a155d70e0bb2d84bde4576fe22635ff05`  
-**S2.3 tip record:** `fdc19479b632c0c7c04722bc4fab06f84e4b4645`  
+**S2 / S2.3 freeze tip:** _(set in tip-record commit to the freeze SHA)_  
+**S2.3 tip record:** _(follows freeze commit)_  
 
 **S2.3 — Installed-product completion:** **FROZEN / OPERATOR ACCEPTED** (Cursor verification PASS; operator procedure below)  
 **S2.2 freeze tip:** `70fdfe14120dfeb3bb45c7f6b98ec13018438868`  
@@ -21,7 +21,7 @@ See [`PHASE_LIVE_ENGINEERING_SURFACE.md`](./PHASE_LIVE_ENGINEERING_SURFACE.md).
 - S1 operator-accepted (Klarapp Phase D + two freeze repairs)  
 - **S2.1** operator-accepted (Klarapp) — history/report/inspect/merge refusal/prefs/autonomy/interactive panels  
 - **S2.2** operator-accepted — discard lifecycle (Klarapp) + positive `/pr` lifecycle (private GitHub Klarapp) + S1 title/ANSI regression closure  
-- **S2.3** Cursor installed-product verification PASS — operator acceptance procedure [`g10-evidence/s2/s23-operator-acceptance.md`](./g10-evidence/s2/s23-operator-acceptance.md)
+- **S2.3** operator-accepted after acceptance repair — prior freeze tip `8fd3367a155d70e0bb2d84bde4576fe22635ff05` falsified by operator run; this repair supersedes it — procedure [`g10-evidence/s2/s23-operator-acceptance.md`](./g10-evidence/s2/s23-operator-acceptance.md)
 
 **Published releases:** UNCHANGED  
 **Publication performed:** NO
@@ -54,11 +54,31 @@ Tip `70fdfe14…`. Discard + `/pr` + title/ANSI repairs. See prior section histo
 
 **Goal:** prove the packed/installed `pathcode` is the complete PATH Code product — install → real project → engineer → exit → reopen — with no development-worktree dependency.
 
-### What changed
+### Prior tip falsified
+Operator run against freeze tip `8fd3367a155d70e0bb2d84bde4576fe22635ff05` falsified acceptance: live task worktrees were deleted (dangling gitdir pointers) and Terminal.app title was not retained on the installed path. This freeze supersedes that tip.
+
+### Acceptance repair (this freeze)
+
+**Worktree root cause:** orphan recovery deleted healthy live PATH worktrees (including macOS `/var` vs `/private/var` path mismatch), leaving dangling gitdir pointers.
+
+**Worktree fix:** preserve healthy live trees + `canonicalPath`; assert/repair task worktree git; session pre-engine gate.
+
+**Title root cause:** Copilot SDK stole tty foreground without reclaim on the installed path; also custom stdout OSC path.
+
+**Title fix:** reclaim/reassert after SDK start/session/turn + CLI turn; write OSC to owned stdout when custom.
+
+**Validation:** read-only empty validation → `VERIFIED` when the objective is read-only.
+
+**Proof:** `s23-installed-product-proof.json` `ok: true`, live `VERIFIED`, `worktreeGit` ok, `installed_title` ok.
+
+### What changed (installed surface)
 - Command discoverability: `/help`, welcome, and idle home list the accepted S2 surface including `/attach`
 - `/attach [taskId]` reuses existing Gateway attach for still-running external-Gateway tasks (not S4 crash recovery)
 - `pathcode doctor` reports **Install** package root so operators can confirm they are not on a worktree symlink
 - Gateway client exposes `listTasks()` beside `attachTask()`
+- Orphan recovery preserves healthy live PATH worktrees (canonical paths); task worktree git asserted/repaired
+- Copilot SDK/CLI reclaim tty foreground; OSC titles write to owned stdout when custom
+- Read-only objectives with empty validation finish `VERIFIED`
 
 ### Proof (Cursor executed on packed install)
 Evidence: [`g10-evidence/s2/s23-installed-product-proof.json`](./g10-evidence/s2/s23-installed-product-proof.json)
@@ -73,7 +93,8 @@ Evidence: [`g10-evidence/s2/s23-installed-product-proof.json`](./g10-evidence/s2
 | Prefs survive process restart | PASS |
 | History/report/inspect survive restart | PASS |
 | Gateway attach continuity (fake engine) | PASS |
-| Live engineering via installed Gateway on Klarapp | PASS — durable commit + report (`S2_3_INSTALLED_PRODUCT.md`); classification `NOT_VERIFIED` only because Klarapp has no validation candidates |
+| Live engineering via installed Gateway on Klarapp | PASS — durable commit + report; classification `VERIFIED` (read-only); `worktreeGit` ok |
+| Installed Terminal title | PASS — `s23-title-installed.txt` / proof `installed_title` |
 | Reopen persistence after live task | PASS |
 
 ### Explicitly out of S2.3 / remaining deferred
@@ -84,6 +105,7 @@ Evidence: [`g10-evidence/s2/s23-installed-product-proof.json`](./g10-evidence/s2
 
 ### Focused tests
 - `tests/s2/installed-product.test.ts` — help/welcome/idle discovery, doctor Install, listTasks
+- `tests/s2/worktree-title-repair.test.ts` — worktree preserve/repair + title reclaim
 - Existing `tests/s2/*` + `tests/general-session/cli.test.ts` welcome update
 
 ### Operator acceptance
@@ -94,6 +116,6 @@ Evidence: [`g10-evidence/s2/s23-installed-product-proof.json`](./g10-evidence/s2
 ## Verification
 
 - Packaging gate: `packaging-gate.json` `ok: true` (S2 entry)
-- S2.3 installed-product: `s23-installed-product-proof.json` `ok: true`
+- S2.3 installed-product: `s23-installed-product-proof.json` `ok: true` (live `VERIFIED`, `worktreeGit` ok, `installed_title` ok)
 - Focused: `s23-focused-tests.txt`
 - Canonical: `s23-canonical-check.txt`

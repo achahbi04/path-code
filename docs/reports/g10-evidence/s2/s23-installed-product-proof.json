@@ -1,6 +1,6 @@
 {
   "schema": "pathcode.s2.3.installed-product.v1",
-  "at": "2026-09-17T12:08:24.778Z",
+  "at": "2026-09-17T19:53:17.298Z",
   "checkout": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
   "s1FreezeTip": "eac5f8620fea8c75070cd27421643bb167864294",
   "s21FreezeTip": "a1bab1070d0f9bfd627fbbfdec6265a90b20a2c8",
@@ -14,7 +14,7 @@
     "npm_pack": {
       "ok": true,
       "tarball": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/s2/path-code-1.0.1.tgz",
-      "bytes": 770756
+      "bytes": 773727
     },
     "audit_release": {
       "ok": true,
@@ -22,13 +22,13 @@
     },
     "isolated_install": {
       "ok": true,
-      "binPath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/bin/pathcode",
-      "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code"
+      "binPath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/prefix/bin/pathcode",
+      "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/prefix/lib/node_modules/path-code"
     },
     "no_checkout_coupling": {
       "ok": true,
-      "binReal": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code/scripts/pathcode.mjs",
-      "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code"
+      "binReal": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/prefix/lib/node_modules/path-code/scripts/pathcode.mjs",
+      "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/prefix/lib/node_modules/path-code"
     },
     "version": {
       "ok": true,
@@ -38,12 +38,12 @@
       "ok": true,
       "status": 1,
       "installVisible": true,
-      "outHead": "PATH Code doctor\n\n  ✓ PATH Code      1.0.1\n  ✓ Install        /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code\n  ✓ Platform       macOS Apple Silicon\n  ✓ Node           Node.js 26.5.0\n  ✓ Git            git version 2.50.1 (Apple Git-155)\n  ✗ Runtime        PATH engine runtime not ready. PATH will attempt automatic repair on next startup.\n  ✓ Engineering    Google Cloud project configured (Vertex/ADC expected).\n  ✓ Project        /Users/achahbi/Projects/Klarapp\n  ✗ GitHub         Not authenticated — run: gh auth login (optional)\n"
+      "outHead": "PATH Code doctor\n\n  ✓ PATH Code      1.0.1\n  ✓ Install        /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/prefix/lib/node_modules/path-code\n  ✓ Platform       macOS Apple Silicon\n  ✓ Node           Node.js 26.5.0\n  ✓ Git            git version 2.50.1 (Apple Git-155)\n  ✗ Runtime        PATH engine runtime not ready. PATH will attempt automatic repair on next startup.\n  ✓ Engineering    Google Cloud project configured (Vertex/ADC expected).\n  ✓ Project        /Users/achahbi/Projects/Klarapp\n  ✗ GitHub         Not authenticated — run: gh auth login (optional)\n"
     },
     "bootstrap": {
       "ok": true,
       "status": 0,
-      "result": "{\"ok\":true,\"code\":null,\"message\":null,\"runtimeRoot\":\"/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/runtime\"}"
+      "result": "{\"ok\":true,\"code\":null,\"message\":null,\"runtimeRoot\":\"/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/runtime\"}"
     },
     "project_identity": {
       "ok": true,
@@ -175,21 +175,21 @@
       "ok": true,
       "write": {
         "writeOk": true,
-        "path": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/home/.path-code/preferences.json",
+        "path": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/home/.path-code/preferences.json",
         "modelId": "s23-installed-model",
         "autonomy": "bounded"
       },
       "reopen": {
         "modelId": "s23-installed-model",
         "autonomy": "bounded",
-        "path": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/home/.path-code/preferences.json",
+        "path": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/home/.path-code/preferences.json",
         "panelHasModel": true,
         "panelHasBounded": true
       }
     },
     "history_reopen": {
       "ok": true,
-      "taskId": "s23-hist-1a0af44f07d",
+      "taskId": "s23-hist-1a0b0eeb428",
       "found": true,
       "listingHas": true,
       "inspectHas": true,
@@ -203,25 +203,41 @@
     },
     "attach_continuity": {
       "ok": true,
-      "taskId": "928ba9bf-861e-4cc2-a7ac-cac8ba94211e",
+      "taskId": "5925a326-ec77-4b26-9ea3-bc00d811655e",
       "listed": [
         {
-          "id": "928ba9bf-861e-4cc2-a7ac-cac8ba94211e",
+          "id": "5925a326-ec77-4b26-9ea3-bc00d811655e",
           "status": "running"
         }
       ],
       "attached": true
     },
+    "installed_title": {
+      "ok": true,
+      "expected": "Klarapp — PATH Code",
+      "reclaimOk": false,
+      "ownedAfterRestore": false
+    },
     "live_engineering": {
       "ok": true,
-      "gatewayTaskId": "c97cc206-09f5-48b7-96a4-fc4bd9f821dd",
-      "taskId": "7d0bfa95-05b1-4a56-a08b-a27f78a10a8b",
-      "status": "failed",
-      "classification": "NOT_VERIFIED",
-      "taskBranch": "path/task-7d0bfa95-05b1-4a56-a08b-a27f78a10a8b",
-      "commitSha": "5e5fc2ff0c98effe093226443b1c410f44b5bfa0",
-      "exitCode": 1,
-      "note": "durable result on minimal project without validation candidates"
+      "gatewayTaskId": "7263cf2e-2e45-4c12-96b2-ca1caa489774",
+      "taskId": "aebeefe8-91d8-48a3-a7c3-79739b5adeb2",
+      "status": "completed",
+      "classification": "VERIFIED",
+      "taskBranch": "path/task-aebeefe8-91d8-48a3-a7c3-79739b5adeb2",
+      "commitSha": "862ada164a58cf42e42ef082c5ba942b1ed4ee70",
+      "exitCode": 0,
+      "worktreeGit": {
+        "ok": true,
+        "worktreePath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/live-runtime/ag1-tasks/aebeefe8-91d8-48a3-a7c3-79739b5adeb2",
+        "gitdir": "/Users/achahbi/Projects/Klarapp/.git/worktrees/aebeefe8-91d8-48a3-a7c3-79739b5adeb2",
+        "gitdirExists": true,
+        "toplevel": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/live-runtime/ag1-tasks/aebeefe8-91d8-48a3-a7c3-79739b5adeb2",
+        "branch": "path/task-aebeefe8-91d8-48a3-a7c3-79739b5adeb2",
+        "stderr": ""
+      },
+      "preservedLiveCount": 1,
+      "note": "read-only assessment verified with healthy task worktree git"
     },
     "live_reopen_persistence": {
       "ok": true,
@@ -232,16 +248,16 @@
       "prefsAutonomy": "bounded",
       "inspectHasId": true,
       "lifecycle": null,
-      "disposition": "FAILED",
+      "disposition": "VERIFIED",
       "historyIds": [
-        "7d0bfa95-05b1-4a56-a08b-a27f78a10a8b"
+        "aebeefe8-91d8-48a3-a7c3-79739b5adeb2"
       ]
     },
     "lifecycle_visibility": {
       "ok": true,
       "inspectHasId": true,
       "lifecycle": null,
-      "disposition": "FAILED",
+      "disposition": "VERIFIED",
       "note": "merge/discard/PR contracts unchanged from S2.2; not re-run destructively"
     }
   },
@@ -347,12 +363,12 @@
   "ok": true,
   "verdict": "PASS",
   "isolated": {
-    "home": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/home",
-    "prefix": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix",
-    "runtime": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/runtime",
-    "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code",
-    "bin": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/bin/pathcode",
-    "binReal": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code/scripts/pathcode.mjs",
-    "liveRuntime": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/live-runtime"
+    "home": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/home",
+    "prefix": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/prefix",
+    "runtime": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/runtime",
+    "packageRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/prefix/lib/node_modules/path-code",
+    "bin": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/prefix/bin/pathcode",
+    "binReal": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/prefix/lib/node_modules/path-code/scripts/pathcode.mjs",
+    "liveRuntime": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/live-runtime"
   }
 }

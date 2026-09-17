@@ -8,6 +8,10 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { detectCopilotCli, parseCopilotHelpFlags } from "../ag8/copilot.mjs";
+import {
+  reclaimTtyForeground,
+  reassertPathTitle,
+} from "../terminal-title.mjs";
 
 /** Tools / patterns that must never be granted for PATH collaborative turns. */
 const DENIED_TOOL_SPECS = Object.freeze([
@@ -207,6 +211,12 @@ export async function runCopilotEngineeringTurn(input) {
     cwd,
     maxBuffer: 8 * 1024 * 1024,
   });
+  try {
+    reclaimTtyForeground();
+    reassertPathTitle();
+  } catch {
+    /* ignore */
+  }
   const reported = listChangedFiles(cwd, env);
 
   const text = `${run.stdout || ""}${run.stderr || ""}`.trim();

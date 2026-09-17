@@ -961,16 +961,16 @@ npm notice 2.7kB scripts/pathcode-cli/ag1/auth-detect.mjs
 npm notice 13.2kB scripts/pathcode-cli/ag1/bridge-client.mjs
 npm notice 2.0kB scripts/pathcode-cli/ag1/cloud-env.mjs
 npm notice 2.0kB scripts/pathcode-cli/ag1/filebound-proof.mjs
-npm notice 9.9kB scripts/pathcode-cli/ag1/final-validation.mjs
+npm notice 10.4kB scripts/pathcode-cli/ag1/final-validation.mjs
 npm notice 3.1kB scripts/pathcode-cli/ag1/jsonl-parser.mjs
 npm notice 2.0kB scripts/pathcode-cli/ag1/noninteractive-env.mjs
 npm notice 38.4kB scripts/pathcode-cli/ag1/python/bridge_main.py
 npm notice 27B scripts/pathcode-cli/ag1/python/requirements.txt
 npm notice 9.6kB scripts/pathcode-cli/ag1/runtime-bootstrap.mjs
 npm notice 8.4kB scripts/pathcode-cli/ag1/sandbox-proof.mjs
-npm notice 60.1kB scripts/pathcode-cli/ag1/session.mjs
+npm notice 61.2kB scripts/pathcode-cli/ag1/session.mjs
 npm notice 3.4kB scripts/pathcode-cli/ag1/task-commit.mjs
-npm notice 27.7kB scripts/pathcode-cli/ag1/task-worktree.mjs
+npm notice 34.3kB scripts/pathcode-cli/ag1/task-worktree.mjs
 npm notice 6.4kB scripts/pathcode-cli/ag1/venv-guard.mjs
 npm notice 471B scripts/pathcode-cli/ag4/approval-keys.mjs
 npm notice 1.3kB scripts/pathcode-cli/ag4/credential-isolation.mjs
@@ -981,7 +981,7 @@ npm notice 8.0kB scripts/pathcode-cli/ag4/publish.mjs
 npm notice 7.9kB scripts/pathcode-cli/ag4/remote.mjs
 npm notice 5.1kB scripts/pathcode-cli/ag5/doctor.mjs
 npm notice 12.6kB scripts/pathcode-cli/ag5/native-validation.mjs
-npm notice 5.1kB scripts/pathcode-cli/ag5/orphan-recovery.mjs
+npm notice 7.9kB scripts/pathcode-cli/ag5/orphan-recovery.mjs
 npm notice 2.2kB scripts/pathcode-cli/ag5/project-env.mjs
 npm notice 2.8kB scripts/pathcode-cli/ag6/platform.mjs
 npm notice 4.8kB scripts/pathcode-cli/ag7/diff-preview.mjs
@@ -995,7 +995,7 @@ npm notice 4.5kB scripts/pathcode-cli/ag8/repair.mjs
 npm notice 9.6kB scripts/pathcode-cli/ag9/affected.mjs
 npm notice 2.3kB scripts/pathcode-cli/ag9/backends.mjs
 npm notice 6.2kB scripts/pathcode-cli/ag9/collaborate.mjs
-npm notice 6.7kB scripts/pathcode-cli/ag9/copilot-engine.mjs
+npm notice 6.9kB scripts/pathcode-cli/ag9/copilot-engine.mjs
 npm notice 6.5kB scripts/pathcode-cli/ag9/copilot-lsp.mjs
 npm notice 3.0kB scripts/pathcode-cli/ag9/envelope.mjs
 npm notice 1.9kB scripts/pathcode-cli/ag9/index.mjs
@@ -1014,7 +1014,7 @@ npm notice 2.7kB scripts/pathcode-cli/ag9/seam.mjs
 npm notice 9.1kB scripts/pathcode-cli/ag9/services.mjs
 npm notice 13.8kB scripts/pathcode-cli/ag9/versions.mjs
 npm notice 6.5kB scripts/pathcode-cli/ag10/ag-session.mjs
-npm notice 15.6kB scripts/pathcode-cli/ag10/copilot-sdk.mjs
+npm notice 16.4kB scripts/pathcode-cli/ag10/copilot-sdk.mjs
 npm notice 18.4kB scripts/pathcode-cli/ag10/events.mjs
 npm notice 121B scripts/pathcode-cli/ag10/fabric.mjs
 npm notice 10.4kB scripts/pathcode-cli/ag10/guards.mjs
@@ -1060,7 +1060,7 @@ npm notice 979B scripts/pathcode-cli/task-control.mjs
 npm notice 14.9kB scripts/pathcode-cli/task-history.mjs
 npm notice 3.7kB scripts/pathcode-cli/task-trace.mjs
 npm notice 3.5kB scripts/pathcode-cli/terminal-restore.mjs
-npm notice 12.0kB scripts/pathcode-cli/terminal-title.mjs
+npm notice 12.5kB scripts/pathcode-cli/terminal-title.mjs
 npm notice 24.8kB scripts/pathcode-cli/terminal.mjs
 npm notice 26.5kB scripts/pathcode-cli/trial.mjs
 npm notice 16.7kB scripts/pathcode-cli/validation-candidates.mjs
@@ -1069,9 +1069,9 @@ npm notice Tarball Details
 npm notice name: path-code
 npm notice version: 1.0.1
 npm notice filename: path-code-1.0.1.tgz
-npm notice package size: 770.8 kB
+npm notice package size: 773.7 kB
 npm notice unpacked size: 3.6 MB
-npm notice shasum: b2c76fe0bb406bcfc1f4c074b72d02f663742029
-npm notice integrity: sha512-yxSjIPYII+M11[...]lSI1UgVtfnjRw==
+npm notice shasum: 968cf5a88ce12ffd8316ab81bc5a4bfc2f7b3c15
+npm notice integrity: sha512-6TY/wkZqQjcwy[...]1NdnvBwzU6i4g==
 npm notice total files: 1061
 npm notice

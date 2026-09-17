@@ -334,30 +334,6 @@
 [2K
 [2K
 [2K
-[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K                                 PATH  ●  Code
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
-[2K
 [J]0;]2;Klarapp — PATH Code[?2004l[?1000l[?1006l[?1007l[?1015lPATH * Code
 
 Local autonomous engineering for a Git project. PATH works in an isolated
@@ -412,6 +388,30 @@ Notes:
   - External Gateway (PATHCODE_GATEWAY_EXTERNAL=1): disconnect ≠ cancel;
     use /attach to rejoin a still-running task (not crash recovery)
 [?2004h[?1000h[?1006h[?1007h]7878;path-idle-composer#5[?25l[H[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K                                 PATH  ●  Code
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[2K
+[J]0;]2;Klarapp — PATH Code#5[?25l[H[2K
 [2K
 [2K
 [2K
@@ -538,10 +538,10 @@ Notes:
 [2K
 [2KDurable task history (1 shown, newest first)
 [2K
-[2KtaskId  s23-hist-1a0af44f07d
+[2KtaskId  s23-hist-1a0b0eeb428
 [2K  project   Klarapp
 [2K  lifecycle VERIFIED · adoptable
-[2K  when      2026-09-17 12:08:45Z
+[2K  when      2026-09-17 19:53:48Z
 [2K  result    1 file(s) changed · report on disk
 [2K  asked     S2.3 installed-product history reopen probe
 [2K
@@ -555,7 +555,7 @@ Notes:
 [2K────────────────────────────────────────────────────────────────────────────────
 [2K■ idle   auto · Klarapp
 [2K
-[J]0;]2;Klarapp — PATH Code[?25l[?2004h[?1000h[?1006h[?1007h]7878;path-idle-composer#5[?25l]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code[?2004l[?1000l[?1006l[?1007l[?1015l#5[?25l[H[2KPATH ● Code
+[J]0;]2;Klarapp — PATH Code[?25l[?2004h[?1000h[?1006h[?1007h]7878;path-idle-composer#5[?25l]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code[?2004l[?1000l[?1006l[?1007l[?1015l#5[?25l[H[2KPATH ● Code
 [2K
 [2KPATH · command
 [2KComposer ready below — type next command · Esc closes
@@ -566,7 +566,7 @@ Notes:
 [2K            source: session
 [2K  autonomy  bounded
 [2K            source: session
-[2K  file      /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-R…[0m
+[2K  file      /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-a…[0m
 [2K
 [2KChange with:
 [2K  /model <id>
@@ -579,5 +579,5 @@ Notes:
 [2K■ idle   auto · Klarapp
 [2K
 [2K
-[J]0;]2;Klarapp — PATH Code[?25l[?2004h[?1000h[?1006h[?1007h]7878;path-idle-composer#5[?25l]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code[?2004l[?1000l[?1006l[?1007l[?1015l#5[?25l]0;]2;Klarapp — PATH Code[?25h[?1049l[0m[?2004l]0;]2;Goodbye.
+[J]0;]2;Klarapp — PATH Code[?25l[?2004h[?1000h[?1006h[?1007h]7878;path-idle-composer]0;]2;Klarapp — PATH Code#5[?25l]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code]0;]2;Klarapp — PATH Code[?2004l[?1000l[?1006l[?1007l[?1015l#5[?25l]0;]2;Klarapp — PATH Code[?25h[?1049l[0m[?2004l]0;]2;Goodbye.
 [?2004l[?25h[?1049l[0m[?2004l

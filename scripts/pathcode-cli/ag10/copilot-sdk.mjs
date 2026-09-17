@@ -12,6 +12,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mapCopilotSdkEvent, toSessionEvent } from "./events.mjs";
 import { whichBinary } from "../ag8/discover.mjs";
+import {
+  reclaimTtyForeground,
+  reassertPathTitle,
+} from "../terminal-title.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(HERE, "../../..");
@@ -232,6 +236,14 @@ export async function createCopilotEngine(options) {
     if (cliPath) process.env.COPILOT_CLI_PATH = cliPath;
     try {
       await nextClient.start();
+      // Copilot runtime steals tty foreground → Terminal.app appends "copilot"
+      // / TMPDIR=... onto the window title. Reclaim immediately after spawn.
+      try {
+        reclaimTtyForeground();
+        reassertPathTitle();
+      } catch {
+        /* ignore */
+      }
     } catch (err) {
       try {
         await nextClient.stop();
@@ -291,6 +303,12 @@ export async function createCopilotEngine(options) {
       session = nextSession;
       activeSessionId = nextSession.sessionId || baseConfig.sessionId;
       mode = "native_sdk";
+      try {
+        reclaimTtyForeground();
+        reassertPathTitle();
+      } catch {
+        /* ignore */
+      }
       return { ok: true, resumed, sessionId: activeSessionId };
     } catch (err) {
       try {
@@ -437,6 +455,12 @@ export async function createCopilotEngine(options) {
           { prompt: turn.prompt },
           typeof turn.timeoutMs === "number" ? turn.timeoutMs : 300_000,
         );
+        try {
+          reclaimTtyForeground();
+          reassertPathTitle();
+        } catch {
+          /* ignore */
+        }
         const text =
           typeof response?.data?.content === "string"
             ? response.data.content
@@ -450,6 +474,12 @@ export async function createCopilotEngine(options) {
           changedFiles: [],
         };
       } catch (err) {
+        try {
+          reclaimTtyForeground();
+          reassertPathTitle();
+        } catch {
+          /* ignore */
+        }
         const classified = classifyCopilotFailure(err);
         // Attempt CLI fallback for this turn without destroying task.
         if (classified.code === "AUTH_REQUIRED") {

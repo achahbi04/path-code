@@ -1,0 +1,47 @@
+[s23] PASS project_preflight
+[s23] PASS npm_pack
+[s23] PASS audit_release
+[s23] PASS isolated_install
+[s23] PASS no_checkout_coupling
+[s23] PASS version
+[s23] PASS doctor
+[s23] PASS bootstrap
+[s23] PASS project_identity
+[s23] PASS help_discoverability
+[s23] PASS parity_matrix
+[s23] PASS prefs_reopen
+[s23] PASS history_reopen
+[s23] PASS pty_command_surface
+[s23] PASS attach_continuity
+[s23] PASS installed_title
+[s23] starting LIVE installed-product engineering task on Klarapp…
+[s23] PASS live_engineering
+[s23] PASS live_reopen_persistence
+[s23] PASS lifecycle_visibility
+{
+  "ok": true,
+  "verdict": "PASS",
+  "steps": [
+    "project_preflight",
+    "npm_pack",
+    "audit_release",
+    "isolated_install",
+    "no_checkout_coupling",
+    "version",
+    "doctor",
+    "bootstrap",
+    "project_identity",
+    "help_discoverability",
+    "parity_matrix",
+    "prefs_reopen",
+    "history_reopen",
+    "pty_command_surface",
+    "attach_continuity",
+    "installed_title",
+    "live_engineering",
+    "live_reopen_persistence",
+    "lifecycle_visibility"
+  ],
+  "liveTaskId": "aebeefe8-91d8-48a3-a7c3-79739b5adeb2",
+  "evidence": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/g10-evidence/s2/s23-installed-product-proof.json"
+}

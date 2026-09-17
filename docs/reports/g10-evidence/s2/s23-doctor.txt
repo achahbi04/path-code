@@ -1,7 +1,7 @@
 PATH Code doctor
 
   ✓ PATH Code      1.0.1
-  ✓ Install        /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-RP6oLr/prefix/lib/node_modules/path-code
+  ✓ Install        /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s23-iso-aff6HC/prefix/lib/node_modules/path-code
   ✓ Platform       macOS Apple Silicon
   ✓ Node           Node.js 26.5.0
   ✓ Git            git version 2.50.1 (Apple Git-155)

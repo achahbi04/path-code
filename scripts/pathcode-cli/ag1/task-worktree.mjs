@@ -2,7 +2,15 @@
  * AG1/AG2 — isolated Git task worktree (primary checkout must remain untouched).
  */
 
-import { mkdirSync, existsSync, rmSync, readFileSync, copyFileSync, statSync } from "node:fs";
+import {
+  mkdirSync,
+  existsSync,
+  rmSync,
+  readFileSync,
+  copyFileSync,
+  realpathSync,
+  statSync,
+} from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -362,6 +370,19 @@ export function createTaskWorktree(input) {
     };
   }
 
+  const healthy = assertTaskWorktreeGitHealthy(worktreePath, primaryRoot);
+  if (!healthy.ok) {
+    git(primaryRoot, ["worktree", "remove", "--force", worktreePath]);
+    git(primaryRoot, ["branch", "-D", taskBranch]);
+    return {
+      ok: false,
+      code: healthy.code || "AG1_WORKTREE_GIT_UNHEALTHY",
+      message:
+        healthy.message ||
+        `Task worktree Git linkage is invalid after create: ${worktreePath}`,
+    };
+  }
+
   /** @type {{ ok: true, adoptedTracked: boolean, adoptedUntracked: number } | null} */
   let adopted = null;
   const shouldAdopt =
@@ -394,11 +415,20 @@ export function createTaskWorktree(input) {
     };
   }
 
+  let resolvedWorktree = resolve(worktreePath);
+  try {
+    if (existsSync(resolvedWorktree)) {
+      resolvedWorktree = realpathSync(resolvedWorktree);
+    }
+  } catch {
+    // keep resolve() result
+  }
+
   return {
     ok: true,
     taskId,
     taskBranch,
-    worktreePath: resolve(worktreePath),
+    worktreePath: resolvedWorktree,
     baseline: {
       head: baselineCommit,
       branch: before.branch,
@@ -407,6 +437,170 @@ export function createTaskWorktree(input) {
     primaryBefore: before,
     adoptedWorkingTree: adopted,
     bootstrapMode: null,
+  };
+}
+
+/**
+ * True when a task worktree's `.git` linkage is valid and ordinary Git commands
+ * succeed (`rev-parse --show-toplevel`, branch when attached).
+ *
+ * @param {string} worktreePath
+ * @param {string} [primaryRoot]
+ * @returns {{
+ *   ok: boolean,
+ *   code?: string,
+ *   message?: string,
+ *   toplevel?: string,
+ *   branch?: string | null,
+ *   gitdir?: string | null,
+ * }}
+ */
+export function assertTaskWorktreeGitHealthy(worktreePath, primaryRoot) {
+  const root = resolve(worktreePath);
+  if (!existsSync(root)) {
+    return {
+      ok: false,
+      code: "AG1_WORKTREE_MISSING",
+      message: `Task worktree path missing: ${root}`,
+    };
+  }
+  const dotGit = join(root, ".git");
+  /** @type {string | null} */
+  let gitdir = null;
+  try {
+    const st = statSync(dotGit);
+    if (st.isFile()) {
+      const text = readFileSync(dotGit, "utf8");
+      const match = /^gitdir:\s*(.+?)\s*$/m.exec(text);
+      if (!match) {
+        return {
+          ok: false,
+          code: "AG1_WORKTREE_GITDIR_MALFORMED",
+          message: `Task worktree .git pointer is malformed: ${dotGit}`,
+        };
+      }
+      const target = match[1];
+      gitdir = target.startsWith("/") ? target : resolve(root, target);
+      if (!existsSync(gitdir)) {
+        // Best-effort repair before declaring failure.
+        if (typeof primaryRoot === "string" && primaryRoot) {
+          const repaired = repairTaskWorktreeGit(primaryRoot, root);
+          if (repaired.ok) {
+            return assertTaskWorktreeGitHealthy(root);
+          }
+        }
+        return {
+          ok: false,
+          code: "AG1_WORKTREE_GITDIR_MISSING",
+          message:
+            `Task worktree .git points at missing admin metadata: ${gitdir}`,
+          gitdir,
+        };
+      }
+    } else if (!st.isDirectory()) {
+      return {
+        ok: false,
+        code: "AG1_WORKTREE_GIT_MISSING",
+        message: `Task worktree has no usable .git: ${dotGit}`,
+      };
+    }
+  } catch {
+    return {
+      ok: false,
+      code: "AG1_WORKTREE_GIT_MISSING",
+      message: `Task worktree .git unreadable: ${dotGit}`,
+    };
+  }
+
+  const inside = git(root, ["rev-parse", "--is-inside-work-tree"]);
+  if (inside.status !== 0 || inside.stdout.trim() !== "true") {
+    return {
+      ok: false,
+      code: "AG1_WORKTREE_NOT_GIT",
+      message:
+        inside.stderr ||
+        inside.stdout ||
+        `fatal: not a git repository: ${root}`,
+      gitdir,
+    };
+  }
+  const toplevel = git(root, ["rev-parse", "--show-toplevel"]);
+  if (toplevel.status !== 0 || !toplevel.stdout.trim()) {
+    return {
+      ok: false,
+      code: "AG1_WORKTREE_TOPLEVEL_FAILED",
+      message:
+        toplevel.stderr ||
+        toplevel.stdout ||
+        `git rev-parse --show-toplevel failed in ${root}`,
+      gitdir,
+    };
+  }
+  const branch = git(root, ["branch", "--show-current"]);
+  return {
+    ok: true,
+    toplevel: toplevel.stdout.trim(),
+    branch: branch.status === 0 ? branch.stdout.trim() || null : null,
+    gitdir,
+  };
+}
+
+/**
+ * Attempt `git worktree repair` when a linked worktree directory still exists
+ * but admin metadata was removed while engines held the tree open.
+ *
+ * @param {string} primaryRoot
+ * @param {string} worktreePath
+ */
+export function repairTaskWorktreeGit(primaryRoot, worktreePath) {
+  const primary = resolve(primaryRoot);
+  const target = resolve(worktreePath);
+  if (!existsSync(target)) {
+    return { ok: false, code: "MISSING", message: "worktree path missing" };
+  }
+  const repair = git(primary, ["worktree", "repair", target]);
+  if (repair.status === 0) {
+    const check = assertTaskWorktreeGitHealthy(target);
+    if (check.ok) return { ok: true, repaired: true, ...check };
+  }
+  // Older Git without repair — try prune + re-add if branch still exists.
+  git(primary, ["worktree", "prune"]);
+  const branch = git(target, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  // Branch probe may fail if gitdir is broken; discover from path basename.
+  const base = target.split(/[/\\]/).filter(Boolean).pop() || "";
+  const guessed = base ? `path/task-${base}` : "";
+  const candidates = [
+    branch.status === 0 ? branch.stdout.trim() : "",
+    guessed,
+  ].filter(Boolean);
+  for (const taskBranch of candidates) {
+    const exists = git(primary, [
+      "show-ref",
+      "--verify",
+      "--quiet",
+      `refs/heads/${taskBranch}`,
+    ]);
+    if (exists.status !== 0) continue;
+    // Remove broken checkout dir contents carefully: only if .git is a pointer file.
+    try {
+      const dotGit = join(target, ".git");
+      if (existsSync(dotGit) && statSync(dotGit).isFile()) {
+        rmSync(target, { recursive: true, force: true });
+      }
+    } catch {
+      // fall through
+    }
+    if (existsSync(target)) continue;
+    const add = git(primary, ["worktree", "add", target, taskBranch]);
+    if (add.status === 0) {
+      const check = assertTaskWorktreeGitHealthy(target);
+      if (check.ok) return { ok: true, repaired: true, readded: true, ...check };
+    }
+  }
+  return {
+    ok: false,
+    code: "REPAIR_FAILED",
+    message: repair.stderr || repair.stdout || "git worktree repair failed",
   };
 }
 
@@ -691,6 +885,19 @@ export function reopenTaskWorktree(input) {
   }
 
   if (existsSync(worktreePath)) {
+    const health = assertTaskWorktreeGitHealthy(worktreePath, primaryRoot);
+    if (!health.ok) {
+      const repaired = repairTaskWorktreeGit(primaryRoot, worktreePath);
+      if (!repaired.ok) {
+        return {
+          ok: false,
+          code: health.code || "G10_RESUME_WORKTREE_UNHEALTHY",
+          message:
+            health.message ||
+            `Existing task worktree Git linkage is invalid: ${worktreePath}`,
+        };
+      }
+    }
     const head = git(worktreePath, ["rev-parse", "HEAD"]);
     const branch = git(worktreePath, ["rev-parse", "--abbrev-ref", "HEAD"]);
     return {
@@ -787,6 +994,15 @@ export function removeTaskWorktree(primaryRoot, worktreePath, opts = {}) {
   const before = capturePrimaryFingerprint(primaryRoot);
   const rm = git(primaryRoot, ["worktree", "remove", "--force", worktreePath]);
   if (rm.status !== 0 && existsSync(worktreePath)) {
+    try {
+      rmSync(worktreePath, { recursive: true, force: true });
+    } catch {
+      // leave inspectable
+    }
+  }
+  // If git removed admin metadata but left a directory with a dangling gitdir
+  // pointer, force-remove the broken checkout so we never strand engines on it.
+  if (existsSync(worktreePath) && !assertTaskWorktreeGitHealthy(worktreePath).ok) {
     try {
       rmSync(worktreePath, { recursive: true, force: true });
     } catch {
