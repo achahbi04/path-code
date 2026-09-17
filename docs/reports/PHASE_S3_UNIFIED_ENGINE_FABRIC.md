@@ -2,7 +2,7 @@
 # UNIFIED ENGINE FABRIC
 
 **S3 RESULT:** **S3.1 LIVE-VERIFIED** (operator acceptance pending)  
-**S3.1 live checkpoint tip:** _(set at commit)_  
+**S3.1 live checkpoint tip:** `c0dc3ace91118d63cce0de0a6490e8df62182925`  
 **S3.1 implementation checkpoint:** `20c3138255526758c1c276eed0353ece6ca97545`  
 **S2 freeze tip preserved:** `67200c1551d7dc6beee9bafb495d133ec11dc0ba`  
 **S2.3 tip record:** `6dd7d31e38fe6436ffd55ade3f63a46b2c24166c`  
