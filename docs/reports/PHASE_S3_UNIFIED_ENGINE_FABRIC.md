@@ -2,6 +2,7 @@
 # UNIFIED ENGINE FABRIC
 
 **S3 RESULT:** **S3.1 MECHANICALLY TESTED** (operator acceptance pending)  
+**S3.1 implementation checkpoint:** `20c3138255526758c1c276eed0353ece6ca97545`  
 **S2 freeze tip preserved:** `67200c1551d7dc6beee9bafb495d133ec11dc0ba`  
 **S2.3 tip record:** `6dd7d31e38fe6436ffd55ade3f63a46b2c24166c`  
 **S1:** FROZEN / OPERATOR ACCEPTED — tip `eac5f8620fea8c75070cd27421643bb167864294` — **do not reopen**
