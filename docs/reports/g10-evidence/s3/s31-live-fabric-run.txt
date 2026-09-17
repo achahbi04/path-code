@@ -1,0 +1,13 @@
+{
+  "verdict": "LIVE-VERIFIED",
+  "cases": {
+    "detect": true,
+    "directTurn": true,
+    "gatewayCaps": true,
+    "gatewayStart": true,
+    "gatewaySteer": true,
+    "gatewayCursorTask": true,
+    "gatewayHistory": true,
+    "cancel": true
+  }
+}

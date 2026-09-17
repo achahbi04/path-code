@@ -1,0 +1,9 @@
+{
+  "status": {
+    "status": "logged-out"
+  },
+  "authPath": "/Users/achahbi/.cursor/sdk/auth.json",
+  "authFileExists": false,
+  "envHasCursorApiKey": false,
+  "envHasPathCursorApiKey": false
+}

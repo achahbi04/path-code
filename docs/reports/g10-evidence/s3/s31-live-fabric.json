@@ -1,0 +1,120 @@
+{
+  "schema": "pathcode.s3.engine-fabric.live.v1",
+  "at": "2026-09-17T22:52:14.051Z",
+  "note": "S3.1 LIVE fabric proof. S2 freeze tip preserved. S4 not started.",
+  "cases": {
+    "detect": {
+      "ok": true,
+      "status": "ready",
+      "evidence": [
+        "CURSOR_API_KEY present",
+        "@cursor/sdk Agent export available",
+        "model composer-2.5"
+      ]
+    },
+    "directTurn": {
+      "ok": true,
+      "turnOk": true,
+      "markOk": true,
+      "engine": "cursor",
+      "mode": "native_sdk",
+      "sessionId": "agent-b439edec-caa6-4f37-982d-51da1a527e4f",
+      "runId": "run-629b5b82-01f3-4303-a805-a7bc06648af0",
+      "changedFiles": [
+        "S31_CURSOR_MARK.txt"
+      ],
+      "eventTypes": [
+        "session.capability.collaborate",
+        "session.engineering.activity",
+        "session.engineering.tool",
+        "session.engineering.narration"
+      ],
+      "text": "done",
+      "detail": "Cursor SDK turn completed",
+      "code": null
+    },
+    "gatewayCaps": {
+      "ok": true,
+      "cursorStatus": "available"
+    },
+    "gatewayStart": {
+      "ok": true,
+      "taskId": "0184131a-adf2-443e-92cf-60216dae3048",
+      "preferredEngine": null
+    },
+    "gatewaySteer": {
+      "ok": true,
+      "code": null,
+      "detail": null
+    },
+    "gatewayCursorTask": {
+      "ok": true,
+      "status": "completed",
+      "classification": "VERIFIED",
+      "worktreePath": null,
+      "provenance": "cursor",
+      "routingEventCount": 14,
+      "eventSample": [
+        {
+          "type": "session.capability.collaborate",
+          "engine": "cursor",
+          "detail": "preferred engine: cursor"
+        },
+        {
+          "type": "session.capability.collaborate",
+          "engine": "cursor",
+          "detail": "Cursor SDK local session ready"
+        },
+        {
+          "type": "session.capability.collaborate",
+          "engine": "cursor",
+          "detail": "preferred Cursor engine taking the primary turn"
+        },
+        {
+          "type": "session.capability.collaborate",
+          "engine": "cursor",
+          "detail": "continuing repair in the task workspace"
+        },
+        {
+          "type": "session.engineering.activity",
+          "engine": null,
+          "detail": "I will append 'gateway-cursor'"
+        },
+        {
+          "type": "session.engineering.activity",
+          "engine": null,
+          "detail": "to S31_CURSOR_MARK.txt"
+        },
+        {
+          "type": "session.engineering.activity",
+          "engine": null,
+          "detail": "S31_CURSOR_MARK.txt"
+        },
+        {
+          "type": "session.engineering.activity",
+          "engine": null,
+          "detail": "one line: \"cursor-fabric-ok\"."
+        }
+      ],
+      "resultDetail": "",
+      "primaryDone": true,
+      "completedOk": true
+    },
+    "gatewayHistory": {
+      "ok": true,
+      "checkpointFiles": [],
+      "taskId": "0184131a-adf2-443e-92cf-60216dae3048",
+      "engine": "cursor",
+      "preferredEngine": "cursor",
+      "classification": "VERIFIED",
+      "commitSha": "b950b7e8e055d64d6fff87da76c5c06fb7d80028"
+    },
+    "cancel": {
+      "ok": true,
+      "code": "CANCELLED",
+      "detail": "Cursor run cancelled",
+      "engine": "cursor"
+    }
+  },
+  "verdict": "LIVE-VERIFIED"
+}

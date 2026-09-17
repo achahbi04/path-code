@@ -1,0 +1,21 @@
+{
+  "keychain": {
+    "ok": false,
+    "reason": "security: SecKeychainItemModifyContent: UNIX[Operation not permitted]\nsecurity: SecKeychainItemCreateFromContent (<default>): UNIX[Operation not permitted]\n"
+  },
+  "resolvedLen": 69,
+  "resolvedPrefix": "crsr_a36",
+  "detect": {
+    "status": "ready",
+    "ready": true,
+    "reason": null,
+    "evidence": [
+      "CURSOR_API_KEY present",
+      "@cursor/sdk Agent export available",
+      "model composer-2.5"
+    ],
+    "model": {
+      "id": "composer-2.5"
+    }
+  }
+}

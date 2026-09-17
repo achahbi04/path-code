@@ -28,6 +28,7 @@ describe("S3.1 cursor executor", () => {
     const env = { ...process.env };
     delete env.CURSOR_API_KEY;
     delete env.PATHCODE_CURSOR_API_KEY;
+    delete env.PATH_CURSOR_API_KEY;
     const detected = await detectCursorEngine({ env });
     expect(detected.ready).toBe(false);
     expect(detected.reason).toBe("auth_required");

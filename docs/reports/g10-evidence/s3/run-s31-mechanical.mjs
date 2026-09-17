@@ -54,7 +54,15 @@ function initDisposableRepo(dir) {
   writeFileSync(join(dir, "README.md"), "s31 live fixture\n");
   writeFileSync(
     join(dir, "package.json"),
-    `${JSON.stringify({ name: "s31-live-fixture", private: true }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        name: "s31-live-fixture",
+        private: true,
+        scripts: { test: 'node -e "process.exit(0)"' },
+      },
+      null,
+      2,
+    )}\n`,
   );
   git(dir, ["add", "."]);
   git(dir, ["commit", "-m", "init"]);
@@ -170,12 +178,12 @@ if (hasKey && loaded.ok) {
       // Prefer Agent.prompt when present; fall back to create+send.
       if (typeof sdk.Agent?.prompt === "function") {
         liveApi = "Agent.prompt";
+        // Signature is Agent.prompt(text, options) — not a single options bag.
         const prompted = await Promise.race([
-          sdk.Agent.prompt({
+          sdk.Agent.prompt("Reply with exactly: ok. Do not modify files.", {
             apiKey,
             model: { id: process.env.PATHCODE_CURSOR_MODEL || "composer-2.5" },
             local: { cwd: liveFixtureRoot },
-            prompt: "Reply with exactly: ok. Do not modify files.",
           }),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error("live_timeout")), 90_000),
@@ -186,14 +194,18 @@ if (hasKey && loaded.ok) {
           prompted?.result || prompted?.status || "done",
         ).slice(0, 200);
       } else {
+        const model = {
+          id: process.env.PATHCODE_CURSOR_MODEL || "composer-2.5",
+        };
         const agent = await sdk.Agent.create({
           apiKey,
-          model: { id: process.env.PATHCODE_CURSOR_MODEL || "composer-2.5" },
+          model,
           local: { cwd: liveFixtureRoot },
         });
         try {
           const run = await agent.send(
             "Reply with exactly: ok. Do not modify files.",
+            { model },
           );
           const waited =
             typeof run.wait === "function"

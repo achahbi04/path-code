@@ -1,7 +1,8 @@
 # PATH CODE — S3
 # UNIFIED ENGINE FABRIC
 
-**S3 RESULT:** **S3.1 MECHANICALLY TESTED** (operator acceptance pending)  
+**S3 RESULT:** **S3.1 LIVE-VERIFIED** (operator acceptance pending)  
+**S3.1 live checkpoint tip:** _(set at commit)_  
 **S3.1 implementation checkpoint:** `20c3138255526758c1c276eed0353ece6ca97545`  
 **S2 freeze tip preserved:** `67200c1551d7dc6beee9bafb495d133ec11dc0ba`  
 **S2.3 tip record:** `6dd7d31e38fe6436ffd55ade3f63a46b2c24166c`  
@@ -23,8 +24,9 @@ See [`PHASE_S2_PRODUCTIZATION.md`](./PHASE_S2_PRODUCTIZATION.md).
 - Cursor SDK local executor (`@cursor/sdk`) against the PATH task worktree
 - Event mapping (`mapCursorSdkEvent`) into the G10 → session cockpit path
 - Collaborative repair + preferred-engine primary turn (skip AG `startTask` when Cursor preferred+ready+ok)
+- Steering continues on the owning peer (Cursor primary → Cursor continue, not forced AG rehydrate)
 - Gateway `listCapabilities` honesty (no `slot_reserved` for Cursor when probe is honest)
-- Mechanical tests + pack-free evidence harness
+- Mechanical + **LIVE** evidence against a real Cursor SDK session
 
 **Out of scope for S3.1 / S4 not started:**
 - Crash-safe multi-engine resume productization beyond existing G10 checkpoints
@@ -38,8 +40,9 @@ See [`PHASE_S2_PRODUCTIZATION.md`](./PHASE_S2_PRODUCTIZATION.md).
 
 - S1/S2 Gateway previously listed Cursor as `slot_reserved` — a placeholder, not a live executor.
 - G10 fabric already had Copilot attach + collab turns + mutation leases; Cursor mirrors that path.
-- Official `@cursor/sdk` is an optional dependency; readiness is API-key + SDK resolve (and attach for live turns).
+- Official `@cursor/sdk` is an optional dependency; readiness is API-key / `Cursor.auth.login` store + SDK resolve (and attach for live turns).
 - Collaboration selection is capability-aware rotation via `selectEngineForTurn` — preference and continuity are opt-in, not permanent rank.
+- Credential resolution: `CURSOR_API_KEY` / `PATHCODE_CURSOR_API_KEY` / `PATH_CURSOR_API_KEY` env → macOS Keychain `PATH_CURSOR_API_KEY` → `~/.cursor/sdk/auth.json` (SDK login).
 
 ---
 
@@ -47,20 +50,21 @@ See [`PHASE_S2_PRODUCTIZATION.md`](./PHASE_S2_PRODUCTIZATION.md).
 
 | Lane | Status |
 | --- | --- |
-| **IMPLEMENTED** | S3.1 wiring: `engine-contract`, `cursor-sdk`, `mapCursorSdkEvent`, fabric `attachCursor` / `runCursorCollabTurn`, session preferred-engine skip-AG primary, gateway capabilities + `preferredEngine` routing |
-| **MECHANICALLY TESTED** | Focused `tests/s3` + `tests/s2`: **33/33** → `s31-focused-tests.txt`; `run-s31-mechanical.mjs` → `s31-mechanical.json` verdict **MECHANICALLY TESTED**; canonical `npm run check` → `s31-canonical-check.txt` **CHECK_EXIT:0** (165 files / 1466 tests + cli:smoke + ledger:verify) |
-| **LIVE-VERIFIED** | **Not run** — `CURSOR_API_KEY` unset on this host. Harness will attempt bounded `Agent.prompt` / `Agent.send` against `docs/reports/g10-evidence/s3/live-fixture` when a key is present |
+| **IMPLEMENTED** | S3.1 wiring: `engine-contract`, `cursor-sdk`, `mapCursorSdkEvent`, fabric `attachCursor` / `runCursorCollabTurn`, session preferred-engine skip-AG primary + Cursor steering continue, gateway capabilities + `preferredEngine` routing, result `engine` / `preferredEngine` provenance |
+| **MECHANICALLY TESTED** | Focused `tests/s3` + `tests/s2`: **13/13** → `s31-focused-tests.txt`; `run-s31-mechanical.mjs` → `s31-mechanical.json` verdict **LIVE-VERIFIED**; canonical `npm run check` → `s31-canonical-check.txt` |
+| **LIVE-VERIFIED** | `run-s31-live-fabric.mjs` → `s31-live-fabric.json` verdict **LIVE-VERIFIED**: direct Cursor turn, Gateway `preferredEngine=cursor` primary (VERIFIED), mid-task steer, cancel=`CANCELLED`, engine provenance |
 | **OPERATOR ACCEPTANCE** | **PENDING** |
 
 ---
 
 ## Evidence
 
-- Mechanical pack: [`g10-evidence/s3/`](./g10-evidence/s3/)
+- Live + mechanical pack: [`g10-evidence/s3/`](./g10-evidence/s3/)
+  - `s31-live-fabric.json` / `s31-live-fabric-run.txt` — Gateway + executor LIVE fabric
+  - `s31-mechanical.json` / `s31-mechanical-run.txt` — contract + optional `Agent.prompt`
   - `s31-focused-tests.txt` — vitest `tests/s3` + `tests/s2`
-  - `s31-mechanical.json` / `s31-mechanical-run.txt` — pack-free fabric harness
   - `s31-canonical-check.txt` — `npm run check` (+ `CHECK_EXIT`)
-  - Optional live fixture root: `g10-evidence/s3/live-fixture/` (created only when live path runs)
+  - Live fixture: `g10-evidence/s3/live-fixture/`
 - S2 freeze tip (do not reopen): `67200c1551d7dc6beee9bafb495d133ec11dc0ba`
 
 ---
@@ -70,17 +74,28 @@ See [`PHASE_S2_PRODUCTIZATION.md`](./PHASE_S2_PRODUCTIZATION.md).
 | Path | Role |
 | --- | --- |
 | `scripts/pathcode-cli/ag10/engine-contract.mjs` | Peer engine IDs, capability list, `selectEngineForTurn`, provenance helpers |
-| `scripts/pathcode-cli/ag10/cursor-sdk.mjs` | `@cursor/sdk` load/detect/execute against task worktree |
+| `scripts/pathcode-cli/ag10/cursor-sdk.mjs` | `@cursor/sdk` load/detect/execute; Keychain + `auth.json` resolve; model on `send` |
 | `scripts/pathcode-cli/ag10/events.mjs` | `mapCursorSdkEvent` → cockpit families |
 | `scripts/pathcode-cli/ag10/index.mjs` / `fabric.mjs` / `task-checkpoint.mjs` | Cursor attach, collab turn, checkpoint provenance |
 | `scripts/pathcode-cli/ag9/collaborate.mjs` | `chooseCollabEngine` → S3 contract rotation |
-| `scripts/pathcode-cli/ag1/session.mjs` | Preferred-engine primary path (skip AG when Cursor preferred+ready) |
+| `scripts/pathcode-cli/ag1/session.mjs` | Preferred Cursor primary; Cursor steering continue; result engine provenance |
 | `scripts/pathcode-cli/gateway/runtime.mjs` | Honest Cursor capability status (no permanent `slot_reserved`) |
 | `scripts/pathcode-cli/ag1/venv-guard.mjs` | Bounded AG1 python probe (8s) so doctor/check cannot hang on wedged import |
 | `tests/s3/engine-fabric.test.ts` | Contract + collab + event mapping |
 | `tests/s3/cursor-executor.test.ts` | SDK load / detect / failure classify |
-| `tests/s2/worktree-title-repair.test.ts` | Workspace-local scratch + template-free `git init` for sandbox hosts |
-| `docs/reports/g10-evidence/s3/run-s31-mechanical.mjs` | Pack-free evidence + optional live fixture |
+| `docs/reports/g10-evidence/s3/run-s31-mechanical.mjs` | Pack-free mechanical + live Agent.prompt |
+| `docs/reports/g10-evidence/s3/run-s31-live-fabric.mjs` | Gateway preferred Cursor + steer + cancel LIVE proof |
+| `docs/reports/g10-evidence/s3/mint-cursor-key.mjs` | Optional `Cursor.auth.login` mint helper |
+
+---
+
+## How routing works (S3.1)
+
+1. Gateway `startTask({ preferredEngine: "cursor" })` → session fabric attaches Cursor SDK against the task worktree.
+2. When Cursor is `native_sdk` and preferred, Cursor takes the **primary** turn (Antigravity `startTask` skipped).
+3. Repair / collab rotation uses `selectEngineForTurn` (capability-aware; continuity optional).
+4. Mid-task operator steer after Cursor primary continues via `runCursorCollabTurn`, not AG rehydrate.
+5. Result records `preferredEngine` + actual `engine` (last collab turn) for provenance.
 
 ---
 

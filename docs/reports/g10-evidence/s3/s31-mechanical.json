@@ -1,6 +1,6 @@
 {
   "schema": "pathcode.s3.engine-fabric.mechanical.v1",
-  "at": "2026-09-17T21:32:48.008Z",
+  "at": "2026-09-17T22:57:58.885Z",
   "note": "S3.1 mechanical proof. S2 freeze tip preserved. S4 not started. OPERATOR ACCEPTANCE PENDING.",
   "s2FreezeTip": "67200c1551d7dc6beee9bafb495d133ec11dc0ba",
   "cases": {
@@ -17,12 +17,12 @@
     },
     "capabilityList": {
       "ok": true,
-      "cursorStatus": "auth_required",
-      "hasKey": false
+      "cursorStatus": "available",
+      "hasKey": true
     },
     "gatewayCapabilities": {
       "ok": true,
-      "cursorStatus": "auth_required",
+      "cursorStatus": "available",
       "engines": [
         {
           "id": "antigravity",
@@ -34,15 +34,15 @@
         },
         {
           "id": "cursor",
-          "status": "auth_required"
+          "status": "available"
         }
       ]
     },
     "detectCursor": {
       "ok": true,
-      "ready": false,
-      "reason": "auth_required",
-      "status": "unavailable"
+      "ready": true,
+      "reason": null,
+      "status": "ready"
     },
     "loadSdk": {
       "ok": true,
@@ -50,9 +50,11 @@
     }
   },
   "live": {
-    "attempted": false,
-    "ok": false,
-    "detail": "CURSOR_API_KEY not set"
+    "attempted": true,
+    "ok": true,
+    "detail": "ok.",
+    "api": "Agent.prompt",
+    "fixture": "docs/reports/g10-evidence/s3/live-fixture"
   },
-  "verdict": "MECHANICALLY TESTED"
+  "verdict": "LIVE-VERIFIED"
 }

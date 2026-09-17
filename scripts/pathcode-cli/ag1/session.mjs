@@ -1283,7 +1283,40 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         });
         armTerminalWait();
         try {
-          if (agBind?.isLive?.()) {
+          // Prefer the same peer that owned the primary turn — do not force
+          // Antigravity rehydrate after a successful Cursor primary.
+          const cursorLive =
+            g10Fabric?.getCursor?.()?.getMode?.() === "native_sdk" &&
+            typeof g10Fabric?.runCursorCollabTurn === "function";
+          if (
+            cursorLive &&
+            (cursorPrimaryDone || lastCollabEngine === "cursor")
+          ) {
+            const turn = await g10Fabric.runCursorCollabTurn({
+              prompt: continuePrompt,
+              timeoutMs: Math.min(
+                180_000,
+                Math.max(30_000, wallMs - (Date.now() - startedAt) - 15_000),
+              ),
+              signal: ac.signal,
+            });
+            lastCollabEngine = "cursor";
+            if (ac.signal.aborted || turn?.code === "CANCELLED") {
+              agentCancelled = true;
+              terminalMsg = { type: "cancelled" };
+              break;
+            }
+            if (turn?.ok) {
+              const summary =
+                typeof turn.text === "string" && turn.text.trim()
+                  ? turn.text.trim().slice(0, 8_000)
+                  : turn.detail || "Cursor steering continue complete";
+              terminalMsg = { type: "finished", summary };
+              agentFinished = true;
+              continue;
+            }
+            // Soft-fail into validation / repair rotation.
+          } else if (agBind?.isLive?.()) {
             const cont = agBind.continueNative({
               text: continuePrompt,
             });
@@ -1292,6 +1325,17 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
                 text: continuePrompt,
               });
             }
+            terminalMsg = await waitForTerminal;
+            agentFinished = terminalMsg?.type === "finished";
+            if (terminalMsg?.type === "cancelled" || ac.signal.aborted) {
+              agentCancelled = true;
+              break;
+            }
+            if (terminalMsg?.type === "failed") {
+              agentFailed = true;
+              break;
+            }
+            continue;
           } else if (agBind) {
             await agBind.resumeOrRehydrate({
               text: continuePrompt,
@@ -1315,22 +1359,33 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
                     : undefined),
               },
             });
+            terminalMsg = await waitForTerminal;
+            agentFinished = terminalMsg?.type === "finished";
+            if (terminalMsg?.type === "cancelled" || ac.signal.aborted) {
+              agentCancelled = true;
+              break;
+            }
+            if (terminalMsg?.type === "failed") {
+              agentFailed = true;
+              break;
+            }
+            continue;
           } else {
             agent.continueTask({
               text: continuePrompt,
             });
+            terminalMsg = await waitForTerminal;
+            agentFinished = terminalMsg?.type === "finished";
+            if (terminalMsg?.type === "cancelled" || ac.signal.aborted) {
+              agentCancelled = true;
+              break;
+            }
+            if (terminalMsg?.type === "failed") {
+              agentFailed = true;
+              break;
+            }
+            continue;
           }
-          terminalMsg = await waitForTerminal;
-          agentFinished = terminalMsg?.type === "finished";
-          if (terminalMsg?.type === "cancelled" || ac.signal.aborted) {
-            agentCancelled = true;
-            break;
-          }
-          if (terminalMsg?.type === "failed") {
-            agentFailed = true;
-            break;
-          }
-          continue;
         } catch {
           // Fall through to validation if continue fails.
         }
@@ -2134,6 +2189,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       },
       agSessionMode: agBind?.getMode?.() || undefined,
       copilotMode: g10Fabric?.getCopilot?.()?.getMode?.() || undefined,
+      cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || undefined,
+      preferredEngine: preferredEngine || undefined,
+      latestEngineTurn: lastCollabEngine || undefined,
     });
     await g10Fabric?.shutdown?.();
   } catch {
@@ -2185,6 +2243,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     engineActivityCount,
     modelCalls: 0,
     repairAttempts,
+    preferredEngine: preferredEngine || null,
+    engine: lastCollabEngine || null,
+    cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || null,
     diagFile: typeof agent.getDiagFile === "function" ? agent.getDiagFile() : null,
   };
 }

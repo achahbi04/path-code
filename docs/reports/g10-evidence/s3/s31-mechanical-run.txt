@@ -1,1 +1,1 @@
-{"verdict":"MECHANICALLY TESTED","cases":{"rotation":true,"normalize":true,"capabilityList":true,"gatewayCapabilities":true,"detectCursor":true,"loadSdk":true},"live":{"attempted":false,"ok":false,"detail":"CURSOR_API_KEY not set"}}
+{"verdict":"LIVE-VERIFIED","cases":{"rotation":true,"normalize":true,"capabilityList":true,"gatewayCapabilities":true,"detectCursor":true,"loadSdk":true},"live":{"attempted":true,"ok":true,"detail":"ok.","api":"Agent.prompt","fixture":"docs/reports/g10-evidence/s3/live-fixture"}}

@@ -6,7 +6,7 @@
  * Cursor's agent loop.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -22,16 +22,141 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(HERE, "../../..");
 
 /**
- * @param {Record<string, string | undefined>} [base]
+ * Read a macOS Keychain generic password (service name).
+ * Used for PATH_CURSOR_API_KEY — never logs the secret.
+ * @param {string} service
+ * @param {string} [account]
  * @returns {string | null}
  */
-export function resolveCursorApiKey(base = process.env) {
-  const key =
+export function readMacOsKeychainPassword(service, account) {
+  if (process.platform !== "darwin") return null;
+  const name = String(service || "").trim();
+  if (!name) return null;
+  try {
+    const args = ["find-generic-password", "-s", name, "-w"];
+    if (typeof account === "string" && account.trim()) {
+      args.splice(1, 0, "-a", account.trim());
+    }
+    const r = spawnSync("security", args, {
+      encoding: "utf8",
+      timeout: 5_000,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    if (r.status !== 0) return null;
+    const value = String(r.stdout || "").trim();
+    return value || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persist API key into macOS Keychain under PATH_CURSOR_API_KEY.
+ * @param {string} apiKey
+ * @param {{ account?: string, service?: string }} [opts]
+ */
+export function storeMacOsKeychainPassword(apiKey, opts = {}) {
+  if (process.platform !== "darwin") {
+    return { ok: false, reason: "not_darwin" };
+  }
+  const key = String(apiKey || "").trim();
+  if (!key) return { ok: false, reason: "empty_key" };
+  const service = opts.service || "PATH_CURSOR_API_KEY";
+  const account =
+    (typeof opts.account === "string" && opts.account.trim()) ||
+    process.env.USER ||
+    "pathcode";
+  try {
+    // Delete prior empty/stale item (ignore failure).
+    spawnSync(
+      "security",
+      ["delete-generic-password", "-a", account, "-s", service],
+      { encoding: "utf8", timeout: 5_000, stdio: "ignore" },
+    );
+    const add = spawnSync(
+      "security",
+      [
+        "add-generic-password",
+        "-a",
+        account,
+        "-s",
+        service,
+        "-w",
+        key,
+        "-U",
+      ],
+      { encoding: "utf8", timeout: 5_000, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    if (add.status !== 0) {
+      return {
+        ok: false,
+        reason: (add.stderr || add.stdout || "add failed").slice(0, 200),
+      };
+    }
+    return { ok: true, service, account };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/**
+ * Read SDK FileCredentialStore (~/.cursor/sdk/auth.json) without logging secrets.
+ * @returns {string | null}
+ */
+export function readCursorSdkAuthFileKey() {
+  try {
+    const home = process.env.HOME || "";
+    if (!home) return null;
+    const authPath = join(home, ".cursor", "sdk", "auth.json");
+    if (!existsSync(authPath)) return null;
+    const raw = JSON.parse(readFileSync(authPath, "utf8"));
+    const key =
+      typeof raw?.apiKey === "string" && raw.apiKey.trim() ? raw.apiKey.trim() : "";
+    if (!key) return null;
+    const exp = raw?.apiKeyExpiresAtMs;
+    if (typeof exp === "number" && Number.isFinite(exp) && Date.now() > exp) {
+      return null;
+    }
+    return key;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve Cursor API key from env, Keychain, or SDK login store.
+ * Stored credentials are used by default. Pass `{ includeStored: false }`
+ * for isolated test env bags that must not see host login state.
+ *
+ * @param {Record<string, string | undefined>} [base]
+ * @param {{ includeStored?: boolean }} [opts]
+ * @returns {string | null}
+ */
+export function resolveCursorApiKey(base = process.env, opts = {}) {
+  const fromEnv =
     (typeof base.CURSOR_API_KEY === "string" && base.CURSOR_API_KEY.trim()) ||
     (typeof base.PATHCODE_CURSOR_API_KEY === "string" &&
       base.PATHCODE_CURSOR_API_KEY.trim()) ||
+    (typeof base.PATH_CURSOR_API_KEY === "string" &&
+      base.PATH_CURSOR_API_KEY.trim()) ||
     "";
-  return key || null;
+  if (fromEnv) return fromEnv;
+
+  if (opts.includeStored === false) return null;
+
+  const fromKeychain =
+    readMacOsKeychainPassword("PATH_CURSOR_API_KEY") ||
+    readMacOsKeychainPassword(
+      "PATH_CURSOR_API_KEY",
+      typeof base.USER === "string" ? base.USER : process.env.USER,
+    ) ||
+    readMacOsKeychainPassword("CURSOR_API_KEY");
+  if (fromKeychain) return fromKeychain;
+
+  return readCursorSdkAuthFileKey();
 }
 
 /**
@@ -103,7 +228,10 @@ export async function detectCursorEngine(opts = {}) {
   /** @type {string[]} */
   const evidence = [];
   const env = opts.env || process.env;
-  const apiKey = resolveCursorApiKey(env);
+  const apiKey = resolveCursorApiKey(env, {
+    // Custom env bags (tests) stay isolated from host Keychain / auth.json.
+    includeStored: env === process.env,
+  });
   if (!apiKey) {
     evidence.push("CURSOR_API_KEY not set");
     return {
@@ -356,7 +484,10 @@ export async function createCursorEngine(options) {
     const signal = turn.signal || options.signal;
 
     try {
-      const run = await agent.send(String(turn.prompt || ""));
+      // Local SDK requires an explicit model on create and/or send.
+      const model =
+        options.model || resolveCursorModel(options.toolEnv || process.env);
+      const run = await agent.send(String(turn.prompt || ""), { model });
       activeRun = run;
       reclaimTitle();
 
