@@ -59,6 +59,18 @@ Proof steps exercised: origin (git, no package.json scaffold), multi-task loop (
 
 ---
 
+## Evidence (Gateway dispatch + live engine)
+
+| Artifact | Runner | Verdict |
+| --- | --- | --- |
+| [`g10-evidence/s5/s5-build-proof.json`](./g10-evidence/s5/s5-build-proof.json) | `node scripts/pathcode-cli/build/headless.mjs proof` | **LIVE-VERIFIED** (controller fake fabric) |
+| [`g10-evidence/s5/s5-gateway-fake-dispatch.json`](./g10-evidence/s5/s5-gateway-fake-dispatch.json) | `node docs/reports/g10-evidence/s5/run-s5-gateway-fake-dispatch.mjs` | **GATEWAY-DISPATCH-VERIFIED** — Build `fakeMode=false`, Gateway `PATHCODE_GATEWAY_FAKE_ENGINE=1`; origin + one engineer child consumed via Gateway |
+| [`g10-evidence/s5/s5-live-engine-attempt.json`](./g10-evidence/s5/s5-live-engine-attempt.json) | `node docs/reports/g10-evidence/s5/run-s5-live-engine-attempt.mjs` | **LIVE-ENGINE-ATTEMPTED** — real Copilot turn (~47s); `LIVE_MARKER.txt` written; session terminal **NOT_VERIFIED** (no fake engine) |
+
+Re-run notes: gateway-fake and live-engine scripts use temp dirs under the OS temp root; live attempt is bounded to ~3 minutes and skips when neither `CURSOR_API_KEY` nor `copilot` on `PATH` is available.
+
+---
+
 ## Remaining limitations
 
 - **Fake fabric** drives automated proof and vitest; it writes a minimal Node marker + tests — not a substitute for live Gateway engineering quality.

@@ -1,0 +1,43 @@
+{
+  "schema": "pathcode.s5.gateway-fake-dispatch.v1",
+  "verdict": "GATEWAY-DISPATCH-VERIFIED",
+  "mode": "live_gateway_fake_engine",
+  "note": "Build controller fakeMode=false; PATHCODE_GATEWAY_FAKE_ENGINE=1 for Gateway IPC path only.",
+  "env": {
+    "PATHCODE_GATEWAY_FAKE_ENGINE": "1",
+    "buildFakeMode": false
+  },
+  "baseDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-gw-fake-XRB46Y",
+  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-gw-fake-XRB46Y/runtime",
+  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-gw-fake-XRB46Y/product",
+  "buildId": "1e38b387-19d5-4a5c-8b23-c398ebfca841",
+  "steps": [
+    {
+      "step": "origin",
+      "ok": true,
+      "buildId": "1e38b387-19d5-4a5c-8b23-c398ebfca841",
+      "git": true,
+      "noScaffoldPackage": true,
+      "bindViaGateway": true
+    },
+    {
+      "step": "engineer_via_gateway",
+      "ok": true,
+      "tickAction": "child_finished",
+      "kind": "engineer",
+      "taskId": "0a899d76-42cb-49b8-be23-ee590c2a33ca",
+      "dispatchState": "consumed",
+      "gatewayTaskStatus": "completed",
+      "gatewayClassification": "VERIFIED",
+      "buildFakeFabricBypassed": true
+    }
+  ],
+  "children": [
+    {
+      "kind": "engineer",
+      "state": "consumed",
+      "taskId": "0a899d76-42cb-49b8-be23-ee590c2a33ca"
+    }
+  ],
+  "loopStatus": "running"
+}

@@ -1,0 +1,67 @@
+{
+  "schema": "pathcode.s5.live-engine-attempt.v1",
+  "verdict": "LIVE-ENGINE-ATTEMPTED",
+  "ok": true,
+  "skipReason": null,
+  "engines": {
+    "copilot": {
+      "available": true,
+      "path": "/Users/achahbi/.local/bin/copilot"
+    },
+    "cursorKey": true,
+    "preferred": "copilot",
+    "skipReason": null
+  },
+  "timeoutMs": 180000,
+  "baseDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-live-eng-XnchF7",
+  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-live-eng-XnchF7/runtime",
+  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-live-eng-XnchF7/product",
+  "steps": [
+    {
+      "step": "start",
+      "ok": true,
+      "buildId": "1982c4de-e8a2-47c3-9f26-80023f82b2dc",
+      "git": true
+    },
+    {
+      "step": "single_engineer_tick",
+      "ok": true,
+      "taskId": "e9c06fb0-ac8a-42a7-9a96-b423f75b00d2",
+      "kind": "engineer",
+      "action": "child_finished",
+      "preferredEngine": "copilot",
+      "gatewayStatus": "failed",
+      "gatewayClassification": "NOT_VERIFIED",
+      "markerExists": true,
+      "elapsedMs": 47124,
+      "eventTypes": [
+        "session.task.received",
+        "session.capability.preparing",
+        "session.preflight",
+        "session.engineering.workspace",
+        "session.recovery.checkpoint",
+        "session.capability.discovered",
+        "session.capability.mcp",
+        "session.capability.provisioning",
+        "session.capability.affected",
+        "session.capability.ready",
+        "session.capability.collaborate",
+        "session.engineering.activity",
+        "session.engineering.bridge",
+        "session.engineering.busy",
+        "session.applying",
+        "session.engineering.tool",
+        "session.edit.summary",
+        "session.engineering.narration",
+        "session.engineering.handoff",
+        "session.validation.plan",
+        "session.engineering.result",
+        "session.engineering.report",
+        "session.terminal",
+        "gateway.task.finished"
+      ],
+      "collaborated": true
+    }
+  ],
+  "buildId": "1982c4de-e8a2-47c3-9f26-80023f82b2dc"
+}
