@@ -60,6 +60,8 @@ import {
 } from "./pathcode-cli/gateway/index.mjs";
 import { normalizeObjectiveText } from "./pathcode-cli/normalize-text.mjs";
 import { isTaskStopCommand } from "./pathcode-cli/task-control.mjs";
+import { reconcileHostStartup } from "./pathcode-cli/ag10/host-startup.mjs";
+import { formatReopenNotice } from "./pathcode-cli/ag10/task-continuity.mjs";
 
 const root = resolvePathPackageRoot();
 
@@ -513,8 +515,22 @@ export async function runPathcodeMain(argv, testIo = {}) {
   let activeGatewayTaskId = null;
   /** @type {Array<{ taskId: string, status?: string, objective?: string }>} */
   let aliveGatewayNotice = [];
+  /** @type {import('./pathcode-cli/ag10/task-continuity.mjs').ContinuityAssessment[]} */
+  let durableRecoverNotice = [];
+  const runtimeRootForContinuity = resolvePathRuntimeRoot({ packageRoot: root });
+  try {
+    const startup = reconcileHostStartup({
+      runtimeRoot: runtimeRootForContinuity,
+      projectRoot,
+    });
+    durableRecoverNotice = Array.isArray(startup.recoverable)
+      ? startup.recoverable.slice(0, 5)
+      : [];
+  } catch {
+    durableRecoverNotice = [];
+  }
   if (useGateway) {
-    const runtimeRoot = resolvePathRuntimeRoot({ packageRoot: root });
+    const runtimeRoot = runtimeRootForContinuity;
     if (useExternalGateway) {
       const ensured = await ensureGateway({
         packageRoot: root,
@@ -538,6 +554,14 @@ export async function runPathcodeMain(argv, testIo = {}) {
       } catch {
         aliveGatewayNotice = [];
       }
+      if (Array.isArray(ensured.interruptedTaskIds) && ensured.interruptedTaskIds.length) {
+        try {
+          const startup = reconcileHostStartup({ runtimeRoot, projectRoot });
+          durableRecoverNotice = startup.recoverable.slice(0, 5);
+        } catch {
+          /* keep prior */
+        }
+      }
     } else {
       gatewayRuntime = createGatewayRuntime({
         packageRoot: root,
@@ -551,7 +575,6 @@ export async function runPathcodeMain(argv, testIo = {}) {
           packageRoot: root,
         });
       } catch (err) {
-        // Socket bind failure must not kill the product — runtime still works in-process.
         stderr.write(
           `PATH Gateway socket unavailable (${err instanceof Error ? err.message : String(err)}); continuing in-process.\n`,
         );
@@ -1330,10 +1353,23 @@ export async function runPathcodeMain(argv, testIo = {}) {
           }),
           "",
           "Rejoin with: /attach <taskId>",
-          "(Disconnect did not cancel them. This is not crash recovery.)",
+          "(Disconnect did not cancel them.)",
         ];
         showOperatorReply(prompt, inlineStudio, lines.join("\n"));
         aliveGatewayNotice = [];
+        redrawPrompt(prompt, unicode, plain, sessionStats, inlineStudio);
+      } else if (durableRecoverNotice.length > 0) {
+        const primary = durableRecoverNotice[0];
+        const card = formatReopenNotice(primary);
+        const extra =
+          durableRecoverNotice.length > 1
+            ? `\n\nAlso recoverable (${durableRecoverNotice.length - 1} more):\n${durableRecoverNotice
+                .slice(1)
+                .map((a) => `  /resume ${a.taskId}`)
+                .join("\n")}`
+            : "";
+        showOperatorReply(prompt, inlineStudio, `${card}${extra}`);
+        // Keep durableRecoverNotice for bare /resume default; clear card-only noise later.
         redrawPrompt(prompt, unicode, plain, sessionStats, inlineStudio);
       }
     }
@@ -1444,7 +1480,27 @@ export async function runPathcodeMain(argv, testIo = {}) {
       }
       if (cmd === "/resume" || cmd.startsWith("/resume ")) {
         const parts = cmd.split(/\s+/);
-        const idArg = parts[1] || "";
+        let idArg = parts[1] || "";
+        if (!idArg && durableRecoverNotice.length === 1) {
+          idArg = durableRecoverNotice[0].taskId;
+        }
+        if (!idArg && durableRecoverNotice.length > 1) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            [
+              "Multiple recoverable PATH tasks:",
+              "",
+              ...durableRecoverNotice.map(
+                (a) => `  ${a.taskId} — ${a.disposition}`,
+              ),
+              "",
+              "Usage: /resume <taskId>",
+            ].join("\n"),
+          );
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
         showOperatorReply(
           prompt,
           ttyInline ? inlineStudio : null,
@@ -1458,6 +1514,10 @@ export async function runPathcodeMain(argv, testIo = {}) {
             prompt,
             ttyInline ? inlineStudio : null,
             followed.message || "Resume failed.",
+          );
+        } else {
+          durableRecoverNotice = durableRecoverNotice.filter(
+            (a) => a.taskId !== (idArg || followed.sessionResult?.taskId),
           );
         }
         redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);

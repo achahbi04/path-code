@@ -1,0 +1,8 @@
+S4.3 host-restart sim — spawn Gateway with in-flight durable task
+task d07e7b55-8d90-4084-a326-f8ec432be604 started
+in_flight=in_flight:cursor
+SIGKILL gateway 60064 (simulate host/process death)
+reconcile recoverable=1 markedInFlight=(none)
+resume mode=resume taskId=d07e7b55-8d90-4084-a326-f8ec432be604
+finished completed
+VERDICT: LIVE-VERIFIED

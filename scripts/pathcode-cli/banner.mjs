@@ -64,7 +64,7 @@ export function renderWelcomeScreen(opts = {}) {
     "  /merge · /discard · /pr   Result lifecycle",
     "  /prefs · /model · /autonomy   Preferences",
     "  /attach [id]        Rejoin a Gateway-owned task still running",
-    "  /resume [id]        Recover an interrupted task from durable state",
+    "  /resume [id]        Continue an interrupted task after restart",
     "  /help               Full command list",
     "  /exit               Leave",
     "",

@@ -251,6 +251,18 @@ export function getTaskHistoryEntry(runtimeRoot, taskId) {
     taskId: id,
     updatedAt,
     finalState,
+    continuityDisposition:
+      checkpoint && typeof checkpoint.continuityDisposition === "string"
+        ? checkpoint.continuityDisposition
+        : null,
+    interruptedAt:
+      checkpoint && typeof checkpoint.interruptedAt === "string"
+        ? checkpoint.interruptedAt
+        : null,
+    latestEngineTurn:
+      checkpoint && typeof checkpoint.latestEngineTurn === "string"
+        ? checkpoint.latestEngineTurn
+        : null,
     objective: objective.slice(0, 240),
     reportPath: hasReport ? reportPath : null,
     hasReport,
@@ -381,11 +393,16 @@ export function formatInspectPanel(entry) {
     "",
     `  lifecycle     ${lifecycle}`,
     `  disposition   ${entry.finalState || "unknown"}`,
+    `  continuity    ${entry.continuityDisposition || "n/a"}`,
+    `  last turn     ${entry.latestEngineTurn || "n/a"}`,
     `  project       ${entry.projectName || "(unknown)"}`,
     `  branch        ${entry.branch || "(none recorded)"}`,
     `  commit        ${entry.sha || "(none recorded)"}`,
     `  baseline      ${entry.baseline || "(none recorded)"}`,
   ];
+  if (entry.interruptedAt) {
+    lines.push(`  interrupted   ${entry.interruptedAt}`);
+  }
   if (entry.lifecycleStatus === "DISCARDED" && entry.discardedAt) {
     lines.push(`  discarded     ${entry.discardedAt}`);
   }

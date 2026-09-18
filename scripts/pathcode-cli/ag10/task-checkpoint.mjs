@@ -157,6 +157,14 @@ export function createCheckpointSkeleton(partial) {
       typeof partial.continuityReason === "string"
         ? partial.continuityReason.slice(0, 400)
         : undefined,
+    inFlightStartedAt:
+      typeof partial.inFlightStartedAt === "string"
+        ? partial.inFlightStartedAt
+        : undefined,
+    inFlightEngine:
+      typeof partial.inFlightEngine === "string"
+        ? partial.inFlightEngine
+        : undefined,
     updatedAt: new Date().toISOString(),
   };
 }

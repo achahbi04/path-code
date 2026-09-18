@@ -288,3 +288,55 @@ export function formatContinuityBrief(assessment) {
   }
   return lines.join("\n");
 }
+
+/**
+ * Product-facing reopen card for one recoverable task.
+ * @param {ContinuityAssessment} assessment
+ * @returns {string}
+ */
+export function formatReopenNotice(assessment) {
+  const cp = assessment.checkpoint || {};
+  const objective =
+    typeof cp.objective === "string" && cp.objective.trim()
+      ? cp.objective.trim().slice(0, 160)
+      : "(objective preserved in durable state)";
+  const when =
+    typeof cp.interruptedAt === "string"
+      ? cp.interruptedAt
+      : typeof cp.updatedAt === "string"
+        ? cp.updatedAt
+        : "unknown";
+  const lastTurn =
+    typeof cp.latestEngineTurn === "string" ? cp.latestEngineTurn : "unknown";
+  const nativeBits = [];
+  if (assessment.engineNativeHint.cursor) {
+    nativeBits.push(`Cursor session id present (${assessment.engineNativeHint.cursor})`);
+  }
+  if (assessment.engineNativeHint.copilot) {
+    nativeBits.push(`Copilot session id present (${assessment.engineNativeHint.copilot})`);
+  }
+  if (assessment.engineNativeHint.antigravity) {
+    nativeBits.push(`Antigravity mode ${assessment.engineNativeHint.antigravity}`);
+  }
+  const nativeLine = nativeBits.length
+    ? `Native resume will be attempted where the provider session is still valid.\n  ${nativeBits.join(" · ")}`
+    : "No durable engine session ids — PATH will rehydrate from task/worktree/Git reality.";
+
+  return [
+    `Interrupted engineering task`,
+    ``,
+    `  ${assessment.taskId}`,
+    `  ${objective}`,
+    ``,
+    `  State: ${assessment.disposition}`,
+    `  Interrupted / updated: ${when}`,
+    `  Last engine turn: ${lastTurn}`,
+    `  Worktree: ${assessment.worktreeExists ? "survived" : "missing"}`,
+    ``,
+    `  ${nativeLine}`,
+    `  Validation may be re-run after continuation.`,
+    ``,
+    `Continue with: /resume ${assessment.taskId}`,
+    `Inspect with:  /inspect ${assessment.taskId}`,
+  ].join("\n");
+}

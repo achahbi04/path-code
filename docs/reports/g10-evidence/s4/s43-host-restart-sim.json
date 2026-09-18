@@ -1,0 +1,35 @@
+{
+  "schema": "pathcode.s4.host-restart-sim.v1",
+  "verdict": "LIVE-VERIFIED",
+  "steps": [
+    {
+      "step": "in_flight",
+      "latestEngineTurn": "in_flight:cursor",
+      "inFlightEngine": "cursor"
+    },
+    {
+      "step": "startup_reconcile",
+      "reclaimed": true,
+      "markedInFlight": [],
+      "recoverable": [
+        {
+          "taskId": "d07e7b55-8d90-4084-a326-f8ec432be604",
+          "disposition": "interrupted",
+          "nextAction": "resume"
+        }
+      ],
+      "noticePreview": "Interrupted engineering task\n\n  d07e7b55-8d90-4084-a326-f8ec432be604\n  S4.3 host restart durable in-flight\n\n  State: interrupted\n  Interrupted / updated: 2026-09-18T18:56:40.547Z\n  Last engine turn: in_flight:cursor\n  Worktree: survived\n\n  "
+    },
+    {
+      "step": "resume",
+      "ok": true,
+      "mode": "resume",
+      "taskId": "d07e7b55-8d90-4084-a326-f8ec432be604"
+    },
+    {
+      "step": "finished",
+      "status": "completed",
+      "classification": "VERIFIED"
+    }
+  ]
+}

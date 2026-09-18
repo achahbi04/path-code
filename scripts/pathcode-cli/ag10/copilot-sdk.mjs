@@ -155,6 +155,7 @@ export function classifyCopilotFailure(err) {
  *   preferSdk?: boolean,
  *   model?: string,
  *   configDirectory?: string,
+ *   runtimeRoot?: string,
  * }} options
  */
 export async function createCopilotEngine(options) {
@@ -508,6 +509,8 @@ export async function createCopilotEngine(options) {
       cwd: options.cwd,
       toolEnv: options.toolEnv,
       timeoutMs: turn.timeoutMs,
+      taskId: options.taskId,
+      runtimeRoot: options.runtimeRoot,
     });
     return {
       ...cliTurn,

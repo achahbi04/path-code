@@ -5,13 +5,15 @@
  * inside the task worktree. Denies push/deploy. Uses PATH-owned COPILOT_HOME.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { detectCopilotCli, parseCopilotHelpFlags } from "../ag8/copilot.mjs";
 import {
   reclaimTtyForeground,
   reassertPathTitle,
 } from "../terminal-title.mjs";
+import { registerProcess } from "../process-registry.mjs";
+import { resolvePathRuntimeRoot } from "../paths.mjs";
 
 /** Tools / patterns that must never be granted for PATH collaborative turns. */
 const DENIED_TOOL_SPECS = Object.freeze([
@@ -204,13 +206,73 @@ export async function runCopilotEngineeringTurn(input) {
     COPILOT_ALLOW_ALL: "1",
   };
 
-  const run = spawnSync(exe, built.args, {
-    encoding: "utf8",
-    timeout: timeoutMs,
-    env,
-    cwd,
-    maxBuffer: 8 * 1024 * 1024,
+  const run = await new Promise((resolve) => {
+    /** @type {import('node:child_process').ChildProcess} */
+    const child = spawn(exe, built.args, {
+      env,
+      cwd,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    try {
+      registerProcess({
+        taskId:
+          typeof input.taskId === "string" && input.taskId.trim()
+            ? input.taskId.trim()
+            : null,
+        kind: "copilot_cli",
+        command: `${exe} ${built.args.slice(0, 4).join(" ")}`.slice(0, 500),
+        child,
+        runtimeRoot:
+          typeof input.runtimeRoot === "string" && input.runtimeRoot
+            ? input.runtimeRoot
+            : resolvePathRuntimeRoot(),
+      });
+    } catch {
+      /* registry is best-effort */
+    }
+
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        /* ignore */
+      }
+      finish({
+        status: null,
+        error: new Error(`copilot timeout after ${timeoutMs}ms`),
+        stdout,
+        stderr,
+        timedOut: true,
+      });
+    }, timeoutMs);
+
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk) => {
+      stdout += String(chunk);
+      if (stdout.length > 8 * 1024 * 1024) stdout = stdout.slice(-4 * 1024 * 1024);
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += String(chunk);
+      if (stderr.length > 8 * 1024 * 1024) stderr = stderr.slice(-4 * 1024 * 1024);
+    });
+    child.on("error", (err) => {
+      finish({ status: null, error: err, stdout, stderr });
+    });
+    child.on("close", (code) => {
+      finish({ status: code, error: null, stdout, stderr });
+    });
   });
+
   try {
     reclaimTtyForeground();
     reassertPathTitle();
@@ -229,7 +291,7 @@ export async function runCopilotEngineeringTurn(input) {
       code,
       value: "unavailable",
       changedFiles: reported,
-      detail: "spawn failed",
+      detail: run.timedOut ? `timeout ${timeoutMs}ms` : "spawn failed",
     };
   }
   if (code !== 0) {

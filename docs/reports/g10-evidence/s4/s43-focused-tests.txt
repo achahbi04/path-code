@@ -1,0 +1,11 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+ RUN  v3.2.7 /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
+
+············
+
+ Test Files  3 passed (3)
+      Tests  12 passed (12)
+   Start at  20:56:27
+   Duration  9.17s (transform 1.35s, setup 0ms, collect 416ms, tests 14.82s, environment 2ms, prepare 701ms)
+

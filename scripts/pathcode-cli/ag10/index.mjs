@@ -174,12 +174,22 @@ export async function createG10Fabric(options) {
     } catch {
       /* ignore */
     }
+    const reality = captureTaskReality(options.worktreePath, options.toolEnv);
     return persist({
       latestEngineTurn: `in_flight:${engine}`,
+      inFlightStartedAt: new Date().toISOString(),
+      inFlightEngine: engine,
+      headSha: reality.headSha || undefined,
+      diffFingerprint: reality.diffFingerprint,
+      changedFiles:
+        Array.isArray(reality.changedFiles) && reality.changedFiles.length
+          ? reality.changedFiles
+          : checkpoint.changedFiles,
       preferredEngine:
         typeof options.preferredEngine === "string"
           ? options.preferredEngine
           : checkpoint.preferredEngine,
+      continuityReason: `in-flight ${engine} — durable snapshot before engine turn`,
     });
   }
 
@@ -249,6 +259,7 @@ export async function createG10Fabric(options) {
       sessionId: checkpoint.copilotSessionId || `path-${options.taskId}`,
       toolEnv: options.toolEnv,
       preferSdk: options.preferCopilotSdk !== false,
+      runtimeRoot: options.runtimeRoot,
       ...(configDirectory ? { configDirectory } : {}),
       emit: emitSession,
     });
@@ -933,8 +944,14 @@ export {
 export {
   assessTaskContinuity,
   formatContinuityBrief,
+  formatReopenNotice,
   isPidAlive,
 } from "./task-continuity.mjs";
+
+export {
+  reconcileHostStartup,
+  listRecoverableTasks,
+} from "./host-startup.mjs";
 
 export {
   normalizeG10Event,
