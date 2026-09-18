@@ -6,6 +6,8 @@
 **Implementation:** NOT AUTHORIZED  
 **Slice plan (S5.1 / S5.2 / …):** NOT DEFINED  
 
+**Refinement (settled recommendation):** [`PHASE_S5_PATH_BUILD_ARCHITECTURE_REFINEMENT.md`](./PHASE_S5_PATH_BUILD_ARCHITECTURE_REFINEMENT.md) — Option A′ (thin orchestrator + fabric cognition). This audit remains the capability/gap baseline; the refinement supersedes §10 where they differ.
+
 **Prior stage:** S4 — **IMPLEMENTATION FROZEN**  
 - S4.3 implementation: `093a29aa963e8132a5d47598dcc9ac62b15609b5`  
 - S4.3 tip: `2d56b23ad922f6e1947c7f48d2059a389ac7badf`  
@@ -442,38 +444,12 @@ Long-running Build = **many durable Code tasks** under one durable Build outcome
 
 ## 10. Recommended S5 architecture
 
-**Recommend Option A — Thin Build orchestrator over PATH Code / Gateway / Engine Fabric**, with a **minimal durable Build record** and an **explicit greenfield origin step**.
+**Superseded for settlement by the refinement:**  
+[`PHASE_S5_PATH_BUILD_ARCHITECTURE_REFINEMENT.md`](./PHASE_S5_PATH_BUILD_ARCHITECTURE_REFINEMENT.md)
 
-### Why
+**Settled form: Option A′** — thin Build orchestrator; evaluation / gaps / next-objective / challenge are **fabric-backed PATH tasks** (not a permanent Build brain); thin `projectBindings` with re-bind; Build-origin empty root; outcome criteria `PROVEN|UNMET|UNKNOWN`; plans as hypotheses; sequential execution as policy only.
 
-1. Matches locked philosophy: control loop over existing engineering power.  
-2. Honors repository truth: `task-reality`, reports, prepare discovery already treat FS/Git as authority.  
-3. Preserves S3 fabric and S4 continuity without a parallel executor.  
-4. Convergence to Code is identity of `projectRoot`, not a migration.  
-5. Keeps architecture general (web, native, API, polyglot, multi-service) while allowing bounded first proofs.  
-6. Avoids Option B’s twin-state failure mode that PATH already fought in G10/S4.
-
-### Recommended seams (names indicative, not an implementation plan)
-
-| Seam | Role |
-| --- | --- |
-| Build record I/O | Persist outcome, projectRoot, childTaskIds, status under runtime metadata |
-| Origin | Create bindable projectRoot from outcome (dir + git/markers as engineered or minimal bootstrap) |
-| Inspector | Compose existing discover/prepare-readonly + Git + history/reports |
-| Evaluator / gap select | Product-level reasoning → next Code objective |
-| Delegator | `bindProject` + `startTask` / `resumeTask` / await |
-| Gateway client role `build` | Wire reserved slot; CLI or headless Build entry |
-| Operator surface | Build progress as PATH product language (outcome / gaps / next / child results) — not a recovery debugger |
-
-### What Build must invent vs reuse
-
-| Invent | Reuse unchanged |
-| --- | --- |
-| Outcome → gap → next-objective intelligence | Gateway task lifecycle |
-| Thin Build durability | Engine fabric |
-| Greenfield bindability | Prepare / mise / LSP / SCIP / MCP / services |
-| Product evaluation | Checkpoints, reports, history, S4 resume |
-| Multi-task sequencing | Worktrees, validation, result lifecycle |
+Baseline Option A from this audit remains directionally correct; A′ answers the challenge/refinement pass without adopting Option B.
 
 ---
 
