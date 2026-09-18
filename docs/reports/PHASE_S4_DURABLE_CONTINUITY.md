@@ -4,7 +4,7 @@
 **S4 RESULT:** **S4.2 LIVE-VERIFIED** (engine/process interruption while Gateway alive)  
 **S3 stage freeze (do not reopen):** `89eea9992c1bb30763413aa0054d93481c65fcb2`  
 **S4.1:** **ACCEPTED / FROZEN** — `3bea879358a2598a41c6632ecb530da446f1c936` — do not reopen / do not re-prove Gateway SIGKILL  
-**S4.2 checkpoint tip:** _(recorded at commit)_
+**S4.2 checkpoint tip:** `e5757296e30e22f4aa0f51c07dce78c908653d59`
 
 **Prior stage:** S3 Unified Engine Fabric — **FROZEN / STAGE COMPLETE** (no S3.3)
 
