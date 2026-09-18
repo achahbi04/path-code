@@ -44,6 +44,9 @@ import { ensureAg9RuntimeDirs } from "../ag9/layout.mjs";
  * @property {string} [baseline] Baseline commit SHA
  * @property {string[]} [changedFiles] Authoritative result file list
  * @property {string} [preferredEngine]
+ * @property {string} [continuityDisposition] interrupted | resumable | …
+ * @property {string} [interruptedAt] ISO timestamp when Gateway/process loss was recorded
+ * @property {string} [continuityReason]
  * @property {string} updatedAt
  */
 
@@ -141,6 +144,18 @@ export function createCheckpointSkeleton(partial) {
     preferredEngine:
       typeof partial.preferredEngine === "string"
         ? partial.preferredEngine
+        : undefined,
+    continuityDisposition:
+      typeof partial.continuityDisposition === "string"
+        ? partial.continuityDisposition
+        : undefined,
+    interruptedAt:
+      typeof partial.interruptedAt === "string"
+        ? partial.interruptedAt
+        : undefined,
+    continuityReason:
+      typeof partial.continuityReason === "string"
+        ? partial.continuityReason.slice(0, 400)
         : undefined,
     updatedAt: new Date().toISOString(),
   };
@@ -295,4 +310,66 @@ export function deleteTaskCheckpoint(runtimeRoot, taskId) {
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * Record honest interruption on a durable checkpoint (Gateway death, reboot).
+ * Preserves extra fields (e.g. resultLifecycle) via full-object write.
+ *
+ * @param {string} runtimeRoot
+ * @param {string} taskId
+ * @param {string} [reason]
+ * @returns {G10TaskCheckpoint | null}
+ */
+export function markTaskInterrupted(runtimeRoot, taskId, reason) {
+  const existing = readTaskCheckpoint(runtimeRoot, taskId);
+  if (!existing) return null;
+  if (
+    existing.finalState === "VERIFIED" ||
+    existing.finalState === "PARTIALLY_VERIFIED" ||
+    existing.finalState === "CANCELLED"
+  ) {
+    return existing;
+  }
+  const next = {
+    ...existing,
+    continuityDisposition: "interrupted",
+    interruptedAt: new Date().toISOString(),
+    continuityReason: String(
+      reason || "Gateway or process interruption",
+    ).slice(0, 400),
+    updatedAt: new Date().toISOString(),
+  };
+  writeTaskCheckpoint(runtimeRoot, /** @type {G10TaskCheckpoint} */ (next));
+  return /** @type {G10TaskCheckpoint} */ (next);
+}
+
+/**
+ * Mark all incomplete checkpoints interrupted (e.g. after stale Gateway reclaim).
+ * @param {string} runtimeRoot
+ * @param {string} [reason]
+ * @returns {string[]} taskIds marked
+ */
+export function markIncompleteCheckpointsInterrupted(runtimeRoot, reason) {
+  const indexPath = resolveCheckpointIndexPath(runtimeRoot);
+  /** @type {string[]} */
+  const marked = [];
+  if (!existsSync(indexPath)) return marked;
+  try {
+    const index = JSON.parse(readFileSync(indexPath, "utf8"));
+    const entries = Array.isArray(index?.entries) ? index.entries : [];
+    for (const e of entries) {
+      const taskId = typeof e?.taskId === "string" ? e.taskId : "";
+      if (!taskId) continue;
+      const cp = readTaskCheckpoint(runtimeRoot, taskId);
+      if (!cp) continue;
+      if (cp.finalState === "VERIFIED" || cp.finalState === "CANCELLED") continue;
+      if (cp.continuityDisposition === "interrupted") continue;
+      markTaskInterrupted(runtimeRoot, taskId, reason);
+      marked.push(taskId);
+    }
+  } catch {
+    return marked;
+  }
+  return marked;
 }

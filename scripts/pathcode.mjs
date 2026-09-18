@@ -862,6 +862,134 @@ export async function runPathcodeMain(argv, testIo = {}) {
   }
 
   /**
+   * Reconstruct Gateway ownership from durable checkpoint after interruption (S4).
+   * Distinct from /attach (live Gateway map only).
+   * @param {string} [taskId]
+   */
+  async function followResumedGatewayTask(taskId) {
+    const id = String(taskId || "").trim();
+    if (!useGateway || (!gatewayClient && !gatewayRuntime)) {
+      return {
+        ok: false,
+        message:
+          "No PATH Gateway is available in this session. Resume requires a Gateway after restart.",
+      };
+    }
+    if (activeGatewayTaskId) {
+      return {
+        ok: false,
+        message: `Already attached to task ${activeGatewayTaskId}. /stop it first, or wait for completion.`,
+      };
+    }
+
+    let sessionResult = null;
+    let continuityNote = "";
+    await runCycle(async (signal) => {
+      if (gatewayClient) {
+        const off = gatewayClient.onEvent((envelope) => {
+          const ev = envelope?.event;
+          if (!ev || typeof ev.type !== "string") return;
+          const { type, ...fields } = ev;
+          eventSink.emit(type, fields);
+        });
+        try {
+          const resumed = await gatewayClient.resumeTask(id || undefined);
+          if (!resumed?.ok && !resumed?.taskId) {
+            throw new Error(resumed?.message || "resume failed");
+          }
+          if (resumed.mode === "reconnect") {
+            continuityNote =
+              resumed.note ||
+              "Gateway still owns this task — reconnecting (same as /attach).";
+            const followed = await followAttachedGatewayTask(resumed.taskId);
+            sessionResult = followed.sessionResult || null;
+            return;
+          }
+          continuityNote = [
+            resumed.assessment?.brief || "",
+            resumed.note || "",
+            `Recovery mode: ${resumed.mode || "resume"} · disposition: ${resumed.disposition || "unknown"}`,
+          ]
+            .filter(Boolean)
+            .join("\n");
+          const resumeId = resumed.taskId || id;
+          activeGatewayTaskId = resumeId;
+          for (;;) {
+            if (signal?.aborted) break;
+            await new Promise((r) => setTimeout(r, 750));
+            const full = await gatewayClient.snapshotTask(resumeId);
+            if (!full || full.status !== "running") {
+              sessionResult =
+                (full && full.result) ||
+                {
+                  exitCode: full?.status === "completed" ? 0 : 1,
+                  classification: full?.classification,
+                  taskBranch: full?.taskBranch,
+                  commitSha: full?.commitSha,
+                };
+              break;
+            }
+          }
+        } finally {
+          activeGatewayTaskId = null;
+          off();
+        }
+      } else if (gatewayRuntime) {
+        const off = gatewayRuntime.onEvent((envelope) => {
+          const ev = envelope?.event;
+          if (!ev || typeof ev.type !== "string") return;
+          const { type, ...fields } = ev;
+          eventSink.emit(type, fields);
+        });
+        try {
+          const resumed = await gatewayRuntime.resumeTask({
+            ...(id ? { taskId: id } : {}),
+          });
+          if (!resumed?.ok) {
+            throw new Error(resumed?.message || "resume failed");
+          }
+          continuityNote = [
+            resumed.assessment?.brief || "",
+            resumed.note || "",
+            `Recovery mode: ${resumed.mode || "resume"} · disposition: ${resumed.disposition || "unknown"}`,
+          ]
+            .filter(Boolean)
+            .join("\n");
+          if (resumed.mode === "reconnect") {
+            activeGatewayTaskId = resumed.taskId;
+            await gatewayRuntime.awaitTask(resumed.taskId);
+            const full = gatewayRuntime.snapshotTask(resumed.taskId);
+            sessionResult = (full && full.result) || null;
+            return;
+          }
+          activeGatewayTaskId = resumed.taskId;
+          await gatewayRuntime.awaitTask(resumed.taskId);
+          const full = gatewayRuntime.snapshotTask(resumed.taskId);
+          sessionResult =
+            (full && full.result) ||
+            {
+              exitCode: full?.status === "completed" ? 0 : 1,
+              classification: full?.classification,
+            };
+        } finally {
+          activeGatewayTaskId = null;
+          off();
+        }
+      }
+    });
+
+    if (continuityNote) {
+      showOperatorReply(prompt, ttyInline ? inlineStudio : null, continuityNote);
+    }
+    if (sessionResult && typeof sessionResult === "object") {
+      sessionStats.taskCount += 1;
+      lastExitCode =
+        typeof sessionResult.exitCode === "number" ? sessionResult.exitCode : 0;
+    }
+    return { ok: true, sessionResult };
+  }
+
+  /**
    * Run one local AG1 (or cloud) engineering cycle; optionally AG4 delivery.
    * @param {string} taskText
    * @param {{
@@ -1309,6 +1437,27 @@ export async function runPathcodeMain(argv, testIo = {}) {
             prompt,
             ttyInline ? inlineStudio : null,
             followed.message || "Attach failed.",
+          );
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+      if (cmd === "/resume" || cmd.startsWith("/resume ")) {
+        const parts = cmd.split(/\s+/);
+        const idArg = parts[1] || "";
+        showOperatorReply(
+          prompt,
+          ttyInline ? inlineStudio : null,
+          idArg
+            ? `Resuming PATH task ${idArg} from durable state…`
+            : "Resuming latest interrupted PATH task from durable state…",
+        );
+        const followed = await followResumedGatewayTask(idArg);
+        if (!followed.ok) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            followed.message || "Resume failed.",
           );
         }
         redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);

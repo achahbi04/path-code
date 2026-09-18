@@ -4,7 +4,13 @@
 
 import { createHash } from "node:crypto";
 import { createServer } from "node:net";
-import { mkdirSync, unlinkSync, existsSync, writeFileSync, chmodSync } from "node:fs";
+import {
+  mkdirSync,
+  unlinkSync,
+  existsSync,
+  writeFileSync,
+  chmodSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createGatewayRuntime } from "./runtime.mjs";
@@ -175,6 +181,15 @@ export async function startGatewayServer(options = {}) {
   });
 
   function stop() {
+    try {
+      if (typeof runtime.markRunningTasksInterrupted === "function") {
+        runtime.markRunningTasksInterrupted(
+          "Gateway stop while task(s) still running",
+        );
+      }
+    } catch {
+      // ignore
+    }
     for (const c of clients) {
       try {
         c.destroy();
@@ -190,6 +205,11 @@ export async function startGatewayServer(options = {}) {
     }
     try {
       if (existsSync(socketPath)) unlinkSync(socketPath);
+    } catch {
+      // ignore
+    }
+    try {
+      if (existsSync(pidPath)) unlinkSync(pidPath);
     } catch {
       // ignore
     }

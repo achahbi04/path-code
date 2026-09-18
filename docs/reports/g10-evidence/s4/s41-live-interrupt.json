@@ -1,0 +1,48 @@
+{
+  "schema": "pathcode.s4.live-interrupt.v1",
+  "verdict": "LIVE-VERIFIED",
+  "steps": [
+    {
+      "step": "gateway_started",
+      "pid": 93930,
+      "socketPath": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pc-gw-081f3a6508eb749b.sock"
+    },
+    {
+      "step": "task_started",
+      "taskId": "df871485-a90c-462b-8db1-6f220b720ed6"
+    },
+    {
+      "step": "checkpoint_present",
+      "objective": "S4.1 interrupt mid-hold",
+      "worktreePath": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s41-live-vSMCrW"
+    },
+    {
+      "step": "gateway_killed",
+      "pid": 93930
+    },
+    {
+      "step": "reclaim",
+      "reclaimed": true,
+      "marked": [
+        "df871485-a90c-462b-8db1-6f220b720ed6"
+      ],
+      "deadPid": 93930
+    },
+    {
+      "step": "continuity",
+      "disposition": "interrupted",
+      "nextAction": "resume"
+    },
+    {
+      "step": "resume",
+      "mode": "resume",
+      "disposition": "interrupted",
+      "taskId": "df871485-a90c-462b-8db1-6f220b720ed6"
+    },
+    {
+      "step": "finished",
+      "status": "completed",
+      "classification": "VERIFIED"
+    }
+  ]
+}

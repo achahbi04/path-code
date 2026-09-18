@@ -1,0 +1,9 @@
+S4.1 live interrupt — spawn Gateway (fake engine, hold 6s)
+task started df871485-a90c-462b-8db1-6f220b720ed6
+checkpoint durable at /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/pathcode-s41-live-vSMCrW
+SIGKILL gateway pid 93930
+reclaim reclaimed=true marked=df871485-a90c-462b-8db1-6f220b720ed6
+continuity: interrupted → resume
+resume mode=resume disposition=interrupted
+finished status=completed classification=VERIFIED
+VERDICT: LIVE-VERIFIED

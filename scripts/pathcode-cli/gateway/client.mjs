@@ -149,6 +149,23 @@ export function createGatewayClient(options = {}) {
     return res.result;
   }
 
+  async function resumeTask(taskId, extra = {}) {
+    const res = await request(GatewayMethods.TASK_RESUME, {
+      ...(taskId ? { taskId } : {}),
+      ...extra,
+    });
+    if (res.error) throw new Error(res.error.message);
+    return res.result;
+  }
+
+  async function assessContinuity(taskId) {
+    const res = await request(GatewayMethods.TASK_CONTINUITY, {
+      ...(taskId ? { taskId } : {}),
+    });
+    if (res.error) throw new Error(res.error.message);
+    return res.result;
+  }
+
   async function snapshotTask(taskId) {
     const res = await request(GatewayMethods.TASK_SNAPSHOT, { taskId });
     if (res.error) throw new Error(res.error.message);
@@ -232,6 +249,8 @@ export function createGatewayClient(options = {}) {
     bindProject,
     startTask,
     attachTask,
+    resumeTask,
+    assessContinuity,
     snapshotTask,
     steerTask,
     cancelTask,

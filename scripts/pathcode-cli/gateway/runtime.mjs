@@ -37,6 +37,16 @@ import {
   resolvePreferredEngine,
 } from "../ag10/engine-contract.mjs";
 import { resolveCursorApiKey } from "../ag10/cursor-sdk.mjs";
+import {
+  findLatestResumableCheckpoint,
+  markTaskInterrupted,
+  readTaskCheckpoint,
+  writeTaskCheckpoint,
+} from "../ag10/task-checkpoint.mjs";
+import {
+  assessTaskContinuity,
+  formatContinuityBrief,
+} from "../ag10/task-continuity.mjs";
 
 /**
  * @typedef {{
@@ -443,6 +453,37 @@ export function createGatewayRuntime(options = {}) {
       prompt.beginCycle();
       try {
         if (process.env.PATHCODE_GATEWAY_FAKE_ENGINE === "1") {
+          // Persist a durable checkpoint early so Gateway kill mid-run leaves
+          // recoverable PATH task reality (S4 continuity evidence).
+          try {
+            writeTaskCheckpoint(runtimeRoot, {
+              schema: "pathcode.g10.task-checkpoint.v1",
+              taskId: task.taskId,
+              sessionId: task.sessionId,
+              repoRoot: task.projectRoot,
+              worktreePath: task.projectRoot,
+              objective,
+              preferredEngine: preferredEngine || undefined,
+              updatedAt: new Date().toISOString(),
+            });
+            task.worktreePath = task.projectRoot;
+          } catch {
+            /* ignore */
+          }
+          const holdMs = Number(process.env.PATHCODE_GATEWAY_FAKE_HOLD_MS || 0);
+          if (Number.isFinite(holdMs) && holdMs > 0) {
+            await new Promise((r) => setTimeout(r, holdMs));
+            if (abort.signal.aborted || prompt.isCycleCancelRequested()) {
+              task.status = "cancelled";
+              task.classification = "CANCELLED";
+              task.result = { exitCode: 130, classification: "CANCELLED" };
+              emitTaskEvent(task, "gateway.task.finished", {
+                status: task.status,
+                classification: task.classification,
+              });
+              return;
+            }
+          }
           // Yield so mid-cycle steer can enqueue before the scripted turn finishes.
           await new Promise((r) => setTimeout(r, 40));
           emitTaskEvent(task, "session.capability.preparing", {
@@ -618,6 +659,15 @@ export function createGatewayRuntime(options = {}) {
           // Keep Gateway taskId === session/worktree taskId so /inspect,
           // reports, and checkpoints share one durable identity.
           taskId: task.taskId,
+          ...(typeof params.resumeTaskId === "string" && params.resumeTaskId
+            ? {
+                resumeTaskId: String(params.resumeTaskId),
+                resumeWorktreePath:
+                  typeof params.resumeWorktreePath === "string"
+                    ? params.resumeWorktreePath
+                    : undefined,
+              }
+            : {}),
           sessionBaseCommit:
             typeof params.sessionBaseCommit === "string"
               ? params.sessionBaseCommit
@@ -767,6 +817,207 @@ export function createGatewayRuntime(options = {}) {
   }
 
   /**
+   * Assess durable + live continuity for a task (S4).
+   * @param {Record<string, unknown>} [params]
+   */
+  function assessContinuity(params = {}) {
+    const taskId =
+      typeof params.taskId === "string" && params.taskId.trim()
+        ? params.taskId.trim()
+        : "";
+    const live = taskId ? tasks.get(taskId) || null : null;
+    const assessment = assessTaskContinuity({
+      runtimeRoot,
+      taskId: taskId || null,
+      liveTask: live
+        ? { status: live.status, result: live.result }
+        : null,
+      gatewayPidAlive: true,
+    });
+    return {
+      ok: true,
+      ...assessment,
+      brief: formatContinuityBrief(assessment),
+    };
+  }
+
+  /**
+   * Resume or reconnect an interrupted / incomplete PATH task from durable state.
+   * Distinct from task.attach (live Gateway map only).
+   *
+   * @param {Record<string, unknown>} [params]
+   */
+  async function resumeTask(params = {}) {
+    let taskId =
+      typeof params.taskId === "string" && params.taskId.trim()
+        ? params.taskId.trim()
+        : "";
+    if (!taskId) {
+      const latest = findLatestResumableCheckpoint(runtimeRoot);
+      taskId = latest?.taskId || "";
+    }
+    if (!taskId) {
+      return {
+        ok: false,
+        code: "NO_RESUMABLE_TASK",
+        message: "No resumable checkpoint found",
+      };
+    }
+
+    const live = tasks.get(taskId);
+    if (live && live.status === "running") {
+      return {
+        ok: true,
+        mode: "reconnect",
+        disposition: "still_running",
+        taskId,
+        assessment: assessContinuity({ taskId }),
+        snapshot: snapshotTask(live),
+        note: "Gateway still owns this task — use attach/events; no reconstruct needed",
+      };
+    }
+    if (live && live.status === "stopping") {
+      return {
+        ok: false,
+        code: "TASK_STOPPING",
+        message: `task ${taskId} is still stopping`,
+        taskId,
+      };
+    }
+
+    const cp = readTaskCheckpoint(runtimeRoot, taskId);
+    if (!cp) {
+      return {
+        ok: false,
+        code: "CHECKPOINT_NOT_FOUND",
+        message: `no durable checkpoint for ${taskId}`,
+        taskId,
+      };
+    }
+
+    const assessment = assessTaskContinuity({
+      runtimeRoot,
+      taskId,
+      liveTask: live ? { status: live.status, result: live.result } : null,
+      checkpoint: cp,
+      gatewayPidAlive: true,
+    });
+
+    if (
+      assessment.disposition === "completed" ||
+      assessment.disposition === "abandoned"
+    ) {
+      return {
+        ok: false,
+        code: "TASK_NOT_RESUMABLE",
+        message: `task ${taskId} is ${assessment.disposition}`,
+        taskId,
+        assessment,
+      };
+    }
+
+    if (
+      !assessment.worktreeExists &&
+      process.env.PATHCODE_GATEWAY_FAKE_ENGINE !== "1"
+    ) {
+      return {
+        ok: false,
+        code: "WORKTREE_MISSING",
+        message: `worktree missing for ${taskId}`,
+        taskId,
+        assessment,
+      };
+    }
+
+    if (cp.repoRoot) {
+      const bound = await bindProject({ cwd: String(cp.repoRoot) });
+      if (!bound.ok) return bound;
+    } else if (!project.projectRoot) {
+      const bound = await bindProject({
+        cwd: typeof params.cwd === "string" ? params.cwd : undefined,
+      });
+      if (!bound.ok) return bound;
+    }
+
+    if (live) tasks.delete(taskId);
+
+    const objective = normalizeObjectiveText(
+      (typeof params.objective === "string" && params.objective.trim()) ||
+        (typeof cp.objective === "string" && cp.objective) ||
+        "Continue the interrupted PATH engineering task from durable state.",
+    );
+
+    const preferredEngine = resolvePreferredEngine({
+      prefer:
+        (typeof params.preferredEngine === "string" && params.preferredEngine) ||
+        (typeof cp.preferredEngine === "string" && cp.preferredEngine) ||
+        null,
+    });
+
+    const started = await startTask({
+      ...params,
+      taskId,
+      objective,
+      taskText: objective,
+      preferredEngine: preferredEngine || undefined,
+      resumeTaskId: taskId,
+      resumeWorktreePath: cp.worktreePath,
+      cwd: cp.repoRoot || params.cwd,
+      continuityResume: true,
+      continuityDisposition: assessment.disposition,
+      continuityReason: assessment.reason,
+    });
+
+    if (!started.ok) return started;
+
+    const owned = tasks.get(taskId);
+    if (owned) {
+      emitTaskEvent(owned, "session.hydration", {
+        stage: "continuity_resume",
+        disposition: assessment.disposition,
+        detail: assessment.reason,
+        mode: "reconstruct",
+      });
+    }
+
+    return {
+      ok: true,
+      mode: "resume",
+      disposition: assessment.disposition,
+      taskId,
+      sessionId: started.sessionId,
+      preferredEngine: preferredEngine || null,
+      assessment: {
+        ...assessment,
+        brief: formatContinuityBrief(assessment),
+      },
+      snapshot: started.snapshot,
+      note:
+        "Reconstructed Gateway ownership from durable checkpoint/worktree. Engine-native resume is attempted only when session ids remain valid.",
+    };
+  }
+
+  /**
+   * Mark running tasks interrupted in durable checkpoints (Gateway stop/crash reclaim).
+   * @param {string} [reason]
+   * @returns {string[]}
+   */
+  function markRunningTasksInterrupted(reason) {
+    /** @type {string[]} */
+    const ids = [];
+    for (const task of tasks.values()) {
+      if (task.status !== "running" && task.status !== "stopping") continue;
+      markTaskInterrupted(
+        runtimeRoot,
+        task.taskId,
+        reason || "Gateway shutdown while task running",
+      );
+      ids.push(task.taskId);
+    }
+    return ids;
+  }
+
+  /**
    * @param {string} method
    * @param {Record<string, unknown>} params
    * @param {string} reqId
@@ -821,6 +1072,15 @@ export function createGatewayRuntime(options = {}) {
             snapshot: snapshotTask(task),
             note: "Subscribe to events for this taskId; snapshot is current reality",
           });
+        }
+        case GatewayMethods.TASK_RESUME: {
+          const r = await resumeTask(params);
+          return r.ok
+            ? makeResult(reqId, r)
+            : makeError(reqId, r.code || "RESUME_FAILED", r.message || "resume failed");
+        }
+        case GatewayMethods.TASK_CONTINUITY: {
+          return makeResult(reqId, assessContinuity(params));
         }
         case GatewayMethods.TASK_STEER: {
           const r = steerTask(String(params.taskId || ""), String(params.text || ""));
@@ -903,6 +1163,9 @@ export function createGatewayRuntime(options = {}) {
     dispatch,
     bindProject,
     startTask,
+    resumeTask,
+    assessContinuity,
+    markRunningTasksInterrupted,
     steerTask,
     cancelTask,
     awaitTask,

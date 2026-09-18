@@ -64,6 +64,7 @@ export function renderWelcomeScreen(opts = {}) {
     "  /merge · /discard · /pr   Result lifecycle",
     "  /prefs · /model · /autonomy   Preferences",
     "  /attach [id]        Rejoin a Gateway-owned task still running",
+    "  /resume [id]        Recover an interrupted task from durable state",
     "  /help               Full command list",
     "  /exit               Leave",
     "",
@@ -110,6 +111,7 @@ At the prompt:
   /discard [id]  Abandon a task result (primary untouched; history kept)
   /pr [id]       Push task branch + open/reuse a GitHub pull request
   /attach [id]   Rejoin a Gateway-owned task that is still running
+  /resume [id]   Recover an interrupted task from durable checkpoint/worktree
   /log, /task    Show recent structured task trace lines
   /model <id>    Set model for subsequent tasks (persisted)
   /autonomy …    Set review|bounded for subsequent tasks (persisted)
@@ -138,6 +140,7 @@ Notes:
   - First run bootstraps a private engine runtime automatically
   - Normal reopen keeps durable history, reports, and preferences
   - External Gateway (PATHCODE_GATEWAY_EXTERNAL=1): disconnect ≠ cancel;
-    use /attach to rejoin a still-running task (not crash recovery)
+    use /attach to rejoin a still-running task
+  - After Gateway/process loss: use /resume to reconstruct from durable state
 `;
 }

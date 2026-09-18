@@ -19,6 +19,8 @@ export const GatewayMethods = Object.freeze({
   TASK_START: "task.start",
   TASK_SNAPSHOT: "task.snapshot",
   TASK_ATTACH: "task.attach",
+  TASK_RESUME: "task.resume",
+  TASK_CONTINUITY: "task.continuity",
   TASK_STEER: "task.steer",
   TASK_CANCEL: "task.cancel",
   TASK_LIST: "task.list",

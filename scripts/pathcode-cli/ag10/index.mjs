@@ -8,6 +8,8 @@ import {
   readTaskCheckpoint,
   findLatestResumableCheckpoint,
   writeTaskCheckpoint,
+  markTaskInterrupted,
+  markIncompleteCheckpointsInterrupted,
 } from "./task-checkpoint.mjs";
 import {
   captureTaskReality,
@@ -752,6 +754,8 @@ export {
   createCheckpointSkeleton,
   writeTaskCheckpoint,
   patchTaskCheckpoint,
+  markTaskInterrupted,
+  markIncompleteCheckpointsInterrupted,
   captureTaskReality,
   reconcileTaskReality,
   detectProgress,
@@ -763,6 +767,12 @@ export {
   withMutationLease,
   SteeringQueue,
 };
+
+export {
+  assessTaskContinuity,
+  formatContinuityBrief,
+  isPidAlive,
+} from "./task-continuity.mjs";
 
 export {
   normalizeG10Event,

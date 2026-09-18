@@ -11,5 +11,5 @@ export {
   resolveGatewayPidPath,
 } from "./server.mjs";
 export { createGatewayClient } from "./client.mjs";
-export { ensureGateway, readGatewayPid } from "./ensure.mjs";
+export { ensureGateway, readGatewayPid, reclaimStaleGatewayOwnership } from "./ensure.mjs";
 export { runHeadlessMain } from "./headless.mjs";
