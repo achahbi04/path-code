@@ -1,5 +1,6 @@
 /**
  * G9 — exclusive per-tool install locks (atomic mkdir lockdir).
+ * S4.2 — owner.json carries pid + startKey so PID reuse cannot hold a lease.
  */
 
 import {
@@ -10,6 +11,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import {
+  captureProcessIdentity,
+  processMatchesIdentity,
+} from "../process-identity.mjs";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_STALE_MS = 15 * 60 * 1000;
@@ -31,9 +36,14 @@ function safeKey(toolKey) {
 function tryAcquireLockDir(lockPath) {
   try {
     mkdirSync(lockPath);
+    const identity = captureProcessIdentity(process.pid);
     writeFileSync(
       join(lockPath, "owner.json"),
-      JSON.stringify({ pid: process.pid, ts: Date.now() }),
+      JSON.stringify({
+        pid: process.pid,
+        startKey: identity?.startKey || "",
+        ts: Date.now(),
+      }),
       { encoding: "utf8" },
     );
     return true;
@@ -57,6 +67,8 @@ function releaseLockDir(lockPath) {
 }
 
 /**
+ * Stale when owner pid is dead, startKey no longer matches (PID reuse),
+ * or the lock exceeded staleMs.
  * @param {string} lockPath
  * @param {number} staleMs
  */
@@ -64,7 +76,6 @@ function isLockStale(lockPath, staleMs) {
   try {
     const ownerPath = join(lockPath, "owner.json");
     if (!existsSync(ownerPath)) {
-      // Empty/corrupt lockdir — treat as stale after a short grace via mtime absence.
       return true;
     }
     const raw = JSON.parse(readFileSync(ownerPath, "utf8"));
@@ -72,12 +83,9 @@ function isLockStale(lockPath, staleMs) {
     if (Date.now() - ts > staleMs) return true;
     const pid = typeof raw.pid === "number" ? raw.pid : 0;
     if (pid > 0) {
-      try {
-        process.kill(pid, 0);
-        return false;
-      } catch {
-        return true;
-      }
+      const startKey = typeof raw.startKey === "string" ? raw.startKey : "";
+      if (processMatchesIdentity(pid, startKey)) return false;
+      return true;
     }
     return Date.now() - ts > staleMs;
   } catch {
@@ -130,3 +138,6 @@ export async function withToolLock(lockDir, toolKey, fn, opts = {}) {
     releaseLockDir(lockPath);
   }
 }
+
+/** @internal test/export */
+export { isLockStale, tryAcquireLockDir, releaseLockDir };

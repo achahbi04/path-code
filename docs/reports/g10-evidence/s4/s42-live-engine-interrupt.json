@@ -1,0 +1,59 @@
+{
+  "schema": "pathcode.s4.engine-interrupt.v1",
+  "verdict": "LIVE-VERIFIED",
+  "steps": [
+    {
+      "step": "in_flight_checkpoint",
+      "latestEngineTurn": "in_flight:antigravity",
+      "taskId": "7934d87b-a533-47cb-8b75-841adc5e7bc2"
+    },
+    {
+      "step": "engine_registered",
+      "pid": 67207,
+      "startKey": "ps:67207:Fri Sep 18 19:43:08 2026",
+      "alive": true
+    },
+    {
+      "step": "reconcile_after_kill",
+      "liveKinds": [],
+      "processes": [
+        {
+          "id": "39646aa5-fd92-4ef0-ac60-1f6043d76a6e",
+          "kind": "antigravity_bridge",
+          "pid": 67207,
+          "startKey": "ps:67207:Fri Sep 18 19:43:08 2026",
+          "command": "node engine-hold",
+          "startedAt": "2026-09-18T17:43:08.302Z",
+          "endedAt": "2026-09-18T17:43:08.501Z",
+          "status": "ended"
+        }
+      ]
+    },
+    {
+      "step": "interrupted",
+      "disposition": "interrupted",
+      "nextAction": "resume"
+    },
+    {
+      "step": "resume",
+      "ok": true,
+      "mode": "resume",
+      "taskId": "7934d87b-a533-47cb-8b75-841adc5e7bc2",
+      "disposition": "interrupted"
+    },
+    {
+      "step": "finished",
+      "status": "completed",
+      "classification": "VERIFIED"
+    },
+    {
+      "step": "cursor_native_policy",
+      "detail": "Cursor Agent.resume attempted on ensureConnected; create fallback is not labeled native resume"
+    }
+  ],
+  "cursorProbe": {
+    "ready": true,
+    "status": "ready",
+    "reason": null
+  }
+}

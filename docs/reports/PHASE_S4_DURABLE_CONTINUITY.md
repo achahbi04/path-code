@@ -1,9 +1,10 @@
 # PATH CODE — S4
 # DURABLE CONTINUITY & RECOVERY
 
-**S4 RESULT:** **S4.1 LIVE-VERIFIED** (first slice — ready for continued S4 work)  
+**S4 RESULT:** **S4.2 LIVE-VERIFIED** (engine/process interruption while Gateway alive)  
 **S3 stage freeze (do not reopen):** `89eea9992c1bb30763413aa0054d93481c65fcb2`  
-**S4.1 checkpoint tip:** `3bea879358a2598a41c6632ecb530da446f1c936`
+**S4.1:** **ACCEPTED / FROZEN** — `3bea879358a2598a41c6632ecb530da446f1c936` — do not reopen / do not re-prove Gateway SIGKILL  
+**S4.2 checkpoint tip:** _(recorded at commit)_
 
 **Prior stage:** S3 Unified Engine Fabric — **FROZEN / STAGE COMPLETE** (no S3.3)
 
@@ -16,89 +17,76 @@
 Make PATH Code durable across interruption:
 
 ```
-start real engineering
+one durable PATH task
     ↓
-PATH / Gateway / engine / terminal interrupted
+processes / Gateway / engines may come and go
     ↓
-start PATH again
+PATH reconciles what is actually alive
     ↓
-PATH understands durable task state
+reconnects or resumes where genuinely supported
     ↓
-recover / reconnect / resume where genuinely supported
+otherwise reconstructs from durable PATH reality
     ↓
-otherwise continue safely from preserved engineering reality
-    ↓
-one coherent task history and result
+continues the same task truthfully
 ```
 
-Truthful dispositions only:
+Never pretend restarting an engine ≡ native engine-session resume.
 
-| Disposition | Meaning |
+---
+
+## S4.1 — ACCEPTED / FROZEN
+
+Gateway SIGKILL → reclaim → `task.resume` same taskId.  
+Evidence: `g10-evidence/s4/s41-live-interrupt.json`. **Do not ask operators to reproduce.**
+
+---
+
+## S4.2 — Engine / process interruption (this slice)
+
+**Why:** S4.1 fixed Gateway death. Engines could still die while Gateway stayed up — bridge exit hung until wall-clock, mid-turn facts lagged, PIDs/leases could be trusted stale, and interrupt was not an honest disposition.
+
+### Gaps found
+
+| Gap | Detail |
 | --- | --- |
-| `still_running` | Gateway Map still owns a live task |
-| `reconnectable` | same — `/attach` |
-| `resumable` | incomplete CP + worktree + engine session ids present |
-| `interrupted` | durable state marked after Gateway/process loss |
-| `recoverable_from_durable_state` | CP + worktree; no native session claim |
-| `completed` / `failed` / `abandoned` | terminal |
+| AG bridge close | Logged only; no terminal event → session hung on wall budget |
+| Mid-turn lag | Session ids / in-flight turn not durable until turn end |
+| Process registry | RAM-only; bare pid kill could hit reused PIDs |
+| Leases | owner.json pid-only; reused PID could hold lock until staleMs |
+| Report write | Non-atomic truncate risk |
+| Engine death | Not marked `interrupted`; often collapsed to FAILED |
 
-Never pretend restarting an engine ≡ native session resume.
+### Engine recovery matrix (honest)
 
----
+| Engine | Native after process death | PATH recovery |
+| --- | --- | --- |
+| **Antigravity** | Only while bridge live (`continueNative`) | Rehydrate from PATH reality (`REHYDRATED_SESSION`) |
+| **Copilot** | `resumeSession` attempted if session id durable | Create / CLI fallback — not labeled native when `resumed:false` |
+| **Cursor** | `Agent.resume` attempted if agent id durable | `Agent.create` fallback — not labeled native when `resumed:false` |
 
-## Gaps discovered (pre-S4.1 audit)
+### Process / lease reconciliation
 
-**Already durable:** G10 checkpoints, worktrees/branches, reports, history, collab journal, engine session ids on checkpoint, lockdirs with pid-stale reclaim.
+- `process-identity.mjs` — pid + startKey (`ps` lstart / linux starttime)
+- Lock `owner.json` stores startKey; mismatch ⇒ stale (PID reuse safe)
+- `cancelTaskProcesses` only signals bare PIDs that still match identity
+- Durable `{taskId}.processes.json` sidecar + `reconcileTaskProcesses`
+- Bridge register writes sidecar; death → ended/stale
 
-**Process-local only:** Gateway task Map, project bind, process-registry PIDs, live SDK/bridge handles, event bus.
+### Checkpoint / atomicity
 
-**Stale risk:** Gateway pid/socket files not cleared on crash; `/attach` only for live Map; library `resumeTaskId` existed but was not product-wired.
-
----
-
-## S4.1 — First slice (chosen)
-
-**Gateway interrupt → restart recovery via existing checkpoint + worktree reopen.**
-
-**Why:** Continuity *data* already survived; ownership after Gateway death did not. Smallest coherent unlock is `task.resume` + disposition assessment + stale pid/socket reclaim — not a second persistence system.
+- `beginEngineTurn(engine)` → `latestEngineTurn: in_flight:…` before turns
+- `noteEngineInterrupted` / AG `BRIDGE_EXIT` → `continuityDisposition=interrupted` without FAILED finalState
+- `clearTaskInterrupted` / `noteContinuityRestored` after successful reconstruct (native vs rehydrate labeled honestly)
+- Engineering report: temp + rename
 
 ### Delivered
 
-- `assessTaskContinuity` / `formatContinuityBrief` (`ag10/task-continuity.mjs`)
-- Checkpoint `continuityDisposition` / `interruptedAt` + `markTaskInterrupted`
-- Gateway `task.resume` + `task.continuity`
-- `reclaimStaleGatewayOwnership` on ensure; pid cleared on server stop; running tasks marked interrupted on stop
-- CLI `/resume [id]` (distinct from `/attach`)
-- Fake-engine early checkpoint + hold for kill tests
-- Mechanical tests + live SIGKILL Gateway → reclaim → resume
-
-### Durable state model (S4.1)
-
-```
-~/.path-code/runtime/v*/metadata/tasks/{taskId}.checkpoint.json
-  + worktree / path/task-* branch
-  + report / history / collab journal
-  + continuityDisposition / interruptedAt (when interrupted)
-Gateway Map (process-local ownership)
-  ← reconstructed by task.resume from checkpoint
-```
-
-### Recovery behavior
-
-1. Live Map running → reconnect (`/attach` or resume→reconnect)
-2. Socket dead + pid dead → reclaim; mark incomplete CPs interrupted
-3. `/resume` → bind project from CP → reopen worktree via `resumeTaskId` → fabric reconcile → engine `ensureConnected` when ids present (honest fallback to rehydrate/create)
-4. VERIFIED/CANCELLED → not resumable (inspect)
-
-### Engine-specific (honest)
-
-| Engine | On resume after process loss |
-| --- | --- |
-| Antigravity | Usually rehydrate (native only while bridge live) |
-| Copilot | `resumeSessionId` attempted; create/fallback if invalid |
-| Cursor | `Agent.resume` attempted; create if invalid |
-
-PATH task identity remains durable regardless.
+- Bridge unexpected close → `failed` + `interrupted` terminal (no hang)
+- Session `INTERRUPTED` disposition; same `taskId` remains resumable
+- Fabric begin/interrupt/restore hooks for Cursor/Copilot/AG turns
+- Process identity + durable sidecar + lock reclaim
+- Atomic report writes
+- Mechanical + live engine-kill evidence
 
 ---
 
@@ -106,23 +94,23 @@ PATH task identity remains durable regardless.
 
 | Lane | Status |
 | --- | --- |
-| **IMPLEMENTED** | Continuity dispositions + Gateway resume + stale reclaim + `/resume` |
-| **MECHANICALLY TESTED** | `tests/s4/continuity.test.ts` |
-| **LIVE-VERIFIED** | `run-s41-live-interrupt.mjs` → SIGKILL Gateway mid-hold → resume same taskId |
-| **REMAINING S4** | Real-engine native resume after kill; reboot story; process-registry orphans; mid-turn checkpoint lag; report atomicity; richer operator UX on reopen |
+| **S4.1** | ACCEPTED / FROZEN |
+| **S4.2 IMPLEMENTED** | Engine death detection + process/lease reconcile + mid-turn heartbeat |
+| **MECHANICALLY TESTED** | `tests/s4/continuity.test.ts` + `tests/s4/engine-process-durability.test.ts` |
+| **LIVE-VERIFIED** | `run-s42-live-engine-interrupt.mjs` — kill registered engine child, Gateway up → interrupted → resume same taskId |
+| **REMAINING S4** | Full Mac reboot product UX; polished interrupted-task reopen choices; guaranteeing provider cloud resume after reboot; optional register of Copilot CLI children |
 
 ---
 
 ## Evidence
 
-- [`g10-evidence/s4/s41-live-interrupt.json`](./g10-evidence/s4/s41-live-interrupt.json)
-- `s41-live-interrupt-run.txt`, `s41-focused-tests.txt`
+- S4.1: `g10-evidence/s4/s41-live-interrupt.json`
+- S4.2: `g10-evidence/s4/s42-live-engine-interrupt.json`, `s42-focused-tests.txt`
 
 ---
 
-## Out of scope for S4.1 / later S4
+## Out of scope (later S4 / later stages)
 
-- Guaranteeing provider-native conversation resume after reboot
-- Persisting process-registry across reboot
+- Full machine-reboot operator experience
 - PATH Build / Studio
-- Inventing a second journal/DB beside G10 checkpoints
+- Second persistence DB beside G10 checkpoints

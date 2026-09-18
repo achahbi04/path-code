@@ -10,7 +10,9 @@ import {
   writeTaskCheckpoint,
   markTaskInterrupted,
   markIncompleteCheckpointsInterrupted,
+  clearTaskInterrupted,
 } from "./task-checkpoint.mjs";
+import { reconcileTaskProcesses } from "../task-processes.mjs";
 import {
   captureTaskReality,
   reconcileTaskReality,
@@ -161,6 +163,81 @@ export async function createG10Fabric(options) {
     return checkpoint;
   }
 
+  /**
+   * S4.2 — durable heartbeat before an engine turn so mid-turn death still
+   * leaves authoritative task/engine/worktree facts.
+   * @param {string} engine
+   */
+  function beginEngineTurn(engine) {
+    try {
+      reconcileTaskProcesses(options.runtimeRoot, options.taskId);
+    } catch {
+      /* ignore */
+    }
+    return persist({
+      latestEngineTurn: `in_flight:${engine}`,
+      preferredEngine:
+        typeof options.preferredEngine === "string"
+          ? options.preferredEngine
+          : checkpoint.preferredEngine,
+    });
+  }
+
+  /**
+   * Honest engine interruption while Gateway may still be alive.
+   * @param {string} engine
+   * @param {string} reason
+   * @param {{ nativeResumePossible?: boolean }} [extra]
+   */
+  function noteEngineInterrupted(engine, reason, extra = {}) {
+    markTaskInterrupted(
+      options.runtimeRoot,
+      options.taskId,
+      `${engine}: ${reason}`,
+    );
+    persist({
+      latestEngineTurn: `interrupted:${engine}`,
+      continuityDisposition: "interrupted",
+      interruptedAt: new Date().toISOString(),
+      continuityReason: String(reason).slice(0, 400),
+    });
+    emitG10({
+      family: "task.interrupted",
+      engine,
+      detail: String(reason).slice(0, 200),
+      payload: {
+        nativeResumePossible: extra.nativeResumePossible === true,
+        recovery: "path_durable_rehydrate_or_native_if_valid",
+      },
+    });
+    emitSession({
+      type: "session.hydration",
+      stage: "engine_interrupted",
+      detail: String(reason).slice(0, 200),
+      mode: engine,
+    });
+  }
+
+  /**
+   * After a successful reconstruct/resume attach, clear interrupt markers.
+   * @param {{ mode?: string, resumed?: boolean }} [info]
+   */
+  function noteContinuityRestored(info = {}) {
+    clearTaskInterrupted(
+      options.runtimeRoot,
+      options.taskId,
+      info.resumed
+        ? "native engine session resumed — same PATH task"
+        : "PATH durable rehydrate — same PATH task (not native session resume)",
+    );
+    persist({
+      continuityDisposition: "active",
+      continuityReason: info.resumed
+        ? `native_resume:${info.mode || "engine"}`
+        : `path_rehydrate:${info.mode || "engine"}`,
+    });
+  }
+
   async function attachCopilot() {
     // Prefer default Copilot auth discovery (~/.copilot). Only use an explicit
     // PATH-owned configDirectory when the caller opts in — isolating config
@@ -182,6 +259,32 @@ export async function createG10Fabric(options) {
       copilotMode: copilot.getMode(),
       copilotSessionId: copilot.getSessionId() || undefined,
     });
+    if (connected?.ok) {
+      const wasInterrupted =
+        checkpoint.continuityDisposition === "interrupted" ||
+        typeof checkpoint.interruptedAt === "string";
+      if (wasInterrupted) {
+        noteContinuityRestored({
+          mode: copilot.getMode(),
+          resumed: connected.resumed === true,
+        });
+      }
+      emitG10({
+        family: "collaboration.handoff",
+        engine: "copilot",
+        detail:
+          connected.resumed === true
+            ? "Copilot native session resumed"
+            : wasInterrupted
+              ? "Copilot session ready (PATH rehydrate / create — not claimed as native resume)"
+              : `Copilot ${copilot.getMode()} ready`,
+        payload: {
+          resumed: connected.resumed === true,
+          mode: copilot.getMode(),
+          restoredFromInterrupt: wasInterrupted,
+        },
+      });
+    }
     if (copilot.getMode() === "cli_fallback") {
       emitG10({
         family: "degraded.mode",
@@ -208,6 +311,32 @@ export async function createG10Fabric(options) {
       cursorMode: cursor.getMode(),
       cursorSessionId: cursor.getSessionId() || undefined,
     });
+    if (connected?.ok) {
+      const wasInterrupted =
+        checkpoint.continuityDisposition === "interrupted" ||
+        typeof checkpoint.interruptedAt === "string";
+      if (wasInterrupted) {
+        noteContinuityRestored({
+          mode: cursor.getMode(),
+          resumed: connected.resumed === true,
+        });
+      }
+      emitG10({
+        family: "collaboration.handoff",
+        engine: "cursor",
+        detail:
+          connected.resumed === true
+            ? "Cursor native session resumed"
+            : wasInterrupted
+              ? "Cursor session ready (PATH rehydrate / create — not claimed as native resume)"
+              : `Cursor ${cursor.getMode()} ready`,
+        payload: {
+          resumed: connected.resumed === true,
+          mode: cursor.getMode(),
+          restoredFromInterrupt: wasInterrupted,
+        },
+      });
+    }
     return connected;
   }
 
@@ -297,6 +426,7 @@ export async function createG10Fabric(options) {
       .join("\n");
 
     const before = captureTaskReality(options.worktreePath, options.toolEnv);
+    beginEngineTurn("copilot");
     steering.setMutationActive(true);
     try {
       const leased = await withMutationLease(
@@ -323,6 +453,19 @@ export async function createG10Fabric(options) {
           return result;
         },
       );
+      if (
+        leased &&
+        leased.ok === false &&
+        /SDK_FAILURE|TIMEOUT|ECONN|PROCESS|EXIT|disconnect/i.test(
+          `${leased.code || ""} ${leased.detail || ""}`,
+        )
+      ) {
+        noteEngineInterrupted(
+          "copilot",
+          String(leased.detail || leased.code || "copilot turn failed"),
+          { nativeResumePossible: Boolean(checkpoint.copilotSessionId) },
+        );
+      }
       const after = captureTaskReality(options.worktreePath, options.toolEnv);
       const progress = detectProgress({ before, after });
       resources.recordHandoff();
@@ -400,6 +543,7 @@ export async function createG10Fabric(options) {
       .join("\n");
 
     const before = captureTaskReality(options.worktreePath, options.toolEnv);
+    beginEngineTurn("cursor");
     steering.setMutationActive(true);
     try {
       const leased = await withMutationLease(
@@ -427,6 +571,19 @@ export async function createG10Fabric(options) {
           return result;
         },
       );
+      if (
+        leased &&
+        leased.ok === false &&
+        /SDK_FAILURE|TIMEOUT|ECONN|PROCESS|EXIT|disconnect|unavailable/i.test(
+          `${leased.code || ""} ${leased.detail || ""}`,
+        )
+      ) {
+        noteEngineInterrupted(
+          "cursor",
+          String(leased.detail || leased.code || "cursor turn failed"),
+          { nativeResumePossible: Boolean(checkpoint.cursorSessionId) },
+        );
+      }
       const after = captureTaskReality(options.worktreePath, options.toolEnv);
       const progress = detectProgress({ before, after });
       resources.recordHandoff();
@@ -499,6 +656,7 @@ export async function createG10Fabric(options) {
 
     applySteeringBoundary();
     const before = captureTaskReality(options.worktreePath, options.toolEnv);
+    beginEngineTurn("antigravity");
     steering.setMutationActive(true);
     try {
       const leased = await withMutationLease(
@@ -717,6 +875,9 @@ export async function createG10Fabric(options) {
     emitG10,
     emitSession,
     persist,
+    beginEngineTurn,
+    noteEngineInterrupted,
+    noteContinuityRestored,
     attachCopilot,
     attachCursor,
     attachAntigravity,
@@ -756,6 +917,7 @@ export {
   patchTaskCheckpoint,
   markTaskInterrupted,
   markIncompleteCheckpointsInterrupted,
+  clearTaskInterrupted,
   captureTaskReality,
   reconcileTaskReality,
   detectProgress,

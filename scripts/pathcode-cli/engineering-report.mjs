@@ -5,7 +5,7 @@
  * and post-session plain text. No second summary shape.
  */
 
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { resolvePathRuntimeRoot } from "./paths.mjs";
 import { normalizeObjectiveText } from "./normalize-text.mjs";
@@ -1035,7 +1035,11 @@ export function writeEngineeringReportFile(taskId, plain, runtimeRoot) {
   if (!id) return null;
   const path = resolveEngineeringReportPath(id, runtimeRoot);
   mkdirSync(join(path, ".."), { recursive: true });
-  writeFileSync(path, plain.endsWith("\n") ? plain : `${plain}\n`, "utf8");
+  const body = plain.endsWith("\n") ? plain : `${plain}\n`;
+  // Atomic write — process death must not leave a truncated authoritative report.
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmp, body, "utf8");
+  renameSync(tmp, path);
   return path;
 }
 

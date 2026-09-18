@@ -4,6 +4,9 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
+import { captureProcessIdentity, processMatchesIdentity } from "./process-identity.mjs";
+import { upsertTaskProcess } from "./task-processes.mjs";
+import { resolvePathRuntimeRoot } from "./paths.mjs";
 
 /** @type {AsyncLocalStorage<{ taskId: string | null }>} */
 const taskContext = new AsyncLocalStorage();
@@ -58,6 +61,7 @@ export function killProcessTree(child, signal = "SIGTERM") {
  *   command: string,
  *   pid: number | null,
  *   pgid: number | null,
+ *   startKey: string,
  *   startedAt: string,
  *   endedAt: string | null,
  *   exitCode: number | null,
@@ -80,6 +84,7 @@ const byTask = new Map();
  *   command?: string,
  *   child?: import('node:child_process').ChildProcess | null,
  *   pid?: number | null,
+ *   runtimeRoot?: string,
  * }} opts
  */
 export function registerProcess(opts) {
@@ -91,6 +96,7 @@ export function registerProcess(opts) {
       : typeof child?.pid === "number"
         ? child.pid
         : null;
+  const identity = typeof pid === "number" ? captureProcessIdentity(pid) : null;
   const ctxTask = getCurrentTaskId();
   /** @type {ProcessRecord} */
   const rec = {
@@ -103,6 +109,7 @@ export function registerProcess(opts) {
     command: typeof opts.command === "string" ? opts.command.slice(0, 500) : "",
     pid,
     pgid: pid,
+    startKey: identity?.startKey || "",
     startedAt: new Date().toISOString(),
     endedAt: null,
     exitCode: null,
@@ -115,6 +122,25 @@ export function registerProcess(opts) {
   if (rec.taskId) {
     if (!byTask.has(rec.taskId)) byTask.set(rec.taskId, new Set());
     byTask.get(rec.taskId)?.add(id);
+    try {
+      const runtimeRoot =
+        typeof opts.runtimeRoot === "string" && opts.runtimeRoot
+          ? opts.runtimeRoot
+          : resolvePathRuntimeRoot();
+      upsertTaskProcess(runtimeRoot, rec.taskId, {
+        id: rec.id,
+        kind: rec.kind,
+        pid: rec.pid,
+        startKey: rec.startKey,
+        command: rec.command,
+        startedAt: rec.startedAt,
+        status: "live",
+      });
+      // Stash for close handler durable update
+      rec._runtimeRoot = runtimeRoot;
+    } catch {
+      /* durable sidecar is best-effort */
+    }
   }
   if (child) {
     child.once("close", (code, signal) => {
@@ -123,6 +149,26 @@ export function registerProcess(opts) {
       rec.signal = typeof signal === "string" ? signal : null;
       if (rec.cleanup === "pending") rec.cleanup = "ok";
       rec.child = null;
+      if (rec.taskId) {
+        try {
+          upsertTaskProcess(
+            rec._runtimeRoot || resolvePathRuntimeRoot(),
+            rec.taskId,
+            {
+            id: rec.id,
+            kind: rec.kind,
+            pid: rec.pid,
+            startKey: rec.startKey,
+            command: rec.command,
+            startedAt: rec.startedAt,
+            endedAt: rec.endedAt,
+            status: "ended",
+          },
+          );
+        } catch {
+          /* ignore */
+        }
+      }
     });
     child.once("error", () => {
       rec.endedAt = new Date().toISOString();
@@ -160,13 +206,27 @@ function snapshotProcess(rec) {
     command: rec.command,
     pid: rec.pid,
     pgid: rec.pgid,
+    startKey: rec.startKey || "",
     startedAt: rec.startedAt,
     endedAt: rec.endedAt,
     exitCode: rec.exitCode,
     signal: rec.signal,
     cancelled: rec.cancelled,
     cleanup: rec.cleanup,
+    alive: isProcessRecordAlive(rec),
   };
+}
+
+/**
+ * @param {ProcessRecord} rec
+ */
+export function isProcessRecordAlive(rec) {
+  if (!rec || rec.endedAt) return false;
+  if (rec.child && typeof rec.child.killed === "boolean" && !rec.child.killed) {
+    return true;
+  }
+  if (typeof rec.pid !== "number") return false;
+  return processMatchesIdentity(rec.pid, rec.startKey);
 }
 
 /**
@@ -207,7 +267,12 @@ export function cancelTaskProcesses(taskId, opts = {}) {
       if (rec.child && !rec.child.killed) {
         killProcessTree(rec.child, signal);
         rec.cleanup = "ok";
-      } else if (typeof rec.pid === "number") {
+      } else if (
+        typeof rec.pid === "number" &&
+        processMatchesIdentity(rec.pid, rec.startKey)
+      ) {
+        // Only signal bare PIDs that still match recorded start identity —
+        // never kill a reused PID that is not PATH-owned.
         try {
           if (process.platform !== "win32") process.kill(-rec.pid, signal);
           else process.kill(rec.pid, signal);
@@ -221,7 +286,7 @@ export function cancelTaskProcesses(taskId, opts = {}) {
           }
         }
       } else {
-        rec.cleanup = "n/a";
+        rec.cleanup = rec.pid != null ? "n/a" : "n/a";
       }
     } catch {
       rec.cleanup = "failed";

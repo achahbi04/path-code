@@ -224,6 +224,8 @@ export function assessTaskContinuity(input) {
     continuityDisposition === "interrupted" ||
     typeof cp.interruptedAt === "string"
   ) {
+    // If Gateway still has a live Map entry, prefer still_running (handled above).
+    // Otherwise interrupted remains until clearTaskInterrupted after reconstruct.
     return {
       taskId,
       disposition: "interrupted",

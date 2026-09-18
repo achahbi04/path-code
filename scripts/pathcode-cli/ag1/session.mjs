@@ -35,6 +35,7 @@ import {
 } from "./final-validation.mjs";
 import { resolveEngineeringCwd, resolvePathRuntimeRoot } from "../paths.mjs";
 import { normalizeObjectiveText } from "../normalize-text.mjs";
+import { markTaskInterrupted } from "../ag10/task-checkpoint.mjs";
 import {
   buildEngineeringReportModel,
   formatEngineeringReportPlain,
@@ -734,6 +735,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   }, wallMs);
   if (typeof wallTimer.unref === "function") wallTimer.unref();
 
+  /** @type {ReturnType<typeof import("../ag10/ag-session.mjs").bindAntigravitySession> | null} */
+  let agBind = null;
+
   const agent = createAntigravityEngineeringAgent({
     ...(options.checkoutRoot ? { checkoutRoot: options.checkoutRoot } : {}),
     onEvent: (msg) => {
@@ -936,11 +940,46 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         resolveTerminal(msg);
       } else if (type === "failed") {
         agentFailed = true;
-        emit("session.engineering.activity", {
-          activity: "failed",
-          label: "Failed",
-          detail: scrubEngineIdentity(String(msg.message ?? msg.code ?? "")),
-        });
+        const interrupted =
+          msg.interrupted === true || msg.code === "BRIDGE_EXIT";
+        if (interrupted) {
+          try {
+            agBind?.markDead?.();
+          } catch {
+            /* ignore */
+          }
+          try {
+            markTaskInterrupted(
+              runtimeRoot,
+              worktree.taskId,
+              String(msg.message || msg.code || "engine process exited"),
+            );
+            g10Fabric?.persist?.({
+              latestEngineTurn: "interrupted",
+              continuityDisposition: "interrupted",
+              interruptedAt: new Date().toISOString(),
+              continuityReason: String(msg.code || "BRIDGE_EXIT").slice(0, 200),
+            });
+          } catch {
+            /* ignore */
+          }
+          emit("session.engineering.activity", {
+            activity: "interrupted",
+            label: "Interrupted",
+            detail: scrubEngineIdentity(String(msg.message ?? msg.code ?? "")),
+          });
+          emit("session.hydration", {
+            stage: "engine_interrupted",
+            detail: String(msg.code || "BRIDGE_EXIT"),
+            mode: "antigravity",
+          });
+        } else {
+          emit("session.engineering.activity", {
+            activity: "failed",
+            label: "Failed",
+            detail: scrubEngineIdentity(String(msg.message ?? msg.code ?? "")),
+          });
+        }
         resolveTerminal(msg);
       } else if (type === "cancelled") {
         agentCancelled = true;
@@ -959,7 +998,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     },
   });
 
-  const agBind = g10Fabric?.attachAntigravity?.(agent) || null;
+  agBind = g10Fabric?.attachAntigravity?.(agent) || null;
 
   ac.signal.addEventListener(
     "abort",
@@ -1978,6 +2017,22 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     classification = "NOT_VERIFIED";
     terminalDisposition = "CANCELLED";
     terminalSummary = "cancelled";
+  } else if (
+    (agentFailed || terminalMsg?.type === "failed") &&
+    (terminalMsg?.interrupted === true ||
+      terminalMsg?.code === "BRIDGE_EXIT")
+  ) {
+    // S4.2 — engine process death is interruption, not a completed failure.
+    // Keep the PATH task resumable from durable reality.
+    classification = "NOT_VERIFIED";
+    terminalDisposition = "INTERRUPTED";
+    terminalSummary = scrubEngineIdentity(
+      String(
+        terminalMsg?.message ||
+          terminalMsg?.code ||
+          "engineering process interrupted",
+      ),
+    );
   } else if (agentFailed || terminalMsg?.type === "failed") {
     classification = "FAILED";
     terminalDisposition = String(terminalMsg?.code || "AG1_ENGINE_FAILED");
@@ -2296,6 +2351,21 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   }
 
   try {
+    if (terminalDisposition === "INTERRUPTED") {
+      // Do not stamp a terminal FAILED finalState — task remains resumable.
+      g10Fabric?.persist?.({
+        latestEngineTurn: "interrupted",
+        continuityDisposition: "interrupted",
+        interruptedAt: new Date().toISOString(),
+        validation: {
+          classification,
+          disposition: terminalDisposition,
+        },
+        branch: worktree.taskBranch || undefined,
+        baseline: baselineSha || undefined,
+        changedFiles: resultChangedFiles,
+      });
+    } else {
     const finalState =
       classification === "VERIFIED"
         ? "VERIFIED"
@@ -2320,6 +2390,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       baseline: baselineSha || undefined,
       changedFiles: resultChangedFiles,
     });
+    }
     await g10Fabric?.shutdown?.();
   } catch {
     /* ignore */
@@ -2333,6 +2404,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
 
   const exitCode = agentCancelled
     ? 130
+    : terminalDisposition === "INTERRUPTED"
+      ? 1
     : terminalDisposition === "GIT_IDENTITY_REQUIRED"
       ? 2
       : classification === "VERIFIED" || classification === "PARTIALLY_VERIFIED"
@@ -2344,6 +2417,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     outcome:
       terminalDisposition === "CANCELLED"
         ? "CANCELLED"
+        : terminalDisposition === "INTERRUPTED"
+          ? "INTERRUPTED"
         : terminalDisposition === "GIT_IDENTITY_REQUIRED"
           ? "GIT_IDENTITY_REQUIRED"
           : classification,

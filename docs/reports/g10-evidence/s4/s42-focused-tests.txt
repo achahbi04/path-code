@@ -1,0 +1,20 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+ RUN  v3.2.7 /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
+
+ ✓ |default| tests/s4/engine-process-durability.test.ts > S4.2 engine/process durability > records process startKey and treats PID-mismatch as stale lock 138ms
+ ✓ |default| tests/s4/continuity.test.ts > S4.1 durable continuity > classifies still_running vs interrupted vs completed from evidence 593ms
+ ✓ |default| tests/s4/continuity.test.ts > S4.1 durable continuity > routes by traits presence for resumable vs recoverable_from_durable_state 281ms
+ ✓ |default| tests/s4/engine-process-durability.test.ts > S4.2 engine/process durability > durable process sidecar reconciles dead children without trusting stale live status 328ms
+ ✓ |default| tests/s4/engine-process-durability.test.ts > S4.2 engine/process durability > beginEngineTurn persists in_flight and hard engine failure marks interrupted 956ms
+ ✓ |default| tests/s4/engine-process-durability.test.ts > S4.2 engine/process durability > bridge unexpected close emits interrupted terminal (not silent hang) 994ms
+ ✓ |default| tests/s4/engine-process-durability.test.ts > S4.2 engine/process durability > engineering report write is atomic (temp + rename) 25ms
+ ✓ |default| tests/s4/continuity.test.ts > S4.1 durable continuity > Gateway resume reconstructs ownership after Map loss (fake engine) 2157ms
+ ✓ |default| tests/s4/continuity.test.ts > S4.1 durable continuity > reclaims stale gateway pid/socket and marks checkpoints interrupted 218ms
+ ✓ |default| tests/s4/continuity.test.ts > S4.1 durable continuity > refuses resume of VERIFIED checkpoints 444ms
+
+ Test Files  2 passed (2)
+      Tests  10 passed (10)
+   Start at  19:42:17
+   Duration  4.09s (transform 643ms, setup 0ms, collect 151ms, tests 6.14s, environment 1ms, prepare 206ms)
+

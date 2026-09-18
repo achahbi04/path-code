@@ -1,0 +1,9 @@
+S4.2 live — engine process kill while Gateway ownership remains
+Cursor probe: ready=true status=ready
+in_flight checkpoint: in_flight:antigravity
+engine registered pid=67207 alive=true
+reconcile liveKinds=[]
+disposition=interrupted next=resume
+resume ok=true mode=resume taskId=7934d87b-a533-47cb-8b75-841adc5e7bc2
+finished status=completed
+VERDICT: LIVE-VERIFIED

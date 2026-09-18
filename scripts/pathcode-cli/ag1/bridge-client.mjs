@@ -93,6 +93,8 @@ export function createAntigravityEngineeringAgent(options = {}) {
     // ignore
   }
   let diagFile = join(diagDir, `bridge-${Date.now()}.log`);
+  /** @type {boolean} */
+  let sawTerminalEvent = false;
 
   /**
    * @param {string} kind
@@ -120,6 +122,14 @@ export function createAntigravityEngineeringAgent(options = {}) {
    * @param {Record<string, unknown>} msg
    */
   function emitEvent(msg) {
+    if (
+      msg &&
+      (msg.type === "finished" ||
+        msg.type === "failed" ||
+        msg.type === "cancelled")
+    ) {
+      sawTerminalEvent = true;
+    }
     if (typeof options.onEvent === "function") {
       try {
         options.onEvent(msg);
@@ -221,6 +231,7 @@ export function createAntigravityEngineeringAgent(options = {}) {
           kind: "antigravity_bridge",
           command: `${pythonPath} ${bridgeScript}`,
           child,
+          runtimeRoot,
         });
       } catch {
         // ignore registry failures
@@ -277,6 +288,17 @@ export function createAntigravityEngineeringAgent(options = {}) {
         "bridge_exit",
         `code=${code ?? "null"} signal=${signal ?? "null"}`,
       );
+      // S4.2: unexpected process death must not leave the session hung until
+      // wall-clock budget. Emit a terminal failed/interrupted event.
+      if (!sawTerminalEvent) {
+        sawTerminalEvent = true;
+        emitEvent({
+          type: "failed",
+          code: "BRIDGE_EXIT",
+          message: `Antigravity bridge exited (code=${code ?? "null"} signal=${signal ?? "null"})`,
+          interrupted: true,
+        });
+      }
       child = null;
     });
 
@@ -355,6 +377,7 @@ export function createAntigravityEngineeringAgent(options = {}) {
   }
 
   function cancel() {
+    sawTerminalEvent = true;
     try {
       writeCommand({ type: "cancel" });
     } catch {

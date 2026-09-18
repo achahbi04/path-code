@@ -373,3 +373,25 @@ export function markIncompleteCheckpointsInterrupted(runtimeRoot, reason) {
   }
   return marked;
 }
+
+/**
+ * Clear interrupted markers after a successful continuity reconstruct/resume.
+ * @param {string} runtimeRoot
+ * @param {string} taskId
+ * @param {string} [reason]
+ */
+export function clearTaskInterrupted(runtimeRoot, taskId, reason) {
+  const existing = readTaskCheckpoint(runtimeRoot, taskId);
+  if (!existing) return null;
+  const next = {
+    ...existing,
+    continuityDisposition: "active",
+    continuityReason: String(
+      reason || "continuity restored — continuing same PATH task",
+    ).slice(0, 400),
+    updatedAt: new Date().toISOString(),
+  };
+  delete next.interruptedAt;
+  writeTaskCheckpoint(runtimeRoot, /** @type {G10TaskCheckpoint} */ (next));
+  return /** @type {G10TaskCheckpoint} */ (next);
+}
