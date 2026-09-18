@@ -615,6 +615,9 @@ export function createGatewayRuntime(options = {}) {
           // Gateway already emitted session.task.received for this task.
           suppressTaskReceived: true,
           cardsOwnProgress: true,
+          // Keep Gateway taskId === session/worktree taskId so /inspect,
+          // reports, and checkpoints share one durable identity.
+          taskId: task.taskId,
           sessionBaseCommit:
             typeof params.sessionBaseCommit === "string"
               ? params.sessionBaseCommit

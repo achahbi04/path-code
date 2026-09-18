@@ -1,0 +1,21 @@
+verdict=LIVE-VERIFIED
+taskId=0ef05753-0d03-4f96-b8e9-4b0654275954
+changed=["S3_CURSOR_OPERATOR_ACCEPTANCE.md"]
+adoptable=true
+
+Inspect task 0ef05753-0d03-4f96-b8e9-4b0654275954
+
+  lifecycle     VERIFIED · adoptable
+  disposition   VERIFIED
+  project       live-fixture
+  branch        path/task-0ef05753-0d03-4f96-b8e9-4b0654275954
+  commit        ac19eef0fb3d
+  baseline      039839b4e5dc
+  changed       1 file(s)
+    - S3_CURSOR_OPERATOR_ACCEPTANCE.md
+
+Read-only inspect command:
+  git diff --no-ext-diff --no-textconv 039839b4e5dc5df762cc0421f3be2496dcfa7b04 ac19eef0fb3d82dae7fe5ae53b021984cbe73dc9 --
+
+Adoptable: yes — /merge 0ef05753-0d03-4f96-b8e9-4b0654275954 or /pr 0ef05753-0d03-4f96-b8e9-4b0654275954 (confirmation required).
+Report: /report 0ef05753-0d03-4f96-b8e9-4b0654275954

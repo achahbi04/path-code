@@ -104,7 +104,7 @@ async function main() {
     packageRoot: checkout,
     runtimeRoot,
   });
-  await gw.bindProject({ projectRoot: fixture });
+  await gw.bindProject({ cwd: fixture });
 
   const objective = [
     "Create a file named S3_CURSOR_OPERATOR_ACCEPTANCE.md in the task workspace.",
@@ -121,12 +121,14 @@ async function main() {
   /** @type {object[]} */
   const events = [];
   const unsub = gw.onEvent((env) => {
-    if (env?.event) events.push(env.event);
+    const ev = env?.event || env;
+    if (ev && typeof ev === "object") events.push(ev);
   });
 
   const started = await gw.startTask({
     objective,
     preferredEngine: "cursor",
+    cwd: fixture,
   });
   const taskId = started.taskId;
   evidence.steps.start = {
@@ -134,27 +136,16 @@ async function main() {
     preferredEngine: started.preferredEngine || null,
   };
 
-  // Wait for terminal (up to 4 minutes).
-  const deadline = Date.now() + 240_000;
-  while (Date.now() < deadline) {
-    const snap = await gw.taskSnapshot({ taskId });
-    if (
-      snap?.status === "completed" ||
-      snap?.status === "failed" ||
-      snap?.status === "cancelled"
-    ) {
-      evidence.steps.snapshot = {
-        status: snap.status,
-        classification: snap.classification || null,
-        commitSha: snap.commitSha || null,
-        taskBranch: snap.taskBranch || null,
-        changedFiles: snap.result?.changedFiles || null,
-      };
-      break;
-    }
-    await new Promise((r) => setTimeout(r, 1500));
-  }
+  const snap = taskId ? await gw.awaitTask(taskId, 300_000) : null;
   unsub?.();
+
+  evidence.steps.snapshot = {
+    status: snap?.status || null,
+    classification: snap?.classification || null,
+    commitSha: snap?.commitSha || null,
+    taskBranch: snap?.taskBranch || null,
+    changedFiles: snap?.result?.changedFiles || null,
+  };
 
   const resultEvent = [...events]
     .reverse()
@@ -165,13 +156,22 @@ async function main() {
     baselineSha: resultEvent?.baselineSha || null,
   };
 
-  const entry = getTaskHistoryEntry(runtimeRoot, taskId);
+  // Prefer session taskId from result (matches report/checkpoint). Gateway may
+  // historically have used a distinct id before resumeTaskId wiring.
+  const durableTaskId =
+    (typeof snap?.result?.taskId === "string" && snap.result.taskId) ||
+    (typeof snap?.taskBranch === "string" &&
+      snap.taskBranch.match(/path\/task-([0-9a-fA-F-]{8,})/)?.[1]) ||
+    taskId;
+
+  const entry = getTaskHistoryEntry(runtimeRoot, durableTaskId);
   const inspect = entry ? formatInspectPanel(entry) : "";
   const reportPath = entry?.reportPath;
   const reportText =
     reportPath && existsSync(reportPath) ? readFileSync(reportPath, "utf8") : "";
 
   evidence.steps.inspect = {
+    durableTaskId,
     changedFiles: entry?.changedFiles || [],
     adoptable: entry ? taskHasAdoptableChanges(entry) : false,
     branch: entry?.branch || null,

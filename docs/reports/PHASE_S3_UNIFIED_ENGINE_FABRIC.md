@@ -1,8 +1,10 @@
 # PATH CODE — S3
 # UNIFIED ENGINE FABRIC
 
-**S3 RESULT:** **S3.1 LIVE-VERIFIED** (operator acceptance pending)  
-**S3.1 acceptance tip:** `48e2a788f4576166bf8bf4aea36f424e1f15535a`  
+**S3 RESULT:** **S3.1 FROZEN / OPERATOR ACCEPTED**  
+**S3.1 freeze tip:** _(see git HEAD after freeze commit)_  
+**S3.1 result-capture tip:** _(same freeze)_  
+**S3.1 prior acceptance tip:** `48e2a788f4576166bf8bf4aea36f424e1f15535a`  
 **S3.1 prior live tip:** `c0dc3ace91118d63cce0de0a6490e8df62182925`  
 **S3.1 implementation checkpoint:** `20c3138255526758c1c276eed0353ece6ca97545`  
 **S2 freeze tip preserved:** `67200c1551d7dc6beee9bafb495d133ec11dc0ba`  
@@ -28,8 +30,9 @@ See [`PHASE_S2_PRODUCTIZATION.md`](./PHASE_S2_PRODUCTIZATION.md).
 - Multi-peer shared worktree turns (Cursor · Copilot under mutation leases)
 - Engineering report **Engine fabric** provenance
 - Mechanical + acceptance LIVE evidence
+- Authoritative Cursor→Git→`/inspect` result capture (changed files + adoptable)
 
-**Out of scope / S4 not started:** crash-safe multi-engine resume productization beyond existing G10 checkpoints; Studio/Build slots; publication/release; permanent engine hierarchy.
+**Out of scope / S4 not started:** crash-safe multi-engine resume productization beyond existing G10 checkpoints; Studio/Build slots; publication/release; permanent engine hierarchy; Terminal title polish.
 
 ---
 
@@ -48,6 +51,7 @@ Unified Engine Fabric (G10)
     └─ Cursor       — @cursor/sdk local cwd, in-flight steer, native cancel/resume
     │
 one task worktree / one project reality
+        → Git/result collection → durable task state → /inspect → adopt/merge
 ```
 
 Participation is capability-aware. Engines keep distinct steering/cancel/resume semantics.
@@ -58,17 +62,18 @@ Participation is capability-aware. Engines keep distinct steering/cancel/resume 
 
 | Lane | Status |
 | --- | --- |
-| **IMPLEMENTED** | Fabric contract + Cursor peer + preferred primary + Cursor steering continue + report provenance + Gateway `preferredEngine` on start/snapshot |
-| **MECHANICALLY TESTED** | `tests/s3` + worktree repair → `s31-focused-tests.txt`; `run-s31-mechanical.mjs` → **LIVE-VERIFIED** |
-| **LIVE-VERIFIED** | `run-s31-acceptance.mjs` → `s31-acceptance.json` **LIVE-VERIFIED** (Cursor direct/steer/cancel, multi-peer Cursor+Copilot, Gateway Cursor primary VERIFIED, Gateway AG path VERIFIED, honest capabilities) |
-| **OPERATOR ACCEPTANCE** | **PENDING** — checklist [`g10-evidence/s3/s31-operator-acceptance.md`](./g10-evidence/s3/s31-operator-acceptance.md) |
+| **IMPLEMENTED** | Fabric contract + Cursor peer + preferred primary + Cursor steering continue + report provenance + Gateway `preferredEngine` + result-capture lifecycle |
+| **MECHANICALLY TESTED** | `tests/s3` incl. `result-capture.test.ts`; freeze-repair + result-lifecycle |
+| **LIVE-VERIFIED** | `run-s31-acceptance.mjs` + `run-s31-result-capture.mjs` → **LIVE-VERIFIED** (`/inspect` shows `S3_CURSOR_OPERATOR_ACCEPTANCE.md`, Adoptable yes) |
+| **OPERATOR ACCEPTANCE** | **ACCEPTED** — live fabric accepted; result-capture inconsistency closed |
 
 ---
 
 ## Evidence
 
 - [`g10-evidence/s3/s31-acceptance.json`](./g10-evidence/s3/s31-acceptance.json) — acceptance LIVE pack
-- `s31-live-fabric.json`, `s31-mechanical.json`, `s31-focused-tests.txt`, `s31-canonical-check.txt`
+- [`g10-evidence/s3/s31-result-capture.json`](./g10-evidence/s3/s31-result-capture.json) — Cursor result-capture LIVE proof
+- `s31-live-fabric.json`, `s31-mechanical.json`, `s31-focused-tests.txt`, `s31-canonical-check.txt`, `s31-result-capture-tests.txt`
 - Operator checklist: `s31-operator-acceptance.md`
 - S2 freeze tip: `67200c1551d7dc6beee9bafb495d133ec11dc0ba`
 
@@ -82,6 +87,13 @@ Participation is capability-aware. Engines keep distinct steering/cancel/resume 
 4. Repair rotation → `selectEngineForTurn` among ready peers (AG · Copilot · Cursor).
 5. Continuity prefers last engine when not in repair role.
 6. Results + durable reports carry `preferredEngine`, `engine`, `enginesUsed`, `cursorMode`.
+7. Post-commit `listCommitChangedFiles(baseline, sha)` is authoritative for report / checkpoint / `/inspect` / adoptable.
+
+---
+
+## Next (S3.2 proposal)
+
+**S3.2 — Fabric continuity & title polish:** crash-safe multi-engine resume productization on shared G10 checkpoints; Terminal title provider/process text cleanup; keep S4 (publication/Studio slots) closed.
 
 ---
 

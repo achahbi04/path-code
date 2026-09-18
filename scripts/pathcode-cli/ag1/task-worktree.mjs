@@ -768,14 +768,15 @@ export function isReadOnlyAssessmentObjective(text) {
   ) {
     return false;
   }
-  const modifyIntent =
-    /\b(fix|repair|implement|refactor|migrate|add |create |delete |remove |edit |modify|write |change |append |update )\b/i.test(
+  // Positive edit/create intent wins over a later "do not modify any other
+  // file" scope constraint (common in Cursor operator acceptance prompts).
+  const positiveEdit =
+    /\b(create|implement|fix|repair|refactor|migrate)\b/i.test(t) ||
+    /\b(add|write|append|edit|update)\s+(a\s+|the\s+|an\s+)?(file|files|code|line|lines)\b/i.test(
       t,
-    );
-  // Scope constraint ("do not modify any other file") must not win over an
-  // explicit create/write intent — otherwise Cursor/Copilot file creates are
-  // mis-finalized as read-only no-op results.
-  if (modifyIntent) {
+    ) ||
+    /\b(add|write|append)\s+\S+\.(md|ts|tsx|js|jsx|json|py|go|rs)\b/i.test(t);
+  if (positiveEdit) {
     return false;
   }
   if (
@@ -790,7 +791,11 @@ export function isReadOnlyAssessmentObjective(text) {
     /\b(assess|inspect|check|review|audit|report|identify|findings?|investigate)\b/i.test(
       t,
     );
-  return assess;
+  const modify =
+    /\b(fix|repair|implement|refactor|migrate|add |create |delete |remove |edit |modify|write |change )\b/i.test(
+      t,
+    );
+  return assess && !modify;
 }
 
 /**

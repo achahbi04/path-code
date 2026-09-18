@@ -30,4 +30,11 @@ Confirm the live first-slice fabric — not a mock. Use the PATH checkout with w
 - `s31-live-fabric.json`, `s31-mechanical.json`, `s31-focused-tests.txt`, `s31-canonical-check.txt`
 
 ## STOP
-Operator reviews this slice. **S4 not started.** S2 freeze tip preserved.
+Operator accepted the S3.1 live fabric experience.
+
+**Result-capture closure (required before freeze):** Cursor-created
+`S3_CURSOR_OPERATOR_ACCEPTANCE.md` must appear in `/inspect` as changed + Adoptable yes.
+Evidence: `s31-result-capture.json` → **LIVE-VERIFIED**.
+
+**S3.1 FROZEN.** S4 not started. S2 freeze tip preserved.
+

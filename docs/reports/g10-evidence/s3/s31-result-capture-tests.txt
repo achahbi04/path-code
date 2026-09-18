@@ -2,4 +2,22 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
 
  RUN  v3.2.7 /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
 
-]0;]2;Klarapp — PATH Code]0;]2;
+]0;]2;Klarapp — PATH Code]0;]2; ✓ |default| tests/s1/freeze-repair.test.ts (3 tests) 1770ms
+   ✓ S1 freeze repair — read-only setup churn > restores lockfile-only churn for assessment objectives  862ms
+   ✓ S1 freeze repair — read-only setup churn > keeps lockfile changes for explicit dependency upgrades  820ms
+ ✓ |default| tests/s3/result-capture.test.ts (4 tests) 1770ms
+   ✓ S3.1 result capture > collects staged Cursor creates and lists post-commit files  717ms
+   ✓ S3.1 result capture > persists changedFiles on checkpoint and /inspect is adoptable  507ms
+   ✓ S3.1 result capture > recovers changedFiles from Git when report omitted Changed  507ms
+ ✓ |default| tests/s3/engine-fabric.test.ts (6 tests) 77ms
+ ✓ |default| tests/s3/cursor-executor.test.ts (3 tests) 519ms
+   ✓ S3.1 cursor executor > loadCursorSdk returns ok when @cursor/sdk is installed  482ms
+ ✓ |default| tests/s3/engineering-report-fabric.test.ts (1 test) 45ms
+ ✓ |default| tests/s2/result-lifecycle.test.ts (3 tests) 1682ms
+   ✓ S2.2 result lifecycle > discards worktree/branch, keeps report, marks DISCARDED, primary untouched  1161ms
+
+ Test Files  6 passed (6)
+      Tests  20 passed (20)
+   Start at  12:14:25
+   Duration  4.20s (transform 513ms, setup 0ms, collect 203ms, tests 5.86s, environment 1ms, prepare 598ms)
+

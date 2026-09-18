@@ -1,0 +1,46 @@
+{
+  "schema": "pathcode.s3.result-capture.live.v1",
+  "at": "2026-09-18T10:12:52.389Z",
+  "verdict": "LIVE-VERIFIED",
+  "steps": {
+    "detect": {
+      "ready": true,
+      "status": "ready"
+    },
+    "start": {
+      "taskId": "0ef05753-0d03-4f96-b8e9-4b0654275954",
+      "preferredEngine": "cursor"
+    },
+    "snapshot": {
+      "status": "completed",
+      "classification": "VERIFIED",
+      "commitSha": "ac19eef0fb3d82dae7fe5ae53b021984cbe73dc9",
+      "taskBranch": "path/task-0ef05753-0d03-4f96-b8e9-4b0654275954",
+      "changedFiles": [
+        "S3_CURSOR_OPERATOR_ACCEPTANCE.md"
+      ]
+    },
+    "resultEvent": {
+      "changedFiles": null,
+      "commitSha": null,
+      "baselineSha": null
+    },
+    "inspect": {
+      "durableTaskId": "0ef05753-0d03-4f96-b8e9-4b0654275954",
+      "changedFiles": [
+        "S3_CURSOR_OPERATOR_ACCEPTANCE.md"
+      ],
+      "adoptable": true,
+      "branch": "path/task-0ef05753-0d03-4f96-b8e9-4b0654275954",
+      "sha": "ac19eef0fb3d",
+      "baseline": "039839b4e5dc",
+      "panelHasFile": true,
+      "panelAdoptable": true
+    },
+    "report": {
+      "hasChangedSection": true,
+      "mentionsFile": true
+    }
+  },
+  "inspectPanel": "Inspect task 0ef05753-0d03-4f96-b8e9-4b0654275954\n\n  lifecycle     VERIFIED · adoptable\n  disposition   VERIFIED\n  project       live-fixture\n  branch        path/task-0ef05753-0d03-4f96-b8e9-4b0654275954\n  commit        ac19eef0fb3d\n  baseline      039839b4e5dc\n  changed       1 file(s)\n    - S3_CURSOR_OPERATOR_ACCEPTANCE.md\n\nRead-only inspect command:\n  git diff --no-ext-diff --no-textconv 039839b4e5dc5df762cc0421f3be2496dcfa7b04 ac19eef0fb3d82dae7fe5ae53b021984cbe73dc9 --\n\nAdoptable: yes — /merge 0ef05753-0d03-4f96-b8e9-4b0654275954 or /pr 0ef05753-0d03-4f96-b8e9-4b0654275954 (confirmation required).\nReport: /report 0ef05753-0d03-4f96-b8e9-4b0654275954"
+}

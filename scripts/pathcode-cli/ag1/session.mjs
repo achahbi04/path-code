@@ -225,6 +225,8 @@ export function scrubEngineIdentity(text) {
  *   preferCopilotSdk?: boolean,
  *   preferredEngine?: string | null,
  *   suppressTaskReceived?: boolean,
+ *   resumeTaskId?: string,
+ *   taskId?: string,
  * }} options
  */
 export async function runAntigravityEngineeringSession(prompt, options = {}) {
@@ -249,7 +251,11 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     typeof options.resumeTaskId === "string" && options.resumeTaskId.trim()
       ? options.resumeTaskId.trim()
       : "";
-  const taskId = resumeTaskId || randomUUID();
+  const forcedTaskId =
+    typeof options.taskId === "string" && options.taskId.trim()
+      ? options.taskId.trim()
+      : "";
+  const taskId = resumeTaskId || forcedTaskId || randomUUID();
   const startedAt = Date.now();
   /** @type {string[]} */
   const timingMarks = [];
