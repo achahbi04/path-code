@@ -1,0 +1,135 @@
+{
+  "schema": "pathcode.s3.fabric-maturity.live.v1",
+  "at": "2026-09-18T11:14:47.488Z",
+  "verdict": "LIVE-VERIFIED",
+  "s31FreezeTip": "4c6cf6a44ebb3e1a6475ec9c6c35dadf62d31559",
+  "cases": {
+    "detect": {
+      "ready": true,
+      "status": "ready"
+    },
+    "capabilities": {
+      "ok": true,
+      "engines": [
+        {
+          "id": "antigravity",
+          "status": "available",
+          "steering": "boundary",
+          "cancel": "native",
+          "traits": [
+            "bridge",
+            "tools",
+            "mcp",
+            "shell",
+            "hooks",
+            "streaming",
+            "repair",
+            "continue",
+            "boundary_steer"
+          ]
+        },
+        {
+          "id": "copilot",
+          "status": "available",
+          "steering": "boundary",
+          "cancel": "abort_registry",
+          "traits": [
+            "sdk",
+            "cli_fallback",
+            "tools",
+            "lsp",
+            "mcp",
+            "shell",
+            "repair",
+            "continue",
+            "boundary_steer"
+          ]
+        },
+        {
+          "id": "cursor",
+          "status": "available",
+          "steering": "immediate",
+          "cancel": "native",
+          "traits": [
+            "sdk",
+            "local_cwd",
+            "tools",
+            "shell",
+            "streaming",
+            "inflight_steer",
+            "repair",
+            "continue"
+          ]
+        }
+      ]
+    },
+    "needRouting": {
+      "ok": true,
+      "needs": [
+        "continue",
+        "inflight_steer"
+      ],
+      "selection": {
+        "engine": "cursor",
+        "reason": "rotate among need-fit peers (cursor)",
+        "needs": [
+          "continue",
+          "inflight_steer"
+        ],
+        "candidates": [
+          "cursor"
+        ],
+        "preferredHonored": false,
+        "continuityHonored": false
+      }
+    },
+    "lspRouting": {
+      "ok": true,
+      "needs": [
+        "repair",
+        "code_edit",
+        "lsp",
+        "shell"
+      ],
+      "selection": {
+        "engine": "copilot",
+        "reason": "rotate among need-fit peers (copilot)",
+        "needs": [
+          "repair",
+          "code_edit",
+          "lsp",
+          "shell"
+        ],
+        "candidates": [
+          "copilot"
+        ],
+        "preferredHonored": false,
+        "continuityHonored": false
+      }
+    },
+    "gatewayCursorPrimary": {
+      "ok": true,
+      "preferredEngine": "cursor",
+      "status": "completed",
+      "classification": "VERIFIED",
+      "engine": "cursor",
+      "enginesUsed": [
+        "cursor"
+      ],
+      "commitSha": "85a588b12c8897aefd813cef39dde80e7213928b",
+      "primaryRouted": true
+    },
+    "handoffPacket": {
+      "ok": true,
+      "toEngine": "copilot",
+      "fromEngine": "cursor",
+      "preview": "PATH fabric handoff — continue from shared task reality.\nPrevious collaborator: cursor\nYour turn: copilot\nRouting: S32 live handoff proof\nTurn needs: repair, lsp\nObjective:\nS32 fabric handoff proof\nWorktree HEAD: b18f70343ea745885d080e6b6b0f38f2a3536123\nValidation:\ntypecheck failed (simulated for handoff text)\nStay inside the PATH task worktree. Do not push, open PRs, or leave the workspace."
+    },
+    "peerTurn": {
+      "ok": true,
+      "mode": "native_sdk",
+      "engine": null,
+      "skipped": false
+    }
+  }
+}

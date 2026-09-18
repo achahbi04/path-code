@@ -1,0 +1,8 @@
+{
+  "verdict": "LIVE-VERIFIED",
+  "ok": true,
+  "cursorReady": true
+}
+g="copilot"
+gatewayCursor=true
+handoff=true

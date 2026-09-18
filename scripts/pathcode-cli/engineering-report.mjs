@@ -589,6 +589,7 @@ function synthesizeTaskEvidence(product, session) {
  *   engine?: string | null,
  *   cursorMode?: string | null,
  *   enginesUsed?: string[],
+ *   fabricRouting?: string[],
  * }} [session]
  */
 export function buildEngineeringReportModel(product, session = {}) {
@@ -795,6 +796,11 @@ export function buildEngineeringReportModel(product, session = {}) {
     : Array.isArray(product.enginesUsed)
       ? product.enginesUsed.map(String).filter(Boolean)
       : [];
+  const fabricRouting = Array.isArray(session.fabricRouting)
+    ? session.fabricRouting.map(String).filter(Boolean).slice(0, 8)
+    : Array.isArray(product.fabricRouting)
+      ? product.fabricRouting.map(String).filter(Boolean).slice(0, 8)
+      : [];
 
   return {
     disposition,
@@ -822,6 +828,7 @@ export function buildEngineeringReportModel(product, session = {}) {
     engine,
     cursorMode,
     enginesUsed,
+    fabricRouting,
     reportPath:
       typeof product.engineeringReportPath === "string"
         ? product.engineeringReportPath
@@ -877,6 +884,9 @@ export function formatEngineeringReportPlain(model) {
     }
     if (model.cursorMode) {
       lines.push(`  cursor     ${model.cursorMode}`);
+    }
+    if (Array.isArray(model.fabricRouting) && model.fabricRouting.length > 0) {
+      lines.push(`  routing    ${model.fabricRouting[model.fabricRouting.length - 1]}`);
     }
     lines.push("");
   }

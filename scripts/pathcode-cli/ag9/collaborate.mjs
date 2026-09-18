@@ -203,7 +203,8 @@ export async function withCollabTurn(input, fn) {
 
 /**
  * Choose which engine should take the next collaborative repair turn.
- * Capability-aware rotation via the S3 engine contract — no permanent hierarchy.
+ * Capability-aware / need-fit rotation via the S3 engine contract —
+ * no permanent hierarchy and no model-judge scoring.
  *
  * @param {{
  *   attempt: number,
@@ -211,6 +212,8 @@ export async function withCollabTurn(input, fn) {
  *   cursorReady?: boolean,
  *   prefer?: string | null,
  *   lastEngine?: string | null,
+ *   needs?: import('../ag10/engine-contract.mjs').TurnNeed[],
+ *   capabilities?: import('../ag10/engine-contract.mjs').EngineCapability[],
  * }} input
  * @returns {CollabEngine}
  */
@@ -220,6 +223,8 @@ export function chooseCollabEngine({
   cursorReady,
   prefer,
   lastEngine,
+  needs,
+  capabilities,
 }) {
   return selectEngineForTurn({
     role: "repair",
@@ -232,5 +237,7 @@ export function chooseCollabEngine({
     prefer,
     lastEngine,
     preferContinuity: false,
+    ...(Array.isArray(needs) ? { needs } : {}),
+    ...(Array.isArray(capabilities) ? { capabilities } : {}),
   });
 }

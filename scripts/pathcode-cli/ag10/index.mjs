@@ -33,6 +33,11 @@ import { createCursorEngine } from "./cursor-sdk.mjs";
 import {
   selectEngineForTurn,
   resolvePreferredEngine,
+  explainEngineSelection,
+  inferTurnNeeds,
+  buildEngineCapabilityList,
+  buildFabricHandoff,
+  formatFabricHandoff,
 } from "./engine-contract.mjs";
 import { bindAntigravitySession } from "./ag-session.mjs";
 import {
@@ -625,15 +630,84 @@ export async function createG10Fabric(options) {
    *   cursorReady?: boolean,
    *   prefer?: string | null,
    *   lastEngine?: string | null,
+   *   needs?: import('./engine-contract.mjs').TurnNeed[],
    * }} input
    */
   function chooseCollabEngine(input) {
+    const capabilities = buildEngineCapabilityList({
+      antigravity: true,
+      copilot: {
+        ready: Boolean(input.copilotReady),
+        mode: copilot?.getMode?.() || checkpoint.copilotMode || "none",
+      },
+      cursor: {
+        ready:
+          typeof input.cursorReady === "boolean"
+            ? input.cursorReady
+            : cursor?.getMode?.() === "native_sdk",
+        mode: cursor?.getMode?.() || checkpoint.cursorMode || "none",
+      },
+    });
     return chooseCollabEngineBase({
       ...input,
       cursorReady:
         typeof input.cursorReady === "boolean"
           ? input.cursorReady
           : cursor?.getMode?.() === "native_sdk",
+      capabilities,
+    });
+  }
+
+  /**
+   * @param {Parameters<typeof explainEngineSelection>[0]} input
+   */
+  function explainCollabSelection(input) {
+    const capabilities = buildEngineCapabilityList({
+      antigravity: input.ready?.antigravity !== false,
+      copilot: {
+        ready: input.ready?.copilot === true,
+        mode: copilot?.getMode?.() || checkpoint.copilotMode || "none",
+      },
+      cursor: {
+        ready: input.ready?.cursor === true,
+        mode: cursor?.getMode?.() || checkpoint.cursorMode || "none",
+      },
+    });
+    return explainEngineSelection({
+      ...input,
+      capabilities,
+    });
+  }
+
+  /**
+   * Build a structured PATH fabric handoff for the next engine turn.
+   * @param {{
+   *   toEngine: string,
+   *   fromEngine?: string | null,
+   *   needs?: import('./engine-contract.mjs').TurnNeed[],
+   *   reason?: string,
+   *   validationSummary?: string,
+   *   pendingSteering?: string,
+   * }} input
+   */
+  function buildNextHandoff(input) {
+    const reality = captureTaskReality(options.worktreePath, options.toolEnv);
+    const journal = readCollabJournal({
+      runtimeRoot: options.runtimeRoot,
+      taskId: options.taskId,
+      limit: 12,
+    });
+    return buildFabricHandoff({
+      fromEngine: input.fromEngine || checkpoint.latestEngineTurn || null,
+      toEngine: input.toEngine,
+      objective: options.objective,
+      needs: input.needs,
+      reason: input.reason,
+      journal,
+      changedFiles: reality.changedFiles,
+      headSha: reality.headSha,
+      validationSummary: input.validationSummary,
+      pendingSteering: input.pendingSteering,
     });
   }
 
@@ -655,8 +729,12 @@ export async function createG10Fabric(options) {
     markFinal,
     shutdown,
     chooseCollabEngine,
+    explainCollabSelection,
+    buildNextHandoff,
     selectEngineForTurn,
     resolvePreferredEngine,
+    inferTurnNeeds,
+    formatFabricHandoff,
     getCheckpoint: () => checkpoint,
     getSteering: () => steering,
     getNoProgress: () => noProgress,
@@ -718,9 +796,15 @@ export {
 
 export {
   selectEngineForTurn,
+  explainEngineSelection,
   resolvePreferredEngine,
   normalizeEngineId,
   buildEngineCapabilityList,
   withEngineProvenance,
+  inferTurnNeeds,
+  engineSupportsNeed,
+  engineMeetsNeeds,
+  buildFabricHandoff,
+  formatFabricHandoff,
   ENGINE_CAPABILITY_TEMPLATES,
 } from "./engine-contract.mjs";

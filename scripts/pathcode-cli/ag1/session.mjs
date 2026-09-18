@@ -1225,6 +1225,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   let lastCollabEngine = cursorPrimaryDone ? "cursor" : null;
   /** @type {Set<string>} */
   const enginesSeen = new Set(cursorPrimaryDone ? ["cursor"] : []);
+  /** @type {string[]} */
+  const fabricRoutingNotes = [];
   markTiming("first_engine_terminal");
   /** Steering continues applied before validation (bounded). */
   let steeringContinues = 0;
@@ -1471,13 +1473,39 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       typeof g10Fabric?.resolvePreferredEngine === "function"
         ? g10Fabric.resolvePreferredEngine({ prefer: options.preferredEngine })
         : preferredEngine;
+    const turnNeeds =
+      typeof g10Fabric?.inferTurnNeeds === "function"
+        ? g10Fabric.inferTurnNeeds({
+            role: "repair",
+            objective: effectiveTaskText,
+            validation,
+          })
+        : { needs: /** @type {string[]} */ (["repair", "code_edit", "shell"]), detail: "repair" };
+    const selection =
+      typeof g10Fabric?.explainCollabSelection === "function"
+        ? g10Fabric.explainCollabSelection({
+            role: "repair",
+            attempt: repairAttempts,
+            ready: {
+              antigravity: true,
+              copilot: copilotReady,
+              cursor: cursorReady,
+            },
+            prefer: preferred,
+            lastEngine: lastCollabEngine,
+            preferContinuity: false,
+            needs: turnNeeds.needs,
+          })
+        : null;
     const engineChoice =
+      (selection && selection.engine) ||
       g10Fabric?.chooseCollabEngine?.({
         attempt: repairAttempts,
         copilotReady,
         cursorReady,
         prefer: preferred,
         lastEngine: lastCollabEngine,
+        needs: turnNeeds.needs,
       }) ||
       ag9Collab?.chooseCollabEngine?.({
         attempt: repairAttempts,
@@ -1485,16 +1513,46 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         cursorReady,
         prefer: preferred,
         lastEngine: lastCollabEngine,
+        needs: turnNeeds.needs,
       }) ||
       "antigravity";
+    const previousEngine = lastCollabEngine;
     lastCollabEngine = engineChoice;
     enginesSeen.add(engineChoice);
+    const routingReason =
+      (selection && selection.reason) ||
+      turnNeeds.detail ||
+      "collaborative repair";
+    fabricRoutingNotes.push(
+      `${engineChoice}: ${routingReason}`.slice(0, 160),
+    );
+    if (fabricRoutingNotes.length > 8) {
+      fabricRoutingNotes.splice(0, fabricRoutingNotes.length - 8);
+    }
     const journalEntries =
       ag9Collab?.readCollabJournal?.({
         runtimeRoot,
         taskId: worktree.taskId,
       }) || [];
-    const collabHandoff = ag9Collab?.formatCollabHandoff?.(journalEntries) || "";
+    const fabricPacket =
+      typeof g10Fabric?.buildNextHandoff === "function"
+        ? g10Fabric.buildNextHandoff({
+            toEngine: engineChoice,
+            fromEngine: previousEngine,
+            needs: turnNeeds.needs,
+            reason: routingReason,
+            validationSummary:
+              typeof validation?.reason === "string" ? validation.reason : "",
+          })
+        : null;
+    const fabricHandoffText =
+      typeof g10Fabric?.formatFabricHandoff === "function" && fabricPacket
+        ? g10Fabric.formatFabricHandoff(fabricPacket)
+        : "";
+    const collabHandoff =
+      fabricHandoffText ||
+      ag9Collab?.formatCollabHandoff?.(journalEntries) ||
+      "";
     const baseRepairPrompt = buildValidationRepairPrompt(validation, {
       ...(collabHandoff ? { collabHandoff } : {}),
     });
@@ -1507,7 +1565,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         engine: "cursor",
         phase: "repair",
         label: "Repairing",
-        detail: "repairing validation failures in the task workspace",
+        detail: routingReason,
+        needs: turnNeeds.needs,
+        routing: routingReason,
       });
       /** @type {boolean} */
       let cursorTurnOk = false;
@@ -1602,7 +1662,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         engine: "copilot",
         phase: "repair",
         label: "Repairing",
-        detail: "repairing validation failures in the task workspace",
+        detail: routingReason,
+        needs: turnNeeds.needs,
+        routing: routingReason,
       });
       /** @type {boolean} */
       let copilotTurnOk = false;
@@ -2154,6 +2216,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       engine: lastCollabEngine || null,
       cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || null,
       enginesUsed: [...enginesSeen],
+      fabricRouting: fabricRoutingNotes.slice(),
     },
     {
       classification: outcomeClassification,
@@ -2177,6 +2240,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       engine: lastCollabEngine || null,
       cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || null,
       enginesUsed: [...enginesSeen],
+      fabricRouting: fabricRoutingNotes.slice(),
     },
   );
   reportModel.disposition = reportDisposition;
