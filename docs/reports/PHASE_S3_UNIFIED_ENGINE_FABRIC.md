@@ -2,8 +2,8 @@
 # UNIFIED ENGINE FABRIC
 
 **S3 RESULT:** **S3.1 FROZEN / OPERATOR ACCEPTED**  
-**S3.1 freeze tip:** `3b6d2b8bbcfb1f2d584f3591d682e2c5a348230d`  
-**S3.1 result-capture tip:** `3b6d2b8bbcfb1f2d584f3591d682e2c5a348230d`  
+**S3.1 freeze tip:** `4c6cf6a44ebb3e1a6475ec9c6c35dadf62d31559`  
+**S3.1 result-capture tip:** `4c6cf6a44ebb3e1a6475ec9c6c35dadf62d31559`  
 **S3.1 prior acceptance tip:** `48e2a788f4576166bf8bf4aea36f424e1f15535a`  
 **S3.1 prior live tip:** `c0dc3ace91118d63cce0de0a6490e8df62182925`  
 **S3.1 implementation checkpoint:** `20c3138255526758c1c276eed0353ece6ca97545`  
