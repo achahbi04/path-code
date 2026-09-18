@@ -1,8 +1,8 @@
 # PATH CODE — S3
 # UNIFIED ENGINE FABRIC
 
-**S3 RESULT:** **S3.2 LIVE-VERIFIED** (ready for operator review)  
-**S3.2 live tip:** `1afe1bf7f0bc845642a490e746b33f43655ded54`  
+**S3 RESULT:** **FROZEN / OPERATOR ACCEPTED** (S3.2 closed)  
+**S3.2 freeze tip:** _(recorded at freeze commit)_  
 **S3.1 freeze tip:** `4c6cf6a44ebb3e1a6475ec9c6c35dadf62d31559` — **do not reopen**  
 **S2 freeze tip preserved:** `67200c1551d7dc6beee9bafb495d133ec11dc0ba`  
 **S1:** FROZEN / OPERATOR ACCEPTED — tip `eac5f8620fea8c75070cd27421643bb167864294` — **do not reopen**
@@ -13,23 +13,50 @@
 
 ---
 
+## S3 freeze judgment
+
+The Unified Engine Fabric is **complete enough to freeze S3**.
+
+What S3 delivered:
+- One Gateway-facing fabric with honest capability differences
+- Need-fit routing (`inferTurnNeeds` → traits → preference/continuity → rotate fit peers)
+- Structured handoff on the same task / worktree / project reality
+- Cursor / Copilot / Antigravity as live collaborators without a permanent hierarchy
+
+What remains is **not** another S3 fabric slice — it is **S4**: durable crash/restart/reboot continuity across engines. Inventing an S3.3 would dilute that boundary.
+
+---
+
+## S3.2 invariants (closure audit)
+
+### 1. Traits are real capabilities, not provider stereotypes
+
+- Declarations live in `scripts/pathcode-cli/ag10/engine-capabilities.mjs`
+- Adapters re-export `declare*EngineCapability` (`cursor-sdk`, `copilot-sdk`, `ag-session`)
+- Routing consumes traits via `engineMeetsNeeds` — it does **not** hard-code “Copilot = LSP” / “Cursor = steer”
+- `buildEngineCapabilityList({ declarations, traitOverrides })` lets traits evolve when an integration gains or loses a capability
+- Mechanical proof: trait-swap test routes inflight steer → Copilot and lsp → Cursor when declarations are swapped
+
+### 2. No hidden engine scoring / model ranking
+
+- `explainEngineSelection` is boolean fit → preference → continuity → rotate among fit peers
+- Peer list order is stable enumeration for rotation only — not preference weights
+- No `qualityScore` / provider weights / model ranks on the selection path
+- Legitimate inputs only: needs, readiness, continuity, preference, steering semantics, declared traits
+
+---
+
 ## S3.2 — Fabric maturity (this slice)
 
-**Goal:** deepen the Unified Engine Fabric so Antigravity, Copilot, and Cursor participate *intelligently* through one PATH task reality while preserving their real differences.
-
-**In scope for S3.2:**
-- Richer capability representation (`traits`, honest `steering` / `cancel` / `resume`)
-- Turn-need inference from objective / role / validation (capability tags — **not** model scores)
-- Need-fit routing via `explainEngineSelection` (preference → continuity → rotate among fit peers)
-- Structured fabric handoff packets (`buildFabricHandoff` / `formatFabricHandoff`) for coherent peer turns
-- Session repair loop uses need-fit selection + handoff text; report surfaces last routing note
-- Gateway `capabilities.list` exposes traits for each live engine
+**In scope (done):**
+- Adapter-owned capability traits + turn-need matching + selection reasons
+- Need-fit routing + structured fabric handoff
+- Session repair loop + report routing note + Gateway `capabilities.list` traits
 
 **Out of scope / deferred:**
-- **S4** crash-safe multi-engine resume / reboot recovery productization
+- **S4** crash-safe multi-engine resume / reboot recovery
 - Permanent provider hierarchy or PATH-as-model-judge ranking
 - Studio/Build slots; publication/release
-- Terminal title polish (may improve incidentally; not the slice goal)
 
 ---
 
@@ -41,18 +68,16 @@ PATH Code (product surface)
 PATH Gateway  (bind / start / steer / cancel / capabilities / results)
     │
 Unified Engine Fabric (G10)
+    │  adapter declare*Capability → traits
     │  inferTurnNeeds → explainEngineSelection (need-fit, no hierarchy)
     │  buildFabricHandoff → peer prompts
     │  mutation leases · steering queue · checkpoints · collab journal
-    ├─ Antigravity  — bridge, hooks, boundary steer, native cancel
-    ├─ Copilot      — SDK/CLI, LSP, boundary steer, abort-registry cancel
-    └─ Cursor       — local SDK, inflight steer, native cancel
+    ├─ Antigravity  — bridge, hooks, boundary steer (declared)
+    ├─ Copilot      — SDK/CLI, LSP, boundary steer (declared)
+    └─ Cursor       — local SDK, inflight steer (declared)
     │
 one task worktree / one project reality
 ```
-
-Participation is capability-aware. Engines keep distinct steering/cancel/resume semantics.
-Not every task uses multiple engines.
 
 ---
 
@@ -60,10 +85,10 @@ Not every task uses multiple engines.
 
 | Lane | Status |
 | --- | --- |
-| **IMPLEMENTED** | Traits + need inference + need-fit selection + fabric handoff + session/report wiring |
-| **MECHANICALLY TESTED** | `tests/s3/fabric-routing.test.ts` + existing `tests/s3` |
+| **IMPLEMENTED** | Traits from adapter declarations + need-fit + handoff + evolvable overrides |
+| **MECHANICALLY TESTED** | `tests/s3/fabric-routing.test.ts` (incl. trait-swap + no-score invariants) |
 | **LIVE-VERIFIED** | `run-s32-live-fabric.mjs` → `s32-live-fabric.json` **LIVE-VERIFIED** |
-| **OPERATOR ACCEPTANCE** | **PENDING REVIEW** — checklist `g10-evidence/s3/s32-operator-acceptance.md` |
+| **OPERATOR ACCEPTANCE** | **ACCEPTED** — checklist `g10-evidence/s3/s32-operator-acceptance.md` |
 
 ---
 
@@ -72,17 +97,6 @@ Not every task uses multiple engines.
 - [`g10-evidence/s3/s32-live-fabric.json`](./g10-evidence/s3/s32-live-fabric.json) — LIVE fabric maturity pack
 - `s32-live-fabric-run.txt`, `s32-focused-tests.txt`
 - S3.1 freeze tip: `4c6cf6a44ebb3e1a6475ec9c6c35dadf62d31559`
-
----
-
-## How need-fit routing works
-
-1. `inferTurnNeeds({ role, objective, validation })` → tags such as `repair`, `lsp`, `inflight_steer`.
-2. `explainEngineSelection` filters ready engines to those that **meet** the needs (boolean fit).
-3. Explicit preference still wins when the preferred engine is ready and fits.
-4. Continuity with the last engine wins on non-repair turns when still fit/ready.
-5. Otherwise rotate among fit peers — never a permanent AG→Copilot→Cursor hierarchy.
-6. On handoff, `buildFabricHandoff` carries objective, needs, routing reason, journal, and worktree reality into the next engine prompt.
 
 ---
 

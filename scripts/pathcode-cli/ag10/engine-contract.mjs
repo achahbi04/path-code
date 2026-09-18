@@ -6,7 +6,16 @@
  * not a model-judge ranking.
  *
  * S3.2: richer live capability traits + turn-need matching + selection reasons.
+ * Traits originate from adapter declarations (engine-capabilities.mjs) and
+ * remain evolvable via traitOverrides / live declarations — routing never
+ * hard-codes provider stereotypes.
  */
+
+import {
+  declareAntigravityEngineCapability,
+  declareCopilotEngineCapability,
+  declareCursorEngineCapability,
+} from "./engine-capabilities.mjs";
 
 /** @typedef {'antigravity'|'copilot'|'cursor'} EngineId */
 
@@ -72,101 +81,22 @@
  * }} EngineSelection
  */
 
-/** Static capability templates (live probes may flip status / evidence). */
+/**
+ * Capability templates sourced from adapter declarations.
+ * Live probes may flip status / evidence; traitOverrides may evolve traits
+ * without redesigning the routing architecture.
+ */
 export const ENGINE_CAPABILITY_TEMPLATES = Object.freeze({
-  antigravity: /** @type {EngineCapability} */ ({
-    id: "antigravity",
-    role: "engineering_collaborator",
-    status: "available",
-    native: [
-      "bridge",
-      "tools",
-      "mcp",
-      "continue",
-      "repair",
-      "cancel",
-      "hooks",
-      "streaming",
-    ],
-    traits: [
-      "bridge",
-      "tools",
-      "mcp",
-      "shell",
-      "hooks",
-      "streaming",
-      "repair",
-      "continue",
-      "boundary_steer",
-    ],
-    steering: "boundary",
-    cancel: "native",
-    resume: "native",
-    note: "Bridge-backed engineering with native continue / cancel / hooks",
-  }),
-  copilot: /** @type {EngineCapability} */ ({
-    id: "copilot",
-    role: "engineering_collaborator",
-    status: "available",
-    native: [
-      "sdk",
-      "cli_fallback",
-      "tools",
-      "lsp",
-      "mcp",
-      "continue",
-      "repair",
-      "stable_cli_path",
-    ],
-    traits: [
-      "sdk",
-      "cli_fallback",
-      "tools",
-      "lsp",
-      "mcp",
-      "shell",
-      "repair",
-      "continue",
-      "boundary_steer",
-    ],
-    // Mid-turn steer is not wired; guidance applies at turn boundaries.
-    steering: "boundary",
-    cancel: "abort_registry",
-    resume: "session_id",
-    note: "Copilot SDK / CLI with LSP and language-aware repair",
-  }),
-  cursor: /** @type {EngineCapability} */ ({
-    id: "cursor",
-    role: "engineering_collaborator",
-    status: "unavailable",
-    native: [
-      "sdk",
-      "local_cwd",
-      "tools",
-      "streaming",
-      "steer_inflight",
-      "cancel",
-      "resume",
-      "multi_turn",
-    ],
-    traits: [
-      "sdk",
-      "local_cwd",
-      "tools",
-      "shell",
-      "streaming",
-      "inflight_steer",
-      "repair",
-      "continue",
-    ],
-    // Local Cursor runs support in-flight steer; fabric still applies boundary
-    // guidance into the next send when the run has finished.
-    steering: "immediate",
-    cancel: "native",
-    resume: "native",
-    note: "Official @cursor/sdk local executor against the PATH task worktree",
-  }),
+  antigravity: Object.freeze(declareAntigravityEngineCapability()),
+  copilot: Object.freeze(declareCopilotEngineCapability()),
+  cursor: Object.freeze(declareCursorEngineCapability()),
 });
+
+export {
+  declareAntigravityEngineCapability,
+  declareCopilotEngineCapability,
+  declareCursorEngineCapability,
+} from "./engine-capabilities.mjs";
 
 /** @type {Record<TurnNeed, EngineTrait[]>} */
 const NEED_TRAIT_ANY_OF = Object.freeze({
@@ -387,6 +317,8 @@ export function explainEngineSelection(input = {}) {
     copilot: input.ready?.copilot === true,
     cursor: input.ready?.cursor === true,
   };
+  // Stable peer enumeration for rotation only — not preference weights or
+  // quality ranks. Fit filtering below decides who may run.
   /** @type {EngineId[]} */
   const available = [];
   if (ready.antigravity) available.push("antigravity");
@@ -417,9 +349,11 @@ export function explainEngineSelection(input = {}) {
     if (fit.length > 0) candidates = fit;
   }
   if (candidates.length === 0) {
+    // PATH's embedded bridge is always present in-process when no peer SDK
+    // is ready — product fallback, not a ranking among ready collaborators.
     return {
       engine: "antigravity",
-      reason: "no ready peers — default antigravity",
+      reason: "no ready peers — PATH bridge fallback",
       needs,
       candidates: [],
       preferredHonored: false,
@@ -474,25 +408,43 @@ export function explainEngineSelection(input = {}) {
 }
 
 /**
- * Build Gateway capability list from templates + live readiness.
+ * Build Gateway capability list from adapter declarations + live readiness.
+ *
+ * Optional `declarations` / `traitOverrides` let traits evolve when an
+ * integration gains or loses a capability — without redesigning routing.
  *
  * @param {{
  *   antigravity?: boolean,
  *   copilot?: { ready?: boolean, mode?: string, evidence?: string[] },
  *   cursor?: { ready?: boolean, mode?: string, evidence?: string[], reason?: string },
+ *   declarations?: Partial<Record<EngineId, EngineCapability>>,
+ *   traitOverrides?: Partial<Record<EngineId, EngineTrait[]>>,
  * }} [live]
  * @returns {EngineCapability[]}
  */
 export function buildEngineCapabilityList(live = {}) {
+  const base = {
+    antigravity:
+      live.declarations?.antigravity || ENGINE_CAPABILITY_TEMPLATES.antigravity,
+    copilot: live.declarations?.copilot || ENGINE_CAPABILITY_TEMPLATES.copilot,
+    cursor: live.declarations?.cursor || ENGINE_CAPABILITY_TEMPLATES.cursor,
+  };
+  /** @param {EngineId} id @param {EngineCapability} tpl */
+  const traitsFor = (id, tpl) => {
+    const override = live.traitOverrides?.[id];
+    if (Array.isArray(override)) return [...override];
+    return [...(tpl.traits || [])];
+  };
+
   const ag = {
-    ...ENGINE_CAPABILITY_TEMPLATES.antigravity,
-    traits: [...ENGINE_CAPABILITY_TEMPLATES.antigravity.traits],
+    ...base.antigravity,
+    traits: traitsFor("antigravity", base.antigravity),
     status: live.antigravity === false ? "unavailable" : "available",
   };
   const copilotReady = live.copilot?.ready === true;
   const copilot = {
-    ...ENGINE_CAPABILITY_TEMPLATES.copilot,
-    traits: [...ENGINE_CAPABILITY_TEMPLATES.copilot.traits],
+    ...base.copilot,
+    traits: traitsFor("copilot", base.copilot),
     status: copilotReady ? "available" : "unavailable",
     evidence: live.copilot?.evidence || [],
     extensions: {
@@ -501,8 +453,8 @@ export function buildEngineCapabilityList(live = {}) {
   };
   const cursorReady = live.cursor?.ready === true;
   const cursor = {
-    ...ENGINE_CAPABILITY_TEMPLATES.cursor,
-    traits: [...ENGINE_CAPABILITY_TEMPLATES.cursor.traits],
+    ...base.cursor,
+    traits: traitsFor("cursor", base.cursor),
     status: cursorReady
       ? "available"
       : live.cursor?.reason === "auth_required"
@@ -512,7 +464,7 @@ export function buildEngineCapabilityList(live = {}) {
     note:
       live.cursor?.reason && !cursorReady
         ? String(live.cursor.reason).slice(0, 200)
-        : ENGINE_CAPABILITY_TEMPLATES.cursor.note,
+        : base.cursor.note,
     extensions: {
       mode: live.cursor?.mode || "none",
     },

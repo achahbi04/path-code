@@ -247,3 +247,5 @@ export function bindAntigravitySession(input) {
     classify: classifyAgSessionContinuity,
   };
 }
+
+export { declareAntigravityEngineCapability } from "./engine-capabilities.mjs";

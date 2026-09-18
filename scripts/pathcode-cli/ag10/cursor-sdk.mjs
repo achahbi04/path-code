@@ -708,3 +708,5 @@ export async function createCursorEngine(options) {
     disconnect,
   };
 }
+
+export { declareCursorEngineCapability } from "./engine-capabilities.mjs";

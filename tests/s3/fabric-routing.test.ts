@@ -156,4 +156,64 @@ describe("S3.2 fabric routing", () => {
     expect(text).toContain("Turn needs: repair, lsp");
     expect(text).toContain("PATH fabric handoff");
   });
+
+  it("routes by declared traits, not provider stereotypes", async () => {
+    const {
+      explainEngineSelection,
+      buildEngineCapabilityList,
+      declareCursorEngineCapability,
+      declareCopilotEngineCapability,
+    } = await load(join(AG10, "engine-contract.mjs"));
+
+    // Swap: give Copilot inflight_steer, give Cursor lsp — routing must follow.
+    const swapped = buildEngineCapabilityList({
+      copilot: { ready: true, mode: "native_sdk" },
+      cursor: { ready: true, mode: "native_sdk" },
+      traitOverrides: {
+        cursor: declareCursorEngineCapability()
+          .traits.filter((t: string) => t !== "inflight_steer")
+          .concat(["lsp"]),
+        copilot: declareCopilotEngineCapability()
+          .traits.filter((t: string) => t !== "lsp")
+          .concat(["inflight_steer"]),
+      },
+      declarations: {
+        cursor: {
+          ...declareCursorEngineCapability(),
+          steering: "boundary",
+        },
+        copilot: {
+          ...declareCopilotEngineCapability(),
+          steering: "immediate",
+        },
+      },
+    });
+
+    const steer = explainEngineSelection({
+      role: "collab",
+      ready: { antigravity: true, copilot: true, cursor: true },
+      needs: ["inflight_steer"],
+      preferContinuity: false,
+      capabilities: swapped,
+    });
+    expect(steer.engine).toBe("copilot");
+    expect(steer.candidates).toEqual(["copilot"]);
+
+    const lsp = explainEngineSelection({
+      role: "repair",
+      ready: { antigravity: true, copilot: true, cursor: true },
+      needs: ["lsp"],
+      preferContinuity: false,
+      capabilities: swapped,
+    });
+    expect(lsp.engine).toBe("cursor");
+    expect(lsp.candidates).toEqual(["cursor"]);
+  });
+
+  it("selection path has no numeric engine quality score", async () => {
+    const fs = await import("node:fs");
+    const src = fs.readFileSync(join(AG10, "engine-contract.mjs"), "utf8");
+    expect(src).not.toMatch(/qualityScore|providerWeight|modelRank|engineScore/i);
+    expect(src).toMatch(/boolean fit/);
+  });
 });

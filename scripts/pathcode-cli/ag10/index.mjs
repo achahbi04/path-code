@@ -807,4 +807,7 @@ export {
   buildFabricHandoff,
   formatFabricHandoff,
   ENGINE_CAPABILITY_TEMPLATES,
+  declareAntigravityEngineCapability,
+  declareCopilotEngineCapability,
+  declareCursorEngineCapability,
 } from "./engine-contract.mjs";

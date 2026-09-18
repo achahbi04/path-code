@@ -546,3 +546,5 @@ export async function createCopilotEngine(options) {
     disconnect,
   };
 }
+
+export { declareCopilotEngineCapability } from "./engine-capabilities.mjs";
