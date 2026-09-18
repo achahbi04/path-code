@@ -3,7 +3,7 @@
 
 **S4 RESULT:** **S4.1 LIVE-VERIFIED** (first slice — ready for continued S4 work)  
 **S3 stage freeze (do not reopen):** `89eea9992c1bb30763413aa0054d93481c65fcb2`  
-**S4.1 checkpoint tip:** _(recorded at commit)_
+**S4.1 checkpoint tip:** `3bea879358a2598a41c6632ecb530da446f1c936`
 
 **Prior stage:** S3 Unified Engine Fabric — **FROZEN / STAGE COMPLETE** (no S3.3)
 
