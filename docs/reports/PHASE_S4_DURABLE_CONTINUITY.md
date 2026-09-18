@@ -5,7 +5,7 @@
 **S3 stage freeze (do not reopen):** `89eea9992c1bb30763413aa0054d93481c65fcb2`  
 **S4.1:** **ACCEPTED / FROZEN** — `3bea879358a2598a41c6632ecb530da446f1c936`  
 **S4.2:** **ACCEPTED / FROZEN** — `e5757296e30e22f4aa0f51c07dce78c908653d59`  
-**S4.3 checkpoint tip:** _(recorded at commit)_
+**S4.3 checkpoint tip:** `093a29aa963e8132a5d47598dcc9ac62b15609b5`
 
 **Prior stage:** S3 Unified Engine Fabric — **FROZEN / STAGE COMPLETE** (no S3.3)
 
