@@ -62,6 +62,11 @@ import { normalizeObjectiveText } from "./pathcode-cli/normalize-text.mjs";
 import { isTaskStopCommand } from "./pathcode-cli/task-control.mjs";
 import { reconcileHostStartup } from "./pathcode-cli/ag10/host-startup.mjs";
 import { formatReopenNotice } from "./pathcode-cli/ag10/task-continuity.mjs";
+import {
+  createBuildController,
+  findLatestActiveBuild,
+  formatBuildStatus,
+} from "./pathcode-cli/build/index.mjs";
 
 const root = resolvePathPackageRoot();
 
@@ -2370,6 +2375,296 @@ export async function runPathcodeMain(argv, testIo = {}) {
       }
       if (cmd === "/help") {
         prompt.write(renderHelpText({ unicode, plain }));
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+
+      // S5 — PATH Build product-level control loop
+      if (cmd === "/build" || cmd.startsWith("/build ")) {
+        const runtimeRoot = runtimeRootForContinuity;
+        const parts = cmd.split(/\s+/);
+        const sub = (parts[1] || "help").toLowerCase();
+        const rest = parts.slice(2).join(" ").trim();
+
+        const buildGatewayPort = () => {
+          if (!gatewayClient && !gatewayRuntime) {
+            return null;
+          }
+          if (gatewayClient) {
+            return {
+              bindProject: (cwd) => gatewayClient.bindProject(cwd),
+              startTask: (objective, extra) =>
+                gatewayClient.startTask(objective, extra),
+              resumeTask: (taskId, extra) =>
+                gatewayClient.resumeTask(taskId, extra),
+              awaitTask: (taskId, timeoutMs) =>
+                gatewayClient.awaitTask(taskId, timeoutMs),
+              steerTask: (taskId, text) =>
+                gatewayClient.steerTask(taskId, text),
+              snapshotTask: (taskId) => gatewayClient.snapshotTask(taskId),
+            };
+          }
+          return {
+            bindProject: (cwd) => gatewayRuntime.bindProject({ cwd }),
+            startTask: (objective, extra) =>
+              gatewayRuntime.startTask({ objective, ...extra }),
+            resumeTask: (taskId, extra) =>
+              gatewayRuntime.resumeTask({ taskId, ...extra }),
+            awaitTask: async (taskId) => gatewayRuntime.awaitTask(taskId),
+            steerTask: (taskId, text) =>
+              gatewayRuntime.steerTask(taskId, text),
+            snapshotTask: (taskId) => gatewayRuntime.snapshotTask(taskId),
+          };
+        };
+
+        const port = buildGatewayPort();
+        const fakeMode =
+          process.env.PATHCODE_GATEWAY_FAKE_ENGINE === "1" ||
+          process.env.PATHCODE_BUILD_FAKE === "1" ||
+          !port;
+        const controller = createBuildController({
+          runtimeRoot,
+          gateway: port || {
+            async bindProject() {
+              return { ok: true };
+            },
+            async startTask() {
+              return { ok: false, code: "NO_GATEWAY" };
+            },
+            async awaitTask() {
+              return {};
+            },
+          },
+          fakeMode,
+        });
+
+        if (sub === "help" || sub === "-h") {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            [
+              "PATH Build — outcome-driven product engineering",
+              "",
+              "  /build start <outcome>   Start Build in cwd (git-init origin if needed)",
+              "  /build status [id]       Show durable Build state",
+              "  /build tick [id]         Run one autonomous loop step",
+              "  /build run [id]          Run until complete/blocked (bounded)",
+              "  /build steer [id] — <text>   Revise product intent",
+              "  /build require [id] — <req>  Add explicit requirement",
+              "",
+              "Child kinds: engineer · evaluate · challenge (via S3 fabric).",
+              "BUILD COMPLETE requires proven criteria + satisfied requirements,",
+              "fresh evidence, evaluate + challenge — not merely child VERIFIED.",
+            ].join("\n"),
+          );
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
+
+        if (sub === "start") {
+          const outcome = rest || "";
+          if (!outcome) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              "Usage: /build start <outcome text>",
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            "Starting PATH Build (origin + durable record)…",
+          );
+          const started = await controller.startBuild(outcome, {
+            targetDir: projectRoot,
+            initialCriteria: [
+              {
+                id: "c-runnable",
+                statement:
+                  "Core software is runnable with project-native checks",
+                required: true,
+              },
+              {
+                id: "c-outcome",
+                statement: `Software advances the stated outcome`,
+                required: true,
+              },
+            ],
+          });
+          if (!started.ok) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              started.message || started.code || "Build start failed",
+            );
+          } else {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              [
+                formatBuildStatus(started.build),
+                "",
+                fakeMode
+                  ? "Note: Build fake mode (PATHCODE_BUILD_FAKE=1 or no gateway)."
+                  : "Use /build tick or /build run to advance autonomously.",
+              ].join("\n"),
+            );
+          }
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
+
+        const resolveBuildId = () => {
+          if (rest && !rest.includes("—") && !rest.includes("--") && rest.length < 80 && !rest.includes(" ")) {
+            return rest;
+          }
+          if (parts[2] && !parts[2].startsWith("—") && parts[2] !== "--") {
+            // /build tick <id>
+            if (sub === "tick" || sub === "run" || sub === "status") {
+              return parts[2];
+            }
+          }
+          const latest = findLatestActiveBuild(runtimeRoot);
+          return latest?.buildId || "";
+        };
+
+        if (sub === "status") {
+          const id = resolveBuildId();
+          if (!id) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              "No active Build. Start with /build start <outcome>.",
+            );
+          } else {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              controller.formatStatus(id),
+            );
+          }
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
+
+        if (sub === "tick") {
+          const id = resolveBuildId();
+          if (!id) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              "No active Build.",
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            `Build tick ${id.slice(0, 8)}…`,
+          );
+          const step = await controller.tick(id);
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            [
+              step.ok
+                ? `action=${step.action} kind=${step.kind || "—"} done=${Boolean(step.done)}`
+                : `failed: ${step.code || step.message || "tick"}`,
+              "",
+              step.build ? formatBuildStatus(step.build) : "",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          );
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
+
+        if (sub === "run") {
+          const id = resolveBuildId();
+          if (!id) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              "No active Build.",
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            `Running PATH Build ${id.slice(0, 8)}… (bounded)`,
+          );
+          const result = await controller.runUntilDone(id, { maxSteps: 10 });
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            [
+              `done=${Boolean(result.done)} blocked=${Boolean(result.blocked)} steps=${result.steps?.length || 0}`,
+              "",
+              result.build ? formatBuildStatus(result.build) : "",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          );
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
+
+        if (sub === "steer" || sub === "require") {
+          const id =
+            findLatestActiveBuild(runtimeRoot)?.buildId ||
+            (parts[2] && parts[2].length === 36 ? parts[2] : "");
+          const sep = cmd.includes("—") ? "—" : cmd.includes(" -- ") ? " -- " : null;
+          let text = rest;
+          let buildId = id;
+          if (sep) {
+            const idx = cmd.indexOf(sep);
+            const before = cmd.slice(0, idx).trim().split(/\s+/);
+            buildId = before[2] || id;
+            text = cmd.slice(idx + sep.length).trim();
+          }
+          if (!buildId || !text) {
+            showOperatorReply(
+              prompt,
+              ttyInline ? inlineStudio : null,
+              sub === "require"
+                ? "Usage: /build require — <requirement text>"
+                : "Usage: /build steer — <intent revision text>",
+            );
+            redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+            continue;
+          }
+          const revised =
+            sub === "require"
+              ? await controller.reviseIntent(buildId, {
+                  addRequirements: [{ statement: text }],
+                  note: `require: ${text}`,
+                })
+              : await controller.reviseIntent(buildId, {
+                  outcome: text,
+                  note: "operator steer",
+                });
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            revised.ok
+              ? formatBuildStatus(revised.build)
+              : revised.message || "steer failed",
+          );
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
+
+        showOperatorReply(
+          prompt,
+          ttyInline ? inlineStudio : null,
+          "Unknown /build subcommand. Try /build help.",
+        );
         redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
         continue;
       }

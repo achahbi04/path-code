@@ -1,0 +1,91 @@
+{
+  "schema": "pathcode.s5.build-proof.v1",
+  "verdict": "LIVE-VERIFIED",
+  "mode": "mechanical_fake_fabric",
+  "buildId": "b581dee0-c29a-46d2-8305-306a9ee919ca",
+  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-proof-tK1NAp/product",
+  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-proof-tK1NAp/runtime",
+  "steps": [
+    {
+      "step": "origin",
+      "ok": true,
+      "buildId": "b581dee0-c29a-46d2-8305-306a9ee919ca",
+      "git": true,
+      "noScaffoldPackage": true
+    },
+    {
+      "step": "multi_task_loop",
+      "ok": true,
+      "kinds": [
+        "engineer",
+        "evaluate",
+        "challenge"
+      ],
+      "hasEngineer": true,
+      "hasEvaluate": true,
+      "hasChallenge": true,
+      "status": "complete"
+    },
+    {
+      "step": "impact_reinspect",
+      "docsIndependent": true,
+      "retainedAfterDocs": true,
+      "demotedAfterSrc": true,
+      "ok": true
+    },
+    {
+      "step": "durability",
+      "consumeDeduped": true,
+      "recoverOk": true,
+      "pendingCleared": true,
+      "ok": true
+    },
+    {
+      "step": "steering",
+      "revision": 2,
+      "hasOffline": true,
+      "statusAfter": "running",
+      "ok": true
+    },
+    {
+      "step": "complete_after_steer",
+      "done": true,
+      "status": "complete",
+      "ok": true
+    },
+    {
+      "step": "code_convergence",
+      "bindable": true,
+      "projectRoot": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-proof-tK1NAp/product",
+      "ok": true
+    }
+  ],
+  "finalStatus": "complete",
+  "children": [
+    {
+      "kind": "engineer",
+      "state": "consumed",
+      "classification": "VERIFIED"
+    },
+    {
+      "kind": "evaluate",
+      "state": "consumed",
+      "classification": "VERIFIED"
+    },
+    {
+      "kind": "challenge",
+      "state": "consumed",
+      "classification": "VERIFIED"
+    },
+    {
+      "kind": "engineer",
+      "state": "consumed",
+      "classification": "VERIFIED"
+    },
+    {
+      "kind": "evaluate",
+      "state": "consumed",
+      "classification": "VERIFIED"
+    }
+  ]
+}

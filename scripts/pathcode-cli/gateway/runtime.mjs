@@ -340,8 +340,8 @@ export function createGatewayRuntime(options = {}) {
       ],
       delivery: ["github_issue_context", "publication_functions_callable"],
       extensibility: {
-        workflows: ["path_code", "path_build_slot", "path_studio_slot"],
-        clients: ["cli", "headless", "studio_slot", "build_slot"],
+        workflows: ["path_code", "path_build", "path_studio_slot"],
+        clients: ["cli", "headless", "studio_slot", "build"],
       },
       project: project.projectRoot
         ? {
