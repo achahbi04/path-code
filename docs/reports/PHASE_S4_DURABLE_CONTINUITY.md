@@ -1,15 +1,38 @@
 # PATH CODE — S4
 # DURABLE CONTINUITY & RECOVERY
 
-**S4 RESULT:** **S4.3 LIVE-VERIFIED** (autonomous host-restart sim) — **awaiting Mac reboot operator acceptance to FREEZE S4**  
+**S4 RESULT:** **IMPLEMENTATION FROZEN**  
+**AUTONOMOUS / LIVE VERIFICATION:** **PASS**  
+**PHYSICAL MAC REBOOT ACCEPTANCE:** **DEFERRED BY OPERATOR**
+
 **S3 stage freeze (do not reopen):** `89eea9992c1bb30763413aa0054d93481c65fcb2`  
 **S4.1:** **ACCEPTED / FROZEN** — `3bea879358a2598a41c6632ecb530da446f1c936`  
 **S4.2:** **ACCEPTED / FROZEN** — `e5757296e30e22f4aa0f51c07dce78c908653d59`  
-**S4.3 checkpoint tip:** `093a29aa963e8132a5d47598dcc9ac62b15609b5`
+**S4.3 implementation:** `093a29aa963e8132a5d47598dcc9ac62b15609b5`  
+**S4.3 tip:** `2d56b23ad922f6e1947c7f48d2059a389ac7badf`
 
 **Prior stage:** S3 Unified Engine Fabric — **FROZEN / STAGE COMPLETE** (no S3.3)
 
-**Next after S4 freeze:** PATH Build **S5** · PATH Studio **S6**
+**Next:** PATH Build **S5** — architecture audit only until implementation is authorized  
+See [`PHASE_S5_PATH_BUILD_ARCHITECTURE_AUDIT.md`](./PHASE_S5_PATH_BUILD_ARCHITECTURE_AUDIT.md)
+
+---
+
+## Freeze judgment
+
+S4 implementation is **frozen** at the verified S4.3 checkpoint.
+
+Cursor completed autonomous host-restart simulation and focused tests.  
+The operator has deferred the physical Mac reboot acceptance because the machine is in active production use. That reboot procedure remains valid and will be run later.
+
+**Do not claim a physical reboot occurred.**
+
+| Gate | Status |
+| --- | --- |
+| S4.1 Gateway SIGKILL → reclaim → resume | **PASS / FROZEN** |
+| S4.2 Engine/process interruption | **PASS / FROZEN** |
+| S4.3 Host-restart reconciliation (sim) | **LIVE-VERIFIED / FROZEN** |
+| Physical Mac reboot | **DEFERRED BY OPERATOR** |
 
 ---
 
@@ -23,52 +46,41 @@
 | `recoverable_from_durable_state` | Incomplete CP + worktree; no native session claim | `/resume` (PATH rehydrate) |
 | `completed` / `failed` / `abandoned` | Terminal | `/inspect` |
 
-PATH taskId is the durable identity. Engine processes/sessions may change.
+PATH taskId is the durable identity. Engine processes/sessions may come and go.
 
 ---
 
-## S4.3 — Host restart / reopen / recovery
+## S4.3 — Host restart / reopen / recovery (frozen)
 
 ### Startup reconciliation (`reconcileHostStartup`)
 
-On every PATH open:
-
-1. Reclaim stale Gateway pid/socket (`reclaimStaleGatewayOwnership`)
-2. Reconcile `{taskId}.processes.json` against pid+startKey
-3. Reconcile worktree/Git into checkpoint when reality drifted
-4. `in_flight:*` with no surviving PATH-owned process → `interrupted`
-5. Build project-scoped recoverable list + reopen notices
+1. Reclaim stale Gateway pid/socket  
+2. Reconcile `{taskId}.processes.json` against pid+startKey  
+3. Reconcile worktree/Git into checkpoint when reality drifted  
+4. Orphan `in_flight:*` → `interrupted`  
+5. Project-scoped recoverable list + reopen notices  
 
 ### Reopen experience
 
-Product card (`formatReopenNotice`): objective, when interrupted, continuity state, last engine turn, worktree survival, native-vs-rehydrate honesty, `/resume` + `/inspect`.  
-Bare `/resume` defaults when exactly one recoverable task exists.
+`formatReopenNotice` + bare `/resume` when exactly one recoverable task exists.
 
 ### Mid-turn durability
 
-`beginEngineTurn` now persists: `in_flight:engine`, `inFlightStartedAt`, `inFlightEngine`, headSha, diffFingerprint, changedFiles snapshot — enough to know what happened vs what may need re-validation after restart.
+`beginEngineTurn` persists in-flight engine, timestamps, headSha, diffFingerprint, changedFiles.
 
 ### Process ownership
 
-Copilot CLI turns use async `spawn` + `registerProcess` (`copilot_cli`) with pid+startKey sidecar (same model as AG bridge).
-
-### Engine continuity (unchanged honesty)
-
-| Engine | Native after host restart | Otherwise |
-| --- | --- | --- |
-| Cursor | `Agent.resume` if session still valid | Create + PATH rehydrate |
-| Copilot | `resumeSession` if valid | Create / CLI (not labeled native) |
-| Antigravity | Only while bridge was live | `REHYDRATED_SESSION` from PATH reality |
+Copilot CLI: async `spawn` + `registerProcess` with pid+startKey.
 
 ### Autonomous proof
 
-`run-s43-host-restart-sim.mjs` — in-flight CP → SIGKILL Gateway → `reconcileHostStartup` → reopen notice inputs → `task.resume` same taskId → completed. **LIVE-VERIFIED.**
+`run-s43-host-restart-sim.mjs` → **LIVE-VERIFIED**  
+(task continuity through Gateway SIGKILL → reconcile → resume → completed)
 
-### Mac reboot (operator only)
+### Mac reboot (deferred)
 
-Procedure: [`g10-evidence/s4/s43-operator-acceptance.md`](./g10-evidence/s4/s43-operator-acceptance.md)
-
-After PASS → **FREEZE S4**.
+Procedure: [`g10-evidence/s4/s43-operator-acceptance.md`](./g10-evidence/s4/s43-operator-acceptance.md)  
+Run later; does not block S5 architecture work.
 
 ---
 
@@ -78,14 +90,14 @@ After PASS → **FREEZE S4**.
 | --- | --- |
 | **S4.1** | ACCEPTED / FROZEN |
 | **S4.2** | ACCEPTED / FROZEN |
-| **S4.3 IMPLEMENTED** | Host startup reconcile + reopen UX + Copilot ownership + mid-turn snapshot |
-| **MECHANICAL** | `tests/s4` (12) |
-| **LIVE (autonomous)** | `s43-host-restart-sim.json` **LIVE-VERIFIED** |
-| **OPERATOR** | Mac reboot acceptance **PENDING** |
+| **S4.3 implementation** | FROZEN at tip `2d56b23…` |
+| **MECHANICAL** | `tests/s4` (12) PASS |
+| **LIVE (autonomous)** | `s43-host-restart-sim.json` LIVE-VERIFIED |
+| **OPERATOR reboot** | DEFERRED |
 
 ---
 
 ## Evidence
 
-- S4.1 / S4.2 evidence under `g10-evidence/s4/` (frozen proofs — do not re-run for acceptance)
+- S4.1 / S4.2 / S4.3 under `g10-evidence/s4/` (frozen proofs)
 - S4.3: `s43-host-restart-sim.json`, `s43-focused-tests.txt`, `s43-operator-acceptance.md`
