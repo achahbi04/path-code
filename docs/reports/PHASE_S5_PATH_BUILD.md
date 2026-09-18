@@ -1,13 +1,19 @@
 # PATH CODE — S5
 # PATH BUILD (Option A′)
 
-**S5 RESULT:** **IMPLEMENTED / LIVE-VERIFIED** (not frozen)  
-**Implementation commit:** `5dc1e07325d85e80d41866cfec37cae94a51b4b4`  
-**Proof artifact:** [`g10-evidence/s5/s5-build-proof.json`](./g10-evidence/s5/s5-build-proof.json) — verdict **LIVE-VERIFIED**  
-**Mode:** mechanical fake fabric for the durable product control loop (CI + unit tests)  
-**Real-engine greenfield:** operator-exercisable via interactive **`/build`** (Gateway-backed tasks)
+**S5 RESULT:** **IMPLEMENTED / LIVE-VERIFIED — OPERATOR ACCEPTANCE PENDING**  
+**S5 tip:** `23c91787b0ac5529751fbda455b9d64579ed1b57`  
+**Mode:** mechanical fake fabric for the durable product control loop (CI + unit tests); real-engine greenfield via interactive **`/build`** (Gateway-backed tasks)
 
-**Prior stages:** S4 durable continuity — preserved; S3/S2/S1 freeze tips unchanged.
+**Evidence artifacts (honest verdicts):**
+
+| Artifact | Runner | Verdict |
+| --- | --- | --- |
+| [`g10-evidence/s5/s5-build-proof.json`](./g10-evidence/s5/s5-build-proof.json) | `node scripts/pathcode-cli/build/headless.mjs proof` | **LIVE-VERIFIED** — controller fake fabric; mechanical greenfield loop |
+| [`g10-evidence/s5/s5-gateway-fake-dispatch.json`](./g10-evidence/s5/s5-gateway-fake-dispatch.json) | `node docs/reports/g10-evidence/s5/run-s5-gateway-fake-dispatch.mjs` | **GATEWAY-DISPATCH-VERIFIED** — `fakeMode=false`, `PATHCODE_GATEWAY_FAKE_ENGINE=1`; origin + one engineer child via Gateway |
+| [`g10-evidence/s5/s5-live-engine-attempt.json`](./g10-evidence/s5/s5-live-engine-attempt.json) | `node docs/reports/g10-evidence/s5/run-s5-live-engine-attempt.mjs` | **LIVE-ENGINE-ATTEMPTED** — real Copilot turn (~47s); `LIVE_MARKER.txt` written; session terminal **NOT_VERIFIED** (no fake engine) |
+
+**Prior stages:** S4 durable continuity — preserved; S3/S2/S1 freeze tips unchanged. S5 is **not frozen** until operator acceptance.
 
 ---
 
