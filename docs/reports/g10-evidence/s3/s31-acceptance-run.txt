@@ -1,0 +1,14 @@
+{
+  "verdict": "LIVE-VERIFIED",
+  "cases": {
+    "selection": true,
+    "detect": true,
+    "gatewayCaps": true,
+    "cursorDirect": true,
+    "cursorSteerCancel": true,
+    "multiPeerFabric": true,
+    "gatewayCursorPrimary": true,
+    "gatewayAgPath": true,
+    "capabilityHonesty": true
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "schema": "pathcode.s3.engine-fabric.acceptance.v1",
+  "at": "2026-09-18T04:56:19.641Z",
+  "note": "S3.1 acceptance LIVE fabric. S2 freeze tip preserved. S4 not started.",
+  "cases": {
+    "selection": {
+      "ok": true,
+      "sequence": [
+        "antigravity",
+        "copilot",
+        "cursor"
+      ],
+      "preferCursor": "cursor",
+      "continuity": "cursor"
+    },
+    "detect": {
+      "ok": true,
+      "status": "ready"
+    },
+    "gatewayCaps": {
+      "ok": true,
+      "engines": {
+        "antigravity": "available",
+        "copilot": "available",
+        "cursor": "available"
+      }
+    },
+    "cursorDirect": {
+      "ok": true,
+      "mode": "native_sdk",
+      "sessionId": "agent-deaa2161-752b-4c96-953c-0c2c937c4434",
+      "runId": "run-777b9e25-bc3d-4aa3-a24f-7d7803520374",
+      "changedFiles": [
+        "S31_FABRIC.md"
+      ],
+      "eventFamilies": [
+        "session.capability.collaborate",
+        "session.engineering.activity",
+        "session.reading",
+        "session.engineering.tool",
+        "session.engineering.narration"
+      ]
+    },
+    "cursorSteerCancel": {
+      "ok": true,
+      "steerOk": true,
+      "steerMode": "inflight",
+      "cancelCode": "CANCELLED"
+    },
+    "multiPeerFabric": {
+      "ok": true,
+      "cursorAttachOk": true,
+      "cursorMode": "native_sdk",
+      "cursorTurnOk": true,
+      "copilotMode": "native_sdk",
+      "copilotTurnOk": true,
+      "copilotCode": null,
+      "sharedHasCursor": true,
+      "sharedHasCopilot": true,
+      "collabEventCount": 4,
+      "eventSample": [
+        {
+          "type": "session.capability.collaborate",
+          "engine": "cursor",
+          "detail": "Cursor SDK local session ready"
+        },
+        {
+          "type": "session.capability.collaborate",
+          "engine": "copilot",
+          "detail": "Copilot SDK session ready"
+        },
+        {
+          "type": "session.capability.collaborate",
+          "engine": "cursor",
+          "detail": "continuing repair in the task workspace"
+        },
+        {
+          "type": "session.capability.collaborate",
+          "engine": "copilot",
+          "detail": "continuing repair in the task workspace"
+        }
+      ]
+    },
+    "gatewayCursorPrimary": {
+      "ok": true,
+      "preferredEngineReturned": "cursor",
+      "preferredEngineSnapshot": "cursor",
+      "status": "completed",
+      "classification": "VERIFIED",
+      "resultEngine": "cursor",
+      "resultPreferred": "cursor",
+      "enginesUsed": [
+        "cursor"
+      ],
+      "commitSha": "6494e7c8482c7cbcc1ba482417cad5c1cc382421",
+      "primaryDone": true,
+      "reportHasFabricSection": true,
+      "reportExcerpt": "✓ COMPLETE\n\nPATH ● Code — Engineering report\n\nAsked\n  Append one line 'gateway-cursor-accept' to S31_FABRIC.md. Keep the change minimal. Reply briefly when done.\n\nEngine fabric\n  preferred  cursor\n  last turn  cursor\n  used       cursor\n  cursor     native_sdk\n\nChanged\n  S31_FABRIC.md\n\nType /report to copy this engineering report again.\n",
+      "eventCount": 138
+    },
+    "gatewayAgPath": {
+      "ok": true,
+      "status": "completed",
+      "classification": "VERIFIED",
+      "preferredEngine": null,
+      "eventCount": 104,
+      "sawEngineeringEvents": true
+    },
+    "capabilityHonesty": {
+      "ok": true,
+      "engines": [
+        {
+          "id": "antigravity",
+          "status": "available",
+          "steering": "boundary",
+          "cancel": "native"
+        },
+        {
+          "id": "copilot",
+          "status": "available",
+          "steering": "boundary",
+          "cancel": "abort_registry"
+        },
+        {
+          "id": "cursor",
+          "status": "available",
+          "steering": "immediate",
+          "cancel": "native"
+        }
+      ]
+    }
+  },
+  "verdict": "LIVE-VERIFIED"
+}

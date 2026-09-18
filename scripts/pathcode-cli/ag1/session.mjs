@@ -1216,6 +1216,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   let repairAttempts = 0;
   /** @type {string | null} */
   let lastCollabEngine = cursorPrimaryDone ? "cursor" : null;
+  /** @type {Set<string>} */
+  const enginesSeen = new Set(cursorPrimaryDone ? ["cursor"] : []);
   markTiming("first_engine_terminal");
   /** Steering continues applied before validation (bounded). */
   let steeringContinues = 0;
@@ -1301,6 +1303,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
               signal: ac.signal,
             });
             lastCollabEngine = "cursor";
+            enginesSeen.add("cursor");
             if (ac.signal.aborted || turn?.code === "CANCELLED") {
               agentCancelled = true;
               terminalMsg = { type: "cancelled" };
@@ -1478,6 +1481,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       }) ||
       "antigravity";
     lastCollabEngine = engineChoice;
+    enginesSeen.add(engineChoice);
     const journalEntries =
       ag9Collab?.readCollabJournal?.({
         runtimeRoot,
@@ -2062,6 +2066,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     diffPreviewShownFiles: preview.shownFiles,
     timingMarks,
     engineeringHandoff: engineeringHandoffSummary || null,
+    preferredEngine: preferredEngine || null,
+    engine: lastCollabEngine || null,
+    cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || null,
   });
 
   const outcomeClassification =
@@ -2099,6 +2106,10 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       terminalSummary,
       blockReason: terminalSummary,
       advancesSession,
+      preferredEngine: preferredEngine || null,
+      engine: lastCollabEngine || null,
+      cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || null,
+      enginesUsed: [...enginesSeen],
     },
     {
       classification: outcomeClassification,
@@ -2118,6 +2129,10 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       pushPerformed: false,
       timingSummary: summarizeTimingMarks(timingMarks),
       advancesSession,
+      preferredEngine: preferredEngine || null,
+      engine: lastCollabEngine || null,
+      cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || null,
+      enginesUsed: [...enginesSeen],
     },
   );
   reportModel.disposition = reportDisposition;
@@ -2246,6 +2261,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     preferredEngine: preferredEngine || null,
     engine: lastCollabEngine || null,
     cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || null,
+    enginesUsed: [...enginesSeen],
     diagFile: typeof agent.getDiagFile === "function" ? agent.getDiagFile() : null,
   };
 }

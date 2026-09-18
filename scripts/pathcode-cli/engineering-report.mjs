@@ -585,6 +585,10 @@ function synthesizeTaskEvidence(product, session) {
  *   terminalSummary?: string,
  *   pushPerformed?: boolean,
  *   advancesSession?: boolean,
+ *   preferredEngine?: string | null,
+ *   engine?: string | null,
+ *   cursorMode?: string | null,
+ *   enginesUsed?: string[],
  * }} [session]
  */
 export function buildEngineeringReportModel(product, session = {}) {
@@ -774,6 +778,24 @@ export function buildEngineeringReportModel(product, session = {}) {
     ? product.diffPreviewLines.filter((l) => typeof l === "string").slice(0, 40)
     : [];
 
+  const preferredEngine =
+    (typeof session.preferredEngine === "string" && session.preferredEngine) ||
+    (typeof product.preferredEngine === "string" && product.preferredEngine) ||
+    null;
+  const engine =
+    (typeof session.engine === "string" && session.engine) ||
+    (typeof product.engine === "string" && product.engine) ||
+    null;
+  const cursorMode =
+    (typeof session.cursorMode === "string" && session.cursorMode) ||
+    (typeof product.cursorMode === "string" && product.cursorMode) ||
+    null;
+  const enginesUsed = Array.isArray(session.enginesUsed)
+    ? session.enginesUsed.map(String).filter(Boolean)
+    : Array.isArray(product.enginesUsed)
+      ? product.enginesUsed.map(String).filter(Boolean)
+      : [];
+
   return {
     disposition,
     classification: classification || disposition,
@@ -796,6 +818,10 @@ export function buildEngineeringReportModel(product, session = {}) {
     incomplete,
     remaining,
     diffLines,
+    preferredEngine,
+    engine,
+    cursorMode,
+    enginesUsed,
     reportPath:
       typeof product.engineeringReportPath === "string"
         ? product.engineeringReportPath
@@ -829,6 +855,28 @@ export function formatEngineeringReportPlain(model) {
     lines.push("Asked");
     for (const p of model.objective.split("\n").slice(0, 12)) {
       lines.push(`  ${p}`);
+    }
+    lines.push("");
+  }
+
+  if (
+    model.preferredEngine ||
+    model.engine ||
+    model.cursorMode ||
+    (Array.isArray(model.enginesUsed) && model.enginesUsed.length > 0)
+  ) {
+    lines.push("Engine fabric");
+    if (model.preferredEngine) {
+      lines.push(`  preferred  ${model.preferredEngine}`);
+    }
+    if (model.engine) {
+      lines.push(`  last turn  ${model.engine}`);
+    }
+    if (Array.isArray(model.enginesUsed) && model.enginesUsed.length > 0) {
+      lines.push(`  used       ${model.enginesUsed.join(" · ")}`);
+    }
+    if (model.cursorMode) {
+      lines.push(`  cursor     ${model.cursorMode}`);
     }
     lines.push("");
   }

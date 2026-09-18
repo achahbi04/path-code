@@ -175,6 +175,7 @@ export function createGatewayRuntime(options = {}) {
       commitSha: task.commitSha,
       classification: task.classification,
       capabilities: task.capabilities,
+      preferredEngine: task.preferredEngine || null,
       result: task.result
         ? sanitizeEventForClient(task.result)
         : null,
@@ -385,6 +386,12 @@ export function createGatewayRuntime(options = {}) {
 
     const prompt = createGatewayPromptAdapter();
     const abort = new AbortController();
+    const preferredEngine = resolvePreferredEngine({
+      prefer:
+        (typeof params.preferredEngine === "string" && params.preferredEngine) ||
+        (typeof params.engine === "string" && params.engine) ||
+        null,
+    });
     /** @type {GatewayTask} */
     const task = {
       taskId,
@@ -405,6 +412,7 @@ export function createGatewayRuntime(options = {}) {
       prompt,
       abort,
       runPromise: null,
+      preferredEngine: preferredEngine || null,
     };
     tasks.set(taskId, task);
 
@@ -417,12 +425,6 @@ export function createGatewayRuntime(options = {}) {
       detail: "Admitting project and preparing environment",
     });
 
-    const preferredEngine = resolvePreferredEngine({
-      prefer:
-        (typeof params.preferredEngine === "string" && params.preferredEngine) ||
-        (typeof params.engine === "string" && params.engine) ||
-        null,
-    });
     if (preferredEngine) {
       emitTaskEvent(task, "session.capability.collaborate", {
         engine: preferredEngine,
@@ -689,6 +691,7 @@ export function createGatewayRuntime(options = {}) {
       ok: true,
       taskId,
       sessionId,
+      preferredEngine: preferredEngine || null,
       snapshot: snapshotTask(task),
     };
   }

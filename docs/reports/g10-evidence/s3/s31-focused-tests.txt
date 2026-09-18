@@ -2,15 +2,16 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
 
  RUN  v3.2.7 /Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1
 
- ✓ |default| tests/s3/cursor-executor.test.ts (3 tests) 376ms
-   ✓ S3.1 cursor executor > loadCursorSdk returns ok when @cursor/sdk is installed  343ms
- ✓ |default| tests/s3/engine-fabric.test.ts (6 tests) 55ms
- ✓ |default| tests/s2/worktree-title-repair.test.ts (4 tests) 1486ms
-   ✓ S2.3 worktree Git parity repair > preserves healthy live PATH worktrees during orphan recovery  729ms
-   ✓ S2.3 worktree Git parity repair > repairs a dangling gitdir pointer when admin metadata was removed  616ms
+ ✓ |default| tests/s3/cursor-executor.test.ts (3 tests) 1115ms
+   ✓ S3.1 cursor executor > loadCursorSdk returns ok when @cursor/sdk is installed  1038ms
+ ✓ |default| tests/s3/engine-fabric.test.ts (6 tests) 105ms
+ ✓ |default| tests/s3/engineering-report-fabric.test.ts (1 test) 9ms
+ ✓ |default| tests/s2/worktree-title-repair.test.ts (4 tests) 3287ms
+   ✓ S2.3 worktree Git parity repair > preserves healthy live PATH worktrees during orphan recovery  1761ms
+   ✓ S2.3 worktree Git parity repair > repairs a dangling gitdir pointer when admin metadata was removed  1174ms
 
- Test Files  3 passed (3)
-      Tests  13 passed (13)
-   Start at  00:59:30
-   Duration  1.76s (transform 207ms, setup 0ms, collect 86ms, tests 1.92s, environment 0ms, prepare 210ms)
+ Test Files  4 passed (4)
+      Tests  14 passed (14)
+   Start at  07:07:16
+   Duration  3.63s (transform 404ms, setup 0ms, collect 180ms, tests 4.52s, environment 1ms, prepare 438ms)
 

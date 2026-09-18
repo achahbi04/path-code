@@ -1,6 +1,6 @@
 {
   "schema": "pathcode.s3.engine-fabric.mechanical.v1",
-  "at": "2026-09-17T22:57:58.885Z",
+  "at": "2026-09-18T05:05:44.324Z",
   "note": "S3.1 mechanical proof. S2 freeze tip preserved. S4 not started. OPERATOR ACCEPTANCE PENDING.",
   "s2FreezeTip": "67200c1551d7dc6beee9bafb495d133ec11dc0ba",
   "cases": {
