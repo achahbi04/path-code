@@ -629,7 +629,7 @@ export function buildEngineeringReportModel(product, session = {}) {
     /\b(assess|inspect|check|review|audit|report|read-?only|identify|findings?)\b/i.test(
       objective,
     ) &&
-    !/\b(fix|repair|implement|add|change|update|migrate|refactor)\b/i.test(
+    !/\b(fix|repair|implement|add|create|write|change|update|migrate|refactor)\b/i.test(
       objective,
     );
   const incidentalLock =
@@ -756,7 +756,7 @@ export function buildEngineeringReportModel(product, session = {}) {
       /\b(assess|inspect|check|review|audit|report|read-?only|identify|findings?)\b/i.test(
         objective,
       ) &&
-      !/\b(fix|repair|implement|add|change|update|migrate|refactor)\b/i.test(
+      !/\b(fix|repair|implement|add|create|write|change|update|migrate|refactor)\b/i.test(
         objective,
       );
     if (advancesSession && branch && sha && !objectiveLooksAssessment) {

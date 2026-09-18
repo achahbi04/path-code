@@ -1626,7 +1626,7 @@ export function applyStudioEvent(state, event, opts = {}) {
           ? event.classification
           : "NOT_VERIFIED";
       const files = Array.isArray(event.changedFiles)
-        ? event.changedFiles
+        ? event.changedFiles.filter((f) => typeof f === "string" && f.trim())
         : [];
       state.product.changedFileTotal = files.length;
       if (typeof event.taskBranch === "string" && event.taskBranch.trim()) {
@@ -1695,15 +1695,36 @@ export function applyStudioEvent(state, event, opts = {}) {
         classification === "VERIFIED" ? "done" : "refused",
         `${classification} — ${files.length} file(s)`,
       );
-      // Replace project entries with the actual changed-file set (stable sort).
-      state.product.projectFiles = files.slice().sort();
-      state.product.projectEntries = files.slice().sort().map((path) => ({
+      // Replace with authoritative changed-file set. Never clobber a non-empty
+      // living set with an empty result when commit≠baseline (rematerialize
+      // must not erase Cursor/Copilot file creates from /inspect).
+      const priorFiles = Array.isArray(state.product.projectFiles)
+        ? state.product.projectFiles.filter(
+            (p) => typeof p === "string" && p.trim() && !p.startsWith("/"),
+          )
+        : [];
+      const shaMoved =
+        typeof state.product.resultSha === "string" &&
+        typeof state.product.baselineSha === "string" &&
+        state.product.resultSha.toLowerCase() !==
+          state.product.baselineSha.toLowerCase();
+      const nextFiles =
+        files.length > 0
+          ? files.slice().sort()
+          : shaMoved && priorFiles.length > 0
+            ? priorFiles.slice().sort()
+            : files.slice().sort();
+      state.product.projectFiles = nextFiles;
+      state.product.projectEntries = nextFiles.map((path) => ({
         path,
         role: "modified",
       }));
+      state.product.changedFileTotal = nextFiles.length;
       // Clear bridge/tool residue so the phase label owns the PATH column.
       state.product.currentDetail =
-        files.length > 0 ? `${files.length} file(s) changed` : "Engineering complete";
+        nextFiles.length > 0
+          ? `${nextFiles.length} file(s) changed`
+          : "Engineering complete";
       if (!Array.isArray(state.product.sessionHistory)) {
         state.product.sessionHistory = [];
       }

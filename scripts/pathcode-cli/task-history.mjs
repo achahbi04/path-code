@@ -5,6 +5,7 @@
 import { basename } from "node:path";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 import { ensureAg9RuntimeDirs } from "./ag9/layout.mjs";
 import { readTaskCheckpoint } from "./ag10/task-checkpoint.mjs";
@@ -13,6 +14,34 @@ import {
   resolveEngineeringReportPath,
 } from "./engineering-report.mjs";
 import { readLifecycleFromCheckpoint } from "./result-lifecycle.mjs";
+
+/**
+ * @param {string} cwd
+ * @param {string} baseline
+ * @param {string} sha
+ * @returns {string[]}
+ */
+function listGitChangedFiles(cwd, baseline, sha) {
+  const r = spawnSync(
+    "git",
+    ["diff", "--name-only", "--no-ext-diff", baseline, sha],
+    {
+      cwd,
+      encoding: "utf8",
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      timeout: 15_000,
+    },
+  );
+  if (r.status !== 0 && r.status !== 1) return [];
+  return [
+    ...new Set(
+      String(r.stdout || "")
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ].sort();
+}
 
 /**
  * @param {string} runtimeRoot
@@ -157,6 +186,33 @@ export function getTaskHistoryEntry(runtimeRoot, taskId) {
     checkpoint && Array.isArray(checkpoint.changedFiles)
       ? checkpoint.changedFiles.filter((f) => typeof f === "string" && f.trim())
       : [];
+  let changedFiles =
+    hints.changedFiles.length > 0 ? hints.changedFiles : cpChanged;
+  const branch = hints.branch || cpBranch;
+  const sha = hints.sha || cpSha;
+  const baseline = hints.baseline || cpBaseline;
+  // Recover authoritative files from Git when report/checkpoint omitted them
+  // but the durable tip clearly moved (S3.1 Cursor result-capture gap).
+  if (
+    changedFiles.length === 0 &&
+    typeof sha === "string" &&
+    typeof baseline === "string" &&
+    /^[0-9a-f]{7,40}$/i.test(sha) &&
+    /^[0-9a-f]{7,40}$/i.test(baseline) &&
+    sha.toLowerCase() !== baseline.toLowerCase()
+  ) {
+    const repo =
+      (checkpoint && typeof checkpoint.repoRoot === "string"
+        ? checkpoint.repoRoot
+        : null) ||
+      (checkpoint && typeof checkpoint.worktreePath === "string"
+        ? checkpoint.worktreePath
+        : null);
+    if (repo && existsSync(repo)) {
+      const recovered = listGitChangedFiles(repo, baseline, sha);
+      if (recovered.length > 0) changedFiles = recovered;
+    }
+  }
   let updatedAt =
     (checkpoint && typeof checkpoint.updatedAt === "string"
       ? checkpoint.updatedAt
@@ -199,12 +255,11 @@ export function getTaskHistoryEntry(runtimeRoot, taskId) {
     reportPath: hasReport ? reportPath : null,
     hasReport,
     hasCheckpoint: Boolean(checkpoint),
-    branch: hints.branch || cpBranch,
-    sha: hints.sha || cpSha,
-    baseline: hints.baseline || cpBaseline,
+    branch,
+    sha,
+    baseline,
     inspectCommand: hints.inspectCommand,
-    changedFiles:
-      hints.changedFiles.length > 0 ? hints.changedFiles : cpChanged,
+    changedFiles,
     worktreePath:
       checkpoint && typeof checkpoint.worktreePath === "string"
         ? checkpoint.worktreePath

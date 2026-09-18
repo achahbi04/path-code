@@ -21,6 +21,7 @@ import {
   captureFilePreviewForUi,
   collectWorktreeResult,
   createTaskWorktree,
+  listCommitChangedFiles,
   primaryUntouched,
   removeTaskWorktree,
   reopenTaskWorktree,
@@ -2005,6 +2006,44 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     }
   }
 
+  const baselineSha = worktree.baseline.head;
+  // Adopt HEAD when the tip already advanced past baseline (Cursor may have
+  // committed during the turn) even if pre-commit collect looked empty.
+  try {
+    const { spawnSync } = await import("node:child_process");
+    const head = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: worktree.worktreePath,
+      encoding: "utf8",
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      timeout: 15_000,
+    });
+    const tip = (head.stdout || "").trim();
+    if (
+      head.status === 0 &&
+      /^[0-9a-f]{7,40}$/i.test(tip) &&
+      classification === "VERIFIED" &&
+      String(tip).toLowerCase() !== String(baselineSha).toLowerCase()
+    ) {
+      commitSha = tip;
+      if (!commitStatus || commitStatus === "NO_CHANGES") {
+        commitStatus = "VERIFIED";
+        advancesSession = true;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Authoritative file list while the worktree still exists.
+  const committedFiles =
+    commitSha &&
+    baselineSha &&
+    String(commitSha).toLowerCase() !== String(baselineSha).toLowerCase()
+      ? listCommitChangedFiles(worktree.worktreePath, baselineSha, commitSha)
+      : [];
+  const resultChangedFiles =
+    committedFiles.length > 0 ? committedFiles : gitResult.changedFiles;
+
   /** @type {{ ok: boolean, code?: string } | null} */
   let cleanup = null;
   if (preservedPath) {
@@ -2034,13 +2073,12 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       }))
     : [];
 
-  const baselineSha = worktree.baseline.head;
   const inspectCommand = buildFullResultInspectCommand({
     baselineSha,
     resultSha: commitSha,
   });
   const preview = buildBoundedDiffPreview(gitResult.diff || "", {
-    changedFiles: gitResult.changedFiles,
+    changedFiles: resultChangedFiles,
   });
 
   emit("session.engineering.result", {
@@ -2048,7 +2086,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       terminalDisposition === "GIT_IDENTITY_REQUIRED"
         ? classification
         : classification,
-    changedFiles: gitResult.changedFiles,
+    changedFiles: resultChangedFiles,
     primaryUntouched: untouched,
     durationMs: Date.now() - startedAt,
     allowShell,
@@ -2092,7 +2130,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         : [],
       engineeringHandoff: engineeringHandoffSummary || null,
       ag1Checks: checkSummaries,
-      projectFiles: gitResult.changedFiles,
+      projectFiles: resultChangedFiles,
       diffPreviewLines: preview.lines,
       durationMs: Date.now() - startedAt,
       timingSummary: summarizeTimingMarks(timingMarks),
@@ -2116,7 +2154,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       disposition: outcomeClassification,
       objective: effectiveTaskText,
       validation,
-      changedFiles: gitResult.changedFiles,
+      changedFiles: resultChangedFiles,
       taskBranch: worktree.taskBranch,
       commitSha,
       baselineSha,
@@ -2207,6 +2245,10 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || undefined,
       preferredEngine: preferredEngine || undefined,
       latestEngineTurn: lastCollabEngine || undefined,
+      branch: worktree.taskBranch || undefined,
+      sha: commitSha || undefined,
+      baseline: baselineSha || undefined,
+      changedFiles: resultChangedFiles,
     });
     await g10Fabric?.shutdown?.();
   } catch {
@@ -2249,7 +2291,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     baselineCommit: worktree.baseline.head,
     worktreePath: preservedPath || (cleanup?.ok ? null : worktree.worktreePath),
     cleanup,
-    changedFiles: gitResult.changedFiles,
+    changedFiles: resultChangedFiles,
     diff: gitResult.diff,
     validation,
     primaryUntouched: untouched,

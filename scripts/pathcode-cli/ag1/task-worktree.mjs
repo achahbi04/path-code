@@ -635,31 +635,99 @@ export function collectWorktreeResult(worktreePath, baselineHead) {
   const nameOnly = hasBaseline
     ? git(worktreePath, ["diff", "--name-only", "--no-ext-diff", baselineHead])
     : git(worktreePath, ["diff", "--name-only", "--no-ext-diff", "HEAD"]);
+  const cachedNameOnly = hasBaseline
+    ? git(worktreePath, [
+        "diff",
+        "--cached",
+        "--name-only",
+        "--no-ext-diff",
+        baselineHead,
+      ])
+    : git(worktreePath, ["diff", "--cached", "--name-only", "--no-ext-diff"]);
   const untracked = git(worktreePath, [
     "ls-files",
     "--others",
     "--exclude-standard",
   ]);
 
+  /** @type {string[]} */
+  const fromPorcelain = [];
+  if (status.status === 0) {
+    for (const line of status.stdout.split("\n")) {
+      const trimmed = line.trimEnd();
+      if (!trimmed) continue;
+      // porcelain v1: XY<space>path  or  XY<space>orig -> path
+      const pathPart = trimmed.slice(3).split(" -> ").pop() || "";
+      const rel = pathPart.replace(/^"|"$/g, "").trim();
+      if (rel) fromPorcelain.push(rel);
+    }
+  }
+
+  // git diff exits 1 when differences exist (with --exit-code) and some
+  // environments surface that even without the flag — treat 0|1 as success.
+  const diffOk = (r) => r.status === 0 || r.status === 1;
+
   const changedFiles = [
     ...new Set([
-      ...(nameOnly.status === 0
-        ? nameOnly.stdout.split("\n").filter(Boolean)
+      ...(diffOk(nameOnly) ? nameOnly.stdout.split("\n").filter(Boolean) : []),
+      ...(diffOk(cachedNameOnly)
+        ? cachedNameOnly.stdout.split("\n").filter(Boolean)
         : []),
       ...(untracked.status === 0
         ? untracked.stdout.split("\n").filter(Boolean)
         : []),
+      ...fromPorcelain,
     ]),
   ].sort();
 
   return {
     ok: status.status === 0,
     porcelain: status.status === 0 ? status.stdout : "",
-    diff: diff.status === 0 ? diff.stdout : "",
-    diffStat: diffStat.status === 0 ? diffStat.stdout : "",
+    diff: diffOk(diff) ? diff.stdout : "",
+    diffStat: diffOk(diffStat) ? diffStat.stdout : "",
     changedFiles,
     unversioned: false,
   };
+}
+
+/**
+ * Authoritative changed-file list for a durable task commit vs baseline.
+ * Prefer this after commitTaskWorktree so /inspect and reports match Git.
+ *
+ * @param {string} worktreePath
+ * @param {string | null | undefined} baselineHead
+ * @param {string | null | undefined} commitSha
+ * @returns {string[]}
+ */
+export function listCommitChangedFiles(worktreePath, baselineHead, commitSha) {
+  const base =
+    typeof baselineHead === "string" && /^[0-9a-f]{7,40}$/i.test(baselineHead)
+      ? baselineHead
+      : "";
+  const sha =
+    typeof commitSha === "string" && /^[0-9a-f]{7,40}$/i.test(commitSha)
+      ? commitSha
+      : "";
+  if (!base || !sha || base.toLowerCase() === sha.toLowerCase()) {
+    return [];
+  }
+  const nameOnly = git(worktreePath, [
+    "diff",
+    "--name-only",
+    "--no-ext-diff",
+    base,
+    sha,
+  ]);
+  // 0 = identical trees, 1 = differences (both are successful invocations).
+  if (nameOnly.status !== 0 && nameOnly.status !== 1) return [];
+  return [
+    ...new Set(
+      nameOnly.stdout
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ].sort();
 }
 
 /** Basenames that dependency/setup tooling commonly mutates without intent. */
@@ -682,6 +750,9 @@ export const INCIDENTAL_SETUP_BASENAMES = Object.freeze([
  * must not produce incidental setup churn as the engineering result.
  * Explicit dependency-upgrade / lockfile-update intents return false.
  *
+ * "Do not modify any other file" alongside create/add/write intent is NOT
+ * read-only — that phrasing constrains scope, it does not forbid the create.
+ *
  * @param {string} text
  */
 export function isReadOnlyAssessmentObjective(text) {
@@ -697,6 +768,16 @@ export function isReadOnlyAssessmentObjective(text) {
   ) {
     return false;
   }
+  const modifyIntent =
+    /\b(fix|repair|implement|refactor|migrate|add |create |delete |remove |edit |modify|write |change |append |update )\b/i.test(
+      t,
+    );
+  // Scope constraint ("do not modify any other file") must not win over an
+  // explicit create/write intent — otherwise Cursor/Copilot file creates are
+  // mis-finalized as read-only no-op results.
+  if (modifyIntent) {
+    return false;
+  }
   if (
     /\bdo not (modify|change|edit|write|alter|touch)\b/i.test(t) ||
     /\bwithout (modifying|changing|editing|altering|writing)\b/i.test(t) ||
@@ -709,11 +790,7 @@ export function isReadOnlyAssessmentObjective(text) {
     /\b(assess|inspect|check|review|audit|report|identify|findings?|investigate)\b/i.test(
       t,
     );
-  const modify =
-    /\b(fix|repair|implement|refactor|migrate|add |create |delete |remove |edit |modify|write |change )\b/i.test(
-      t,
-    );
-  return assess && !modify;
+  return assess;
 }
 
 /**

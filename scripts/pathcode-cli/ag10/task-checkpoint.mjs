@@ -39,6 +39,11 @@ import { ensureAg9RuntimeDirs } from "../ag9/layout.mjs";
  * @property {object} [collaboration]
  * @property {object} [usage]
  * @property {string} [finalState]
+ * @property {string} [branch] Task branch (path/task-…)
+ * @property {string} [sha] Result commit SHA
+ * @property {string} [baseline] Baseline commit SHA
+ * @property {string[]} [changedFiles] Authoritative result file list
+ * @property {string} [preferredEngine]
  * @property {string} updatedAt
  */
 
@@ -123,6 +128,20 @@ export function createCheckpointSkeleton(partial) {
       partial.usage && typeof partial.usage === "object" ? partial.usage : undefined,
     finalState:
       typeof partial.finalState === "string" ? partial.finalState : undefined,
+    branch: typeof partial.branch === "string" ? partial.branch : undefined,
+    sha: typeof partial.sha === "string" ? partial.sha : undefined,
+    baseline:
+      typeof partial.baseline === "string" ? partial.baseline : undefined,
+    changedFiles: Array.isArray(partial.changedFiles)
+      ? partial.changedFiles
+          .filter((f) => typeof f === "string" && f.trim())
+          .map((f) => String(f).trim())
+          .slice(0, 200)
+      : undefined,
+    preferredEngine:
+      typeof partial.preferredEngine === "string"
+        ? partial.preferredEngine
+        : undefined,
     updatedAt: new Date().toISOString(),
   };
 }
