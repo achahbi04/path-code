@@ -2,7 +2,7 @@
 # UNIFIED ENGINE FABRIC
 
 **S3 RESULT:** **S3.2 LIVE-VERIFIED** (ready for operator review)  
-**S3.2 live tip:** _(recorded on freeze)_  
+**S3.2 live tip:** `1afe1bf7f0bc845642a490e746b33f43655ded54`  
 **S3.1 freeze tip:** `4c6cf6a44ebb3e1a6475ec9c6c35dadf62d31559` — **do not reopen**  
 **S2 freeze tip preserved:** `67200c1551d7dc6beee9bafb495d133ec11dc0ba`  
 **S1:** FROZEN / OPERATOR ACCEPTED — tip `eac5f8620fea8c75070cd27421643bb167864294` — **do not reopen**
