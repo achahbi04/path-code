@@ -2,7 +2,7 @@
 # UNIFIED ENGINE FABRIC
 
 **S3 RESULT:** **FROZEN / OPERATOR ACCEPTED** (S3.2 closed)  
-**S3.2 freeze tip:** _(recorded at freeze commit)_  
+**S3.2 freeze tip:** `89eea9992c1bb30763413aa0054d93481c65fcb2`  
 **S3.1 freeze tip:** `4c6cf6a44ebb3e1a6475ec9c6c35dadf62d31559` — **do not reopen**  
 **S2 freeze tip preserved:** `67200c1551d7dc6beee9bafb495d133ec11dc0ba`  
 **S1:** FROZEN / OPERATOR ACCEPTED — tip `eac5f8620fea8c75070cd27421643bb167864294` — **do not reopen**
