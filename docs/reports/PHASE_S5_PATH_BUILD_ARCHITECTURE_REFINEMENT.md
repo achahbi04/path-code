@@ -1,382 +1,488 @@
 # PATH CODE — S5
 # PATH BUILD — ARCHITECTURE REFINEMENT
-# Thin orchestrator · fabric intelligence · no second state universe
+# Option A′ · Impact-aware re-inspection · Durable Build loop
 
-**Document type:** REFINED ARCHITECTURE RECOMMENDATION ONLY  
+**Document type:** SETTLED ARCHITECTURE (documentation only)  
 **Parent audit:** [`PHASE_S5_PATH_BUILD_ARCHITECTURE_AUDIT.md`](./PHASE_S5_PATH_BUILD_ARCHITECTURE_AUDIT.md)  
-**Implementation:** NOT AUTHORIZED  
+**Implementation:** NOT AUTHORIZED — pending operator review of this settlement  
 **Slice plan:** NOT DEFINED  
 
-**Judgment on challenges:** These challenges **strengthen Option A** — they do **not** require Option B’s fat product graph, and they do **not** expose a different repository-grounded architecture.  
-They convert the prior “Build invents evaluation intelligence” soft spot into: **Build remains thin; S3 fabric performs deep product-level reasoning as ordinary PATH tasks.**
+**S4 status (unchanged):**
+
+```text
+IMPLEMENTATION FROZEN
+AUTONOMOUS / LIVE VERIFICATION — PASS
+PHYSICAL MAC REBOOT ACCEPTANCE — DEFERRED BY OPERATOR
+```
+
+S4.3 implementation `093a29aa…` · tip `2d56b23a…`
 
 ---
 
-## Settled recommendation
+## Settlement judgment
 
-**Option A′ — Thin Build orchestrator + fabric-executed cognition**
+**Option A′ is settled and ready for implementation authorization review.**
+
+No repository-level contradiction blocks building it. Remaining work is implementation, not open architecture.
+
+Challenges below **strengthen** thin orchestration: deep intelligence stays in the S3 fabric; Build stays a durable control loop with impact-proportionate inspection.
+
+---
+
+## Preserved product / architecture
+
+PATH Build = product-level autonomous engineering control loop over PATH Code (S1–S4).
+
+| Reuse | Role |
+| --- | --- |
+| Gateway + task lifecycle | Dispatch / await / steer / resume children |
+| S3 engine fabric | Engineer, evaluate, challenge (need-fit) |
+| S4 continuity | Child recovery + host reconcile |
+| Ordinary PATH projects + `projectBindings` | Authoritative trees |
+| Tools / runtimes / services / Git / checks / reports | Evidence |
+| Thin durable Build record | Outcome, linkage, criteria, hypotheses — not a twin product |
+
+“Thin” = minimal duplicated infrastructure/state — **not** reduced ambition or intelligence.
+
+Architecture stays general; first proof does not define the ceiling.
+
+---
+
+## Settled stack
 
 ```text
-                    USER OUTCOME
-                         │
-                         ▼
-              ┌─────────────────────┐
-              │   PATH BUILD (thin) │
-              │  durable record +   │
-              │  loop / policy only │
-              └──────────┬──────────┘
-                         │
-         issue PATH tasks (kinds below)
-                         │
-                         ▼
-                    PATH CODE
-                   PATH Gateway
-              Unified Engine Fabric
-           AG · Copilot · Cursor (need-fit)
-                         │
-              FS / Git / run / test / report
-                         │
-                         ▼
-         evidence → Build updates thin record
+                         USER OUTCOME
+                         + explicit requirements
+                                  │
+                                  ▼
+                     ┌────────────────────────┐
+                     │ PATH BUILD (thin loop) │
+                     │ record · policy · S4   │
+                     └───────────┬────────────┘
+                                 │
+              child tasks: engineer | evaluate | challenge
+                                 │
+                                 ▼
+                           PATH CODE / Gateway
+                         Unified Engine Fabric
+                      AG · Copilot · Cursor
+                                 │
+                    FS / Git / checks / runtime / reports
+                                 │
+                                 ▼
+              impact-aware re-inspect → update criteria
               (hypotheses yield to reality)
 ```
 
-**Build owns:** outcome identity, thin durable record, loop cadence, bind/re-bind policy, when to issue which *kind* of PATH task, when to claim BUILD COMPLETE.  
+**Task kinds** (labels on ordinary PATH tasks — not new executors):
 
-**Build does not own:** a permanent reasoning brain, a twin product graph, engine selection by provider brand, or authoritative “what exists.”
-
----
-
-## 1. Thin state, deep intelligence
-
-### Problem in the prior audit
-
-Option A risked implying that “evaluator / gap select” is a **new permanent Build brain**. That would either:
-
-- stay dumb (heuristic-only), or  
-- become a second agent architecture beside the fabric.
-
-### Refinement
-
-Product-level evaluation, gap discovery, architectural reconsideration, and next-objective selection are **PATH Code tasks** driven through the frozen S3 fabric — same Gateway, same need-fit routing (`inferTurnNeeds` / `selectEngineForTurn`), same worktree/reality rules.
-
-Build only:
-
-1. Chooses the **task kind** and **binding**  
-2. Frames a precise **objective** for that kind  
-3. Awaits the authoritative **report + Git/FS**  
-4. Updates thin durable fields (hypotheses + evidence refs)  
-5. Decides the next loop step  
-
-### Task kinds (policy labels on child tasks — not new executors)
-
-| Kind | Intent | Fabric participation |
-| --- | --- | --- |
-| `engineer` | Close a gap (implement / repair / establish structure) | Need-fit edit/shell/repair as today |
-| `evaluate` | Against outcome + bindings: what exists, what’s missing, ranked gaps, proposed next objective | Prefer assessment-shaped objectives (fabric already classifies `assessment` needs) |
-| `challenge` | Attempt to **falsify** a product-level claim against real evidence | Assessment + shell/validation needs; peer rotate allowed |
-
-No permanent “planner engine” or “reviewer engine.” Provider names never get fixed Build roles. Continuity preference and rotate-among-fit-peers remain S3 law.
-
-### How one PATH product stays coherent
-
-- Every cognitive step is a real `taskId` with checkpoint, report, history, S4 resume.  
-- Operator `/history` / `/inspect` sees Build child tasks as PATH tasks.  
-- Engines never talk to a secret Build channel — only ordinary objectives + shared project reality.
-
-### What stays in thin Build (non-brain)
-
-- `buildId`, outcome text  
-- `projectBindings[]` (see §3)  
-- `childTaskIds[]` (+ optional kind tags)  
-- `outcomeCriteria[]` status + evidence refs (see §5)  
-- `hypotheses` (gap plan / architecture notes) — **explicitly non-authoritative**  
-- loop status (`running` / `blocked` / `complete`)
-
-Mechanical inspection Build may do **without** a fabric turn (cheap, deterministic):
-
-- existsSync / Git porcelain / read last reports / list child dispositions  
-
-Anything that requires judgment → **fabric task**, not a Build-local LLM.
-
----
-
-## 2. Evidence-challenge loop
-
-### Yes — bounded, fabric-backed falsification
-
-Before Build may mark a criterion `PROVEN`, or claim `BUILD COMPLETE`, it should be able to issue a **`challenge` task**:
-
-> Attempt to falsify: “\<claim\>”.  
-> Use only repository, runtime, tests, services, and PATH reports under the bound project(s).  
-> Return: claim stands | claim falsified | evidence insufficient — with concrete paths/commands/check ids.
-
-### Design rules
-
-| Rule | Rationale |
+| Kind | Purpose |
 | --- | --- |
-| Challenge is a PATH task | Reuses fabric, validation, S4 |
-| No permanent reviewer role | Need-fit + peer rotate; never “Copilot always reviews” |
-| Bounded | Not every micro-claim; **required outcome criteria** and **BUILD COMPLETE** gate |
-| Evidence beats rhetoric | Challenge that cannot cite FS/Git/check/runtime evidence → criterion stays `UNKNOWN`, not `PROVEN` |
-| Engineer may not self-certify Completeness alone | Completeness requires evaluate ± challenge after engineering evidence exists |
-
-### Claim lifecycle (thin)
-
-```text
-hypothesis / engineer result
-        │
-        ▼
-   evaluate → propose criterion statuses
-        │
-        ▼
-   (optional/required) challenge important PROVEN candidates
-        │
-        ├── falsified → UNMET · revise hypotheses · next engineer
-        ├── stands + evidence → PROVEN
-        └── insufficient → UNKNOWN · gather evidence (engineer or evaluate)
-```
-
-This is how Build becomes **more intelligent than a one-shot generator** without a second universe: adversarial product claims inside the same fabric.
+| `engineer` | Close a gap / establish structure |
+| `evaluate` | Judge existence, gaps, next objective, criterion proposals |
+| `challenge` | Falsify important claims against real evidence |
 
 ---
 
-## 3. Project root generality — `projectBindings`
+## 1. Intent representation — separate four layers
 
-### Correction to the prior audit
-
-“Same `projectRoot` forever” was too strong as a **product ceiling**.  
-It remains the **simple/common case**, not the architectural limit.
-
-Gateway still binds **one** root per session/task — that is fine. Build sits above that.
-
-### Thin Build-owned model
+Smallest coherent Build-record split:
 
 ```text
-projectBindings: [
-  {
-    bindingId,
-    projectRoot,          // ordinary PATH TARGET_PROJECT_ROOT
-    roleHint?,            // hypothesis only: "api" | "web" | … — NOT authority
-    createdByTaskId?,
-  }
-]
-```
+intent: {
+  outcome: string,                    // software result the user wants
+  outcomeRevision: number,            // bumps when user revises intent
+  revisedAt?: ISO,
+  explicitRequirements: [             // user-stated invariants / constraints
+    {
+      id,
+      statement,                      // e.g. offline-capable, specific stack, data rules
+      status: SATISFIED | VIOLATED | UNKNOWN,
+      evidence: EvidenceRef[],        // same ref shape as criteria
+      required: true,                 // explicit requirements are required by default
+    }
+  ]
+}
 
-**Rules:**
-
-1. Each binding is an ordinary authoritative PATH project (Git or Build-origin → then engineered).  
-2. Each child task names **one** `bindingId`; Build **re-binds** Gateway to that `projectRoot` before `startTask` / `resumeTask`.  
-3. **No** duplicate product graph of services/packages — topology lives in the trees.  
-4. Default: **one** binding for the whole Build. Multi-binding only when the outcome genuinely requires separate repositories.  
-5. Cross-binding evaluation: an `evaluate`/`challenge` task binds to one root at a time **or** Build runs one evaluate per binding and mechanically merges evidence refs into criteria (still no twin graph).  
-6. PATH Code convergence: any single binding is forever a normal Code project; Build is optional orchestration above it.
-
-### What this is not
-
-- Not multi-root inside one Gateway task  
-- Not a service mesh model in Build metadata  
-- Not forced multi-repo for v1 proofs  
-
----
-
-## 4. Greenfield origin without scaffolder architecture
-
-### Smallest origin seam
-
-Use the reserved Gateway **`build` client role / `path_build_slot`** to admit a **Build-origin root** that may initially be **empty** (or nearly empty):
-
-| Step | Who | What |
-| --- | --- | --- |
-| O0 | Build | Create/select directory; register as first `projectBindings` entry with origin mark (e.g. `buildOrigin: true`) |
-| O1 | Gateway (Build role) | Allow bind of that root **without** `looksLikeExistingProject` / without requiring Git — **Build client only**, not general Code cwd |
-| O2 | Build | First child task kind=`engineer` on that binding: establish Git + architecture + manifests as **real engineering**, fabric-chosen |
-| O3 | Reality | Once markers/Git exist, root is ordinary PATH project; further binds need no special case |
-
-### What origin must not be
-
-- Template catalog / “choose stack” as the product definition  
-- PATH writing a fixed scaffold outside the fabric  
-- Declaring architecture complete at O0  
-
-Origin’s only job: **make the existing engineering system able to take over** with zero migration thereafter.
-
-Unversioned_inplace already proves PATH can engineer before Git; Build-origin extends that one step earlier (empty dir), then prefers early Git via the first engineer task for isolation/S4 quality.
-
----
-
-## 5. Product completion evidence
-
-### Child `VERIFIED` ≠ BUILD COMPLETE
-
-A child task can be VERIFIED for a local objective while the product outcome remains unmet.
-
-### Thin outcome-criteria model
-
-```text
-outcomeCriteria: [
+outcomeCriteria: [                    // observable “does the result exist?”
   {
     id,
-    statement,                 // product-level claim
+    statement,
+    required: boolean,
     status: PROVEN | UNMET | UNKNOWN,
-    evidence: [                // references only — no blob twin of the tree
-      { kind: git|fs|check|runtime|report|validation, ref, taskId? }
-    ],
+    evidence: EvidenceRef[],
     challengedByTaskId?,
     updatedAt,
   }
 ]
+
+hypotheses: {                         // NON-AUTHORITATIVE
+  architectureNotes?,
+  gapPlan?,
+  ordering?,
+  topologyAssumptions?,
+  proposedNextAction?,
+  revisedByTaskId?,
+  updatedAt,
+}
 ```
 
-| Status | Meaning |
-| --- | --- |
-| `PROVEN` | Challenge/evaluate accepted with concrete evidence refs; not merely engineer success |
-| `UNMET` | Inspection or challenge shows absence/failure |
-| `UNKNOWN` | Insufficient evidence to decide |
+| Layer | Authority | Who may change |
+| --- | --- | --- |
+| **Outcome** | User intent | Operator revision only (Build records revision; does not invent) |
+| **Explicit requirements** | User constraints | Operator revision; engines must **respect**, not silently weaken |
+| **Outcome criteria** | Observable product claims | Evaluate/challenge + mechanical invalidation from evidence |
+| **Hypotheses** | Inferred plan only | Fabric evaluate / engineering revelation — freely revisable |
 
-### BUILD COMPLETE gate (architecture)
+**Rules:**
 
-Allowed only when:
-
-1. All **required** criteria are `PROVEN` (none `UNMET`/`UNKNOWN`), and  
-2. At least one recent `evaluate` (and bounded `challenge` on completeness / critical criteria) supports that set against live bindings, and  
-3. Mechanical consistency: cited paths/checks still resolve (FS/Git wins — stale PROVEN demoted to UNKNOWN/UNMET on re-inspect).
-
-Optional criteria may remain UNKNOWN without blocking if marked non-required.
+1. Engines may reconsider **hypotheses** without touching explicit requirements.  
+2. Evaluate/challenge must assess **both** criteria achievement **and** requirement respect.  
+3. Product-level steering that changes outcome/requirements updates `intent` **before** (or as) it reaches child prompts; bumps `outcomeRevision`; invalidates hypotheses and any evidence whose scope depended on the old intent.  
+4. Child-only steer (active task) uses existing Gateway `task.steer` / `pendingSteering`; Build-level intent change is recorded on the Build record and pushed into subsequent objectives (and into the live child via steer when one is running).
 
 ---
 
-## 6. Execution policy vs architecture
+## 2. Impact-aware re-inspection policy
 
-**Sequential child tasks are an execution policy for early Build, not a durable-schema assumption.**
-
-Durable record tracks `childTaskIds` (and kinds/bindings). It must **not** encode “only one running child forever.”
-
-Future-safe (no v1 concurrency required):
-
-- Independent gaps on **disjoint bindings** or clearly non-overlapping scopes could later run concurrent Gateway tasks.  
-- Shared single-root mutation concurrency remains constrained by existing collab leases / worktree reality — Build must not invent a second lock universe.
-
-v1 may run strictly sequential while keeping the schema concurrency-agnostic.
-
----
-
-## 7. Self-correcting product plan
-
-### Plans are hypotheses
-
-Gap lists, architecture notes, `roleHint` on bindings, and “next objective” proposals are stored as **hypotheses** (from `evaluate` tasks or prior loops).
-
-They are **never** authority over:
-
-- what exists  
-- what to keep building when reality diverges  
-
-### S4 principle applied at product level
-
-> FS/Git/reality wins over stale memory.  
-> (`task-reality.mjs` / reconcile — already law for tasks)
-
-Build loop:
+**Principle:**
 
 ```text
-every cycle (and after every child terminal state):
-  mechanical re-inspect bindings
-  if reality contradicts hypotheses → invalidate affected criteria / gap hypotheses
-  issue evaluate (fabric) when judgment needed
-  only then select next engineer/challenge
+ALWAYS REFRESH REALITY CHEAPLY.
+REVALIDATE ACCORDING TO IMPACT.
+DEEPEN INSPECTION WHEN THE EVIDENCE WARRANTS IT.
 ```
 
-If engineering proves the initial architecture wrong (e.g. mono vs multi-repo, wrong service split):
+Re-inspection is **mandatory** before advancing from a child terminal result (or Build recovery) to the next Build decision. It is **not** “rerun the whole product after every child.”
 
-1. Do **not** finish the stale gap list  
-2. `evaluate` rewrites hypotheses  
-3. May add/remove `projectBindings`  
-4. Demote relevant `PROVEN` → `UNKNOWN`/`UNMET` when evidence no longer holds  
-5. Continue  
+### Depth A — Lightweight reality refresh (normal loop)
 
-Blind plan completion is an architectural failure mode — explicitly rejected.
+**Triggers:** every child terminal disposition; Build-loop recovery; before selecting next action after consume.
 
----
+**Consumes (existing facilities):**
 
-## Challenge → architecture verdict
-
-| Challenge | Effect on Option A |
+| Fact | Source |
 | --- | --- |
-| 1 Fabric for evaluation/gaps | **Strengthens A** — removes Build-brain; cognition = PATH tasks |
-| 2 Evidence-challenge | **Strengthens A** — bounded falsification via fabric |
-| 3 projectBindings / re-bind | **Strengthens A** — lifts false one-root ceiling without Option B |
-| 4 Build-origin empty root | **Strengthens A** — smallest seam; anti-scaffolder |
-| 5 PROVEN/UNMET/UNKNOWN | **Strengthens A** — thin completion evidence |
-| 6 Sequential ≠ schema | **Clarifies A** — policy vs durability |
-| 7 Hypotheses vs authority | **Strengthens A** — aligns with S4 reality-wins |
+| Child disposition / result | Checkpoint `finalState`, Gateway snapshot, report, `task-history` |
+| Binding + worktree identity | `projectBindings[].projectRoot`, checkpoint `worktreePath` / `repoRoot` |
+| Git HEAD / dirty / untracked | `captureTaskReality` / `reconcileTaskReality` (`ag10/task-reality.mjs`) |
+| Change fingerprint | `diffFingerprint`, `changedFiles`, porcelain |
+| Check/report refs | Checkpoint `validation`, engineering report path, history hints |
+| Prior runtime notes | Existing service metadata timestamps if present (`ag9/services` meta) — **read**, don’t start |
 
-**Hybrid?** Only in the weak sense that A′ uses **fabric tasks for cognition** (already PATH Code). That is **not** Option B (no authoritative product graph).
+**Does not:** launch full suites, start compose, or request a fabric reasoning turn.
 
-**Different architecture?** No. Still thin orchestrator over Gateway + S3 + S4.
+**Question:** What changed, and which conclusions may be stale?
+
+**Distinguish:**
+
+- **Child result identity** — task worktree / task branch / result SHA (`checkpoint.sha`, `branch`)  
+- **Product revision** — binding primary HEAD + dirty fingerprint **after** any adopt/merge into the product tree  
+
+A completed child and the product revision that incorporates it are different anchors.
+
+**Action:** produce a `RealityDelta` (mechanical): changed paths, fingerprint before/after, candidate stale criterion/requirement ids (path/config heuristic). Set `pendingReinspect: false` only after this refresh completes (see §4).
+
+### Depth B — Targeted revalidation (impact hits a claim)
+
+**Triggers:** RealityDelta shows code/deps/config/interfaces/schemas/runtime touching a criterion or explicit requirement scope; **or** impact unknown for a required claim.
+
+**Consumes / runs through PATH:**
+
+- Scope the affected evidence  
+- Mark affected `PROVEN`/`SATISFIED` → `UNKNOWN` (pending)  
+- Reuse `discoverAffectedChecks` (`ag9/affected.mjs`) + `ag5/native-validation` / prepare validation paths  
+- Run **relevant** tests/builds/probes via ordinary PATH mechanisms (engineer or evaluate task with shell/validation needs — not a new runner)  
+- Update evidence refs + statuses from actual results  
+
+**Examples:**
+
+- Auth code change → session/auth checks in scope; docs-only change → retain auth evidence if independence established from changed-file set.  
+- **Unknown impact → UNKNOWN**, then broaden enough to resolve — never assume harmless.
+
+### Depth C — Deep product inspection (justified)
+
+**Triggers:** architecture/topology change; cross-binding contract change; contradictory evidence; possible explicit-requirement violation; challenge needing broader runtime proof; **candidate BUILD COMPLETE**.
+
+**Behavior:** sufficient coverage of outcome + requirements — not blindly every historical command. Reuse valid evidence when anchors still match (§3). Fabric `evaluate`/`challenge` where judgment is needed; mechanical freshness stays mechanical.
+
+### Policy table
+
+| Trigger | Depth | Evidence consumed | Action | Invalidation |
+| --- | --- | --- | --- | --- |
+| Child terminal / recovery | A | Reality + reports | Delta; flag stale candidates | Potentially affected → UNKNOWN |
+| Delta intersects claim scope | B | Affected checks / targeted probes | Fresh evidence | Failure → UNMET/VIOLATED; pass → restore PROVEN/SATISFIED |
+| Impact unclear on required claim | B→widen | Broader checks until resolved | Don’t advance on assumption | Stay UNKNOWN until resolved |
+| Topology / contradiction / COMPLETE candidate | C | Evaluate±challenge + needed runtime | Gate next action / COMPLETE | Stale proofs demoted first |
 
 ---
 
-## Refined durable Build record (ceiling — still thin)
+## 3. Evidence freshness and invalidation
+
+### EvidenceRef (compact anchors — not a product copy)
+
+```text
+EvidenceRef: {
+  kind: git | fs | check | runtime | report | validation,
+  ref,                         // path, check id, report path, command id, …
+  bindingId,
+  taskId?,                     // child that produced observation
+  headSha?,                    // commit when observed (may be null if dirty/unborn)
+  dirtyFingerprint?,           // e.g. task-reality diffFingerprint / porcelain hash
+  configFingerprint?,          // optional hash of scoped manifests/lockfiles
+  toolchainHint?,              // when result depends on toolchain identity
+  runtimeObservationAt?,       // ISO if runtime/service was observed
+  scope: string[],             // criterion/requirement ids this supports
+  observedAt: ISO,
+}
+```
+
+**Existing fields to reuse:** checkpoint `headSha`, `diffFingerprint`, `changedFiles`, `sha`/`baseline`/`branch`, `validation`; `captureTaskReality`; report paths via `engineering-report.mjs` / `task-history.mjs`; affected-check command lists.
+
+**Proposed Build-only additions:** `dirtyFingerprint` + `scope` on refs; `configFingerprint` when deps/config matter; store refs on criteria/requirements — **not** a parallel inspection engine.
+
+**Commit alone is insufficient** when dirty or env changed. **Timestamp alone** does not prove validity.
+
+### Invalidation rules
+
+| Situation | Effect |
+| --- | --- |
+| Proof potentially affected or anchors mismatch | → `UNKNOWN` (criteria) / `UNKNOWN` (requirements) pending fresh evidence |
+| Observed absence/failure | → `UNMET` or requirement `VIOLATED` |
+| Fresh supporting evidence with matching anchors | → `PROVEN` / `SATISFIED` |
+| Unrelated changes + independence established | **Retain** prior evidence |
+| Unknown impact on required claim | Treat as stale → `UNKNOWN`, then Depth B |
+
+Re-inspection **invalidates** stale conclusions — it does not merely append events beside old `PROVEN` rows.
+
+Freshness check (mechanical): compare ref.`headSha`+`dirtyFingerprint`(+`configFingerprint` if present) to current binding reality; mismatch ⇒ stale.
+
+---
+
+## 4. S4 applied to the Build controller
+
+Children already have checkpoints, process identity, `reconcileHostStartup`, resume/rehydrate. Build needs the **same honesty** for loop decisions and linkage.
+
+### Durable Build record additions (loop control)
 
 ```text
 buildId
-outcome
-status: running | blocked | complete
-projectBindings[]          // ≥1 ordinary PATH roots; origin allowed empty initially
-childTaskIds[]             // + kind: engineer|evaluate|challenge; bindingId
-outcomeCriteria[]          // PROVEN|UNMET|UNKNOWN + evidence refs
-hypotheses                 // gap plan / architecture notes — non-authoritative
-updatedAt
+intent / outcomeCriteria / hypotheses / projectBindings
+children: [{
+  taskId, bindingId, kind,
+  actionId,                    // stable Build action identity
+  dispatchState: selected | dispatched | terminal_seen | consumed,
+  resultFingerprint?,          // from child checkpoint when consumed
+}]
+loop: {
+  pendingReinspect: boolean,   // MUST be true after terminal until Depth A done
+  lastRealityDelta?,
+  lastConsumedActionId?,
+  status: running | blocked | complete,
+}
+intentRevision / updatedAt
 ```
 
-Anything richer belongs in **trees + reports**, not Build.
+### Action identity / dispatch idempotency
 
----
+**Reuse pattern:** `ExternalActionRegistry` / `EventIdempotencyGuard` (`ag10/guards.mjs`).  
+**Gateway seam already present:** `startTask` accepts client `taskId`; duplicate in live map → `TASK_EXISTS` (`gateway/runtime.mjs`).
 
-## Refined control loop
+**Smallest coherent extension (identified gap):**
+
+| Gap | Extension |
+| --- | --- |
+| Build must not double-dispatch after crash | Pre-allocate `taskId` = f(actionId); durable-record `dispatched` **before or atomically with** Gateway start; on replay: if checkpoint/history shows task, **resume/await** — do not create a second task |
+| Gateway has no Build-level action log | Build record is that log (under `PATH_RUNTIME_ROOT` metadata, atomic write like checkpoints) |
+
+No second Gateway protocol required if Build owns actionId↔taskId and uses existing start/resume/TASK_EXISTS.
+
+### Recovery boundaries
+
+| Boundary | Recovery |
+| --- | --- |
+| Next action **selected**, child not dispatched | Replay selection from durable `selected` row; dispatch with same `actionId`/`taskId` |
+| Child **dispatched**, linkage not recorded | Scan runtime tasks/checkpoints for known `taskId` prefix / binding; repair `children[]`; treat as dispatched |
+| Child **completed**, result not consumed | Load checkpoint/report; mark `terminal_seen`; run consume once (idempotent on `actionId`) |
+| Evidence recorded, criteria update interrupted | Re-apply consume from child anchors (idempotent status write); set `pendingReinspect` |
+| Criteria updated, next action not dispatched | Depth A if `pendingReinspect`; then select next — **never** skip re-inspect |
+
+### Desired restart behavior
 
 ```text
-1. Ensure ≥1 projectBinding (Build-origin if needed)
-2. Re-inspect reality (mechanical); invalidate stale hypotheses/criteria
-3. If judgment needed → startTask(kind=evaluate) via fabric
-4. Update criteria + hypotheses from report + evidence refs
-5. If completeness candidates → startTask(kind=challenge) as required
-6. If required criteria all PROVEN → BUILD COMPLETE
-7. Else select next gap → startTask(kind=engineer) on chosen binding
-8. Await; S4-resume if interrupted; goto 2
+recover buildId
+  → reconcile child tasks (S4 assess/resume as needed)
+  → determine what actually happened (checkpoints > Build memory)
+  → consume each terminal result idempotently (once per actionId)
+  → if pendingReinspect → Depth A (then B/C as policy)
+  → continue same Build
 ```
 
----
+**Hard rule:** restart must **not** skip unfinished re-inspection and launch the next task from stale conclusions (`pendingReinspect` gate).
 
-## Risks updated
-
-1. **Evaluate/challenge objectives must demand evidence** — otherwise fabric prose fakes PROVEN.  
-2. **Build-origin bind must be role-gated** — must not weaken normal PATH Code `NOT_A_PROJECT` for casual cwd.  
-3. **Criteria explosion** — keep required criteria few and product-level.  
-4. **Re-bind thrash** — multi-binding is opt-in; default one root.  
-5. **Challenge theater** — same engine rubber-stamping; mitigate with assessment needs + peer rotate + mechanical evidence checks, not provider reviewer roles.
+Physical Mac reboot acceptance remains **DEFERRED BY OPERATOR**; child + Build-loop design assumes S4 live-verified behavior.
 
 ---
 
-## Proof implications (still not a slice plan)
+## 5. Integrated intelligence rules (still Option A′)
 
-A settling proof should exercise:
+### Product-level steering
 
-- Build-origin empty → first `engineer` establishes real structure (not a hidden template)  
-- ≥1 `evaluate` and ≥1 `challenge` as real taskIds  
-- Criteria reach PROVEN only with evidence refs  
-- Optional: second binding **or** explicit single-binding path (both valid)  
-- Interrupt/resume of a child under S4 while Build continues same `buildId`  
-- After COMPLETE, PATH Code alone on a binding — zero migration  
+User revises outcome/requirements → update `intent` + `outcomeRevision` → invalidate hypotheses and scoped evidence → steer live child if any (`task.steer` with revision summary) → all **future** child objectives include current intent. Not merely patching the active prompt.
+
+### Cross-binding evaluation
+
+Fabric evaluate/challenge may receive a **referenced evidence package** (paths, SHAs, report refs, contract files, prior check ids) spanning multiple bindings while the task itself is bound to **one** cwd for mutation/tools.
+
+**Two green repos ≠ integration.** Compatibility claims need contract/runtime evidence, e.g.:
+
+- shared API schema / client stubs matching  
+- end-to-end probe or compose spanning services  
+- explicit contract tests  
+
+Absent that → criterion stays `UNKNOWN`/`UNMET`, not `PROVEN`.
+
+### Evaluate / challenge behavior
+
+Assessment-shaped objectives (fabric already maps assess/inspect/review → `assessment` needs in `inferTurnNeeds`).  
+
+**Must not** silently become implementation tasks. Temporary test/setup in the worktree must be distinguishable (prefer disposable paths / revertible probes; report must label probe artifacts vs product changes). If an evaluate mutates product intent, treat as control failure — follow with reality refresh and hypothesis correction.
+
+### Challenge participation
+
+For important claims, prefer a **different fit peer** when available (`selectEngineForTurn` rotate / continuity rules) — **not** permanent reviewer roles. Different providers alone ≠ independence; challenge must add real evidence.
+
+### No-progress handling
+
+Reuse `NoProgressCircuitBreaker` spirit (`ag10/guards.mjs`) at **Build loop** level:
+
+- Same failure + no new evidence → stop identical retries  
+- Force `evaluate` reconsideration, different investigation, or honest block (“missing X”)  
+- Progress includes **learning an approach is wrong**, not only counting PROVEN criteria  
+
+### Greenfield origin — settled from code
+
+**Probe result (this settlement):**
+
+| Starting cwd | `resolveTargetProjectRoot` | Admission |
+| --- | --- | --- |
+| Empty directory | `NOT_A_PROJECT` | — |
+| Empty dir + `git init` only (unborn HEAD) | **ok** (Git toplevel) | **ok**, `unversioned: true` |
+
+**Settled origin seam (smallest, no scaffolder):**
+
+1. Build creates/selects directory.  
+2. Build runs **`git init` only** (no commits, no manifests, no templates).  
+3. Register `projectBindings` entry; bind via **ordinary** Gateway path.  
+4. First child `engineer` establishes architecture/manifests/structure through the fabric.  
+5. Thereafter: normal PATH project forever.
+
+**Rejected as primary:** Build-role empty-dir Gateway exception — unnecessary given git-init already admits; keep Code’s `NOT_A_PROJECT` honest for casual empty cwds.  
+
+**Optional later** empty bind remains possible but is **not** required for A′.
+
+Architecture/implementation stay with the fabric — origin does not define the product.
 
 ---
 
-## Final settlement
+## 6. Modules reused vs missing seams
 
-**Architecture settled for authorization review:**
+### Reuse unchanged
 
-> **Option A′ — Thin Build orchestrator; deep intelligence only through the frozen S3 engine fabric as ordinary PATH tasks; thin durable Build record; optional multi-binding via re-bind; Build-origin empty root; outcome criteria PROVEN/UNMET/UNKNOWN; plans as hypotheses; FS/Git wins.**
+| Module | Use |
+| --- | --- |
+| `gateway/runtime.mjs` start/resume/steer/await | Child lifecycle; client `taskId`; `TASK_EXISTS` |
+| `ag10/task-reality.mjs` | Depth A freshness |
+| `ag10/task-checkpoint.mjs` | Child truth + anchors |
+| `ag10/host-startup.mjs` / continuity | Child reconcile after interrupt |
+| `ag10/engine-contract.mjs` / fabric | Engineer/evaluate/challenge |
+| `ag10/guards.mjs` | Idempotency + no-progress patterns |
+| `ag9/affected.mjs` / native-validation / prepare | Depth B/C |
+| `engineering-report.mjs` / `task-history.mjs` | Evidence refs |
+| `ag1/admission.mjs` + `paths.mjs` | Bind after git-init origin |
 
-No implementation authorized by this document.  
-No S5.x slices defined.
+### Missing seams (smallest coherent set — not a new engine)
+
+| Seam | Why |
+| --- | --- |
+| Durable Build record I/O (atomic) | Loop state, intent, criteria, children, `pendingReinspect` |
+| Build actionId ↔ taskId dispatch protocol | Idempotent dispatch/consume |
+| EvidenceRef freshness compare helper | Mechanical stale detection using reality fingerprints |
+| Build-level no-progress counter | Across child attempts, not only intra-task handoffs |
+| Intent revision → steer + invalidate | Product-level steering |
+| Evaluate evidence-package prompt convention | Cross-binding claims without multi-root Gateway |
+
+No separate inspection engine. No fat product graph.
+
+---
+
+## 7. Worked traces
+
+### T1 — Unrelated change retains valid evidence
+
+1. Criterion `auth-works` PROVEN with EvidenceRef scoped to `src/auth/**`, anchors SHA+dirty FP.  
+2. Child engineers `README.md` only.  
+3. Depth A: delta = README; auth scope untouched; independence established.  
+4. **Retain** `auth-works` PROVEN. No Depth B.
+
+### T2 — Relevant change invalidates and revalidates
+
+1. Same `auth-works` PROVEN.  
+2. Child changes `src/auth/session.ts`.  
+3. Depth A: delta intersects auth scope → mark `auth-works` **UNKNOWN**.  
+4. Depth B: affected/auth tests via PATH → pass → PROVEN with new anchors; fail → UNMET.
+
+### T3 — Restart after child completion
+
+1. Child terminal; Build crashes after checkpoint written, before consume.  
+2. Recover `buildId` → see child terminal via checkpoint → consume **once** (`actionId`) → `pendingReinspect=true`.  
+3. Depth A → then next decision.  
+4. Replay does **not** `startTask` again (`TASK_EXISTS` / existing checkpoint).
+
+### T4 — Cross-binding compatibility
+
+1. Binding `api` and `web` each have VERIFIED children.  
+2. Criterion `api-web-contract` cannot PROVEN from two solos.  
+3. Evaluate/challenge with evidence package + e2e/contract probe → only then PROVEN; else UNKNOWN/UNMET.
+
+### T5 — BUILD COMPLETE
+
+Allowed only when:
+
+- all **required** criteria `PROVEN` with **fresh** anchors, and  
+- all **explicit requirements** `SATISFIED` (none VIOLATED/UNKNOWN), and  
+- Depth C evaluate±challenge supports completeness against current intent revision, and  
+- `pendingReinspect` is clear.
+
+Child VERIFIED counts are insufficient.
+
+---
+
+## 8. Refined control loop (settled)
+
+```text
+1. Ensure binding (git-init origin if needed)
+2. Recover/reconcile children (S4); idempotent consume; honor pendingReinspect
+3. Depth A reality refresh → invalidate stale proofs
+4. Depth B/C as policy (impact / COMPLETE / contradictions)
+5. If required criteria+requirements satisfied → BUILD COMPLETE
+6. Else issue evaluate (judgment) or engineer (gap) or challenge (important claim)
+7. Await child; on terminal goto 2
+```
+
+Sequential children = **v1 execution policy**, not schema.
+
+---
+
+## 9. Conclusion
+
+| Question | Answer |
+| --- | --- |
+| Architecture | **Option A′ settled** |
+| Open contradiction? | **None** at repository level |
+| Origin | **`git init` only** — existing bind/admission; fabric builds the software |
+| Inspection | Impact-aware A/B/C; cheap by default |
+| Build durability | ActionId + pendingReinspect + idempotent consume on S4 children |
+| Ready for implementation authorization? | **YES** — pending your review of this settlement |
+
+**No implementation or S5 slice plan is authorized by this document.**

@@ -6,7 +6,7 @@
 **Implementation:** NOT AUTHORIZED  
 **Slice plan (S5.1 / S5.2 / …):** NOT DEFINED  
 
-**Refinement (settled recommendation):** [`PHASE_S5_PATH_BUILD_ARCHITECTURE_REFINEMENT.md`](./PHASE_S5_PATH_BUILD_ARCHITECTURE_REFINEMENT.md) — Option A′ (thin orchestrator + fabric cognition). This audit remains the capability/gap baseline; the refinement supersedes §10 where they differ.
+**Refinement (settled recommendation):** [`PHASE_S5_PATH_BUILD_ARCHITECTURE_REFINEMENT.md`](./PHASE_S5_PATH_BUILD_ARCHITECTURE_REFINEMENT.md) — Option A′ settled (impact-aware re-inspection, intent layers, Build-loop S4, git-init origin). This audit remains the capability/gap baseline; the refinement is authoritative where they differ.
 
 **Prior stage:** S4 — **IMPLEMENTATION FROZEN**  
 - S4.3 implementation: `093a29aa963e8132a5d47598dcc9ac62b15609b5`  
@@ -447,9 +447,7 @@ Long-running Build = **many durable Code tasks** under one durable Build outcome
 **Superseded for settlement by the refinement:**  
 [`PHASE_S5_PATH_BUILD_ARCHITECTURE_REFINEMENT.md`](./PHASE_S5_PATH_BUILD_ARCHITECTURE_REFINEMENT.md)
 
-**Settled form: Option A′** — thin Build orchestrator; evaluation / gaps / next-objective / challenge are **fabric-backed PATH tasks** (not a permanent Build brain); thin `projectBindings` with re-bind; Build-origin empty root; outcome criteria `PROVEN|UNMET|UNKNOWN`; plans as hypotheses; sequential execution as policy only.
-
-Baseline Option A from this audit remains directionally correct; A′ answers the challenge/refinement pass without adopting Option B.
+**Settled form: Option A′** — see refinement for impact-aware re-inspection, intent/criteria/hypotheses split, Build-loop S4 recovery, evidence freshness, and **git-init-only** greenfield origin (empty dir fails bind; `git init` admits via existing code).
 
 ---
 
