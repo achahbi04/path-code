@@ -109,6 +109,82 @@ describe("S5 Build child reconciliation", () => {
     expect(decision.action).toBe("mark_terminal_and_consume");
     expect(decision.orphan).toBe(true);
   });
+
+  it("conversation steer supersedes active evaluate and forces engineer next", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "path-steer-"));
+    const runtimeRoot = join(dir, "rt");
+    mkdirSync(join(runtimeRoot, "metadata", "tasks"), { recursive: true });
+    const target = join(dir, "site");
+    mkdirSync(target);
+    /** @type {string[]} */
+    const cancelled = [];
+
+    const controller = createBuildController({
+      runtimeRoot,
+      fakeMode: true,
+      gateway: {
+        async bindProject() {
+          return { ok: true };
+        },
+        async startTask() {
+          return { ok: true, taskId: "t-new" };
+        },
+        async awaitTask() {
+          return { status: "verified", classification: "VERIFIED" };
+        },
+        snapshotTask() {
+          return { status: "running" };
+        },
+        async cancelTask(taskId) {
+          cancelled.push(taskId);
+          return { ok: true };
+        },
+      },
+    });
+
+    const started = await controller.startBuild("Build a website for ICE", {
+      targetDir: target,
+      originKind: "build-created",
+      initialCriteria: [
+        { id: "c-runnable", statement: "runnable", required: true },
+        { id: "c-outcome", statement: "outcome", required: true },
+      ],
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    const { writeBuildRecord, readBuildRecord } = await import(
+      "../../scripts/pathcode-cli/build/record.mjs"
+    );
+    const build = started.build;
+    const evalId = "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee";
+    build.children.push({
+      kind: "evaluate",
+      taskId: evalId,
+      actionId: "evaluate:stuck",
+      bindingId: build.projectBindings[0].bindingId,
+      dispatchState: "dispatched",
+      dispatchedAt: new Date().toISOString(),
+      selectedAt: new Date().toISOString(),
+    });
+    build.loop.status = "running";
+    writeBuildRecord(runtimeRoot, build);
+
+    const applied = await controller.applyConversation(build.buildId, {
+      message: "Make the ICE hero dark navy.",
+    });
+    expect(applied.ok).toBe(true);
+    expect(cancelled).toContain(evalId);
+
+    const after = readBuildRecord(runtimeRoot, build.buildId);
+    const evalChild = after.children.find((c) => c.taskId === evalId);
+    expect(evalChild.dispatchState).toBe("consumed");
+    expect(after.loop.forceNextKind).toBe("engineer");
+    expect(after.loop.pendingConversationSteer).toBe(true);
+    expect(after.hypotheses.proposedNextAction).toMatch(/dark navy/i);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
 });
 
 describe("S5 structured cognitive results", () => {

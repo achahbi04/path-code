@@ -160,6 +160,7 @@ export async function startPathBuildSurface(options) {
         gatewayRuntime.awaitTask(taskId, timeoutMs),
       steerTask: (taskId, text) => gatewayRuntime.steerTask(taskId, text),
       snapshotTask: (taskId) => gatewayRuntime.snapshotTask(taskId),
+      cancelTask: (taskId) => gatewayRuntime.cancelTask(taskId),
     },
   });
 
@@ -257,7 +258,12 @@ export async function startPathBuildSurface(options) {
       .catch((err) => ({
         ok: false,
         message: err instanceof Error ? err.message : String(err),
-      }));
+      }))
+      .finally(() => {
+        // Allow a later conversation steer / recovery to start a new loop.
+        const cur = loops.get(buildId);
+        if (cur && cur.promise === promise) loops.delete(buildId);
+      });
     loops.set(buildId, { promise, startedAt });
   }
 

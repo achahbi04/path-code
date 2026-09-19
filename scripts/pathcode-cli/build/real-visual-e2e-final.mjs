@@ -131,9 +131,7 @@ async function main() {
   const afterStrong = await waitFor(
     async () => {
       const b = readBuildRecord(runtimeRoot, BUILD_ID);
-      await fetch(new URL(`/api/builds/${BUILD_ID}/runtime/restart`, surface.url), {
-        method: "POST",
-      }).catch(() => null);
+      // Do NOT thrash runtime restart — only inspect.
       const view = await (await fetch(new URL(`/api/builds/${BUILD_ID}`, surface.url))).json();
       const ev = await captureBrowserEvidence({
         url: view.preview?.url || b?.previewUrl,
@@ -149,6 +147,9 @@ async function main() {
       });
       const adopted =
         (b?.adoptionHistory?.length || 0) > (prior.adoptionHistory?.length || 0);
+      const authChanged =
+        Boolean(b?.authoritativeSha) &&
+        b.authoritativeSha !== prior.authoritativeSha;
       const hashChanged = ev.ok && before.contentHash && ev.contentHash !== before.contentHash;
       const styleChanged =
         (before.heroStyles?.backgroundColor &&
@@ -156,15 +157,21 @@ async function main() {
           before.heroStyles.backgroundColor !== ev.heroStyles.backgroundColor) ||
         (before.headingStyles?.fontSize &&
           ev.headingStyles?.fontSize &&
-          before.headingStyles.fontSize !== ev.headingStyles.fontSize);
-      if (adopted && (hashChanged || styleChanged || ev.ok)) {
-        return { ok: true, ev, b, adopted, hashChanged, styleChanged };
+          before.headingStyles.fontSize !== ev.headingStyles.fontSize) ||
+        (before.cta?.backgroundColor &&
+          ev.cta?.backgroundColor &&
+          before.cta.backgroundColor !== ev.cta.backgroundColor) ||
+        (before.cta?.text && ev.cta?.text && before.cta.text !== ev.cta.text);
+      if ((adopted || authChanged) && (hashChanged || styleChanged)) {
+        return { ok: true, ev, b, adopted, hashChanged, styleChanged, authChanged };
       }
       return {
         ok: false,
         status: b?.loop?.status,
+        force: b?.loop?.forceNextKind,
         adoptions: b?.adoptionHistory?.length,
         children: b?.children?.slice(-3).map((c) => `${c.kind}:${c.dispatchState}`),
+        auth: b?.authoritativeSha?.slice?.(0, 8),
       };
     },
     { timeoutMs: 1_800_000, label: "strong_visual" },

@@ -55,6 +55,7 @@ import { mechanicalProbeBinding } from "./mechanical-probe.mjs";
  *   awaitTask: (taskId: string, timeoutMs?: number) => Promise<object>,
  *   snapshotTask?: (taskId: string) => Promise<object>,
  *   steerTask?: (taskId: string, text: string) => Promise<object>,
+ *   cancelTask?: (taskId: string) => Promise<object> | object,
  *   getResult?: (taskId: string) => Promise<object>,
  * }} BuildGatewayPort
  */
@@ -408,6 +409,51 @@ export function createBuildController(opts) {
   }
 
   /**
+   * Cancel + consume active evaluate/challenge so product steers can engineer next.
+   * Never steer a cognitive child into product mutation.
+   * @param {string} buildId
+   * @param {string} [reason]
+   */
+  async function supersedeActiveCognitiveChildren(buildId, reason = "SUPERSEDED_BY_STEER") {
+    let record = readBuildRecord(runtimeRoot, buildId);
+    if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    const active = (record.children || []).filter(
+      (c) =>
+        (c.kind === "evaluate" || c.kind === "challenge") &&
+        (c.dispatchState === "dispatched" ||
+          c.dispatchState === "selected" ||
+          c.dispatchState === "terminal_seen"),
+    );
+    /** @type {string[]} */
+    const superseded = [];
+    for (const child of active) {
+      if (typeof gateway.cancelTask === "function") {
+        try {
+          await gateway.cancelTask(child.taskId);
+        } catch {
+          /* best-effort */
+        }
+      }
+      child.dispatchState = "terminal_seen";
+      child.terminalAt = child.terminalAt || new Date().toISOString();
+      child.classification = reason;
+      child.orphanAbandoned = true;
+      superseded.push(child.taskId);
+    }
+    if (superseded.length) {
+      writeBuildRecord(runtimeRoot, record);
+      for (const taskId of superseded) {
+        await consumeChildResult(buildId, taskId);
+      }
+    }
+    return {
+      ok: true,
+      superseded,
+      build: readBuildRecord(runtimeRoot, buildId),
+    };
+  }
+
+  /**
    * @param {string} buildId
    * @param {string} [bindingId]
    * @param {string} [childTaskId]
@@ -756,9 +802,10 @@ export function createBuildController(opts) {
 
     // Apply assessment directives from engineering reports
     if (
-      child.kind === "evaluate" ||
-      child.kind === "challenge" ||
-      child.kind === "engineer"
+      !child.orphanAbandoned &&
+      (child.kind === "evaluate" ||
+        child.kind === "challenge" ||
+        child.kind === "engineer")
     ) {
       applyAssessmentToRecord(record, reportText, {
         taskId,
@@ -1381,12 +1428,24 @@ export function createBuildController(opts) {
         Array.isArray(record.loop.lastRealityDelta.demotedIds) &&
         record.loop.lastRealityDelta.demotedIds) ||
       [];
+    const forceEngineer =
+      record.loop.forceNextKind === "engineer" ||
+      Boolean(record.loop.pendingConversationSteer);
 
     /** @type {import('./types.mjs').BuildTaskKind} */
     let kind = "engineer";
     let objective = "";
 
-    if (engineers.length === 0) {
+    if (forceEngineer) {
+      kind = "engineer";
+      objective = frameEngineerObjective(
+        record,
+        record.hypotheses.proposedNextAction || "",
+      );
+      record.loop.forceNextKind = undefined;
+      record.loop.pendingConversationSteer = false;
+      writeBuildRecord(runtimeRoot, record);
+    } else if (engineers.length === 0) {
       kind = "engineer";
       objective = frameEngineerObjective(
         record,
@@ -1622,7 +1681,7 @@ export function createBuildController(opts) {
    * }} revision
    */
   async function reviseIntent(buildId, revision) {
-    const record = readBuildRecord(runtimeRoot, buildId);
+    let record = readBuildRecord(runtimeRoot, buildId);
     if (!record) {
       return { ok: false, code: "BUILD_NOT_FOUND" };
     }
@@ -1677,6 +1736,11 @@ export function createBuildController(opts) {
       }
     }
     record.loop.pendingReinspect = true;
+    // Product steers must engineer before re-evaluate — never leave evaluate stuck.
+    if (revision.demoteAll || revision.note || revision.outcome) {
+      record.loop.forceNextKind = "engineer";
+      record.loop.pendingConversationSteer = true;
+    }
     // Require fresh evaluate/challenge for this revision before COMPLETE.
     record.loop.lastEvaluateTaskId = undefined;
     record.loop.lastChallengeTaskId = undefined;
@@ -1685,10 +1749,18 @@ export function createBuildController(opts) {
     }
     writeBuildRecord(runtimeRoot, record);
 
-    // Steer active dispatched child if any
-    const active = [...record.children]
+    // Supersede active evaluate/challenge — do not steer them into product edits.
+    await supersedeActiveCognitiveChildren(buildId, "ABANDONED_SUPERSEDED_BY_STEER");
+    record = readBuildRecord(runtimeRoot, buildId) || record;
+
+    // Steer only an active engineer child (product mutation is intentional there).
+    const active = [...(record.children || [])]
       .reverse()
-      .find((c) => c.dispatchState === "dispatched");
+      .find(
+        (c) =>
+          c.kind === "engineer" &&
+          (c.dispatchState === "dispatched" || c.dispatchState === "selected"),
+      );
     if (active && gateway.steerTask) {
       const text = [
         `PATH Build product-level intent revision r${record.intent.outcomeRevision}.`,
