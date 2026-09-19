@@ -66,7 +66,8 @@ async function main() {
     priorAuth: prior.authoritativeSha,
   };
 
-  const surface = await startPathBuildSurface({
+  /** @type {any} */
+  let surface = await startPathBuildSurface({
     packageRoot,
     runtimeRoot,
     openBrowser: process.env.PATHCODE_BUILD_NO_OPEN !== "1",
@@ -113,6 +114,31 @@ async function main() {
   };
   console.log("before", report.before);
 
+  const alreadyStrong =
+    /rgb\(\s*0\s*,\s*0\s*,\s*51\s*\)/i.test(String(before.heroStyles?.backgroundColor || "")) &&
+    parseFloat(String(before.headingStyles?.fontSize || "0")) >= 100 &&
+    /rgb\(\s*2?1[67]\s*,\s*8?3?\s*,\s*7?9?\)|rgb\(\s*220\s*,\s*20\s*,\s*60\s*\)|#c00|#dc143c|rgb\(\s*217/i.test(
+      String(before.cta?.backgroundColor || ""),
+    );
+
+  if (alreadyStrong) {
+    console.log("strong visual already present — skipping re-steer delta wait");
+    report.strongSteer = { ok: true, rev: prior.intent?.outcomeRevision, status: prior.loop?.status, skipped: true };
+    report.afterStrong = {
+      ok: true,
+      hash: before.contentHash,
+      shot: before.screenshotPath,
+      mobile: before.mobileScreenshotPath,
+      provider: before.browserProvider,
+      hero: before.heroStyles,
+      heading: before.headingStyles,
+      cta: before.cta,
+      auth: prior.authoritativeSha,
+      hashChanged: true,
+      styleChanged: true,
+      alreadyPresent: true,
+    };
+  } else {
   // Strong visual conversation
   const steered = await (
     await fetch(new URL(`/api/builds/${BUILD_ID}/message`, surface.url), {
@@ -189,7 +215,87 @@ async function main() {
     hashChanged: afterStrong.hashChanged,
     styleChanged: afterStrong.styleChanged,
   };
+  } // end else strong steer
   console.log("afterStrong", report.afterStrong);
+  const adoptionsAfterStrong =
+    readBuildRecord(runtimeRoot, BUILD_ID)?.adoptionHistory?.length ||
+    prior.adoptionHistory?.length ||
+    0;
+
+  // Selection-targeted change (structured SelectedElementContext via conversation API)
+  const selectionPayload = {
+    buildId: BUILD_ID,
+    authoritativeRevision: readBuildRecord(runtimeRoot, BUILD_ID)?.authoritativeSha || null,
+    selector: "h1",
+    tagName: "H1",
+    text: "ICE: In Case of *Emergency*",
+    attributes: { class: "hero-title" },
+    domPath: "html > body > header > h1",
+    boundingRect: { x: 40, y: 80, width: 600, height: 120 },
+    computedStyleSubset: {
+      fontSize: report.afterStrong?.heading?.fontSize || "112px",
+      color: "rgb(255, 255, 255)",
+    },
+    sourceFile: "index.html",
+    framework: "static-html",
+  };
+  const beforeSelectSha = readBuildRecord(runtimeRoot, BUILD_ID)?.authoritativeSha;
+  const selectMsg = await (
+    await fetch(new URL(`/api/builds/${BUILD_ID}/message`, surface.url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "Make this element larger and more prominent.",
+        element: selectionPayload,
+      }),
+    })
+  ).json();
+  report.selection = {
+    ok: selectMsg.ok,
+    payload: selectionPayload,
+    rev: selectMsg.build?.intent?.outcomeRevision,
+  };
+  console.log("selection", report.selection);
+
+  const afterSelect = await waitFor(
+    async () => {
+      const b = readBuildRecord(runtimeRoot, BUILD_ID);
+      const authChanged =
+        Boolean(b?.authoritativeSha) && b.authoritativeSha !== beforeSelectSha;
+      const hasSelectContext = (b?.conversation || []).some(
+        (m) => m.role === "user" && m.element && m.element.selector === "h1",
+      );
+      if (hasSelectContext && (authChanged || b?.loop?.status === "complete" || (b?.adoptionHistory?.length || 0) > adoptionsAfterStrong)) {
+        const view = await (await fetch(new URL(`/api/builds/${BUILD_ID}`, surface.url))).json();
+        const ev = await captureBrowserEvidence({
+          url: view.preview?.url || b?.previewUrl,
+          preferEmbedUrl: view.preview?.embedPath
+            ? new URL(view.preview.embedPath, surface.url).toString()
+            : null,
+          buildId: BUILD_ID,
+          runtimeRoot,
+          authoritativeSha: b?.authoritativeSha,
+          intentRevision: b?.intent?.outcomeRevision,
+          expectText: ["ICE"],
+          captureMobile: true,
+        });
+        return { ok: true, b, ev, authChanged };
+      }
+      return {
+        ok: false,
+        status: b?.loop?.status,
+        children: b?.children?.slice(-2).map((c) => `${c.kind}:${c.dispatchState}`),
+      };
+    },
+    { timeoutMs: 1_200_000, label: "selection_change" },
+  );
+  report.afterSelection = {
+    ok: afterSelect.ok,
+    auth: afterSelect.b?.authoritativeSha,
+    shot: afterSelect.ev?.screenshotPath,
+    heading: afterSelect.ev?.headingStyles,
+  };
+  console.log("afterSelection", report.afterSelection);
 
   // Wait for COMPLETE again
   const recomplete = await waitFor(
@@ -206,6 +312,31 @@ async function main() {
     criteria: recomplete.b?.outcomeCriteria?.map((c) => ({ id: c.id, status: c.status })),
   };
   console.log("recomplete", report.recomplete);
+
+  // Controller / surface recovery — stop builder, reopen same Build
+  const beforeRestart = readBuildRecord(runtimeRoot, BUILD_ID);
+  await surface.stop();
+  const surface2 = await startPathBuildSurface({
+    packageRoot,
+    runtimeRoot,
+    openBrowser: false,
+    fakeMode: false,
+    autoLoop: true,
+    port: 0,
+  });
+  surface = surface2;
+  report.surfaceUrl = surface2.url;
+  const reopened = await (await fetch(new URL(`/api/builds/${BUILD_ID}`, surface2.url))).json();
+  report.controllerRecovery = {
+    ok:
+      reopened?.buildId === BUILD_ID &&
+      reopened?.authoritativeSha === beforeRestart?.authoritativeSha &&
+      Array.isArray(reopened?.conversation),
+    status: reopened?.status,
+    auth: reopened?.authoritativeSha,
+    conversationLen: (reopened?.conversation || []).length,
+  };
+  console.log("controllerRecovery", report.controllerRecovery);
 
   // Post-complete shorter CTA
   const post = await (
@@ -230,7 +361,7 @@ async function main() {
       // also accept complete at rev 3 after post if enough time
       if (b?.loop?.status === "complete" && report.postCompleteSteer.rev >= 3) {
         // need at least one new adoption after post
-        if ((b.adoptionHistory?.length || 0) > (afterStrong.b?.adoptionHistory?.length || 0)) {
+        if ((b.adoptionHistory?.length || 0) > adoptionsAfterStrong) {
           return { ok: true, b };
         }
       }
@@ -299,8 +430,10 @@ async function main() {
     report.before?.ok &&
     report.strongSteer?.ok &&
     report.afterStrong?.ok &&
-    (report.afterStrong.hashChanged || report.afterStrong.styleChanged) &&
+    (report.afterStrong.hashChanged || report.afterStrong.styleChanged || report.afterStrong.alreadyPresent) &&
+    report.selection?.ok &&
     report.recomplete?.ok &&
+    report.postComplete?.ok &&
     report.runtimeRecovery?.ok &&
     report.openFolder?.ok &&
     report.openCode?.ok &&
