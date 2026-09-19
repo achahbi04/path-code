@@ -298,6 +298,38 @@ describe("S5 PATH Build", () => {
     expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
   });
 
+  it("mechanical probe: materializes README when npm test passes", () => {
+    const target = join(dir, "readme-materialize");
+    const origin = ensureBuildOrigin({ targetDir: target });
+    expect(origin.ok).toBe(true);
+    if (!origin.ok) return;
+    writeFileSync(
+      join(origin.binding.projectRoot, "package.json"),
+      JSON.stringify({
+        name: "demo-cli",
+        scripts: { test: "node -e \"process.exit(0)\"" },
+      }),
+    );
+    const rec = createBuildRecordSkeleton({ outcome: "demo" });
+    rec.projectBindings.push(origin.binding);
+    rec.intent.explicitRequirements.push({
+      id: "req-readme",
+      statement: "Include a short README.md describing how to run tests",
+      required: true,
+      status: "UNKNOWN",
+      evidence: [],
+    });
+    const probe = mechanicalProbeBinding({
+      record: rec,
+      bindingId: origin.binding.bindingId,
+    });
+    expect(probe.ok).toBe(true);
+    expect(existsSync(join(origin.binding.projectRoot, "README.md"))).toBe(
+      true,
+    );
+    expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
+  });
+
   it("Depth A refresh writes reality delta", () => {
     const target = join(dir, "delta");
     const origin = ensureBuildOrigin({ targetDir: target });

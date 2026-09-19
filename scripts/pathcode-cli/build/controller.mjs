@@ -248,13 +248,58 @@ export function createBuildController(opts) {
     record.loop.lastRealityDelta = refresh.delta;
     record.loop.pendingReinspect = false;
     writeBuildRecord(runtimeRoot, record);
+
+    try {
+      const probe = mechanicalProbeBinding({
+        record,
+        bindingId: binding.bindingId,
+        taskId: childTaskId,
+        changedFiles: refresh.delta?.changedFiles || [],
+      });
+      if (probe.ok && Array.isArray(probe.updates) && probe.updates.length) {
+        writeBuildRecord(runtimeRoot, record);
+      }
+    } catch {
+      // best-effort mechanical refresh after Depth A
+    }
+
     return {
       ok: true,
       delta: refresh.delta,
       recommendedNext: refresh.recommendedNext,
       needsTargetedRevalidation: refresh.needsTargetedRevalidation,
-      build: record,
+      build: readBuildRecord(runtimeRoot, buildId) || record,
     };
+  }
+
+  /**
+   * @param {import('./types.mjs').BuildChildRecord} child
+   */
+  function childVerificationClass(child) {
+    if (!child?.taskId) return "";
+    let cls = String(child.classification || "");
+    if (/VERIFIED/i.test(cls)) return cls;
+    const cp = readTaskCheckpoint(runtimeRoot, child.taskId);
+    cls = String(
+      cls ||
+        (cp?.validation && cp.validation.classification) ||
+        cp?.finalState ||
+        "",
+    );
+    if (/VERIFIED/i.test(cls)) return cls;
+    if (
+      typeof gateway.snapshotTask === "function" &&
+      (child.kind === "evaluate" || child.kind === "challenge")
+    ) {
+      try {
+        const snap = gateway.snapshotTask(child.taskId);
+        const fromSnap = snap && snap.classification ? String(snap.classification) : "";
+        if (/VERIFIED/i.test(fromSnap)) return fromSnap;
+      } catch {
+        // best-effort
+      }
+    }
+    return cls;
   }
 
   /**
@@ -566,10 +611,7 @@ export function createBuildController(opts) {
     child.dispatchState = "consumed";
     child.consumedAt = new Date().toISOString();
     child.resultFingerprint = resultFingerprint;
-    child.classification =
-      (cp?.validation && cp.validation.classification) ||
-      cp?.finalState ||
-      child.classification;
+    child.classification = childVerificationClass(child) || child.classification;
     child.terminalAt = child.terminalAt || new Date().toISOString();
     record.loop.lastConsumedActionId = child.actionId;
     record.loop.pendingReinspect = true;
@@ -760,8 +802,7 @@ export function createBuildController(opts) {
       .reverse()
       .find((c) => c.kind === "challenge");
     const assessVerified = (child) =>
-      child &&
-      /VERIFIED/i.test(String(child.classification || ""));
+      child && /VERIFIED/i.test(childVerificationClass(child));
     const hasEvaluate = assessVerified(lastEvaluate);
     const hasChallenge = assessVerified(lastChallenge);
     if (!critOk || !reqOk) {
@@ -876,9 +917,11 @@ export function createBuildController(opts) {
       const openReqs = (record.intent.explicitRequirements || []).filter(
         (r) => r.required !== false && r.status !== "SATISFIED",
       );
-      const gap =
-        openReqs.map((r) => `[${r.id}] ${r.statement}`).join(" · ") ||
-        "Close remaining explicit operator requirements.";
+      const gap = [
+        "Close these explicit operator requirements in this turn (do not skip):",
+        ...openReqs.map((r) => `- [${r.id}] ${r.statement}`),
+        "If a README is required, create README.md at the repository root with how to run npm test.",
+      ].join("\n");
       objective = frameEngineerObjective(record, gap);
     } else if (
       demoted.length > 0 &&
@@ -886,14 +929,27 @@ export function createBuildController(opts) {
     ) {
       kind = "evaluate";
       objective = buildTargetedRevalidationObjective(record, demoted);
-    } else if (evaluates.length === 0 || (engineers.length > evaluates.length && engineers.length % 2 === 0)) {
+    } else if (completion.reason === "evaluate_required") {
+      kind = "evaluate";
+      objective = frameEvaluateObjective(record);
+    } else if (completion.reason === "challenge_required") {
+      kind = "challenge";
+      const claim =
+        (record.outcomeCriteria || []).find((c) => c.status === "PROVEN")
+          ?.statement || completenessClaim(record);
+      objective = frameChallengeObjective(record, claim, {
+        preferPeerHint: true,
+      });
+    } else if (
+      evaluates.length === 0 ||
+      (engineers.length > evaluates.length && engineers.length % 2 === 0)
+    ) {
       kind = "evaluate";
       objective = frameEvaluateObjective(record);
     } else if (
-      completion.reason === "challenge_required" ||
-      (evaluates.length > 0 &&
-        challenges.length === 0 &&
-        (record.outcomeCriteria || []).some((c) => c.status === "PROVEN"))
+      evaluates.length > 0 &&
+      challenges.length === 0 &&
+      (record.outcomeCriteria || []).some((c) => c.status === "PROVEN")
     ) {
       kind = "challenge";
       const claim =
@@ -902,9 +958,6 @@ export function createBuildController(opts) {
       objective = frameChallengeObjective(record, claim, {
         preferPeerHint: true,
       });
-    } else if (completion.reason === "evaluate_required") {
-      kind = "evaluate";
-      objective = frameEvaluateObjective(record);
     } else {
       kind = "engineer";
       objective = frameEngineerObjective(
@@ -1025,8 +1078,17 @@ export function createBuildController(opts) {
         });
       }
     }
-    // Invalidate hypotheses + demote criteria/requirements to UNKNOWN
-    record.hypotheses.proposedNextAction = "";
+    // Hypotheses are disposable; force next engineering toward new requirements.
+    const newReqGap = (revision.addRequirements || [])
+      .map((r) => String(r.statement || "").trim())
+      .filter(Boolean)
+      .map((s) => `MUST satisfy now: ${s}`)
+      .join("\n");
+    record.hypotheses.proposedNextAction =
+      newReqGap ||
+      (typeof revision.outcome === "string" && revision.outcome.trim()
+        ? `Re-align product with revised outcome: ${revision.outcome.trim().slice(0, 500)}`
+        : record.hypotheses.proposedNextAction || "");
     record.hypotheses.architectureNotes = [
       record.hypotheses.architectureNotes || "",
       revision.note ? `Steer: ${revision.note}` : "",
@@ -1036,16 +1098,20 @@ export function createBuildController(opts) {
       .join("\n")
       .slice(0, 4_000);
     record.hypotheses.updatedAt = now;
-    for (const c of record.outcomeCriteria || []) {
-      if (c.status === "PROVEN") {
-        c.status = "UNKNOWN";
-        c.updatedAt = now;
+
+    // Outcome text change → demote criteria (product meaning changed).
+    // New requirements start UNKNOWN; do NOT silently weaken prior SATISFIED
+    // requirements that were not revised.
+    if (typeof revision.outcome === "string" && revision.outcome.trim()) {
+      for (const c of record.outcomeCriteria || []) {
+        if (c.status === "PROVEN") {
+          c.status = "UNKNOWN";
+          c.updatedAt = now;
+        }
       }
     }
-    for (const r of record.intent.explicitRequirements || []) {
-      if (r.status === "SATISFIED") r.status = "UNKNOWN";
-    }
     record.loop.pendingReinspect = true;
+    // Require fresh evaluate/challenge for this revision before COMPLETE.
     record.loop.lastEvaluateTaskId = undefined;
     record.loop.lastChallengeTaskId = undefined;
     if (record.loop.status === "complete") {
