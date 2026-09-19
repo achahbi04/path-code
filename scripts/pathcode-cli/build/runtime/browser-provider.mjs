@@ -181,46 +181,47 @@ export async function resolveBrowserProvider() {
     }
   }
 
-  // One repair attempt for chromium then retry default + chrome channel
-  const repaired = repairPlaywrightBrowsers("chromium");
-  if (repaired.ok) {
-    for (const c of [
-      { name: "chromium_after_repair", opts: { headless: true } },
-      { name: "chrome_channel_after_repair", opts: { headless: true, channel: "chrome" } },
-    ]) {
+  // Optional repair — skip by default (can take many minutes); enable with PATHCODE_PLAYWRIGHT_REPAIR=1
+  if (process.env.PATHCODE_PLAYWRIGHT_REPAIR === "1") {
+    const repaired = repairPlaywrightBrowsers("chromium");
+    if (repaired.ok) {
+      for (const c of [
+        { name: "chromium_after_repair", opts: { headless: true } },
+        { name: "chrome_channel_after_repair", opts: { headless: true, channel: "chrome" } },
+      ]) {
+        try {
+          const browser = await playwright.chromium.launch(c.opts);
+          await browser.close();
+          return {
+            ok: true,
+            provider: c.name,
+            launchOptions: c.opts,
+            playwright,
+            browserTypeName: "chromium",
+          };
+        } catch (err) {
+          errors.push(`${c.name}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    } else {
+      errors.push(`repair_failed: ${repaired.stderr || repaired.stdout}`);
+    }
+
+    const wk = repairPlaywrightBrowsers("webkit");
+    if (wk.ok && playwright.webkit) {
       try {
-        const browser = await playwright.chromium.launch(c.opts);
+        const browser = await playwright.webkit.launch({ headless: true });
         await browser.close();
         return {
           ok: true,
-          provider: c.name,
-          launchOptions: c.opts,
+          provider: "webkit_after_install",
+          launchOptions: { headless: true },
           playwright,
-          browserTypeName: "chromium",
+          browserTypeName: "webkit",
         };
       } catch (err) {
-        errors.push(`${c.name}: ${err instanceof Error ? err.message : String(err)}`);
+        errors.push(`webkit_after_install: ${err instanceof Error ? err.message : String(err)}`);
       }
-    }
-  } else {
-    errors.push(`repair_failed: ${repaired.stderr || repaired.stdout}`);
-  }
-
-  // Try installing webkit
-  const wk = repairPlaywrightBrowsers("webkit");
-  if (wk.ok && playwright.webkit) {
-    try {
-      const browser = await playwright.webkit.launch({ headless: true });
-      await browser.close();
-      return {
-        ok: true,
-        provider: "webkit_after_install",
-        launchOptions: { headless: true },
-        playwright,
-        browserTypeName: "webkit",
-      };
-    } catch (err) {
-      errors.push(`webkit_after_install: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

@@ -151,13 +151,8 @@ export function detectBuildArtifact(projectRoot, opts = {}) {
     artifact.preview.capability = "web";
     artifact.preview.mode = "dev_server";
     artifact.signals.push("vite");
-  } else if (pkg && (artifact.devCommand || artifact.startCommand) && (hasIndexHtml || deps.react || deps.vue || deps.svelte)) {
-    artifact.kind = "web";
-    artifact.framework = deps.react ? "react" : "node-web";
-    artifact.preview.capability = "web";
-    artifact.preview.mode = "dev_server";
-    artifact.signals.push("node_web_scripts");
   } else if (hasIndexHtml || hasStaticHtml) {
+    // Prefer static HTML preview over fragile Express starters that ignore PORT.
     artifact.kind = "web";
     artifact.framework = "static";
     artifact.preview.capability = "web";
@@ -166,7 +161,12 @@ export function detectBuildArtifact(projectRoot, opts = {}) {
       hasIndexHtml ? "static_index_html" : `static_${staticServeRoot}_index_html`,
     );
     artifact.staticRoot = staticServeRoot || ".";
-    // Keep PATH-owned static serve — do not spawn npx serve for plain static trees.
+  } else if (pkg && (artifact.devCommand || artifact.startCommand) && (deps.react || deps.vue || deps.svelte)) {
+    artifact.kind = "web";
+    artifact.framework = deps.react ? "react" : "node-web";
+    artifact.preview.capability = "web";
+    artifact.preview.mode = "dev_server";
+    artifact.signals.push("node_web_scripts");
   } else if (pkg?.bin || (scripts.start && /\bcli\b|commander|yargs/i.test(JSON.stringify(deps)))) {
     artifact.kind = "cli";
     artifact.preview.capability = "cli";
@@ -241,6 +241,34 @@ export function resolveArtifactStartPlan(artifact, opts) {
       args: [],
       env: {},
       staticRoot: staticRel,
+    };
+  }
+
+  // Prefer PATH-owned static preview when a static index exists — many generated
+  // Express starters hardcode :3000 and ignore PORT, which breaks Build runtime.
+  if (
+    typeof artifact.staticRoot === "string" &&
+    artifact.staticRoot &&
+    existsSync(
+      join(
+        artifact.projectRoot,
+        artifact.staticRoot === "." ? "index.html" : join(artifact.staticRoot, "index.html"),
+      ),
+    )
+  ) {
+    const staticRel = artifact.staticRoot;
+    return {
+      kind: "static",
+      port: opts.port,
+      cwd:
+        staticRel === "."
+          ? artifact.projectRoot
+          : join(artifact.projectRoot, staticRel),
+      cmd: null,
+      args: [],
+      env: {},
+      staticRoot: staticRel,
+      reason: "prefer_static_over_port_fragile_start",
     };
   }
 
