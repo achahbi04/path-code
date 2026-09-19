@@ -2,7 +2,7 @@
 # PATH BUILD (Option A′)
 
 **S5 RESULT:** **REAL-LIVE-VERIFICATION NOT YET PASSING** (real-engine end-to-end harness; see below)  
-**S5 implementation checkpoint:** authoritative tip is **HEAD of this branch after the S5 verification commit** (replaces prior `23c91787…` as the implementation SHA for Build controller, Gateway dispatch wiring, mechanical probe, and real-e2e harness).  
+**S5 implementation checkpoint:** `ebb8cf76d89ef7d3c2f76048d37b043d63332f4b` (Build controller, Gateway `preferredEngine`, mechanical probe, real-e2e harness, phase evidence labels).  
 **Mode:** mechanical fake fabric for CI/unit tests; real-engine PATH Build via `node docs/reports/g10-evidence/s5/run-s5-real-e2e.mjs` (no Build fake fabric, no Gateway fake engine)
 
 **Evidence artifacts (honest verdict labels — do not conflate with S5 live-verified):**
