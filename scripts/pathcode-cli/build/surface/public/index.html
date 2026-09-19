@@ -7,78 +7,108 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;700&family=Manrope:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/assets/app.css" />
   </head>
   <body>
     <div class="atmosphere" aria-hidden="true"></div>
-    <main class="shell">
+
+    <!-- Landing / create -->
+    <section class="landing" id="landing">
       <header class="brand-block">
         <p class="brand">PATH Build</p>
         <p class="tagline">Turn an outcome into working software.</p>
       </header>
-
-      <section class="composer" id="composer">
+      <div class="composer-card">
         <label class="sr-only" for="outcome">What do you want to build?</label>
         <textarea
           id="outcome"
-          name="outcome"
-          rows="3"
+          rows="4"
           placeholder="Build me an inventory app for a small warehouse…"
           autocomplete="off"
         ></textarea>
         <div class="composer-actions">
           <button type="button" class="cta" id="buildBtn">Build</button>
         </div>
-        <p class="hint" id="hint">
-          Fresh project under ~/PATH Builds. Engines use your real PATH fabric —
-          Cursor, Copilot, or Antigravity.
-        </p>
-      </section>
+        <p class="hint">Fresh project under ~/PATH Builds.</p>
+      </div>
+      <p class="error" id="landingError" hidden></p>
+    </section>
 
-      <section class="stage" id="stage" hidden>
-        <div class="stage-pulse" id="pulse" aria-hidden="true"></div>
-        <p class="phase-kicker" id="phaseKicker">Working</p>
-        <h1 class="headline" id="headline">Building your product…</h1>
-        <p class="detail" id="detail"></p>
-
-        <div class="meta-row" id="metaRow"></div>
-
-        <div class="lists" id="lists"></div>
-
-        <div class="steer-panel" id="steerPanel" hidden>
-          <label for="steerText">Steer the product</label>
-          <textarea
-            id="steerText"
-            rows="2"
-            placeholder="Change direction, or add a must-have…"
-          ></textarea>
-          <div class="steer-actions">
-            <button type="button" class="ghost" id="steerBtn">Revise outcome</button>
-            <button type="button" class="ghost" id="requireBtn">Add requirement</button>
-          </div>
+    <!-- Builder workspace -->
+    <section class="workspace" id="workspace" hidden>
+      <header class="topbar">
+        <div class="topbar-brand">
+          <span class="brand-mini">PATH Build</span>
+          <span class="status-pill" id="statusPill">Building…</span>
         </div>
+        <div class="topbar-actions">
+          <button type="button" class="ghost" id="selectModeBtn" title="Select element in preview">
+            Select
+          </button>
+          <button type="button" class="ghost" id="refreshPreviewBtn">Refresh</button>
+          <button type="button" class="ghost" id="openExternalBtn">Open preview</button>
+          <button type="button" class="ghost" id="detailsBtn">Activity</button>
+          <button type="button" class="ghost" id="newBuildBtn">New</button>
+        </div>
+      </header>
 
-        <div class="handoff" id="handoff" hidden>
-          <p class="handoff-title">Your project</p>
+      <div class="workspace-grid">
+        <aside class="chat-pane">
+          <div class="chat-scroll" id="chatScroll"></div>
+          <div class="selection-chip" id="selectionChip" hidden></div>
+          <form class="chat-composer" id="chatForm">
+            <textarea
+              id="chatInput"
+              rows="2"
+              placeholder="Ask for a change… e.g. Make the hero darker"
+            ></textarea>
+            <button type="submit" class="cta compact" id="sendBtn">Send</button>
+          </form>
+        </aside>
+
+        <main class="preview-pane">
+          <div class="preview-toolbar">
+            <span class="preview-label" id="previewLabel">Product preview</span>
+            <div class="viewport-toggles" role="group" aria-label="Viewport">
+              <button type="button" class="ghost tiny active" data-viewport="desktop">Desktop</button>
+              <button type="button" class="ghost tiny" data-viewport="tablet">Tablet</button>
+              <button type="button" class="ghost tiny" data-viewport="mobile">Mobile</button>
+            </div>
+          </div>
+          <div class="preview-stage" id="previewStage">
+            <div class="preview-empty" id="previewEmpty">
+              <p>Your product will appear here as soon as it is runnable.</p>
+            </div>
+            <iframe
+              id="previewFrame"
+              title="Live product preview"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+              hidden
+            ></iframe>
+          </div>
+          <div class="preview-error" id="previewError" hidden></div>
+        </main>
+      </div>
+
+      <aside class="drawer" id="drawer" hidden>
+        <div class="drawer-head">
+          <h2>Activity</h2>
+          <button type="button" class="ghost" id="closeDrawerBtn">Close</button>
+        </div>
+        <div class="drawer-body" id="drawerBody"></div>
+        <div class="drawer-foot">
           <code class="path" id="projectPath"></code>
-          <div class="handoff-actions">
-            <button type="button" class="cta secondary" id="openFolderBtn">
-              Open folder
-            </button>
-            <button type="button" class="ghost" id="newBuildBtn">New build</button>
+          <div class="drawer-actions">
+            <button type="button" class="cta secondary" id="openFolderBtn">Open folder</button>
+            <button type="button" class="ghost" id="openCodeBtn">Open in PATH Code</button>
           </div>
-          <p class="hint">
-            PATH Code stays the terminal for engineering an existing repo. This
-            surface is for creating the product.
-          </p>
         </div>
-      </section>
+      </aside>
+    </section>
 
-      <p class="error" id="error" hidden></p>
-    </main>
     <script src="/assets/app.js" type="module"></script>
   </body>
 </html>

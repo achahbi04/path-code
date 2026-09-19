@@ -2,14 +2,22 @@
  * S5 — PATH Build product surface smoke (not PATH Code CLI).
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtempSync, rmSync, existsSync, realpathSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 
 import { projectBuildForSurface } from "../../scripts/pathcode-cli/build/surface/product-view.mjs";
 import { startPathBuildSurface } from "../../scripts/pathcode-cli/build/surface/server.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
+
+function canon(p) {
+  try {
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
+  }
+}
 
 describe("S5 PATH Build product surface", () => {
   /** @type {Awaited<ReturnType<typeof startPathBuildSurface>> | null} */
@@ -61,6 +69,7 @@ describe("S5 PATH Build product surface", () => {
       runtimeRoot,
       openBrowser: false,
       fakeMode: true,
+      autoLoop: false,
       port: 0,
     });
 
@@ -70,6 +79,7 @@ describe("S5 PATH Build product surface", () => {
     expect(html).toMatch(/PATH Build/);
     expect(html).toMatch(/What do you want to build|inventory/i);
     expect(html).not.toMatch(/\/build help/);
+    expect(html).not.toMatch(/Engines use your real PATH fabric/);
 
     const css = await fetch(new URL("/assets/app.css", surface.url));
     expect(css.status).toBe(200);
@@ -90,6 +100,8 @@ describe("S5 PATH Build product surface", () => {
     expect(existsSync(join(targetDir, ".git"))).toBe(true);
     expect(body.view.phase).not.toBe("idle");
     expect(body.view.projectRoot).toBeTruthy();
+    expect(canon(body.view.projectRoot)).toBe(canon(targetDir));
+    expect(body.view.criteria?.length || 0).toBeGreaterThan(0);
 
     const latest = await fetch(new URL("/api/builds/latest", surface.url));
     const view = await latest.json();

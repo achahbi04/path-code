@@ -1,6 +1,6 @@
 /**
- * PATH Build — localhost product surface server.
- * Drives createBuildController over Gateway. Not PATH Code. Not Studio.
+ * PATH Build — localhost visual builder surface.
+ * Drives createBuildController over Gateway + product runtime/preview.
  */
 
 import { createServer } from "node:http";
@@ -24,6 +24,14 @@ import {
   listBuildRecords,
 } from "../index.mjs";
 import { projectBuildForSurface } from "./product-view.mjs";
+import { createBuildRuntimeManager } from "../runtime/manager.mjs";
+import { detectBuildArtifact } from "../runtime/artifact.mjs";
+import {
+  proxyPreviewHttp,
+  proxyPreviewWs,
+} from "../runtime/proxy.mjs";
+import { captureBrowserEvidence } from "../runtime/browser-evidence.mjs";
+import { deriveProductBrief } from "../brief.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(HERE, "public");
@@ -110,6 +118,7 @@ function sendFile(res, filePath) {
  *   openBrowser?: boolean,
  *   preferredEngine?: string | null,
  *   fakeMode?: boolean,
+ *   autoLoop?: boolean,
  * }} options
  */
 export async function startPathBuildSurface(options) {
@@ -124,11 +133,14 @@ export async function startPathBuildSurface(options) {
     options.fakeMode === true ||
     process.env.PATHCODE_BUILD_FAKE === "1" ||
     process.env.PATHCODE_GATEWAY_FAKE_ENGINE === "1";
+  const autoLoop = options.autoLoop !== false;
 
   const gatewayRuntime = createGatewayRuntime({
     packageRoot,
     runtimeRoot,
   });
+
+  const runtimeManager = createBuildRuntimeManager({ runtimeRoot });
 
   /** @type {ReturnType<typeof createBuildController>} */
   const controller = createBuildController({
@@ -156,26 +168,53 @@ export async function startPathBuildSurface(options) {
 
   /**
    * @param {string} buildId
+   * @param {{ autoPreview?: boolean }} [opts]
    */
-  function ensureLoop(buildId) {
+  function ensureLoop(buildId, opts = {}) {
     if (loops.has(buildId)) return;
     const startedAt = new Date().toISOString();
     const promise = controller
       .runUntilDone(buildId, { maxSteps: 48 })
+      .then(async (result) => {
+        if (opts.autoPreview !== false) {
+          await maybeStartPreview(buildId);
+        }
+        return result;
+      })
       .catch((err) => ({
         ok: false,
         message: err instanceof Error ? err.message : String(err),
-      }))
-      .finally(() => {
-        // keep entry until replaced so UI can see last run
-      });
+      }));
     loops.set(buildId, { promise, startedAt });
+  }
+
+  /**
+   * @param {string} buildId
+   */
+  async function maybeStartPreview(buildId) {
+    const build = readBuildRecord(runtimeRoot, buildId);
+    const root = build?.projectBindings?.[0]?.projectRoot;
+    if (!root || !existsSync(root)) return null;
+    const artifact = detectBuildArtifact(root, {
+      outcomeHint: build?.intent?.outcome,
+    });
+    if (artifact.preview.capability !== "web") return null;
+    // Need some product files before starting
+    if ((artifact.signals || []).includes("empty_tree")) return null;
+    try {
+      return await runtimeManager.start(buildId, root, {
+        bindingId: build.projectBindings[0].bindingId,
+        outcomeHint: build.intent?.outcome,
+      });
+    } catch {
+      return null;
+    }
   }
 
   /**
    * @param {string} [buildId]
    */
-  function viewFor(buildId) {
+  async function viewFor(buildId) {
     let id = buildId || "";
     if (!id) {
       const latest =
@@ -185,7 +224,42 @@ export async function startPathBuildSurface(options) {
       id = latest?.buildId || "";
     }
     const build = id ? readBuildRecord(runtimeRoot, id) : null;
-    const view = projectBuildForSurface(build);
+    const root = build?.projectBindings?.[0]?.projectRoot || null;
+    const artifact =
+      root && existsSync(root)
+        ? detectBuildArtifact(root, { outcomeHint: build?.intent?.outcome })
+        : null;
+    const inspected = id ? await runtimeManager.inspect(id) : { runtime: null };
+    let preview = id ? runtimeManager.getPreviewDescriptor(id) : null;
+
+    // Opportunistic preview start when product tree exists and runtime idle
+    if (
+      id &&
+      root &&
+      artifact?.preview?.capability === "web" &&
+      !(artifact.signals || []).includes("empty_tree") &&
+      (!inspected.runtime ||
+        inspected.runtime.status === "stopped" ||
+        inspected.runtime.status === "stale" ||
+        inspected.runtime.status === "idle" ||
+        inspected.runtime.status === "unavailable")
+    ) {
+      const last = (build?.children || []).slice(-1)[0];
+      const engineered =
+        (build?.children || []).some((c) => c.kind === "engineer") ||
+        artifact.kind === "web";
+      if (engineered && last?.dispatchState !== "dispatched") {
+        // fire-and-forget; next poll picks it up
+        void maybeStartPreview(id);
+      }
+    }
+
+    preview = id ? runtimeManager.getPreviewDescriptor(id) : preview;
+    const view = projectBuildForSurface(build, {
+      preview,
+      runtime: inspected.runtime,
+      artifact,
+    });
     const loop = id ? loops.get(id) : null;
     return {
       ...view,
@@ -195,12 +269,49 @@ export async function startPathBuildSurface(options) {
     };
   }
 
+  /**
+   * @param {string} buildId
+   */
+  function assertBuildRoot(buildId) {
+    const build = readBuildRecord(runtimeRoot, buildId);
+    if (!build) return { ok: false, code: "BUILD_NOT_FOUND" };
+    const binding = build.projectBindings?.[0];
+    if (!binding?.projectRoot) {
+      return { ok: false, code: "NO_PROJECT_ROOT", build };
+    }
+    return { ok: true, build, binding, projectRoot: binding.projectRoot };
+  }
+
   const server = createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://${host}`);
     const path = url.pathname;
     const method = req.method || "GET";
 
     try {
+      // Preview proxy (same-origin embed)
+      const previewMatch = path.match(/^\/preview\/([^/]+)(?:\/(.*))?$/);
+      if (previewMatch && (method === "GET" || method === "HEAD" || method === "POST")) {
+        const buildId = decodeURIComponent(previewMatch[1]);
+        const live = runtimeManager.getLiveTarget(buildId);
+        const desc = runtimeManager.getPreviewDescriptor(buildId);
+        const targetUrl = live?.url || desc?.url;
+        if (!targetUrl) {
+          sendJson(res, 503, {
+            ok: false,
+            code: "PREVIEW_UNAVAILABLE",
+            message: "Product runtime is not ready yet.",
+          });
+          return;
+        }
+        const stripPrefix = `/preview/${encodeURIComponent(buildId)}`;
+        proxyPreviewHttp(req, res, {
+          targetUrl,
+          buildId,
+          stripPrefix,
+        });
+        return;
+      }
+
       if (method === "GET" && (path === "/" || path === "/index.html")) {
         sendFile(res, join(PUBLIC_DIR, "index.html"));
         return;
@@ -223,7 +334,7 @@ export async function startPathBuildSurface(options) {
       }
 
       if (method === "GET" && path === "/api/builds/latest") {
-        sendJson(res, 200, viewFor());
+        sendJson(res, 200, await viewFor());
         return;
       }
 
@@ -236,16 +347,18 @@ export async function startPathBuildSurface(options) {
             status: b.loop?.status,
             outcome: b.intent?.outcome,
             projectRoot: b.projectBindings?.[0]?.projectRoot || null,
+            originKind: b.originKind || b.projectBindings?.[0]?.originKind || null,
             updatedAt: b.updatedAt,
           })),
         });
         return;
       }
 
-      const buildMatch = path.match(/^\/api\/builds\/([^/]+)(?:\/([^/]+))?$/);
+      const buildMatch = path.match(/^\/api\/builds\/([^/]+)(?:\/([^/]+)(?:\/([^/]+))?)?$/);
       if (buildMatch) {
         const buildId = decodeURIComponent(buildMatch[1]);
         const action = buildMatch[2] || "";
+        const sub = buildMatch[3] || "";
 
         if (method === "GET" && !action) {
           const build = readBuildRecord(runtimeRoot, buildId);
@@ -253,7 +366,7 @@ export async function startPathBuildSurface(options) {
             sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
             return;
           }
-          sendJson(res, 200, viewFor(buildId));
+          sendJson(res, 200, await viewFor(buildId));
           return;
         }
 
@@ -263,70 +376,205 @@ export async function startPathBuildSurface(options) {
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
           });
-          const push = () => {
-            const payload = JSON.stringify(viewFor(buildId));
+          const push = async () => {
+            const payload = JSON.stringify(await viewFor(buildId));
             res.write(`data: ${payload}\n\n`);
           };
-          push();
-          const timer = setInterval(push, 1200);
+          await push();
+          const timer = setInterval(() => {
+            void push();
+          }, 1200);
           req.on("close", () => clearInterval(timer));
           return;
         }
 
         if (method === "POST" && action === "tick") {
           const step = await controller.tick(buildId);
+          if (step.ok) await maybeStartPreview(buildId);
           sendJson(res, step.ok ? 200 : 400, {
             ...step,
-            view: viewFor(buildId),
+            view: await viewFor(buildId),
           });
           return;
         }
 
-        if (method === "POST" && action === "run") {
-          ensureLoop(buildId);
-          sendJson(res, 200, { ok: true, view: viewFor(buildId) });
+        if (method === "POST" && action === "message") {
+          const body = await readJsonBody(req);
+          const applied = await controller.applyConversation(buildId, {
+            message: String(body.message || ""),
+            element: body.element || null,
+          });
+          if (applied.ok) {
+            loops.delete(buildId);
+            ensureLoop(buildId);
+          }
+          sendJson(res, applied.ok ? 200 : 400, {
+            ...applied,
+            view: await viewFor(buildId),
+          });
           return;
         }
 
-        if (method === "POST" && (action === "steer" || action === "require")) {
+        if (method === "POST" && action === "steer") {
+          // Back-compat — prefer /message
           const body = await readJsonBody(req);
-          const text = String(body.text || body.statement || "").trim();
-          if (!text) {
-            sendJson(res, 400, {
-              ok: false,
-              code: "TEXT_REQUIRED",
-              message: "Provide text for steer/require.",
+          const text = String(body.text || body.message || "").trim();
+          const applied = await controller.applyConversation(buildId, {
+            message: text,
+            element: body.element || null,
+          });
+          if (applied.ok) {
+            loops.delete(buildId);
+            ensureLoop(buildId);
+          }
+          sendJson(res, applied.ok ? 200 : 400, {
+            ...applied,
+            view: await viewFor(buildId),
+          });
+          return;
+        }
+
+        // Runtime APIs
+        if (action === "runtime") {
+          const gate = assertBuildRoot(buildId);
+          if (!gate.ok) {
+            sendJson(res, 404, gate);
+            return;
+          }
+
+          if (method === "GET" && !sub) {
+            const inspected = await runtimeManager.inspect(buildId);
+            sendJson(res, 200, {
+              ok: true,
+              runtime: inspected.runtime,
+              preview: runtimeManager.getPreviewDescriptor(buildId),
+              artifact: detectBuildArtifact(gate.projectRoot, {
+                outcomeHint: gate.build.intent?.outcome,
+              }),
             });
             return;
           }
-          const revised =
-            action === "require"
-              ? await controller.reviseIntent(buildId, {
-                  addRequirements: [{ statement: text }],
-                })
-              : await controller.reviseIntent(buildId, { outcome: text });
-          if (revised.ok) ensureLoop(buildId);
-          sendJson(res, revised.ok ? 200 : 400, {
-            ...revised,
-            view: viewFor(buildId),
-          });
-          return;
+
+          if (method === "POST" && sub === "start") {
+            const started = await runtimeManager.start(
+              buildId,
+              gate.projectRoot,
+              {
+                bindingId: gate.binding.bindingId,
+                outcomeHint: gate.build.intent?.outcome,
+                forceRestart: false,
+              },
+            );
+            sendJson(res, started.ok ? 200 : 400, {
+              ...started,
+              view: await viewFor(buildId),
+            });
+            return;
+          }
+
+          if (method === "POST" && sub === "restart") {
+            const started = await runtimeManager.refresh(
+              buildId,
+              gate.projectRoot,
+              {
+                bindingId: gate.binding.bindingId,
+                outcomeHint: gate.build.intent?.outcome,
+              },
+            );
+            sendJson(res, started.ok ? 200 : 400, {
+              ...started,
+              view: await viewFor(buildId),
+            });
+            return;
+          }
+
+          if (method === "POST" && sub === "evidence") {
+            const preview = runtimeManager.getPreviewDescriptor(buildId);
+            if (!preview?.url) {
+              sendJson(res, 400, {
+                ok: false,
+                code: "NO_PREVIEW_URL",
+              });
+              return;
+            }
+            const brief = gate.build.productBrief || deriveProductBrief(gate.build.intent?.outcome || "");
+            const expectText = (brief.acceptanceCriteria || [])
+              .map((c) => c.statement)
+              .slice(0, 6);
+            // Prefer short product tokens from outcome
+            const tokens = String(gate.build.intent?.outcome || "")
+              .split(/\s+/)
+              .filter((w) => w.length > 3)
+              .slice(0, 8);
+            const evidence = await captureBrowserEvidence({
+              url: preview.url,
+              buildId,
+              runtimeRoot,
+              expectText: [...tokens, ...expectText].slice(0, 10),
+            });
+            sendJson(res, 200, { ok: evidence.ok, evidence });
+            return;
+          }
+
+          if (method === "DELETE" && !sub) {
+            const stopped = await runtimeManager.stop(buildId);
+            sendJson(res, 200, { ...stopped, view: await viewFor(buildId) });
+            return;
+          }
         }
       }
 
       if (method === "POST" && path === "/api/open-folder") {
         const body = await readJsonBody(req);
-        const dir =
+        let dir =
           typeof body.path === "string" && body.path.trim()
             ? resolve(body.path.trim())
             : "";
+        // Prefer authoritative build binding when buildId provided
+        if (typeof body.buildId === "string" && body.buildId.trim()) {
+          const gate = assertBuildRoot(body.buildId.trim());
+          if (gate.ok) dir = gate.projectRoot;
+        }
         if (!dir || !existsSync(dir)) {
           sendJson(res, 400, { ok: false, code: "PATH_REQUIRED" });
           return;
         }
         try {
           spawn("open", [dir], { detached: true, stdio: "ignore" }).unref();
-          sendJson(res, 200, { ok: true });
+          sendJson(res, 200, { ok: true, path: dir });
+        } catch (err) {
+          sendJson(res, 500, {
+            ok: false,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (method === "POST" && path === "/api/open-code") {
+        const body = await readJsonBody(req);
+        const gate =
+          typeof body.buildId === "string" && body.buildId.trim()
+            ? assertBuildRoot(body.buildId.trim())
+            : null;
+        const dir = gate?.ok
+          ? gate.projectRoot
+          : typeof body.path === "string"
+            ? resolve(body.path)
+            : "";
+        if (!dir || !existsSync(dir)) {
+          sendJson(res, 400, { ok: false, code: "PATH_REQUIRED" });
+          return;
+        }
+        const launcher = join(packageRoot, "scripts", "pathcode.mjs");
+        try {
+          spawn(process.execPath, [launcher], {
+            cwd: dir,
+            detached: true,
+            stdio: "ignore",
+            env: { ...process.env },
+          }).unref();
+          sendJson(res, 200, { ok: true, path: dir });
         } catch (err) {
           sendJson(res, 500, {
             ok: false,
@@ -348,6 +596,11 @@ export async function startPathBuildSurface(options) {
           return;
         }
 
+        const originKind =
+          body.originKind === "existing-project"
+            ? "existing-project"
+            : "build-created";
+
         let targetDir =
           typeof body.targetDir === "string" && body.targetDir.trim()
             ? resolve(body.targetDir.trim())
@@ -364,30 +617,47 @@ export async function startPathBuildSurface(options) {
 
         const started = await controller.startBuild(outcome, {
           targetDir,
-          initialCriteria: [
-            {
-              id: "c-runnable",
-              statement:
-                "Core software is runnable with project-native checks",
-              required: true,
-            },
-            {
-              id: "c-outcome",
-              statement: "Software advances the stated outcome",
-              required: true,
-            },
-          ],
+          originKind,
+          // Criteria come from product brief inside startBuild.
         });
         if (!started.ok) {
           sendJson(res, 400, started);
           return;
         }
-        ensureLoop(started.build.buildId);
+
+        // Hard invariant for build-created (canonicalize for macOS /var vs /private/var)
+        const { realpathSync } = await import("node:fs");
+        const canon = (p) => {
+          try {
+            return realpathSync(p);
+          } catch {
+            return resolve(p);
+          }
+        };
+        if (
+          originKind === "build-created" &&
+          canon(started.projectRoot) !== canon(targetDir)
+        ) {
+          sendJson(res, 500, {
+            ok: false,
+            code: "BINDING_ROOT_MISMATCH",
+            message: `Bound ${started.projectRoot} != target ${targetDir}`,
+          });
+          return;
+        }
+
+        // Defer loop so HTTP response returns immediately (tests + UX).
+        if (autoLoop) {
+          setImmediate(() =>
+            ensureLoop(started.build.buildId, { autoPreview: true }),
+          );
+        }
         sendJson(res, 200, {
           ok: true,
           buildId: started.build.buildId,
           projectRoot: started.projectRoot,
-          view: viewFor(started.build.buildId),
+          originKind,
+          view: await viewFor(started.build.buildId),
         });
         return;
       }
@@ -399,6 +669,31 @@ export async function startPathBuildSurface(options) {
         code: "SURFACE_ERROR",
         message: err instanceof Error ? err.message : String(err),
       });
+    }
+  });
+
+  server.on("upgrade", (req, socket, head) => {
+    try {
+      const url = new URL(req.url || "/", `http://${host}`);
+      const previewMatch = url.pathname.match(/^\/preview\/([^/]+)/);
+      if (!previewMatch) {
+        socket.destroy();
+        return;
+      }
+      const buildId = decodeURIComponent(previewMatch[1]);
+      const live = runtimeManager.getLiveTarget(buildId);
+      const targetUrl = live?.url;
+      if (!targetUrl) {
+        socket.destroy();
+        return;
+      }
+      proxyPreviewWs(req, socket, head, { targetUrl });
+    } catch {
+      try {
+        socket.destroy();
+      } catch {
+        /* ignore */
+      }
     }
   });
 
@@ -445,9 +740,12 @@ export async function startPathBuildSurface(options) {
     server,
     runtimeRoot,
     fakeMode,
-    stop: () =>
-      new Promise((resolveStop) => {
+    runtimeManager,
+    stop: async () => {
+      await runtimeManager.stopAll();
+      await new Promise((resolveStop) => {
         server.close(() => resolveStop());
-      }),
+      });
+    },
   };
 }

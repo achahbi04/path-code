@@ -1,31 +1,44 @@
 /**
- * PATH Build — human product projection (not terminal/CLI language).
+ * PATH Build — human product projection for the visual builder workspace.
  */
 
 /**
  * @param {import('../types.mjs').BuildRecord | null | undefined} build
+ * @param {{
+ *   preview?: object | null,
+ *   runtime?: object | null,
+ *   artifact?: object | null,
+ *   uiState?: string | null,
+ * }} [extras]
  */
-export function projectBuildForSurface(build) {
+export function projectBuildForSurface(build, extras = {}) {
   if (!build || typeof build !== "object") {
     return {
-      ok: false,
+      ok: true,
       phase: "idle",
+      uiState: "idle",
       headline: "What do you want to build?",
       detail:
-        "Describe the product in plain language. PATH Build will create a project and engineer toward that outcome.",
+        "Describe the product in plain language. PATH Build will create it and show it live.",
       buildId: null,
       status: null,
       outcome: "",
       projectRoot: null,
       originGitInit: false,
+      originKind: null,
       progressLabel: null,
       requirements: [],
       criteria: [],
       children: [],
+      conversation: [],
       proposedNext: null,
       blockedReason: null,
       complete: false,
       canSteer: false,
+      preview: null,
+      runtime: null,
+      artifact: null,
+      activity: [],
       handoff: null,
     };
   }
@@ -37,108 +50,168 @@ export function projectBuildForSurface(build) {
   const projectRoot = binding?.projectRoot || null;
   const kids = Array.isArray(build.children) ? build.children : [];
   const last = kids.length ? kids[kids.length - 1] : null;
+  const preview = extras.preview || null;
+  const runtime = extras.runtime || null;
+  const artifact = extras.artifact || null;
 
   /** @type {string} */
   let phase = "running";
   /** @type {string} */
+  let uiState = "building";
+  /** @type {string} */
   let headline = "Building your product…";
   /** @type {string} */
-  let detail = "PATH is establishing architecture and working toward your outcome.";
+  let detail = "PATH is engineering toward your outcome.";
   /** @type {string | null} */
-  let progressLabel = null;
+  let progressLabel = "Building…";
 
   if (complete) {
     phase = "complete";
-    headline = "Build complete";
-    detail =
-      "The product loop finished against your outcome and requirements. You can open the project folder or continue engineering in PATH Code.";
-    progressLabel = "Done";
+    uiState = "ready";
+    headline = "Ready";
+    detail = "Your product is running. Keep chatting to change it.";
+    progressLabel = "Ready";
   } else if (blocked) {
     phase = "blocked";
-    headline = "Build needs your input";
+    uiState = "error";
+    headline = "Needs your input";
     detail =
       build.loop?.blockedReason ||
-      "PATH could not advance honestly. Adjust the outcome or add a requirement, then continue.";
+      "PATH could not advance honestly. Adjust the request and continue.";
     progressLabel = "Blocked";
+  } else if (runtime?.status === "failed" || runtime?.status === "unhealthy") {
+    phase = "runtime_error";
+    uiState = "error";
+    headline = "Preview failed";
+    detail = runtime.error || runtime.reason || "Could not start the product runtime.";
+    progressLabel = "Error";
+  } else if (preview?.status === "ready" || runtime?.status === "ready") {
+    phase = "preview";
+    uiState = last?.dispatchState === "dispatched" ? "applying" : "ready";
+    headline = uiState === "applying" ? "Applying changes…" : "Live preview";
+    detail =
+      uiState === "applying"
+        ? "Engineering is updating the product. Preview will refresh when ready."
+        : "Interact with the live product. Chat to request changes.";
+    progressLabel = uiState === "applying" ? "Applying changes…" : "Ready";
   } else if (!kids.length) {
     phase = "starting";
+    uiState = "building";
     headline = "Starting your build";
-    detail = binding?.originGitInit
-      ? "Created a fresh project (git init only). First engineer turn will establish the architecture."
-      : "Bound to your project. First engineer turn is about to begin.";
-    progressLabel = "Starting";
+    detail =
+      binding?.originKind === "build-created" || binding?.originGitInit
+        ? "Created a fresh project. First engineering pass is establishing the product."
+        : "Bound to your project. First engineering pass is about to begin.";
+    progressLabel = "Building…";
   } else if (last) {
     const kind = String(last.kind || "");
     const ds = String(last.dispatchState || "");
     if (kind === "engineer") {
       phase = "engineering";
+      uiState = ds === "dispatched" || ds === "selected" ? "building" : "checking";
       headline =
         ds === "dispatched" || ds === "selected"
-          ? "Engineering the product"
-          : "Engineering pass finished";
-      detail =
-        "A real engine is implementing toward your outcome — not a template scaffold.";
-      progressLabel = "Engineering";
+          ? "Building…"
+          : "Checking…";
+      detail = "A real engine is implementing toward your outcome.";
+      progressLabel = headline;
     } else if (kind === "evaluate") {
       phase = "evaluating";
-      headline = "Checking the product";
-      detail = "Independent evaluation against your outcome and criteria.";
-      progressLabel = "Evaluating";
+      uiState = "checking";
+      headline = "Checking…";
+      detail = "Verifying the product against your outcome.";
+      progressLabel = "Checking…";
     } else if (kind === "challenge") {
       phase = "challenging";
-      headline = "Stress-testing claims";
-      detail = "Challenge pass looks for gaps before PATH calls the build done.";
-      progressLabel = "Challenging";
-    } else {
-      progressLabel = kind || "Working";
-    }
-    if (last.classification) {
-      detail = `${detail} Latest result: ${last.classification}.`;
+      uiState = "checking";
+      headline = "Checking…";
+      detail = "Challenge pass is trying to falsify completion claims.";
+      progressLabel = "Checking…";
     }
   }
 
-  if (build.hypotheses?.proposedNextAction && !complete) {
-    detail = `${detail} Next: ${build.hypotheses.proposedNextAction}`;
-  }
+  const conversation = Array.isArray(build.conversation)
+    ? build.conversation.map((m) => ({
+        id: m.id,
+        role: m.role,
+        text: m.text,
+        at: m.at,
+        kind: m.kind || null,
+      }))
+    : [
+        {
+          id: "outcome",
+          role: "user",
+          text: build.intent?.outcome || "",
+          at: build.createdAt,
+          kind: "outcome",
+        },
+      ];
+
+  const activity = kids.slice(-12).map((c) => ({
+    kind: c.kind,
+    taskId: c.taskId,
+    dispatchState: c.dispatchState,
+    classification: c.classification || null,
+    at: c.consumedAt || c.dispatchedAt || c.selectedAt || null,
+  }));
 
   return {
     ok: true,
     phase,
+    uiState,
     headline,
     detail,
+    progressLabel,
     buildId: build.buildId,
     status,
-    outcome: String(build.intent?.outcome || ""),
+    outcome: build.intent?.outcome || "",
     outcomeRevision: build.intent?.outcomeRevision || 1,
     projectRoot,
-    originGitInit: binding?.originGitInit === true,
-    progressLabel,
+    originGitInit: Boolean(binding?.originGitInit),
+    originKind: binding?.originKind || build.originKind || null,
+    productBranch: build.productBranch || null,
     requirements: (build.intent?.explicitRequirements || []).map((r) => ({
       id: r.id,
       statement: r.statement,
       status: r.status,
+      required: r.required,
     })),
     criteria: (build.outcomeCriteria || []).map((c) => ({
       id: c.id,
       statement: c.statement,
       status: c.status,
-      required: c.required !== false,
+      required: c.required,
+      source: c.source || null,
     })),
-    children: kids.slice(-12).map((c) => ({
-      kind: c.kind,
-      state: c.dispatchState,
-      classification: c.classification || null,
-      taskId: c.taskId,
-    })),
+    children: activity,
+    conversation,
+    activity,
     proposedNext: build.hypotheses?.proposedNextAction || null,
     blockedReason: build.loop?.blockedReason || null,
     complete,
-    canSteer: !complete,
+    canSteer: !blocked,
+    preview,
+    runtime,
+    artifact: artifact
+      ? {
+          kind: artifact.kind,
+          framework: artifact.framework,
+          signals: artifact.signals || [],
+        }
+      : null,
+    productBrief: build.productBrief
+      ? {
+          productKind: build.productBrief.productKind,
+          capabilityCount: (build.productBrief.capabilities || []).length,
+          criteriaCount: (build.productBrief.acceptanceCriteria || []).length,
+        }
+      : null,
     handoff: projectRoot
       ? {
           projectRoot,
-          codeHint: `cd ${JSON.stringify(projectRoot)} && node <path-to-checkout>/scripts/pathcode.mjs`,
           openFolderHint: `open ${JSON.stringify(projectRoot)}`,
+          codeHint: `cd ${JSON.stringify(projectRoot)} && pathcode`,
         }
       : null,
   };

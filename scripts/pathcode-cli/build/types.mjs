@@ -34,14 +34,40 @@
  * @property {string} [challengedByTaskId]
  * @property {string} [updatedAt]
  *
+ * @typedef {'build-created'|'existing-project'} OriginKind
+ *
  * @typedef {object} ProjectBinding
  * @property {string} bindingId
  * @property {string} projectRoot
  * @property {string} [roleHint]
  * @property {string} [createdByTaskId]
  * @property {boolean} [originGitInit]
+ * @property {OriginKind} [originKind]
  * @property {string} [activeWorktreePath] Latest engineer task worktree when distinct from projectRoot
  * @property {string} [activeTaskBranch] Task branch carrying unmerged engineer commits (e.g. README)
+ *
+ * @typedef {object} ConversationMessage
+ * @property {string} id
+ * @property {'user'|'assistant'|'system'} role
+ * @property {string} text
+ * @property {string} at
+ * @property {object} [element]
+ * @property {string} [kind]
+ *
+ * @typedef {object} BuildArtifact
+ * @property {string} bindingId
+ * @property {string} projectRoot
+ * @property {'web'|'api'|'cli'|'desktop'|'mobile'|'service'|'multi_service'|'unknown'} kind
+ * @property {string|null} framework
+ * @property {string|null} packageManager
+ * @property {string|null} startCommand
+ * @property {string|null} devCommand
+ * @property {string[]} testCommands
+ * @property {string|null} buildCommand
+ * @property {{ capability: string, mode: string, url?: string|null, port?: number|null, status: string }} preview
+ * @property {{ status: string, processId?: string|null, startedAt?: string|null, health?: string|null }} runtime
+ * @property {string} [detectedAt]
+ * @property {string[]} [signals]
  *
  * @typedef {object} BuildChild
  * @property {string} taskId
@@ -91,6 +117,10 @@
  * @property {ProjectBinding[]} projectBindings
  * @property {BuildChild[]} children
  * @property {BuildLoop} loop
+ * @property {OriginKind} [originKind]
+ * @property {object} [productBrief]
+ * @property {ConversationMessage[]} [conversation]
+ * @property {string} [productBranch]
  * @property {string} createdAt
  * @property {string} updatedAt
  */

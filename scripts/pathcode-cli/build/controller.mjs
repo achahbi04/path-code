@@ -220,20 +220,67 @@ export function createBuildController(opts) {
       explicitRequirements: options.explicitRequirements || [],
     });
 
-    if (Array.isArray(options.initialCriteria)) {
-      record.outcomeCriteria = options.initialCriteria.map((c, i) => ({
+    const originKind =
+      options.originKind === "existing-project"
+        ? "existing-project"
+        : "build-created";
+    record.originKind = originKind;
+
+    // Product brief → concrete acceptance criteria (not only c-runnable/c-outcome).
+    const { deriveProductBrief, briefToOutcomeCriteria } = await import(
+      "./brief.mjs"
+    );
+    const brief = deriveProductBrief(String(outcome || ""), {});
+    record.productBrief = brief;
+
+    if (Array.isArray(options.initialCriteria) && options.initialCriteria.length) {
+      // Caller-supplied criteria merge with derived; derived fills gaps.
+      const now = new Date().toISOString();
+      const fromCaller = options.initialCriteria.map((c, i) => ({
         id: c.id || `c-${i + 1}`,
         statement: String(c.statement || "").slice(0, 2_000),
         required: c.required !== false,
         status: /** @type {const} */ ("UNKNOWN"),
         evidence: [],
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
+        source: "caller",
       }));
+      const derived = briefToOutcomeCriteria(brief);
+      const byId = new Map(fromCaller.map((c) => [c.id, c]));
+      for (const d of derived) {
+        if (!byId.has(d.id)) byId.set(d.id, d);
+      }
+      // Prefer derived set when caller only passed the legacy two generics.
+      record.outcomeCriteria =
+        fromCaller.length <= 2 ? derived : [...byId.values()];
+    } else {
+      record.outcomeCriteria = briefToOutcomeCriteria(brief);
     }
 
+    record.conversation = [
+      {
+        id: `msg-${randomUUID().slice(0, 8)}`,
+        role: "user",
+        text: String(outcome || "").trim(),
+        at: new Date().toISOString(),
+      },
+    ];
+
     let projectRoot = options.targetDir;
-    if (!isBindableProject(projectRoot)) {
-      const origin = ensureBuildOrigin({ targetDir: projectRoot });
+    if (originKind === "build-created") {
+      // Exact-root Build origin — never upward-discover $HOME.
+      const origin = ensureBuildOrigin({
+        targetDir: projectRoot,
+        exactRoot: true,
+      });
+      if (!origin.ok) return origin;
+      record.projectBindings.push(origin.binding);
+      projectRoot = origin.binding.projectRoot;
+    } else if (!isBindableProject(projectRoot)) {
+      const origin = ensureBuildOrigin({
+        targetDir: projectRoot,
+        exactRoot: false,
+      });
       if (!origin.ok) return origin;
       record.projectBindings.push(origin.binding);
       projectRoot = origin.binding.projectRoot;
@@ -251,6 +298,7 @@ export function createBuildController(opts) {
         bindingId: `bind-${randomUUID().slice(0, 8)}`,
         projectRoot: discovered.projectRoot,
         originGitInit: false,
+        originKind: "existing-project",
       });
       projectRoot = discovered.projectRoot;
     }
@@ -264,9 +312,10 @@ export function createBuildController(opts) {
       "origin established — first engineer establishes architecture",
     ];
     record.loop.pendingReinspect = false;
+    record.productBranch = `path-build/${record.buildId.slice(0, 8)}`;
 
     writeBuildRecord(runtimeRoot, record);
-    return { ok: true, build: record, projectRoot };
+    return { ok: true, build: record, projectRoot, originKind };
   }
 
   /**
@@ -1183,12 +1232,91 @@ export function createBuildController(opts) {
   }
 
   /**
+   * Conversation-first product control — classifies free text into Build semantics.
+   * @param {string} buildId
+   * @param {{
+   *   message: string,
+   *   element?: object | null,
+   * }} input
+   */
+  async function applyConversation(buildId, input) {
+    const { classifyConversationMessage } = await import("./conversation.mjs");
+    const record = readBuildRecord(runtimeRoot, buildId);
+    if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    const text = String(input.message || "").trim();
+    if (!text) return { ok: false, code: "MESSAGE_REQUIRED" };
+
+    const classified = classifyConversationMessage(text, {
+      hasSelection: Boolean(input.element),
+    });
+    if (!Array.isArray(record.conversation)) record.conversation = [];
+    record.conversation.push({
+      id: `msg-${randomUUID().slice(0, 8)}`,
+      role: "user",
+      text,
+      at: new Date().toISOString(),
+      kind: classified.kind,
+      element: input.element || undefined,
+    });
+    record.hypotheses.proposedNextAction = classified.engineerObjectiveHint;
+    writeBuildRecord(runtimeRoot, record);
+
+    /** @type {{ outcome?: string, addRequirements?: Array<{ statement: string }>, note?: string, demoteAll?: boolean }} */
+    const revision = {
+      note: [
+        classified.steerNote,
+        input.element
+          ? `Selected element: ${JSON.stringify(input.element).slice(0, 1_500)}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      demoteAll: true,
+    };
+    if (classified.kind === "revise_outcome" && classified.outcomePatch) {
+      revision.outcome = classified.outcomePatch;
+    }
+    if (classified.kind === "requirement" && classified.requirement) {
+      revision.addRequirements = [{ statement: classified.requirement }];
+    }
+
+    const revised = await reviseIntent(buildId, revision);
+    if (!revised.ok) return revised;
+
+    const after = readBuildRecord(runtimeRoot, buildId);
+    if (after) {
+      if (!Array.isArray(after.conversation)) after.conversation = [];
+      after.conversation.push({
+        id: `msg-${randomUUID().slice(0, 8)}`,
+        role: "assistant",
+        text:
+          classified.kind === "change" || classified.kind === "correction"
+            ? "Applying that change to the live product…"
+            : classified.kind === "requirement"
+              ? "Recorded as a hard requirement and continuing engineering…"
+              : "Updating the product direction…",
+        at: new Date().toISOString(),
+        kind: classified.kind,
+      });
+      after.hypotheses.proposedNextAction = classified.engineerObjectiveHint;
+      writeBuildRecord(runtimeRoot, after);
+    }
+
+    return {
+      ok: true,
+      classified,
+      build: readBuildRecord(runtimeRoot, buildId),
+    };
+  }
+
+  /**
    * Product-level steering — revise intent.
    * @param {string} buildId
    * @param {{
    *   outcome?: string,
    *   addRequirements?: Array<{ statement: string, id?: string }>,
    *   note?: string,
+   *   demoteAll?: boolean,
    * }} revision
    */
   async function reviseIntent(buildId, revision) {
@@ -1234,10 +1362,11 @@ export function createBuildController(opts) {
       .slice(0, 4_000);
     record.hypotheses.updatedAt = now;
 
-    // Outcome text change → demote criteria (product meaning changed).
-    // New requirements start UNKNOWN; do NOT silently weaken prior SATISFIED
-    // requirements that were not revised.
-    if (typeof revision.outcome === "string" && revision.outcome.trim()) {
+    // Outcome text change OR demoteAll (conversation change) → demote criteria.
+    if (
+      revision.demoteAll ||
+      (typeof revision.outcome === "string" && revision.outcome.trim())
+    ) {
       for (const c of record.outcomeCriteria || []) {
         if (c.status === "PROVEN") {
           c.status = "UNKNOWN";
@@ -1283,6 +1412,7 @@ export function createBuildController(opts) {
 
   return {
     startBuild,
+    applyConversation,
     load,
     recover,
     runDepthA,

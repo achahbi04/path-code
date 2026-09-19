@@ -14,7 +14,13 @@ export {
   resolveBuildsDir,
 } from "./record.mjs";
 
-export { ensureBuildOrigin, isBindableProject } from "./origin.mjs";
+export { ensureBuildOrigin, isBindableProject, hasGitDir } from "./origin.mjs";
+
+export { deriveProductBrief, briefToOutcomeCriteria, inferProductKind } from "./brief.mjs";
+export { classifyConversationMessage } from "./conversation.mjs";
+export { detectBuildArtifact, resolveArtifactStartPlan } from "./runtime/artifact.mjs";
+export { createBuildRuntimeManager } from "./runtime/manager.mjs";
+export { captureBrowserEvidence } from "./runtime/browser-evidence.mjs";
 
 export {
   captureBindingReality,

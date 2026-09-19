@@ -1,14 +1,13 @@
 /**
  * S5 — greenfield origin: directory + git init only (no scaffolds).
+ * Build-created roots bind the EXACT target directory — never walk to $HOME.
  */
 
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import {
-  resolveTargetProjectRoot,
-} from "../paths.mjs";
+import { resolveTargetProjectRoot } from "../paths.mjs";
 import { admitPrimaryCheckout } from "../ag1/admission.mjs";
 
 /**
@@ -25,12 +24,28 @@ function git(cwd, args) {
 }
 
 /**
+ * @param {string} p
+ */
+function realpathOrResolve(p) {
+  try {
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
+  }
+}
+
+/**
  * Ensure a Build-origin project root: mkdir + git init only.
  * Architecture is left to the first engineer task.
+ *
+ * When exactRoot is true (Build-created), projectRoot is ALWAYS the canonical
+ * target directory after git init — upward marker discovery (e.g. macOS Public/
+ * + ~/.claude.json) cannot hijack binding to $HOME.
  *
  * @param {{
  *   targetDir: string,
  *   bindingId?: string,
+ *   exactRoot?: boolean,
  * }} input
  * @returns {{
  *   ok: true,
@@ -44,14 +59,18 @@ function git(cwd, args) {
  * }}
  */
 export function ensureBuildOrigin(input) {
-  const targetDir = resolve(String(input.targetDir || "").trim());
-  if (!targetDir) {
+  const requested = String(input.targetDir || "").trim();
+  if (!requested) {
     return {
       ok: false,
       code: "ORIGIN_DIR_REQUIRED",
       message: "Build origin requires a target directory.",
     };
   }
+
+  // Resolve first (may be /var/... before mkdir); re-canonicalize after mkdir.
+  let targetDir = resolve(requested);
+  const exactRoot = input.exactRoot !== false;
 
   try {
     mkdirSync(targetDir, { recursive: true });
@@ -63,6 +82,8 @@ export function ensureBuildOrigin(input) {
     };
   }
 
+  targetDir = realpathOrResolve(targetDir);
+
   const inside = git(targetDir, ["rev-parse", "--is-inside-work-tree"]);
   if (inside.status !== 0 || inside.stdout.trim() !== "true") {
     const init = git(targetDir, ["init", "--template="]);
@@ -73,6 +94,53 @@ export function ensureBuildOrigin(input) {
         message: (init.stderr || init.stdout || "git init failed").trim(),
       };
     }
+  }
+
+  // Build-created: authoritative root is the directory we just initialized.
+  // Do not call resolveTargetProjectRoot — it walks upward and can admit $HOME.
+  if (exactRoot) {
+    const top = git(targetDir, ["rev-parse", "--show-toplevel"]);
+    const toplevel = realpathOrResolve((top.stdout || "").trim() || targetDir);
+    if (top.status !== 0 || toplevel !== targetDir) {
+      return {
+        ok: false,
+        code: "ORIGIN_ROOT_MISMATCH",
+        message: `Build origin git toplevel ${JSON.stringify(toplevel)} does not match target ${JSON.stringify(targetDir)}.`,
+      };
+    }
+
+    const admission = admitPrimaryCheckout(targetDir);
+    if (!admission.ok) {
+      return {
+        ok: false,
+        code: admission.code || "ORIGIN_ADMISSION_FAILED",
+        message: admission.message || "Build origin admission failed.",
+      };
+    }
+
+    return {
+      ok: true,
+      binding: {
+        bindingId:
+          typeof input.bindingId === "string" && input.bindingId.trim()
+            ? input.bindingId.trim()
+            : `bind-${randomUUID().slice(0, 8)}`,
+        projectRoot: targetDir,
+        originGitInit: true,
+        originKind: "build-created",
+      },
+      admission,
+      discovered: {
+        ok: true,
+        projectRoot: targetDir,
+        gitRepositoryRoot: targetDir,
+        workingSubdir: "",
+        invocationCwd: targetDir,
+        gitDir: resolve(targetDir, ".git"),
+        unversioned: false,
+        exactRoot: true,
+      },
+    };
   }
 
   const discovered = resolveTargetProjectRoot(targetDir);
@@ -104,6 +172,7 @@ export function ensureBuildOrigin(input) {
           : `bind-${randomUUID().slice(0, 8)}`,
       projectRoot: discovered.projectRoot,
       originGitInit: true,
+      originKind: "existing-project",
     },
     admission,
     discovered,

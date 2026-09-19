@@ -188,7 +188,16 @@ export function mechanicalProbeBinding(input) {
       existsSync(join(root, "src")) ||
       existsSync(join(root, "lib")) ||
       existsSync(join(root, "index.js")) ||
-      existsSync(join(root, "index.mjs")),
+      existsSync(join(root, "index.mjs")) ||
+      existsSync(join(root, "index.html")) ||
+      existsSync(join(root, "app")) ||
+      existsSync(join(root, "public", "index.html")),
+  );
+
+  const webSurfaceExists = probeRoots.some(
+    (root) =>
+      existsSync(join(root, "index.html")) ||
+      existsSync(join(root, "public", "index.html")),
   );
 
   for (const c of input.record.outcomeCriteria || []) {
@@ -219,12 +228,29 @@ export function mechanicalProbeBinding(input) {
         note = testOk
           ? "package + src + npm test ok"
           : "package/src present; checks not green yet";
+      } else if (webSurfaceExists && testOk) {
+        next = "PROVEN";
+        note = "web surface + project-native checks ok";
+      } else if (webSurfaceExists) {
+        next = "UNKNOWN";
+        note = "web surface present; await checks/evidence";
       } else if (hasPkg || srcExists) {
         next = "UNKNOWN";
         note = "partial tree; await more engineering";
       } else {
         next = "UNKNOWN";
         note = "software surface not established";
+      }
+    } else if (/landing|hero|cta|call-to-action|render|preview|website|page/i.test(stmt)) {
+      if (webSurfaceExists && testOk) {
+        next = "PROVEN";
+        note = "web surface present and checks green";
+      } else if (webSurfaceExists) {
+        next = "UNKNOWN";
+        note = "web surface present; checks pending";
+      } else {
+        next = "UNKNOWN";
+        note = "web surface not established";
       }
     }
 
