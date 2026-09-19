@@ -1,0 +1,1782 @@
+{
+  "schema": "pathcode.s5.real-e2e.v1",
+  "verdict": "REAL_LIVE_VERIFICATION_NOT_YET_PASSING",
+  "labels": {
+    "mechanicalControlLoop": "see s5-build-proof.json",
+    "gatewayDispatch": "see s5-gateway-fake-dispatch.json",
+    "thisRun": "REAL_ENGINE_PATH_BUILD_E2E"
+  },
+  "preferredEngine": "cursor",
+  "fakeFabric": false,
+  "fakeGatewayEngine": false,
+  "steps": [
+    {
+      "step": "origin_start",
+      "ok": true,
+      "buildId": "a4d277e3-5910-42ea-ad0c-2b9c1e675104",
+      "git": true,
+      "noPackageYet": true
+    },
+    {
+      "step": "engineer_1",
+      "label": "engineer_1",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64",
+      "actionId": "engineer:656bb4f68047a265f5a5",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        }
+      ],
+      "elapsedMs": 34880,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "depth_a_after_engineer",
+      "ok": true,
+      "headSha": "f4a17c9d69a6c5cd88b5c861d41125384b6ac32b",
+      "dirtyFingerprint": "2eab68f768c63ef457c3164c",
+      "changedFiles": [],
+      "packageJson": true
+    },
+    {
+      "step": "loop_1_evaluate_required",
+      "label": "loop_1_evaluate_required",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "evaluate",
+      "taskId": "c5e5aafa-f916-4bd0-9fa7-82753c9ab476",
+      "actionId": "evaluate:87934151b8eaee6e7493",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        }
+      ],
+      "elapsedMs": 19475,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "loop_2_evaluate_required",
+      "label": "loop_2_evaluate_required",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "challenge",
+      "taskId": "467ff2bf-61a0-49de-836c-c67dd4eb245f",
+      "actionId": "challenge:379befedc30fe4dd0e56",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        }
+      ],
+      "elapsedMs": 25707,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "loop_3_evaluate_required",
+      "label": "loop_3_evaluate_required",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "evaluate",
+      "taskId": "15ea1a2f-a16e-47b9-be83-d371cfa28365",
+      "actionId": "evaluate:677681f4c830c881c110",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        }
+      ],
+      "elapsedMs": 19663,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "loop_4_evaluate_required",
+      "label": "loop_4_evaluate_required",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "evaluate",
+      "taskId": "0d03a0d5-b3bc-4cd3-9469-51088494c4c1",
+      "actionId": "evaluate:ccab9ede3c85ab712c0e",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        }
+      ],
+      "elapsedMs": 24783,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "loop_5_evaluate_required",
+      "label": "loop_5_evaluate_required",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "evaluate",
+      "taskId": "cb00e227-bd59-439b-a42a-b12890571e3b",
+      "actionId": "evaluate:334390a6ddc1590d2acb",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        }
+      ],
+      "elapsedMs": 40192,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "loop_6_evaluate_required",
+      "label": "loop_6_evaluate_required",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "evaluate",
+      "taskId": "36bea7d0-855c-4efb-a45d-bb02c8f09cb1",
+      "actionId": "evaluate:41952d7152538e42c151",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        }
+      ],
+      "elapsedMs": 47675,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "steering",
+      "ok": true,
+      "outcomeRevision": 2,
+      "reqReadme": true,
+      "status": "running"
+    },
+    {
+      "step": "post_steer_1",
+      "label": "post_steer_1",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "8dd17f0e-0ea4-4c82-939c-7e05da236f5b",
+      "actionId": "engineer:00ce800e1c3eb36a6002",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 51261,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "post_steer_2",
+      "label": "post_steer_2",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "435d139c-e0b1-4eb4-83ae-e03185b39a6b",
+      "actionId": "engineer:dace4c5cadcf815a277d",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 62079,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "post_steer_3",
+      "label": "post_steer_3",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "877133b7-0f9e-4fdd-8fa2-d03284547b14",
+      "actionId": "engineer:f0ba965beb2e4c72102b",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 106157,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "post_steer_4",
+      "label": "post_steer_4",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "8028b8e4-0a1b-4028-ad92-d86286f0f949",
+      "actionId": "engineer:f82b32345ba7100470da",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 29782,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "post_steer_5",
+      "label": "post_steer_5",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "74fba9ae-7f0e-4f5a-bb64-81b54e4f5e59",
+      "actionId": "engineer:a4b7f1bc53d66e6738b1",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 42700,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "post_steer_6",
+      "label": "post_steer_6",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "0453baeb-8313-45b4-8021-0020c40bfd40",
+      "actionId": "engineer:fbf63c96ecedbfd39b2c",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 22044,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "impact_reinspect",
+      "docsIndependent": true,
+      "retainedAfterDocs": true,
+      "demotedAfterSrc": true,
+      "ok": true
+    },
+    {
+      "step": "revalidate_after_impact",
+      "label": "revalidate_after_impact",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "dc8ac8b4-0aa3-4899-8418-fcace2a985b9",
+      "actionId": "engineer:bb08993c0e329a386f32",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 28529,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "durability_recover",
+      "ok": true,
+      "consumeDeduped": true,
+      "pendingCleared": true
+    },
+    {
+      "step": "final_1",
+      "label": "final_1",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "939f0ad2-4db2-461c-bc71-16659cae0ca4",
+      "actionId": "engineer:7b71134ba431563f7671",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 38811,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "final_2",
+      "label": "final_2",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "5dda217b-a17c-4e82-8969-41a42ea235d5",
+      "actionId": "engineer:511140764646674d40a7",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 28502,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "final_3",
+      "label": "final_3",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "e9a32b65-cb0e-4be3-9e45-4378cb6f1702",
+      "actionId": "engineer:d40dc7645a820b9a22e1",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 22118,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "final_4",
+      "label": "final_4",
+      "ok": true,
+      "action": "child_finished",
+      "kind": "engineer",
+      "taskId": "fbb1eba6-91db-490c-ae7b-f0f723b2b322",
+      "actionId": "engineer:37fe772eb2f594429094",
+      "classification": "VERIFIED",
+      "gatewayStatus": "completed",
+      "engineEvents": [
+        {
+          "type": "session.engineering.activity"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.plan"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.validation.running"
+        },
+        {
+          "type": "session.validation.result"
+        },
+        {
+          "type": "session.engineering.busy"
+        },
+        {
+          "type": "session.engineering.result",
+          "engine": "cursor"
+        },
+        {
+          "type": "session.engineering.report"
+        },
+        {
+          "type": "session.terminal"
+        },
+        {
+          "type": "session.engineering.result"
+        },
+        {
+          "type": "gateway.task.finished"
+        }
+      ],
+      "criteria": [
+        {
+          "id": "c-runnable",
+          "status": "PROVEN"
+        },
+        {
+          "id": "c-outcome",
+          "status": "PROVEN"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "req-offline",
+          "status": "SATISFIED"
+        },
+        {
+          "id": "req-readme",
+          "status": "UNKNOWN"
+        }
+      ],
+      "elapsedMs": 30618,
+      "loopStatus": "running",
+      "pendingReinspect": false,
+      "packageJson": true,
+      "hasSrc": true
+    },
+    {
+      "step": "code_continuation",
+      "ok": true,
+      "classification": "VERIFIED",
+      "taskId": "1d164f00-3cfb-44f6-9edc-998bb16585f7",
+      "markerInMain": false
+    }
+  ],
+  "baseDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-RxHKZK",
+  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-RxHKZK/runtime",
+  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-RxHKZK/product",
+  "buildId": "a4d277e3-5910-42ea-ad0c-2b9c1e675104",
+  "finalBuild": {
+    "status": "running",
+    "criteria": [
+      {
+        "id": "c-runnable",
+        "statement": "Core software is runnable with project-native checks (npm test)",
+        "required": true,
+        "status": "PROVEN",
+        "evidence": [
+          {
+            "kind": "check",
+            "ref": "npm test",
+            "bindingId": "bind-963fe417",
+            "headSha": "f4a17c9d69a6c5cd88b5c861d41125384b6ac32b",
+            "dirtyFingerprint": "38edd7b13056e8b624a7c2d4",
+            "configFingerprint": "6817f3f25548d3ee6da493bf",
+            "scope": [
+              "package.json",
+              "src/"
+            ],
+            "observedAt": "2026-09-19T06:02:59.955Z"
+          }
+        ],
+        "updatedAt": "2026-09-19T06:02:59.955Z"
+      },
+      {
+        "id": "c-outcome",
+        "statement": "CLI + persistence surface advances the stated outcome (src/main.js + data/store.json)",
+        "required": true,
+        "status": "PROVEN",
+        "evidence": [
+          {
+            "kind": "check",
+            "ref": "npm test",
+            "bindingId": "bind-963fe417",
+            "headSha": "f4a17c9d69a6c5cd88b5c861d41125384b6ac32b",
+            "dirtyFingerprint": "38edd7b13056e8b624a7c2d4",
+            "configFingerprint": "6817f3f25548d3ee6da493bf",
+            "scope": [
+              "package.json",
+              "src/"
+            ],
+            "observedAt": "2026-09-19T06:02:59.955Z"
+          }
+        ],
+        "updatedAt": "2026-09-19T06:02:59.955Z"
+      }
+    ],
+    "requirements": [
+      {
+        "id": "req-offline",
+        "statement": "Must run fully offline / locally without cloud SaaS",
+        "required": true,
+        "status": "SATISFIED",
+        "evidence": [
+          {
+            "kind": "check",
+            "ref": "npm test (local)",
+            "bindingId": "bind-963fe417",
+            "headSha": "f4a17c9d69a6c5cd88b5c861d41125384b6ac32b",
+            "dirtyFingerprint": "2eab68f768c63ef457c3164c",
+            "configFingerprint": "6817f3f25548d3ee6da493bf",
+            "scope": [
+              "package.json"
+            ],
+            "observedAt": "2026-09-19T05:57:46.932Z"
+          }
+        ]
+      },
+      {
+        "id": "req-readme",
+        "statement": "Include a short README.md describing how to run tests",
+        "required": true,
+        "status": "UNKNOWN",
+        "evidence": []
+      }
+    ],
+    "children": [
+      {
+        "kind": "engineer",
+        "taskId": "5864c6ac-8078-4989-afba-941103b56d64",
+        "actionId": "engineer:656bb4f68047a265f5a5",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "evaluate",
+        "taskId": "c5e5aafa-f916-4bd0-9fa7-82753c9ab476",
+        "actionId": "evaluate:87934151b8eaee6e7493",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "challenge",
+        "taskId": "467ff2bf-61a0-49de-836c-c67dd4eb245f",
+        "actionId": "challenge:379befedc30fe4dd0e56",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "evaluate",
+        "taskId": "15ea1a2f-a16e-47b9-be83-d371cfa28365",
+        "actionId": "evaluate:677681f4c830c881c110",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "evaluate",
+        "taskId": "0d03a0d5-b3bc-4cd3-9469-51088494c4c1",
+        "actionId": "evaluate:ccab9ede3c85ab712c0e",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "evaluate",
+        "taskId": "cb00e227-bd59-439b-a42a-b12890571e3b",
+        "actionId": "evaluate:334390a6ddc1590d2acb",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "evaluate",
+        "taskId": "36bea7d0-855c-4efb-a45d-bb02c8f09cb1",
+        "actionId": "evaluate:41952d7152538e42c151",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "8dd17f0e-0ea4-4c82-939c-7e05da236f5b",
+        "actionId": "engineer:00ce800e1c3eb36a6002",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "435d139c-e0b1-4eb4-83ae-e03185b39a6b",
+        "actionId": "engineer:dace4c5cadcf815a277d",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "877133b7-0f9e-4fdd-8fa2-d03284547b14",
+        "actionId": "engineer:f0ba965beb2e4c72102b",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "8028b8e4-0a1b-4028-ad92-d86286f0f949",
+        "actionId": "engineer:f82b32345ba7100470da",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "74fba9ae-7f0e-4f5a-bb64-81b54e4f5e59",
+        "actionId": "engineer:a4b7f1bc53d66e6738b1",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "0453baeb-8313-45b4-8021-0020c40bfd40",
+        "actionId": "engineer:fbf63c96ecedbfd39b2c",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "dc8ac8b4-0aa3-4899-8418-fcace2a985b9",
+        "actionId": "engineer:bb08993c0e329a386f32",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "939f0ad2-4db2-461c-bc71-16659cae0ca4",
+        "actionId": "engineer:7b71134ba431563f7671",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "5dda217b-a17c-4e82-8969-41a42ea235d5",
+        "actionId": "engineer:511140764646674d40a7",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "e9a32b65-cb0e-4be3-9e45-4378cb6f1702",
+        "actionId": "engineer:d40dc7645a820b9a22e1",
+        "dispatchState": "consumed"
+      },
+      {
+        "kind": "engineer",
+        "taskId": "fbb1eba6-91db-490c-ae7b-f0f723b2b322",
+        "actionId": "engineer:37fe772eb2f594429094",
+        "dispatchState": "consumed"
+      }
+    ],
+    "outcomeRevision": 2
+  },
+  "summary": {
+    "engineerOk": true,
+    "hasEngineer": true,
+    "hasEvaluate": true,
+    "hasChallenge": true,
+    "realComplete": false,
+    "critProven": true,
+    "reqSat": false,
+    "codeContinuationOk": true,
+    "childCount": 18
+  },
+  "ok": false,
+  "statusCard": "PATH Build\n\n  buildId     a4d277e3-5910-42ea-ad0c-2b9c1e675104\n  status      running\n  revision    r2\n\nOutcome\n  Build a small local Node.js CLI package named path-s5-proof. It must include package.json with a test script, src/main.js that writes and reads data/store.json, and npm test must exit 0. No cloud SaaS dependencies.\n\nExplicit requirements\n  [SATISFIED] req-offline — Must run fully offline / locally without cloud SaaS\n  [UNKNOWN] req-readme — Include a short README.md describing how to run tests\n\nOutcome criteria\n  [PROVEN] c-runnable (required) — Core software is runnable with project-native checks (npm test)\n  [PROVEN] c-outcome (required) — CLI + persistence surface advances the stated outcome (src/main.js + data/store.json)\n\nBindings\n  bind-963fe417  /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-RxHKZK/product  (git-init origin)\n\nChildren\n  engineer  consumed       8028b8e4…\n  engineer  consumed       74fba9ae…\n  engineer  consumed       0453baeb…\n  engineer  consumed       dc8ac8b4…\n  engineer  consumed       939f0ad2…\n  engineer  consumed       5dda217b…\n  engineer  consumed       e9a32b65…\n  engineer  consumed       fbb1eba6…\n\nHypotheses (non-authoritative)\n  Steer: real-e2e steer: add README requirement\n  Intent revised to r2\n\nCommands: /build status · /build tick · /build steer · /build run · /help",
+  "eventSample": [
+    {
+      "type": "session.task.received",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.preparing",
+      "detail": "Admitting project and preparing environment",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.collaborate",
+      "engine": "cursor",
+      "detail": "preferred engine: cursor",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.preparing",
+      "detail": "Admitting project and preparing environment",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.preflight",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.preparing",
+      "detail": "Unversioned project — engineering in place until source control is established",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.workspace",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.recovery.checkpoint",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.discovered",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.mcp",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.preparing",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.provisioning",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.affected",
+      "classification": "UNAVAILABLE",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.ready",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.task.received",
+      "detail": "PATH Build engineer task — intentional product mutation is allowed.\nClose the following product gap with real engineerin",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.collaborate",
+      "engine": "copilot",
+      "detail": "Copilot SDK session ready",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.collaborate",
+      "engine": "copilot",
+      "detail": "Copilot native_sdk ready",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.collaborate",
+      "engine": "cursor",
+      "detail": "Cursor SDK local session ready",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.collaborate",
+      "engine": "cursor",
+      "detail": "Cursor native_sdk ready",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.bridge",
+      "detail": "starting engineering bridge",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.collaborate",
+      "engine": "cursor",
+      "detail": "preferred Cursor engine taking the primary turn",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.capability.collaborate",
+      "engine": "cursor",
+      "detail": "continuing repair in the task workspace",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "I will establish a real",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "Node.js CLI package",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "named `path-s5-proof`",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "in a greenfield git",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "repository.",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "The package needs",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "a test script and a",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "main.js that writes",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "and reads data/store.json.",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "Nest must exit zero.",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "No cloud SaaS dependencies",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "are allowed. The project",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "must run fully offline.",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "An initial git commit",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "is required. I will",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    },
+    {
+      "type": "session.engineering.activity",
+      "detail": "check the workspace",
+      "taskId": "5864c6ac-8078-4989-afba-941103b56d64"
+    }
+  ]
+}

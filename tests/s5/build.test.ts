@@ -24,7 +24,10 @@ import {
   readBuildRecord,
   parseStatusDirectives,
   realityRefreshDepthA,
+  frameEvaluateObjective,
+  mechanicalProbeBinding,
 } from "../../scripts/pathcode-cli/build/index.mjs";
+import { isReadOnlyAssessmentObjective } from "../../scripts/pathcode-cli/ag1/task-worktree.mjs";
 
 describe("S5 PATH Build", () => {
   /** @type {string} */
@@ -78,6 +81,28 @@ describe("S5 PATH Build", () => {
     const r2 = captureBindingReality(origin.binding.projectRoot);
     const fresh = classifyEvidenceFreshness(ref, r2);
     expect(fresh.fresh).toBe(false);
+  });
+
+  it("isReadOnlyAssessmentObjective: evaluate framing stays read-only when outcome mentions Create", () => {
+    const rec = createBuildRecordSkeleton({
+      outcome: "Create a runnable Node service with tests",
+    });
+    rec.intent.explicitRequirements.push({
+      id: "req-1",
+      statement: "Must run locally",
+      status: "UNKNOWN",
+    });
+    rec.outcomeCriteria.push({
+      id: "c1",
+      statement: "Service is runnable",
+      required: true,
+      status: "UNKNOWN",
+      evidence: [],
+      updatedAt: new Date().toISOString(),
+    });
+    const objective = frameEvaluateObjective(rec);
+    expect(objective).toMatch(/Create a runnable Node service/i);
+    expect(isReadOnlyAssessmentObjective(objective)).toBe(true);
   });
 
   it("independence: docs change does not intersect src/auth scope", () => {
@@ -241,6 +266,36 @@ describe("S5 PATH Build", () => {
         /offline/i.test(r.statement),
       ),
     ).toBe(true);
+  });
+
+  it("mechanical probe: README requirement satisfied from README.md", () => {
+    const target = join(dir, "readme-req");
+    const origin = ensureBuildOrigin({ targetDir: target });
+    expect(origin.ok).toBe(true);
+    if (!origin.ok) return;
+    writeFileSync(
+      join(origin.binding.projectRoot, "package.json"),
+      JSON.stringify({ scripts: { test: "node -e \"process.exit(0)\"" } }),
+    );
+    writeFileSync(
+      join(origin.binding.projectRoot, "README.md"),
+      "# Demo\n\nRun tests with `npm test`.\n",
+    );
+    const rec = createBuildRecordSkeleton({ outcome: "demo" });
+    rec.projectBindings.push(origin.binding);
+    rec.intent.explicitRequirements.push({
+      id: "req-readme",
+      statement: "Include a short README.md describing how to run tests",
+      required: true,
+      status: "UNKNOWN",
+      evidence: [],
+    });
+    const probe = mechanicalProbeBinding({
+      record: rec,
+      bindingId: origin.binding.bindingId,
+    });
+    expect(probe.ok).toBe(true);
+    expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
   });
 
   it("Depth A refresh writes reality delta", () => {

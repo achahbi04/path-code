@@ -34,6 +34,7 @@ import {
   completenessClaim,
 } from "./objectives.mjs";
 import { formatBuildStatus } from "./format.mjs";
+import { mechanicalProbeBinding } from "./mechanical-probe.mjs";
 
 /**
  * @typedef {{
@@ -52,12 +53,38 @@ import { formatBuildStatus } from "./format.mjs";
  *   runtimeRoot: string,
  *   gateway: BuildGatewayPort,
  *   fakeMode?: boolean,
+ *   preferredEngine?: string | null,
  * }} opts
  */
 export function createBuildController(opts) {
   const runtimeRoot = opts.runtimeRoot;
   const gateway = opts.gateway;
   const fakeMode = opts.fakeMode === true;
+  const controllerPreferredEngine =
+    typeof opts.preferredEngine === "string" && opts.preferredEngine.trim()
+      ? opts.preferredEngine.trim()
+      : typeof process.env.PATHCODE_PREFERRED_ENGINE === "string" &&
+          process.env.PATHCODE_PREFERRED_ENGINE.trim()
+        ? process.env.PATHCODE_PREFERRED_ENGINE.trim()
+        : null;
+
+  /**
+   * @param {import('./types.mjs').BuildTaskKind} kind
+   * @param {{ preferEngine?: string|null, preferredEngine?: string|null }} [extra]
+   * @returns {string|undefined}
+   */
+  function resolveDispatchPreferredEngine(kind, extra = {}) {
+    if (kind === "challenge") return undefined;
+    const fromExtra =
+      (typeof extra.preferredEngine === "string" && extra.preferredEngine) ||
+      (typeof extra.preferEngine === "string" && extra.preferEngine) ||
+      null;
+    if (extra.preferEngine === null || extra.preferredEngine === null) {
+      return undefined;
+    }
+    const resolved = fromExtra || controllerPreferredEngine;
+    return resolved || undefined;
+  }
 
   /**
    * @param {string} outcome
@@ -241,7 +268,7 @@ export function createBuildController(opts) {
    * @param {string} buildId
    * @param {import('./types.mjs').BuildTaskKind} kind
    * @param {string} objective
-   * @param {{ bindingId?: string, preferEngine?: string|null }} [extra]
+   * @param {{ bindingId?: string, preferEngine?: string|null, preferredEngine?: string|null }} [extra]
    */
   async function dispatchChild(buildId, kind, objective, extra = {}) {
     let record = readBuildRecord(runtimeRoot, buildId);
@@ -316,10 +343,11 @@ export function createBuildController(opts) {
     const bound = await gateway.bindProject(binding.projectRoot);
     if (bound && bound.ok === false) return bound;
 
+    const preferredEngine = resolveDispatchPreferredEngine(kind, extra);
     const startExtra = {
       taskId,
       cwd: binding.projectRoot,
-      ...(extra.preferEngine ? { preferredEngine: extra.preferEngine } : {}),
+      ...(preferredEngine ? { preferredEngine } : {}),
     };
 
     let started;
@@ -482,8 +510,12 @@ export function createBuildController(opts) {
       .digest("hex")
       .slice(0, 24);
 
-    // Apply evaluate/challenge directives
-    if (child.kind === "evaluate" || child.kind === "challenge") {
+    // Apply assessment directives from engineering reports
+    if (
+      child.kind === "evaluate" ||
+      child.kind === "challenge" ||
+      child.kind === "engineer"
+    ) {
       applyAssessmentToRecord(record, reportText, {
         taskId,
         bindingId: child.bindingId,
@@ -493,11 +525,20 @@ export function createBuildController(opts) {
     }
 
     // Engineer progress / no-progress
+    const classification = String(
+      (cp?.validation && cp.validation.classification) ||
+        cp?.finalState ||
+        "",
+    );
     const failed =
       cp?.finalState === "failed" ||
-      (cp?.validation &&
-        /FAIL|NOT_VERIFIED|BLOCKED/i.test(String(cp.validation.classification || "")));
-    if (failed) {
+      /FAIL|NOT_VERIFIED|BLOCKED/i.test(classification);
+    const noValidationCandidates = /no discoverable project validation/i.test(
+      String(
+        (cp?.validation && cp.validation.reason) || reportText || "",
+      ),
+    );
+    if (failed && !(noValidationCandidates && child.kind === "engineer")) {
       const fp = resultFingerprint;
       if (record.loop.lastFailureFingerprint === fp) {
         record.loop.noProgressCount = (record.loop.noProgressCount || 0) + 1;
@@ -513,9 +554,10 @@ export function createBuildController(opts) {
     } else {
       record.loop.noProgressCount = 0;
       record.loop.lastFailureFingerprint = null;
-      if (record.loop.status === "blocked" && !record.loop.blockedReason?.startsWith("NO_PROGRESS")) {
-        // leave other blocks
-      } else if (record.loop.status === "blocked") {
+      if (
+        record.loop.status === "blocked" &&
+        record.loop.blockedReason?.startsWith("NO_PROGRESS")
+      ) {
         record.loop.status = "running";
         record.loop.blockedReason = undefined;
       }
@@ -537,10 +579,30 @@ export function createBuildController(opts) {
     // Depth A immediately after consume
     const depthA = await runDepthA(buildId, child.bindingId, taskId);
 
+    // Mechanical FS/check probe — updates criteria from authoritative reality
+    let probe = null;
+    try {
+      const rec2 = readBuildRecord(runtimeRoot, buildId);
+      if (rec2) {
+        probe = mechanicalProbeBinding({
+          record: rec2,
+          bindingId: child.bindingId,
+          taskId,
+          changedFiles: cp?.changedFiles || reality?.changedFiles || [],
+        });
+        if (probe.ok && Array.isArray(probe.updates) && probe.updates.length) {
+          writeBuildRecord(runtimeRoot, rec2);
+        }
+      }
+    } catch {
+      probe = null;
+    }
+
     return {
       ok: true,
       build: readBuildRecord(runtimeRoot, buildId),
       depthA,
+      probe,
       reportPath,
     };
   }
@@ -601,6 +663,34 @@ export function createBuildController(opts) {
       record.hypotheses.revisedByTaskId = ctx.taskId;
     }
 
+    if (ctx.kind === "challenge") {
+      if (/\bCLAIM STANDS\b/i.test(reportText)) {
+        for (const c of record.outcomeCriteria || []) {
+          if (c.status === "UNKNOWN" && c.required) {
+            // Do not auto-PROVEN from CLAIM STANDS alone without CRITERION line —
+            // leave UNKNOWN unless directives already set.
+          }
+        }
+      }
+      if (/\bCLAIM FALSIFIED\b/i.test(reportText)) {
+        for (const c of record.outcomeCriteria || []) {
+          if (c.challengedByTaskId === ctx.taskId || c.status === "PROVEN") {
+            // If challenge targeted completeness and falsified, demote proven required
+          }
+        }
+        const proven = (record.outcomeCriteria || []).filter(
+          (c) => c.required && c.status === "PROVEN",
+        );
+        if (proven.length && !directives.some((d) => d.status === "UNMET")) {
+          // Prefer explicit CRITERION lines; if none, demote last proven
+          const target = proven[proven.length - 1];
+          target.status = "UNMET";
+          target.updatedAt = now;
+          target.challengedByTaskId = ctx.taskId;
+        }
+      }
+    }
+
     // Seed criteria from evaluate if empty
     if (
       ctx.kind === "evaluate" &&
@@ -657,8 +747,23 @@ export function createBuildController(opts) {
     }
     const critOk = requiredCriteria.every((c) => c.status === "PROVEN");
     const reqOk = requiredReqs.every((r) => r.status === "SATISFIED");
-    const hasEvaluate = Boolean(record.loop.lastEvaluateTaskId);
-    const hasChallenge = Boolean(record.loop.lastChallengeTaskId);
+    const consumedSinceRevision = (record.children || []).filter(
+      (c) =>
+        c.dispatchState === "consumed" &&
+        (c.selectedAt >= record.intent.revisedAt ||
+          record.intent.outcomeRevision <= 1),
+    );
+    const lastEvaluate = [...consumedSinceRevision]
+      .reverse()
+      .find((c) => c.kind === "evaluate");
+    const lastChallenge = [...consumedSinceRevision]
+      .reverse()
+      .find((c) => c.kind === "challenge");
+    const assessVerified = (child) =>
+      child &&
+      /VERIFIED/i.test(String(child.classification || ""));
+    const hasEvaluate = assessVerified(lastEvaluate);
+    const hasChallenge = assessVerified(lastChallenge);
     if (!critOk || !reqOk) {
       return {
         ok: true,
@@ -722,6 +827,24 @@ export function createBuildController(opts) {
       };
     }
 
+    const bindingForProbe = primaryBinding(record);
+    if (bindingForProbe) {
+      try {
+        const reality = captureBindingReality(bindingForProbe.projectRoot);
+        const probe = mechanicalProbeBinding({
+          record,
+          bindingId: bindingForProbe.bindingId,
+          changedFiles: reality?.changedFiles || [],
+        });
+        if (probe.ok && Array.isArray(probe.updates) && probe.updates.length) {
+          writeBuildRecord(runtimeRoot, record);
+          record = readBuildRecord(runtimeRoot, buildId) || record;
+        }
+      } catch {
+        // best-effort mechanical refresh
+      }
+    }
+
     const completion = assessCompletion(buildId);
     if (completion.complete) {
       const marked = markComplete(buildId);
@@ -748,6 +871,15 @@ export function createBuildController(opts) {
         record,
         record.hypotheses.proposedNextAction || "",
       );
+    } else if (completion.reason === "requirements_unsatisfied") {
+      kind = "engineer";
+      const openReqs = (record.intent.explicitRequirements || []).filter(
+        (r) => r.required !== false && r.status !== "SATISFIED",
+      );
+      const gap =
+        openReqs.map((r) => `[${r.id}] ${r.statement}`).join(" · ") ||
+        "Close remaining explicit operator requirements.";
+      objective = frameEngineerObjective(record, gap);
     } else if (
       demoted.length > 0 &&
       completion.reason === "criteria_unproven"
@@ -789,7 +921,9 @@ export function createBuildController(opts) {
     }
 
     const dispatched = await dispatchChild(buildId, kind, objective, {
-      preferEngine: kind === "challenge" ? null : undefined,
+      ...(kind === "challenge"
+        ? { preferEngine: null, preferredEngine: null }
+        : {}),
     });
     if (!dispatched.ok) return dispatched;
 
@@ -912,6 +1046,8 @@ export function createBuildController(opts) {
       if (r.status === "SATISFIED") r.status = "UNKNOWN";
     }
     record.loop.pendingReinspect = true;
+    record.loop.lastEvaluateTaskId = undefined;
+    record.loop.lastChallengeTaskId = undefined;
     if (record.loop.status === "complete") {
       record.loop.status = "running";
     }

@@ -31,6 +31,8 @@ export {
   parseStatusDirectives,
 } from "./reinspect.mjs";
 
+export { mechanicalProbeBinding } from "./mechanical-probe.mjs";
+
 export {
   frameEngineerObjective,
   frameEvaluateObjective,

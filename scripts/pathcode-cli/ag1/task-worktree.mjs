@@ -758,6 +758,15 @@ export const INCIDENTAL_SETUP_BASENAMES = Object.freeze([
 export function isReadOnlyAssessmentObjective(text) {
   const t = String(text || "");
   if (!t.trim()) return false;
+  // S5 — Build evaluate/challenge are assessment-shaped even when the durable
+  // outcome text mentions create/implement (those verbs describe the product,
+  // not this task's mutation authority).
+  if (
+    /\bPATH Build (evaluate|challenge) task\b/i.test(t) &&
+    /\bassessment only\b/i.test(t)
+  ) {
+    return true;
+  }
   if (
     /\b(upgrade|update|bump|refresh|pin)\b[\s\S]{0,40}\b(dependenc|lockfile|package-lock|pnpm-lock|yarn\.lock)\b/i.test(
       t,

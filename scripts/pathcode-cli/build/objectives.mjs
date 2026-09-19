@@ -29,16 +29,32 @@ function intentBlock(record) {
  * @param {string} gap
  */
 export function frameEngineerObjective(record, gap) {
+  const binding = (record.projectBindings || [])[0];
+  const greenfieldHint = binding?.originGitInit
+    ? [
+        "Greenfield context: this binding began as git-init-only.",
+        "You MUST establish a real software project in this turn:",
+        "- package.json (or equivalent manifests for the chosen stack)",
+        "- source entrypoints",
+        "- at least one project-native check/test script that exits 0",
+        "- make an initial git commit of the established project",
+        "Do not stop at a marker file alone.",
+      ].join("\n")
+    : "Continue engineering toward the outcome with project-native validation.";
+
   return [
     "PATH Build engineer task — intentional product mutation is allowed.",
     "Close the following product gap with real engineering in this project.",
     "Establish or modify architecture, manifests, code, tests, and config as needed.",
     "Validate with project-native checks when possible.",
+    greenfieldHint,
     "",
     intentBlock(record),
     "",
     "Highest-value gap to close now:",
-    gap || record.hypotheses?.proposedNextAction || "Establish the software architecture required by the outcome.",
+    gap ||
+      record.hypotheses?.proposedNextAction ||
+      "Establish the software architecture, manifests, runnable entrypoints, and tests required by the outcome.",
     "",
     "When done, summarize what exists now vs what still remains for the Build outcome.",
   ].join("\n");
@@ -51,8 +67,8 @@ export function frameEngineerObjective(record, gap) {
 export function frameEvaluateObjective(record, opts = {}) {
   return [
     "PATH Build evaluate task — assessment only.",
-    "Inspect authoritative FS/Git/runtime/test/report evidence for this binding.",
-    "Do NOT implement product features. Disposable probes must be revertible.",
+    "READ-ONLY assessment. Do not modify, change, edit, write, or alter product files.",
+    "Disposable probes must be revertible if absolutely required; prefer inspection of existing FS/Git/tests/reports.",
     "",
     intentBlock(record),
     "",
@@ -63,7 +79,7 @@ export function frameEvaluateObjective(record, opts = {}) {
     "4) Whether architecture/gap hypotheses remain valid",
     "5) The single highest-value next engineering action",
     "",
-    "Emit machine-readable lines where possible:",
+    "Emit machine-readable lines (required):",
     "CRITERION <id>: PROVEN|UNMET|UNKNOWN — <evidence note>",
     "REQUIREMENT <id>: SATISFIED|VIOLATED|UNKNOWN — <evidence note>",
     "NEXT: <proposed engineer objective>",
@@ -83,9 +99,9 @@ export function frameEvaluateObjective(record, opts = {}) {
  */
 export function frameChallengeObjective(record, claim, opts = {}) {
   return [
-    "PATH Build challenge task — attempt to FALSIFY the claim using real evidence.",
-    "Assessment/probe only. Do NOT implement the product. Prefer checks, runtime probes, contract tests.",
-    "Disposable setup must be revertible and labeled as probe artifacts.",
+    "PATH Build challenge task — assessment only.",
+    "READ-ONLY challenge. Do not modify, change, edit, write, or alter product files except disposable revertible probes.",
+    "Attempt to FALSIFY the claim using real FS/Git/runtime/test/report evidence.",
     "",
     intentBlock(record),
     "",
@@ -97,7 +113,7 @@ export function frameChallengeObjective(record, claim, opts = {}) {
     "CLAIM FALSIFIED — with concrete counter-evidence",
     "EVIDENCE INSUFFICIENT — what is missing",
     "",
-    "Also emit:",
+    "Also emit machine-readable lines:",
     "CRITERION <id>: PROVEN|UNMET|UNKNOWN — … (if claim maps to a criterion)",
     "REQUIREMENT <id>: SATISFIED|VIOLATED|UNKNOWN — … (if applicable)",
     opts.preferPeerHint
