@@ -1,11 +1,15 @@
 /**
  * Browser/render evidence for visual Build products.
- * Uses fetch + lightweight HTML checks; Playwright when available.
+ * Fetch baseline + Playwright via resolved browser provider.
  */
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
+import {
+  resolveBrowserProvider,
+  launchBrowserEvidenceSession,
+} from "./browser-provider.mjs";
 
 /**
  * @param {string} html
@@ -24,6 +28,20 @@ function findNeedles(html, needles) {
 }
 
 /**
+ * @param {string} html
+ */
+function extractRevisionMarker(html) {
+  const meta = String(html || "").match(
+    /<meta\s+name=["']path-build-revision["']\s+content=["']([^"']+)["']/i,
+  );
+  if (meta) return meta[1];
+  const win = String(html || "").match(
+    /__PATH_BUILD_REVISION__\s*=\s*["']([^"']+)["']/,
+  );
+  return win ? win[1] : null;
+}
+
+/**
  * Capture rendered evidence from a preview URL.
  * @param {{
  *   url: string,
@@ -31,10 +49,15 @@ function findNeedles(html, needles) {
  *   runtimeRoot: string,
  *   expectText?: string[],
  *   viewport?: { width: number, height: number },
+ *   authoritativeSha?: string | null,
+ *   intentRevision?: number | null,
+ *   bindingId?: string | null,
+ *   preferEmbedUrl?: string | null,
+ *   captureMobile?: boolean,
  * }} input
  */
 export async function captureBrowserEvidence(input) {
-  const url = String(input.url || "").trim();
+  const url = String(input.preferEmbedUrl || input.url || "").trim();
   const outDir = join(
     input.runtimeRoot,
     "metadata",
@@ -47,14 +70,26 @@ export async function captureBrowserEvidence(input) {
   const evidence = {
     ok: false,
     url,
+    buildId: input.buildId,
+    bindingId: input.bindingId || null,
+    authoritativeSha: input.authoritativeSha || null,
+    intentRevision: input.intentRevision ?? null,
+    renderedRevision: null,
+    revisionMatch: null,
     capturedAt: new Date().toISOString(),
     htmlPath: null,
     screenshotPath: null,
+    mobileScreenshotPath: null,
     title: null,
     textSample: null,
+    heroStyles: null,
+    headingStyles: null,
+    cta: null,
     needles: [],
     consoleErrors: [],
+    failedRequests: [],
     engine: "fetch",
+    browserProvider: null,
     error: null,
   };
 
@@ -71,6 +106,11 @@ export async function captureBrowserEvidence(input) {
     evidence.htmlPath = htmlPath;
     evidence.ok = res.ok;
     evidence.status = res.status;
+    evidence.renderedRevision = extractRevisionMarker(html);
+    if (evidence.authoritativeSha && evidence.renderedRevision) {
+      evidence.revisionMatch =
+        evidence.renderedRevision === evidence.authoritativeSha;
+    }
     const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
     evidence.title = titleMatch ? titleMatch[1].trim() : null;
     evidence.textSample = html
@@ -87,58 +127,126 @@ export async function captureBrowserEvidence(input) {
     return evidence;
   }
 
-  // Optional Playwright screenshot when installed
+  // Stale revision via proxy marker — do not accept as current proof
+  if (
+    evidence.authoritativeSha &&
+    evidence.renderedRevision &&
+    evidence.renderedRevision !== evidence.authoritativeSha
+  ) {
+    evidence.ok = false;
+    evidence.error = "stale_rendered_revision";
+    evidence.revisionMatch = false;
+  }
+
   try {
-    const mod = await import("playwright").catch(() => null);
-    if (mod?.chromium) {
-      /** @type {{ headless: boolean, executablePath?: string }} */
-      const launchOpts = { headless: true };
-      const home = process.env.HOME || "";
-      const browsersRoot =
-        process.env.PLAYWRIGHT_BROWSERS_PATH ||
-        join(home, "Library/Caches/ms-playwright");
-      const candidates = [
-        process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
-        join(
-          browsersRoot,
-          "chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
-        ),
-        join(
-          browsersRoot,
-          "chromium-1148/chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
-        ),
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        "/Applications/Chromium.app/Contents/MacOS/Chromium",
-      ].filter(Boolean);
-      for (const c of candidates) {
-        if (c && existsSync(c)) {
-          launchOpts.executablePath = c;
-          break;
-        }
-      }
-      const browser = await mod.chromium.launch(launchOpts);
+    const session = await launchBrowserEvidenceSession();
+    if (session.ok && session.browser) {
+      evidence.browserProvider = session.provider;
       try {
-        const page = await browser.newPage({
+        const page = await session.browser.newPage({
           viewport: input.viewport || { width: 1280, height: 800 },
         });
         const consoleErrors = [];
+        const failedRequests = [];
         page.on("pageerror", (e) => consoleErrors.push(String(e.message || e)));
         page.on("console", (msg) => {
           if (msg.type() === "error") consoleErrors.push(msg.text());
         });
-        await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
-        const shot = join(outDir, `shot-${stamp}.png`);
-        await page.screenshot({ path: shot, fullPage: true });
-        evidence.screenshotPath = shot;
-        evidence.consoleErrors = consoleErrors.slice(0, 20);
-        evidence.engine = "playwright";
-        evidence.title = (await page.title()) || evidence.title;
-        const bodyText = await page.innerText("body").catch(() => "");
-        if (bodyText) evidence.textSample = bodyText.replace(/\s+/g, " ").trim().slice(0, 2_000);
-        evidence.ok = true;
+        page.on("requestfailed", (req) => {
+          failedRequests.push(`${req.failure()?.errorText || "fail"} ${req.url()}`);
+        });
+          await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+          await new Promise((r) => setTimeout(r, 400));
+
+        const renderedRevision = await page
+          .evaluate(() => {
+            const meta = document.querySelector('meta[name="path-build-revision"]');
+            // @ts-ignore
+            return (
+              (meta && meta.getAttribute("content")) ||
+              // @ts-ignore
+              window.__PATH_BUILD_REVISION__ ||
+              null
+            );
+          })
+          .catch(() => null);
+        if (renderedRevision) evidence.renderedRevision = renderedRevision;
+        if (evidence.authoritativeSha && evidence.renderedRevision) {
+          evidence.revisionMatch =
+            evidence.renderedRevision === evidence.authoritativeSha;
+          if (!evidence.revisionMatch) {
+            evidence.ok = false;
+            evidence.error = "stale_rendered_revision";
+          }
+        }
+
+        if (evidence.revisionMatch !== false) {
+          const shot = join(outDir, `shot-desktop-${stamp}.png`);
+          await page.screenshot({ path: shot, fullPage: true });
+          evidence.screenshotPath = shot;
+
+          const styles = await page
+            .evaluate(() => {
+              const hero =
+                document.querySelector("header") ||
+                document.querySelector("[class*='hero']") ||
+                document.querySelector("main") ||
+                document.body;
+              const heading =
+                document.querySelector("h1") ||
+                document.querySelector("header h1") ||
+                document.querySelector("h2");
+              const cta =
+                document.querySelector("header a, header button, .btn, .button, [class*='cta']") ||
+                document.querySelector("a.button, button");
+              const cs = (el) => {
+                if (!el) return null;
+                const s = window.getComputedStyle(el);
+                return {
+                  tag: el.tagName.toLowerCase(),
+                  text: (el.innerText || "").trim().slice(0, 160),
+                  backgroundColor: s.backgroundColor,
+                  color: s.color,
+                  fontSize: s.fontSize,
+                  fontWeight: s.fontWeight,
+                };
+              };
+              return {
+                hero: cs(hero),
+                heading: cs(heading),
+                cta: cs(cta),
+              };
+            })
+            .catch(() => null);
+          if (styles) {
+            evidence.heroStyles = styles.hero;
+            evidence.headingStyles = styles.heading;
+            evidence.cta = styles.cta;
+          }
+
+          evidence.consoleErrors = consoleErrors.slice(0, 20);
+          evidence.failedRequests = failedRequests.slice(0, 20);
+          evidence.engine = "playwright";
+          evidence.title = (await page.title()) || evidence.title;
+          const bodyText = await page.innerText("body").catch(() => "");
+          if (bodyText) {
+            evidence.textSample = bodyText.replace(/\s+/g, " ").trim().slice(0, 2_000);
+          }
+          if (evidence.error !== "stale_rendered_revision") evidence.ok = true;
+
+          if (input.captureMobile !== false) {
+            await page.setViewportSize({ width: 390, height: 844 });
+            await new Promise((r) => setTimeout(r, 200));
+            const mobileShot = join(outDir, `shot-mobile-${stamp}.png`);
+            await page.screenshot({ path: mobileShot, fullPage: true });
+            evidence.mobileScreenshotPath = mobileShot;
+          }
+        }
       } finally {
-        await browser.close();
+        await session.close();
       }
+    } else {
+      evidence.playwrightError = session.error || "no_browser_provider";
     }
   } catch (err) {
     evidence.playwrightError = err instanceof Error ? err.message : String(err);
@@ -156,11 +264,20 @@ export async function captureBrowserEvidence(input) {
  */
 export function browserEvidenceSupports(evidence, requiredNeedles) {
   if (!evidence?.ok) return false;
+  if (evidence.revisionMatch === false) return false;
   const needles = evidence.needles || [];
   for (const req of requiredNeedles || []) {
-    const hit = needles.find((n) => n.needle.toLowerCase() === String(req).toLowerCase());
+    const hit = needles.find(
+      (n) => n.needle.toLowerCase() === String(req).toLowerCase(),
+    );
     if (hit && !hit.found) return false;
-    if (!hit && evidence.textSample && !String(evidence.textSample).toLowerCase().includes(String(req).toLowerCase())) {
+    if (
+      !hit &&
+      evidence.textSample &&
+      !String(evidence.textSample)
+        .toLowerCase()
+        .includes(String(req).toLowerCase())
+    ) {
       return false;
     }
   }
@@ -173,3 +290,5 @@ export function browserEvidenceSupports(evidence, requiredNeedles) {
 export function evidenceFileExists(path) {
   return typeof path === "string" && path && existsSync(path);
 }
+
+export { resolveBrowserProvider };

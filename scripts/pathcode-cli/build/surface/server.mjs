@@ -165,11 +165,9 @@ export async function startPathBuildSurface(options) {
 
   /** @type {Map<string, { promise: Promise<unknown>, startedAt: string }>} */
   const loops = new Map();
+  /** @type {string | null} */
+  let surfaceBaseUrl = null;
 
-  /**
-   * @param {string} buildId
-   * @param {{ autoPreview?: boolean }} [opts]
-   */
   /**
    * Keep product runtime + browser evidence aligned with authoritative Build revision.
    * @param {string} buildId
@@ -215,10 +213,18 @@ export async function startPathBuildSurface(options) {
     }
 
     const preview = runtimeManager.getPreviewDescriptor(buildId);
+    const directUrl = started.runtime?.url || preview?.url || null;
+    const embedUrl =
+      surfaceBaseUrl && preview?.embedPath
+        ? new URL(preview.embedPath, surfaceBaseUrl).toString()
+        : null;
     const evidence = await captureBrowserEvidence({
-      url: started.runtime?.url || preview?.url,
+      url: embedUrl || directUrl,
       buildId,
       runtimeRoot,
+      authoritativeSha: build.authoritativeSha || null,
+      intentRevision: build.intent?.outcomeRevision ?? null,
+      bindingId: gate.binding.bindingId,
       expectText: String(build.intent?.outcome || "")
         .split(/\s+/)
         .filter((w) => w.length > 3)
@@ -227,7 +233,7 @@ export async function startPathBuildSurface(options) {
     evidence.authoritativeSha = build.authoritativeSha || null;
 
     controller.patchRuntimeState?.(buildId, {
-      previewUrl: started.runtime?.url || preview?.url || null,
+      previewUrl: directUrl,
       runtimeHealth: started.runtime?.status === "ready" ? "ok" : "down",
       browserEvidence: evidence,
       clearRuntimeRefresh: true,
@@ -791,6 +797,7 @@ export async function startPathBuildSurface(options) {
   });
 
   const url = `http://${host}:${port}/`;
+  surfaceBaseUrl = url;
   if (options.openBrowser !== false && process.env.PATHCODE_BUILD_NO_OPEN !== "1") {
     try {
       spawn("open", [url], { detached: true, stdio: "ignore" }).unref();

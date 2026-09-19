@@ -2,6 +2,8 @@
  * S5 — Build child task objective framing (engineer / evaluate / challenge).
  */
 
+import { structuredResultContractBlock } from "./cognitive-result.mjs";
+
 /**
  * @param {import('./types.mjs').BuildRecord} record
  */
@@ -101,6 +103,7 @@ export function frameEvaluateObjective(record, opts = {}) {
     opts.evidencePackage
       ? `\nCross-binding evidence package:\n${opts.evidencePackage}`
       : "",
+    structuredResultContractBlock("evaluate", record),
   ]
     .filter(Boolean)
     .join("\n");
@@ -136,6 +139,7 @@ export function frameChallengeObjective(record, claim, opts = {}) {
     opts.evidencePackage
       ? `\nEvidence package:\n${opts.evidencePackage}`
       : "",
+    structuredResultContractBlock("challenge", record),
   ]
     .filter(Boolean)
     .join("\n");

@@ -252,6 +252,33 @@ export function mechanicalProbeBinding(input) {
         next = "UNKNOWN";
         note = "web surface not established";
       }
+    } else if (
+      /explain|what the product|why it matters|visually|professionally|emergency value|value proposition/i.test(
+        stmt,
+      )
+    ) {
+      const browser = Array.isArray(input.record.browserEvidence)
+        ? input.record.browserEvidence.slice(-1)[0]
+        : null;
+      const sample = String(browser?.textSample || "").toLowerCase();
+      const hasProduct =
+        /ice|emergency|product|app/.test(sample) || webSurfaceExists;
+      const hasWhy = /why|matters|emergency|second|responder|life/.test(sample);
+      const hasVisual = Boolean(webSurfaceExists);
+      const revisionOk =
+        !browser?.authoritativeSha ||
+        !input.record.authoritativeSha ||
+        browser.authoritativeSha === input.record.authoritativeSha;
+      if (hasProduct && hasWhy && hasVisual && browser?.ok && revisionOk) {
+        next = "PROVEN";
+        note = "DOM/browser evidence shows product, purpose, and visual surface";
+      } else if (webSurfaceExists && hasProduct) {
+        next = "UNKNOWN";
+        note = "partial product explanation; await stronger browser evidence";
+      } else {
+        next = "UNKNOWN";
+        note = "product explanation / visual presentation not evidenced yet";
+      }
     }
 
     if (next && next !== c.status) {

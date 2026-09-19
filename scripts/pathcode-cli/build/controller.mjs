@@ -30,6 +30,15 @@ import {
   readReportText,
 } from "./reinspect.mjs";
 import {
+  decideChildReconciliation,
+  loadChildTruth,
+  extractProviderProvenance,
+} from "./reconcile.mjs";
+import {
+  parseBuildCognitiveResult,
+  cognitiveResultToDirectives,
+} from "./cognitive-result.mjs";
+import {
   frameEngineerObjective,
   frameEvaluateObjective,
   frameChallengeObjective,
@@ -334,55 +343,50 @@ export function createBuildController(opts) {
   }
 
   /**
-   * Recover Build + children; idempotent consume; pending reinspect.
+   * Reconcile all Build children against PATH task truth; consume terminals once.
    * @param {string} buildId
    */
-  async function recover(buildId) {
+  async function reconcileBuildChildren(buildId) {
     scrubBuildTempFiles(runtimeRoot);
     let record = readBuildRecord(runtimeRoot, buildId);
     if (!record) {
       return { ok: false, code: "BUILD_NOT_FOUND", message: `no build ${buildId}` };
     }
 
-    // Repair selected→dispatched if task checkpoint exists
+    /** @type {object[]} */
+    const decisions = [];
     for (const child of record.children) {
-      if (child.dispatchState === "selected") {
-        const cp = resolveTaskCheckpoint(child.taskId);
-        if (cp) {
-          child.dispatchState = "dispatched";
-          child.dispatchedAt = child.dispatchedAt || new Date().toISOString();
-        }
+      if (child.dispatchState === "consumed") continue;
+      const truth = loadChildTruth(runtimeRoot, child.taskId, gateway);
+      const decision = decideChildReconciliation({
+        child,
+        cp: truth.cp,
+        snap: truth.snap,
+        reportText: truth.reportText,
+      });
+      decisions.push({ taskId: child.taskId, ...decision });
+
+      if (decision.action === "mark_dispatched") {
+        child.dispatchState = "dispatched";
+        child.dispatchedAt = child.dispatchedAt || new Date().toISOString();
       }
-      if (
-        child.dispatchState === "dispatched" ||
-        child.dispatchState === "terminal_seen"
-      ) {
-        const cp = resolveTaskCheckpoint(child.taskId);
-        const terminal =
-          cp &&
-          (cp.finalState === "completed" ||
-            cp.finalState === "failed" ||
-            cp.finalState === "interrupted" ||
-            cp.finalState === "abandoned" ||
-            (cp.validation && cp.validation.classification));
-        if (terminal && child.dispatchState !== "consumed") {
-          child.dispatchState = "terminal_seen";
-          child.terminalAt = child.terminalAt || new Date().toISOString();
-          child.classification =
-            (cp.validation && cp.validation.classification) ||
-            cp.finalState ||
-            child.classification;
+      if (decision.action === "mark_terminal_and_consume") {
+        child.dispatchState = "terminal_seen";
+        child.terminalAt = child.terminalAt || new Date().toISOString();
+        child.classification = decision.classification || child.classification;
+        if (decision.provider) child.provider = decision.provider;
+        if (decision.engineMode) child.engineMode = decision.engineMode;
+        if (decision.orphan) {
+          child.orphanAbandoned = true;
         }
       }
     }
 
     writeBuildRecord(runtimeRoot, record);
 
-    // Consume terminal_seen children once
-    for (const child of [...record.children]) {
+    for (const child of [...(readBuildRecord(runtimeRoot, buildId)?.children || [])]) {
       if (child.dispatchState === "terminal_seen") {
         await consumeChildResult(buildId, child.taskId);
-        record = readBuildRecord(runtimeRoot, buildId) || record;
       }
     }
 
@@ -392,7 +396,15 @@ export function createBuildController(opts) {
       record = readBuildRecord(runtimeRoot, buildId) || record;
     }
 
-    return { ok: true, build: record };
+    return { ok: true, build: record, decisions };
+  }
+
+  /**
+   * Recover Build + children; idempotent consume; pending reinspect.
+   * @param {string} buildId
+   */
+  async function recover(buildId) {
+    return reconcileBuildChildren(buildId);
   }
 
   /**
@@ -803,6 +815,11 @@ export function createBuildController(opts) {
     child.resultFingerprint = resultFingerprint;
     child.classification = childVerificationClass(child) || child.classification;
     child.terminalAt = child.terminalAt || new Date().toISOString();
+    {
+      const provenance = extractProviderProvenance(cp, snap, reportText);
+      if (provenance.provider) child.provider = provenance.provider;
+      if (provenance.engineMode) child.engineMode = provenance.engineMode;
+    }
     record.loop.lastConsumedActionId = child.actionId;
     record.loop.pendingReinspect = true;
 
@@ -923,7 +940,21 @@ export function createBuildController(opts) {
    * @param {{ taskId: string, bindingId: string, reality: ReturnType<typeof captureBindingReality>|null, kind: string }} ctx
    */
   function applyAssessmentToRecord(record, reportText, ctx) {
-    const directives = parseStatusDirectives(reportText);
+    const parsed = parseBuildCognitiveResult(reportText, {
+      expectedBuildId: record.buildId,
+      expectedIntentRevision: record.intent?.outcomeRevision,
+      expectedAuthoritativeRevision: record.authoritativeSha || null,
+    });
+    if (parsed.malformedStructured && parsed.errors.length) {
+      record.loop.lastCognitiveParseError = {
+        errors: parsed.errors,
+        at: new Date().toISOString(),
+        taskId: ctx.taskId,
+        kind: ctx.kind,
+      };
+      // Do not mutate criteria from mismatched structured result; prose may still apply.
+    }
+    const directives = cognitiveResultToDirectives(parsed);
     const now = new Date().toISOString();
     const reality = ctx.reality;
 
@@ -945,6 +976,19 @@ export function createBuildController(opts) {
 
       const criterion = (record.outcomeCriteria || []).find((c) => c.id === d.id);
       if (criterion && /PROVEN|UNMET|UNKNOWN/.test(d.status)) {
+        // Structured revision mismatch already nulled structured; prose can still update.
+        if (
+          d.source.startsWith("structured") &&
+          parsed.errors.includes("authoritativeRevision_mismatch")
+        ) {
+          continue;
+        }
+        if (
+          d.source.startsWith("structured") &&
+          parsed.errors.includes("intentRevision_mismatch")
+        ) {
+          continue;
+        }
         criterion.status = /** @type {any} */ (d.status);
         criterion.evidence = ev;
         criterion.updatedAt = now;
@@ -958,6 +1002,14 @@ export function createBuildController(opts) {
         req.status = /** @type {any} */ (d.status);
         req.evidence = ev;
       }
+    }
+
+    if (parsed.structured?.proposedNextAction) {
+      record.hypotheses.proposedNextAction = String(
+        parsed.structured.proposedNextAction,
+      ).slice(0, 2_000);
+      record.hypotheses.updatedAt = now;
+      record.hypotheses.revisedByTaskId = ctx.taskId;
     }
 
     const nextMatch = reportText.match(/^\s*NEXT:\s*(.+)$/im);
@@ -1219,7 +1271,7 @@ export function createBuildController(opts) {
    * @param {string} buildId
    */
   async function tick(buildId) {
-    const recovered = await recover(buildId);
+    const recovered = await reconcileBuildChildren(buildId);
     if (!recovered.ok) return recovered;
     let record = /** @type {import('./types.mjs').BuildRecord} */ (recovered.build);
 
@@ -1234,6 +1286,65 @@ export function createBuildController(opts) {
         build: record,
         action: "blocked",
         reason: record.loop.blockedReason,
+      };
+    }
+
+    // One active child at a time — await / reconcile rather than dispatching another.
+    const active = [...(record.children || [])]
+      .reverse()
+      .find(
+        (c) =>
+          c.dispatchState === "dispatched" ||
+          c.dispatchState === "selected" ||
+          c.dispatchState === "terminal_seen",
+      );
+    if (active) {
+      if (active.dispatchState === "terminal_seen") {
+        await consumeChildResult(buildId, active.taskId);
+        return {
+          ok: true,
+          done: false,
+          action: "consumed_active",
+          taskId: active.taskId,
+          build: readBuildRecord(runtimeRoot, buildId),
+        };
+      }
+      if (!fakeMode) {
+        try {
+          await gateway.awaitTask(active.taskId, 120_000);
+        } catch {
+          // bounded wait — reconcile next tick / orphan rules
+        }
+        await reconcileBuildChildren(buildId);
+        const after = readBuildRecord(runtimeRoot, buildId);
+        const still = after?.children?.find((c) => c.taskId === active.taskId);
+        if (still && still.dispatchState !== "consumed") {
+          return {
+            ok: true,
+            done: false,
+            action: "await_active_child",
+            taskId: active.taskId,
+            kind: active.kind,
+            build: after,
+          };
+        }
+        return {
+          ok: true,
+          done: false,
+          action: "child_finished",
+          taskId: active.taskId,
+          kind: active.kind,
+          build: after,
+        };
+      }
+      // fakeMode: force-consume active so the loop can progress
+      await consumeChildResult(buildId, active.taskId);
+      return {
+        ok: true,
+        done: false,
+        action: "fake_consumed_active",
+        taskId: active.taskId,
+        build: readBuildRecord(runtimeRoot, buildId),
       };
     }
 
@@ -1688,6 +1799,7 @@ export function createBuildController(opts) {
     applyConversation,
     load,
     recover,
+    reconcileBuildChildren,
     runDepthA,
     dispatchChild,
     awaitAndConsume,

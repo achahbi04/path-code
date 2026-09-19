@@ -27,9 +27,20 @@ export {
   gitHeadSha,
 } from "./adopt.mjs";
 export {
+  decideChildReconciliation,
+  isTaskTerminal,
+  extractProviderProvenance,
+} from "./reconcile.mjs";
+export {
+  parseBuildCognitiveResult,
+  cognitiveResultToDirectives,
+  isBuildEvaluationResult,
+} from "./cognitive-result.mjs";
+export {
   ARTIFACT_PRESENTATION_MATRIX,
   describePresentation,
 } from "./runtime/presentation.mjs";
+export { resolveBrowserProvider } from "./runtime/browser-provider.mjs";
 
 export {
   captureBindingReality,
