@@ -371,10 +371,15 @@ window.addEventListener("message", (ev) => {
   }
 });
 
-// Resume latest active build if present
+// Resume explicit buildId from URL, else latest active build
 (async () => {
   try {
-    const res = await fetch("/api/builds/latest");
+    const params = new URLSearchParams(location.search);
+    const fromUrl = params.get("buildId");
+    const path = fromUrl
+      ? `/api/builds/${encodeURIComponent(fromUrl)}`
+      : "/api/builds/latest";
+    const res = await fetch(path);
     const view = await res.json();
     if (view?.buildId && view.phase !== "idle") {
       render(view);
