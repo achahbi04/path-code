@@ -234,9 +234,9 @@ export function createBuildController(opts) {
     record.productBrief = brief;
 
     if (Array.isArray(options.initialCriteria) && options.initialCriteria.length) {
-      // Caller-supplied criteria merge with derived; derived fills gaps.
+      // Caller-supplied criteria are authoritative (tests / harnesses).
       const now = new Date().toISOString();
-      const fromCaller = options.initialCriteria.map((c, i) => ({
+      record.outcomeCriteria = options.initialCriteria.map((c, i) => ({
         id: c.id || `c-${i + 1}`,
         statement: String(c.statement || "").slice(0, 2_000),
         required: c.required !== false,
@@ -245,14 +245,6 @@ export function createBuildController(opts) {
         updatedAt: now,
         source: "caller",
       }));
-      const derived = briefToOutcomeCriteria(brief);
-      const byId = new Map(fromCaller.map((c) => [c.id, c]));
-      for (const d of derived) {
-        if (!byId.has(d.id)) byId.set(d.id, d);
-      }
-      // Prefer derived set when caller only passed the legacy two generics.
-      record.outcomeCriteria =
-        fromCaller.length <= 2 ? derived : [...byId.values()];
     } else {
       record.outcomeCriteria = briefToOutcomeCriteria(brief);
     }
@@ -313,6 +305,22 @@ export function createBuildController(opts) {
     ];
     record.loop.pendingReinspect = false;
     record.productBranch = `path-build/${record.buildId.slice(0, 8)}`;
+    record.adoptionHistory = [];
+    record.browserEvidence = [];
+
+    // Seed product branch so subsequent task worktrees can merge back.
+    try {
+      const { ensureBuildProductBranch } = await import("./adopt.mjs");
+      const seeded = ensureBuildProductBranch({
+        projectRoot,
+        productBranch: record.productBranch,
+      });
+      if (seeded.ok) {
+        record.authoritativeSha = seeded.authoritativeSha;
+      }
+    } catch {
+      /* non-fatal — first engineer may still establish commits */
+    }
 
     writeBuildRecord(runtimeRoot, record);
     return { ok: true, build: record, projectRoot, originKind };
@@ -800,6 +808,81 @@ export function createBuildController(opts) {
 
     noteEngineerProductRoots(record, child, cp, snap, classification);
 
+    // Adopt engineer results into authoritative Build product revision.
+    /** @type {object | null} */
+    let adoption = null;
+    if (child.kind === "engineer") {
+      const changed =
+        Array.isArray(cp?.changedFiles) && cp.changedFiles.length > 0;
+      const acceptable =
+        /VERIFIED|SUCCESS/i.test(classification) ||
+        (/completed/i.test(String(cp?.finalState || "")) && changed);
+      if (acceptable || (changed && !/BLOCKED/i.test(classification))) {
+        const { adoptEngineerResultIntoBuild, ensureBuildProductBranch } =
+          await import("./adopt.mjs");
+        const productBranch =
+          record.productBranch || `path-build/${record.buildId.slice(0, 8)}`;
+        record.productBranch = productBranch;
+        ensureBuildProductBranch({
+          projectRoot: binding?.projectRoot || "",
+          productBranch,
+        });
+        if (binding?.projectRoot) {
+          adoption = adoptEngineerResultIntoBuild({
+            runtimeRoot,
+            buildId,
+            projectRoot: binding.projectRoot,
+            productBranch,
+            taskId,
+            taskBranch:
+              (typeof cp?.branch === "string" && cp.branch) ||
+              binding.activeTaskBranch ||
+              null,
+            sourceSha:
+              (typeof cp?.sha === "string" && cp.sha) ||
+              (typeof snap?.sha === "string" && snap.sha) ||
+              null,
+            worktreePath:
+              (typeof cp?.worktreePath === "string" && cp.worktreePath) ||
+              binding.activeWorktreePath ||
+              null,
+          });
+          if (adoption?.ok) {
+            if (!Array.isArray(record.adoptionHistory)) {
+              record.adoptionHistory = [];
+            }
+            record.adoptionHistory.push({
+              buildId,
+              taskId,
+              sourceSha: adoption.sourceSha,
+              adoptedSha: adoption.adoptedSha,
+              projectRoot: adoption.projectRoot,
+              productBranch: adoption.productBranch,
+              mode: adoption.mode,
+              adoptedAt: adoption.adoptedAt,
+            });
+            record.authoritativeSha = adoption.adoptedSha;
+            record.loop.pendingRuntimeRefresh = !fakeMode;
+            if (fakeMode) {
+              record.runtimeHealth = "ok";
+              record.previewUrl = record.previewUrl || "http://127.0.0.1:0/fake";
+            }
+            // Product reality is now primary — clear transient worktree pointer.
+            delete binding.activeWorktreePath;
+            child.adoptedSha = adoption.adoptedSha;
+            child.sourceSha = adoption.sourceSha;
+          } else if (adoption && !adoption.ok) {
+            record.loop.lastAdoptionError = {
+              code: adoption.code,
+              message: adoption.message,
+              at: new Date().toISOString(),
+              taskId,
+            };
+          }
+        }
+      }
+    }
+
     writeBuildRecord(runtimeRoot, record);
 
     // Depth A immediately after consume
@@ -830,6 +913,7 @@ export function createBuildController(opts) {
       depthA,
       probe,
       reportPath,
+      adoption,
     };
   }
 
@@ -959,6 +1043,22 @@ export function createBuildController(opts) {
         build: record,
       };
     }
+    if (record.loop.pendingRuntimeRefresh) {
+      return {
+        ok: true,
+        complete: false,
+        reason: "pending_runtime_refresh",
+        build: record,
+      };
+    }
+    if (record.loop.lastAdoptionError) {
+      return {
+        ok: true,
+        complete: false,
+        reason: "adoption_failed",
+        build: record,
+      };
+    }
     const requiredCriteria = (record.outcomeCriteria || []).filter((c) => c.required);
     const requiredReqs = (record.intent.explicitRequirements || []).filter(
       (r) => r.required,
@@ -968,6 +1068,29 @@ export function createBuildController(opts) {
         ok: true,
         complete: false,
         reason: "no_required_criteria",
+        build: record,
+      };
+    }
+    // Derived criteria must exist beyond the two legacy generics for visual/web Builds.
+    const derivedRequired = requiredCriteria.filter(
+      (c) => c.id !== "c-runnable" && c.id !== "c-outcome",
+    );
+    const productKindHint =
+      record.productBrief?.productKind ||
+      record.artifactKind ||
+      "unknown";
+    const needsDerived =
+      productKindHint === "web" ||
+      /website|web\s*app|landing/i.test(record.intent?.outcome || "");
+    if (
+      needsDerived &&
+      derivedRequired.length === 0 &&
+      (record.productBrief?.acceptanceCriteria || []).length > 2
+    ) {
+      return {
+        ok: true,
+        complete: false,
+        reason: "derived_criteria_missing",
         build: record,
       };
     }
@@ -1005,6 +1128,68 @@ export function createBuildController(opts) {
         build: record,
       };
     }
+
+    const productKind =
+      record.productBrief?.productKind ||
+      record.artifactKind ||
+      "unknown";
+    const isVisual =
+      !fakeMode &&
+      (productKind === "web" ||
+        /website|web\s*app|landing/i.test(record.intent?.outcome || ""));
+    if (isVisual) {
+      if (!record.authoritativeSha) {
+        return {
+          ok: true,
+          complete: false,
+          reason: "no_authoritative_revision",
+          build: record,
+        };
+      }
+      const evidence = Array.isArray(record.browserEvidence)
+        ? record.browserEvidence
+        : [];
+      const fresh = evidence
+        .filter((e) => e && e.ok)
+        .slice(-1)[0];
+      if (!fresh) {
+        return {
+          ok: true,
+          complete: false,
+          reason: "browser_evidence_required",
+          build: record,
+        };
+      }
+      if (
+        fresh.authoritativeSha &&
+        record.authoritativeSha &&
+        fresh.authoritativeSha !== record.authoritativeSha
+      ) {
+        return {
+          ok: true,
+          complete: false,
+          reason: "browser_evidence_stale_revision",
+          build: record,
+        };
+      }
+      if (record.runtimeHealth && record.runtimeHealth !== "ok") {
+        return {
+          ok: true,
+          complete: false,
+          reason: "runtime_unhealthy",
+          build: record,
+        };
+      }
+      if (!record.previewUrl) {
+        return {
+          ok: true,
+          complete: false,
+          reason: "preview_unreachable",
+          build: record,
+        };
+      }
+    }
+
     return { ok: true, complete: true, reason: "ready", build: record };
   }
 
@@ -1115,7 +1300,9 @@ export function createBuildController(opts) {
       objective = buildTargetedRevalidationObjective(record, demoted);
     } else if (completion.reason === "evaluate_required") {
       kind = "evaluate";
-      objective = frameEvaluateObjective(record);
+      objective = frameEvaluateObjective(record, {
+        evidencePackage: buildEvidencePackage(record),
+      });
     } else if (completion.reason === "challenge_required") {
       kind = "challenge";
       const claim =
@@ -1123,13 +1310,16 @@ export function createBuildController(opts) {
           ?.statement || completenessClaim(record);
       objective = frameChallengeObjective(record, claim, {
         preferPeerHint: true,
+        evidencePackage: buildEvidencePackage(record),
       });
     } else if (
       evaluates.length === 0 ||
       (engineers.length > evaluates.length && engineers.length % 2 === 0)
     ) {
       kind = "evaluate";
-      objective = frameEvaluateObjective(record);
+      objective = frameEvaluateObjective(record, {
+        evidencePackage: buildEvidencePackage(record),
+      });
     } else if (
       evaluates.length > 0 &&
       challenges.length === 0 &&
@@ -1141,6 +1331,7 @@ export function createBuildController(opts) {
           ?.statement || completenessClaim(record);
       objective = frameChallengeObjective(record, claim, {
         preferPeerHint: true,
+        evidencePackage: buildEvidencePackage(record),
       });
     } else {
       kind = "engineer";
@@ -1410,6 +1601,88 @@ export function createBuildController(opts) {
     return { ok: true, build: readBuildRecord(runtimeRoot, buildId) };
   }
 
+  /**
+   * Compact evidence package for evaluate/challenge objectives.
+   * @param {import('./types.mjs').BuildRecord} record
+   */
+  function buildEvidencePackage(record) {
+    const lastBrowser = Array.isArray(record.browserEvidence)
+      ? record.browserEvidence.slice(-1)[0]
+      : null;
+    const brief = record.productBrief;
+    const binding = (record.projectBindings || [])[0];
+    return [
+      `authoritativeSha: ${record.authoritativeSha || "(none)"}`,
+      `productBranch: ${record.productBranch || "(none)"}`,
+      `projectRoot: ${binding?.projectRoot || "(none)"}`,
+      `previewUrl: ${record.previewUrl || "(none)"}`,
+      `runtimeHealth: ${record.runtimeHealth || "(unknown)"}`,
+      `productKind: ${brief?.productKind || "(unknown)"}`,
+      `productBrief: ${(brief?.summary || brief?.title || "(none)").toString().slice(0, 400)}`,
+      `acceptanceCriteria: ${(brief?.acceptanceCriteria || [])
+        .map((c) => c.statement || c.id)
+        .slice(0, 12)
+        .join(" | ")}`,
+      lastBrowser
+        ? [
+            `browserEvidence: ok=${lastBrowser.ok} sha=${lastBrowser.authoritativeSha || "?"} title=${lastBrowser.title || ""}`,
+            `  html=${lastBrowser.htmlPath || ""} shot=${lastBrowser.screenshotPath || ""}`,
+            `  textSample=${String(lastBrowser.textSample || "").slice(0, 500)}`,
+            `  consoleErrors=${(lastBrowser.consoleErrors || []).slice(0, 5).join("; ")}`,
+          ].join("\n")
+        : "browserEvidence: (none)",
+      `adoptionHistory: ${(record.adoptionHistory || [])
+        .slice(-4)
+        .map((a) => `${a.taskId}:${a.sourceSha}->${a.adoptedSha}`)
+        .join(", ") || "(none)"}`,
+      `criteria: ${(record.outcomeCriteria || [])
+        .map((c) => `${c.id}=${c.status}`)
+        .join(", ")}`,
+      "Challenge/evaluate MUST use this evidence (DOM/screenshot/SHA/runtime) — do not trust engineer narrative alone.",
+    ].join("\n");
+  }
+
+  /**
+   * Attach runtime/preview health onto the Build record (called by surface).
+   * @param {string} buildId
+   * @param {{
+   *   previewUrl?: string | null,
+   *   runtimeHealth?: string | null,
+   *   authoritativeSha?: string | null,
+   *   browserEvidence?: object | null,
+   *   clearRuntimeRefresh?: boolean,
+   * }} patch
+   */
+  function patchRuntimeState(buildId, patch) {
+    const record = readBuildRecord(runtimeRoot, buildId);
+    if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (typeof patch.previewUrl === "string" || patch.previewUrl === null) {
+      record.previewUrl = patch.previewUrl;
+    }
+    if (typeof patch.runtimeHealth === "string" || patch.runtimeHealth === null) {
+      record.runtimeHealth = patch.runtimeHealth;
+    }
+    if (typeof patch.authoritativeSha === "string" && patch.authoritativeSha) {
+      record.authoritativeSha = patch.authoritativeSha;
+    }
+    if (patch.browserEvidence && typeof patch.browserEvidence === "object") {
+      if (!Array.isArray(record.browserEvidence)) record.browserEvidence = [];
+      record.browserEvidence.push({
+        ...patch.browserEvidence,
+        authoritativeSha:
+          patch.browserEvidence.authoritativeSha || record.authoritativeSha,
+        observedAt: new Date().toISOString(),
+      });
+      // Keep last 8
+      record.browserEvidence = record.browserEvidence.slice(-8);
+    }
+    if (patch.clearRuntimeRefresh) {
+      record.loop.pendingRuntimeRefresh = false;
+    }
+    writeBuildRecord(runtimeRoot, record);
+    return { ok: true, build: record };
+  }
+
   return {
     startBuild,
     applyConversation,
@@ -1424,6 +1697,7 @@ export function createBuildController(opts) {
     tick,
     runUntilDone,
     reviseIntent,
+    patchRuntimeState,
     formatStatus: (buildId) => {
       const b = readBuildRecord(runtimeRoot, buildId);
       return b ? formatBuildStatus(b) : "Build not found.";

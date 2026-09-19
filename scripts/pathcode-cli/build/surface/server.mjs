@@ -170,6 +170,73 @@ export async function startPathBuildSurface(options) {
    * @param {string} buildId
    * @param {{ autoPreview?: boolean }} [opts]
    */
+  /**
+   * Keep product runtime + browser evidence aligned with authoritative Build revision.
+   * @param {string} buildId
+   */
+  async function syncRuntimeForBuild(buildId) {
+    const gate = assertBuildRoot(buildId);
+    if (!gate.ok) return gate;
+    const build = gate.build;
+    const root = gate.projectRoot;
+    const artifact = detectBuildArtifact(root, {
+      outcomeHint: build.intent?.outcome,
+    });
+    if (artifact.preview.capability !== "web") {
+      controller.patchRuntimeState?.(buildId, {
+        previewUrl: null,
+        runtimeHealth: "n/a",
+        clearRuntimeRefresh: true,
+      });
+      return { ok: true, skipped: true, reason: "non_web" };
+    }
+    if ((artifact.signals || []).includes("empty_tree")) {
+      return { ok: true, skipped: true, reason: "empty_tree" };
+    }
+
+    const force = Boolean(build.loop?.pendingRuntimeRefresh);
+    const started = force
+      ? await runtimeManager.refresh(buildId, root, {
+          bindingId: gate.binding.bindingId,
+          outcomeHint: build.intent?.outcome,
+        })
+      : await runtimeManager.start(buildId, root, {
+          bindingId: gate.binding.bindingId,
+          outcomeHint: build.intent?.outcome,
+        });
+
+    if (!started.ok) {
+      controller.patchRuntimeState?.(buildId, {
+        previewUrl: null,
+        runtimeHealth: "failed",
+        clearRuntimeRefresh: true,
+      });
+      return started;
+    }
+
+    const preview = runtimeManager.getPreviewDescriptor(buildId);
+    const evidence = await captureBrowserEvidence({
+      url: started.runtime?.url || preview?.url,
+      buildId,
+      runtimeRoot,
+      expectText: String(build.intent?.outcome || "")
+        .split(/\s+/)
+        .filter((w) => w.length > 3)
+        .slice(0, 8),
+    });
+    evidence.authoritativeSha = build.authoritativeSha || null;
+
+    controller.patchRuntimeState?.(buildId, {
+      previewUrl: started.runtime?.url || preview?.url || null,
+      runtimeHealth: started.runtime?.status === "ready" ? "ok" : "down",
+      browserEvidence: evidence,
+      clearRuntimeRefresh: true,
+      authoritativeSha: build.authoritativeSha || null,
+    });
+
+    return { ok: true, runtime: started.runtime, evidence, preview };
+  }
+
   function ensureLoop(buildId, opts = {}) {
     if (loops.has(buildId)) return;
     const startedAt = new Date().toISOString();
@@ -177,7 +244,7 @@ export async function startPathBuildSurface(options) {
       .runUntilDone(buildId, { maxSteps: 48 })
       .then(async (result) => {
         if (opts.autoPreview !== false) {
-          await maybeStartPreview(buildId);
+          await syncRuntimeForBuild(buildId);
         }
         return result;
       })
@@ -232,25 +299,22 @@ export async function startPathBuildSurface(options) {
     const inspected = id ? await runtimeManager.inspect(id) : { runtime: null };
     let preview = id ? runtimeManager.getPreviewDescriptor(id) : null;
 
-    // Opportunistic preview start when product tree exists and runtime idle
+    // Opportunistic preview / revision sync
     if (
       id &&
       root &&
       artifact?.preview?.capability === "web" &&
-      !(artifact.signals || []).includes("empty_tree") &&
-      (!inspected.runtime ||
+      !(artifact.signals || []).includes("empty_tree")
+    ) {
+      const needs =
+        build?.loop?.pendingRuntimeRefresh ||
+        !inspected.runtime ||
         inspected.runtime.status === "stopped" ||
         inspected.runtime.status === "stale" ||
         inspected.runtime.status === "idle" ||
-        inspected.runtime.status === "unavailable")
-    ) {
-      const last = (build?.children || []).slice(-1)[0];
-      const engineered =
-        (build?.children || []).some((c) => c.kind === "engineer") ||
-        artifact.kind === "web";
-      if (engineered && last?.dispatchState !== "dispatched") {
-        // fire-and-forget; next poll picks it up
-        void maybeStartPreview(id);
+        inspected.runtime.status === "unavailable";
+      if (needs) {
+        void syncRuntimeForBuild(id);
       }
     }
 
@@ -304,10 +368,12 @@ export async function startPathBuildSurface(options) {
           return;
         }
         const stripPrefix = `/preview/${encodeURIComponent(buildId)}`;
+        const buildRec = readBuildRecord(runtimeRoot, buildId);
         proxyPreviewHttp(req, res, {
           targetUrl,
           buildId,
           stripPrefix,
+          authoritativeSha: buildRec?.authoritativeSha || null,
         });
         return;
       }
@@ -390,7 +456,7 @@ export async function startPathBuildSurface(options) {
 
         if (method === "POST" && action === "tick") {
           const step = await controller.tick(buildId);
-          if (step.ok) await maybeStartPreview(buildId);
+          if (step.ok) await syncRuntimeForBuild(buildId);
           sendJson(res, step.ok ? 200 : 400, {
             ...step,
             view: await viewFor(buildId),

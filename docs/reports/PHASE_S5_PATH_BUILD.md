@@ -1,11 +1,12 @@
 # PATH CODE — S5
-# PATH BUILD (visual builder pass)
+# PATH BUILD (visual builder closure pass)
 
 **S5 NOT FROZEN**  
-**OPERATOR ACCEPTANCE:** **NOT YET** — substrate + builder UI shipped; full real-engine ICE visual e2e still open  
+**OPERATOR ACCEPTANCE:** **NOT YET** — awaiting real-engine ICE visual E2E operator confirmation  
 **PRODUCT SURFACE:** visual builder workspace (`path-build`) over Gateway / S3 / S5 controller
 
-**Authoritative tip (dirty worktree):** see `git status` — visual builder modules uncommitted on top of `59f64be628c6550915ecf71f254a640c5e5249b5`
+**Substrate checkpoint:** `c931421`  
+**Closure work:** uncommitted on top of substrate until committed in this pass
 
 **Product entry:**
 
@@ -20,28 +21,22 @@ Opens a local **builder workspace**: conversation + **live product preview** (if
 
 ---
 
-## What this pass added
+## Authoritative Build product revision
 
-| Area | Location |
+| Concept | Definition |
 | --- | --- |
-| Exact Build-origin binding | `build/origin.mjs` — `exactRoot` never walks to `$HOME` |
-| Product brief / derived criteria | `build/brief.mjs` |
-| Conversation steering | `build/conversation.mjs` + `POST /api/builds/:id/message` |
-| Artifact detection | `build/runtime/artifact.mjs` |
-| Runtime manager | `build/runtime/manager.mjs` (+ static serve, browser evidence, proxy) |
-| Builder UI | `build/surface/public/{index.html,app.js,app.css}` |
-| Proof harness | `build/proof-visual-builder.mjs` |
-| Regressions | `tests/s5/build-builder.test.ts` (26/26 S5 tests passing) |
+| Authoritative tree | Build binding `projectRoot` checked out on `path-build/<buildIdPrefix>` |
+| Engineer isolation | Gateway task worktree on `path/task-*` |
+| Adoption | `git merge path/task-*` into product branch via `build/adopt.mjs` (no `cp -R`) |
+| Runtime / preview / Open Folder / Open in PATH Code | All bind to the same `projectRoot` after adoption |
+
+Persisted per adoption: `buildId`, `taskId`, `sourceSha`, `adoptedSha`, `projectRoot`, `productBranch`, `adoptedAt`.
 
 ---
 
-## Still open before operator acceptance
+## Artifact presentation matrix
 
-1. **Real-engine ICE e2e** (no `PATHCODE_BUILD_FAKE`) with engineer → preview → conversation change → visible HMR/reload proof  
-2. **Worktree → product branch adoption** beyond recording `productBranch`  
-3. **Playwright** screenshots (optional dep; fetch HTML evidence works today)  
-4. **Evaluate/challenge** consuming rendered browser evidence automatically  
-5. Non-web presentation adapters beyond detection stubs  
+See `scripts/pathcode-cli/build/runtime/presentation.mjs` — web is fully interactive in-builder; desktop/mobile/multi_service unsupported; api/cli/service partial.
 
 ---
 
@@ -50,4 +45,6 @@ Opens a local **builder workspace**: conversation + **live product preview** (if
 ```bash
 npx vitest run tests/s5/
 node scripts/pathcode-cli/build/proof-visual-builder.mjs
+# Real engine (no fake env):
+PATHCODE_BUILD_NO_OPEN=1 node scripts/pathcode-cli/build/real-visual-e2e.mjs
 ```

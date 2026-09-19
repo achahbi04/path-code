@@ -6,17 +6,25 @@
 import { request as httpRequest } from "node:http";
 
 /**
- * Inject element-selection helper into HTML responses for visual targeting.
+ * Inject element-selection helper + revision marker into HTML responses.
  * @param {string} html
  * @param {string} buildId
+ * @param {{ authoritativeSha?: string | null }} [meta]
  */
-export function injectPreviewHelpers(html, buildId) {
+export function injectPreviewHelpers(html, buildId, meta = {}) {
+  const sha = typeof meta.authoritativeSha === "string" ? meta.authoritativeSha : "";
+  const metaTag = sha
+    ? `<meta name="path-build-revision" content="${sha.replace(/"/g, "")}">`
+    : "";
   const snip = `
+${metaTag}
 <script data-path-build-preview="1">
 (function(){
   if (window.__PATH_BUILD_PREVIEW__) return;
   window.__PATH_BUILD_PREVIEW__ = true;
   var BUILD_ID = ${JSON.stringify(buildId)};
+  var AUTH_SHA = ${JSON.stringify(sha)};
+  window.__PATH_BUILD_REVISION__ = AUTH_SHA || null;
   var selecting = false;
   function cssPath(el){
     if (!el || el.nodeType !== 1) return "";
@@ -94,6 +102,7 @@ export function injectPreviewHelpers(html, buildId) {
  *   targetUrl: string,
  *   buildId: string,
  *   stripPrefix: string,
+ *   authoritativeSha?: string | null,
  * }} opts
  */
 export function proxyPreviewHttp(req, res, opts) {
@@ -119,12 +128,17 @@ export function proxyPreviewHttp(req, res, opts) {
         proxyRes.on("data", (c) => chunks.push(c));
         proxyRes.on("end", () => {
           let body = Buffer.concat(chunks).toString("utf8");
-          body = injectPreviewHelpers(body, opts.buildId);
+          body = injectPreviewHelpers(body, opts.buildId, {
+            authoritativeSha: opts.authoritativeSha || null,
+          });
           const outHeaders = { ...proxyRes.headers };
           delete outHeaders["content-length"];
           delete outHeaders["content-encoding"];
           outHeaders["content-type"] = "text/html; charset=utf-8";
           outHeaders["cache-control"] = "no-store";
+          if (opts.authoritativeSha) {
+            outHeaders["x-path-build-revision"] = String(opts.authoritativeSha);
+          }
           // Allow iframe embedding from same origin builder
           delete outHeaders["x-frame-options"];
           if (outHeaders["content-security-policy"]) {

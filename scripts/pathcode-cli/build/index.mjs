@@ -21,6 +21,15 @@ export { classifyConversationMessage } from "./conversation.mjs";
 export { detectBuildArtifact, resolveArtifactStartPlan } from "./runtime/artifact.mjs";
 export { createBuildRuntimeManager } from "./runtime/manager.mjs";
 export { captureBrowserEvidence } from "./runtime/browser-evidence.mjs";
+export {
+  adoptEngineerResultIntoBuild,
+  ensureBuildProductBranch,
+  gitHeadSha,
+} from "./adopt.mjs";
+export {
+  ARTIFACT_PRESENTATION_MATRIX,
+  describePresentation,
+} from "./runtime/presentation.mjs";
 
 export {
   captureBindingReality,

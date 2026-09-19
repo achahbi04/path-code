@@ -42,6 +42,17 @@ export function frameEngineerObjective(record, gap) {
       ].join("\n")
     : "Continue engineering toward the outcome with project-native validation.";
 
+  const lastUser = [...(record.conversation || [])]
+    .reverse()
+    .find((m) => m.role === "user" && m.element);
+  const selectionBlock = lastUser?.element
+    ? [
+        "",
+        "Operator selected a preview element — prioritize editing that source/render target:",
+        JSON.stringify(lastUser.element).slice(0, 1_500),
+      ].join("\n")
+    : "";
+
   return [
     "PATH Build engineer task — intentional product mutation is allowed.",
     "Close the following product gap with real engineering in this project.",
@@ -50,6 +61,7 @@ export function frameEngineerObjective(record, gap) {
     greenfieldHint,
     "",
     intentBlock(record),
+    selectionBlock,
     "",
     "Highest-value gap to close now:",
     gap ||
@@ -57,7 +69,9 @@ export function frameEngineerObjective(record, gap) {
       "Establish the software architecture, manifests, runnable entrypoints, and tests required by the outcome.",
     "",
     "When done, summarize what exists now vs what still remains for the Build outcome.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /**

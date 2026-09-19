@@ -91,7 +91,32 @@ export async function captureBrowserEvidence(input) {
   try {
     const mod = await import("playwright").catch(() => null);
     if (mod?.chromium) {
-      const browser = await mod.chromium.launch({ headless: true });
+      /** @type {{ headless: boolean, executablePath?: string }} */
+      const launchOpts = { headless: true };
+      const home = process.env.HOME || "";
+      const browsersRoot =
+        process.env.PLAYWRIGHT_BROWSERS_PATH ||
+        join(home, "Library/Caches/ms-playwright");
+      const candidates = [
+        process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+        join(
+          browsersRoot,
+          "chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
+        ),
+        join(
+          browsersRoot,
+          "chromium-1148/chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
+        ),
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+      ].filter(Boolean);
+      for (const c of candidates) {
+        if (c && existsSync(c)) {
+          launchOpts.executablePath = c;
+          break;
+        }
+      }
+      const browser = await mod.chromium.launch(launchOpts);
       try {
         const page = await browser.newPage({
           viewport: input.viewport || { width: 1280, height: 800 },
