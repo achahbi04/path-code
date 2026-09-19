@@ -6,7 +6,7 @@
 **OPERATOR ACCEPTANCE:** **NOT READY**  
 **S5 NOT FROZEN**
 
-**S5 implementation checkpoint (authoritative HEAD — includes probe honesty fix + latest e2e evidence):** see git log after doc/evidence commit on `cursor/pathcode-antigravity-v1`  
+**S5 implementation checkpoint (authoritative HEAD — includes probe honesty fix + latest e2e evidence):** 357d9328ad2fe0634fd43ad6e0e394d517907a34  
 **Prior superseded checkpoint:** `d4e3f7b5304fd78dcd3560a405b035a239c744d5` (archived e2e used probe README materialization — **invalid for operator acceptance**)
 
 **Mode:** mechanical fake fabric for CI/unit tests; real-engine PATH Build via `node docs/reports/g10-evidence/s5/run-s5-real-e2e.mjs` (no Build fake fabric, no Gateway fake engine)
