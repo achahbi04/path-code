@@ -13,7 +13,8 @@
     "arm64"
   ],
   "bin": {
-    "pathcode": "./scripts/pathcode.mjs"
+    "pathcode": "./scripts/pathcode.mjs",
+    "path-build": "./scripts/path-build.mjs"
   },
   "exports": {
     ".": {
@@ -27,6 +28,7 @@
     "dist",
     "README.md",
     "scripts/pathcode.mjs",
+    "scripts/path-build.mjs",
     "scripts/path-studio",
     "scripts/pathcode-cli/*.mjs",
     "scripts/pathcode-cli/ag1/**",
@@ -37,7 +39,8 @@
     "scripts/pathcode-cli/ag8/**",
     "scripts/pathcode-cli/ag9/**",
     "scripts/pathcode-cli/ag10/**",
-    "scripts/pathcode-cli/gateway/**"
+    "scripts/pathcode-cli/gateway/**",
+    "scripts/pathcode-cli/build/**"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",

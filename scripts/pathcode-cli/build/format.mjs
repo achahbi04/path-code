@@ -70,7 +70,7 @@ export function formatBuildStatus(build) {
   }
   lines.push("");
   lines.push(
-    "Commands: /build status · /build tick · /build steer · /build run · /help",
+    "Product surface: path-build (browser). Debug: /build status · tick · steer · run",
   );
   return lines.join("\n");
 }

@@ -42,3 +42,5 @@ export {
 
 export { createBuildController } from "./controller.mjs";
 export { formatBuildStatus, formatBuildCard } from "./format.mjs";
+export { projectBuildForSurface } from "./surface/product-view.mjs";
+export { startPathBuildSurface } from "./surface/server.mjs";

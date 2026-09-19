@@ -65,7 +65,7 @@ export function renderWelcomeScreen(opts = {}) {
     "  /prefs · /model · /autonomy   Preferences",
     "  /attach [id]        Rejoin a Gateway-owned task still running",
     "  /resume [id]        Continue an interrupted task after restart",
-    "  /build …            Outcome-driven PATH Build (product-level loop)",
+    "  /build …            Debug Build loop (product surface: path-build)",
     "  /help               Full command list",
     "  /exit               Leave",
     "",
@@ -113,7 +113,7 @@ At the prompt:
   /pr [id]       Push task branch + open/reuse a GitHub pull request
   /attach [id]   Rejoin a Gateway-owned task that is still running
   /resume [id]   Recover an interrupted task from durable checkpoint/worktree
-  /build …       PATH Build — outcome-driven product loop (see /build help)
+  /build …       Debug Build loop — product builder is: path-build / node scripts/path-build.mjs
   /log, /task    Show recent structured task trace lines
   /model <id>    Set model for subsequent tasks (persisted)
   /autonomy …    Set review|bounded for subsequent tasks (persisted)

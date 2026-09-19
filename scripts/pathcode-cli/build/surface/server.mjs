@@ -1,0 +1,453 @@
+/**
+ * PATH Build — localhost product surface server.
+ * Drives createBuildController over Gateway. Not PATH Code. Not Studio.
+ */
+
+import { createServer } from "node:http";
+import {
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  statSync,
+} from "node:fs";
+import { dirname, join, extname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
+import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
+
+import { createGatewayRuntime } from "../../gateway/runtime.mjs";
+import {
+  createBuildController,
+  readBuildRecord,
+  findLatestActiveBuild,
+  listBuildRecords,
+} from "../index.mjs";
+import { projectBuildForSurface } from "./product-view.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = join(HERE, "public");
+
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".json": "application/json; charset=utf-8",
+  ".ico": "image/x-icon",
+};
+
+/**
+ * @param {string} outcome
+ */
+function slugifyOutcome(outcome) {
+  const base = String(outcome || "product")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 36);
+  return base || "product";
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} req
+ */
+function readJsonBody(req) {
+  return new Promise((resolveBody, reject) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      const raw = Buffer.concat(chunks).toString("utf8");
+      if (!raw.trim()) {
+        resolveBody({});
+        return;
+      }
+      try {
+        resolveBody(JSON.parse(raw));
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+/**
+ * @param {import('node:http').ServerResponse} res
+ * @param {number} status
+ * @param {object} body
+ */
+function sendJson(res, status, body) {
+  const data = JSON.stringify(body);
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(data);
+}
+
+/**
+ * @param {import('node:http').ServerResponse} res
+ * @param {string} filePath
+ */
+function sendFile(res, filePath) {
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+    res.writeHead(404).end("Not found");
+    return;
+  }
+  const ext = extname(filePath);
+  const type = MIME[ext] || "application/octet-stream";
+  res.writeHead(200, { "Content-Type": type, "Cache-Control": "no-cache" });
+  res.end(readFileSync(filePath));
+}
+
+/**
+ * @param {{
+ *   packageRoot: string,
+ *   runtimeRoot: string,
+ *   host?: string,
+ *   port?: number,
+ *   openBrowser?: boolean,
+ *   preferredEngine?: string | null,
+ *   fakeMode?: boolean,
+ * }} options
+ */
+export async function startPathBuildSurface(options) {
+  const packageRoot = options.packageRoot;
+  const runtimeRoot = options.runtimeRoot;
+  const host = options.host || "127.0.0.1";
+  const preferredEngine =
+    typeof options.preferredEngine === "string" && options.preferredEngine.trim()
+      ? options.preferredEngine.trim()
+      : process.env.PATHCODE_PREFERRED_ENGINE || null;
+  const fakeMode =
+    options.fakeMode === true ||
+    process.env.PATHCODE_BUILD_FAKE === "1" ||
+    process.env.PATHCODE_GATEWAY_FAKE_ENGINE === "1";
+
+  const gatewayRuntime = createGatewayRuntime({
+    packageRoot,
+    runtimeRoot,
+  });
+
+  /** @type {ReturnType<typeof createBuildController>} */
+  const controller = createBuildController({
+    runtimeRoot,
+    preferredEngine,
+    fakeMode,
+    gateway: {
+      bindProject: (cwd) =>
+        gatewayRuntime.bindProject({
+          cwd: typeof cwd === "string" ? cwd : cwd?.cwd,
+        }),
+      startTask: (objective, extra) =>
+        gatewayRuntime.startTask({ objective, ...extra }),
+      resumeTask: (taskId, extra) =>
+        gatewayRuntime.resumeTask({ taskId, ...extra }),
+      awaitTask: (taskId, timeoutMs) =>
+        gatewayRuntime.awaitTask(taskId, timeoutMs),
+      steerTask: (taskId, text) => gatewayRuntime.steerTask(taskId, text),
+      snapshotTask: (taskId) => gatewayRuntime.snapshotTask(taskId),
+    },
+  });
+
+  /** @type {Map<string, { promise: Promise<unknown>, startedAt: string }>} */
+  const loops = new Map();
+
+  /**
+   * @param {string} buildId
+   */
+  function ensureLoop(buildId) {
+    if (loops.has(buildId)) return;
+    const startedAt = new Date().toISOString();
+    const promise = controller
+      .runUntilDone(buildId, { maxSteps: 48 })
+      .catch((err) => ({
+        ok: false,
+        message: err instanceof Error ? err.message : String(err),
+      }))
+      .finally(() => {
+        // keep entry until replaced so UI can see last run
+      });
+    loops.set(buildId, { promise, startedAt });
+  }
+
+  /**
+   * @param {string} [buildId]
+   */
+  function viewFor(buildId) {
+    let id = buildId || "";
+    if (!id) {
+      const latest =
+        findLatestActiveBuild(runtimeRoot) ||
+        listBuildRecords(runtimeRoot)[0] ||
+        null;
+      id = latest?.buildId || "";
+    }
+    const build = id ? readBuildRecord(runtimeRoot, id) : null;
+    const view = projectBuildForSurface(build);
+    const loop = id ? loops.get(id) : null;
+    return {
+      ...view,
+      loopRunning: Boolean(loop),
+      fakeMode,
+      preferredEngine: preferredEngine || null,
+    };
+  }
+
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url || "/", `http://${host}`);
+    const path = url.pathname;
+    const method = req.method || "GET";
+
+    try {
+      if (method === "GET" && (path === "/" || path === "/index.html")) {
+        sendFile(res, join(PUBLIC_DIR, "index.html"));
+        return;
+      }
+      if (method === "GET" && path.startsWith("/assets/")) {
+        const rel = path.slice("/assets/".length).replace(/\.\./g, "");
+        sendFile(res, join(PUBLIC_DIR, rel));
+        return;
+      }
+
+      if (method === "GET" && path === "/api/health") {
+        sendJson(res, 200, {
+          ok: true,
+          product: "path-build",
+          fakeMode,
+          preferredEngine,
+          runtimeRoot,
+        });
+        return;
+      }
+
+      if (method === "GET" && path === "/api/builds/latest") {
+        sendJson(res, 200, viewFor());
+        return;
+      }
+
+      if (method === "GET" && path === "/api/builds") {
+        const rows = listBuildRecords(runtimeRoot).slice(0, 20);
+        sendJson(res, 200, {
+          ok: true,
+          builds: rows.map((b) => ({
+            buildId: b.buildId,
+            status: b.loop?.status,
+            outcome: b.intent?.outcome,
+            projectRoot: b.projectBindings?.[0]?.projectRoot || null,
+            updatedAt: b.updatedAt,
+          })),
+        });
+        return;
+      }
+
+      const buildMatch = path.match(/^\/api\/builds\/([^/]+)(?:\/([^/]+))?$/);
+      if (buildMatch) {
+        const buildId = decodeURIComponent(buildMatch[1]);
+        const action = buildMatch[2] || "";
+
+        if (method === "GET" && !action) {
+          const build = readBuildRecord(runtimeRoot, buildId);
+          if (!build) {
+            sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
+            return;
+          }
+          sendJson(res, 200, viewFor(buildId));
+          return;
+        }
+
+        if (method === "GET" && action === "events") {
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          });
+          const push = () => {
+            const payload = JSON.stringify(viewFor(buildId));
+            res.write(`data: ${payload}\n\n`);
+          };
+          push();
+          const timer = setInterval(push, 1200);
+          req.on("close", () => clearInterval(timer));
+          return;
+        }
+
+        if (method === "POST" && action === "tick") {
+          const step = await controller.tick(buildId);
+          sendJson(res, step.ok ? 200 : 400, {
+            ...step,
+            view: viewFor(buildId),
+          });
+          return;
+        }
+
+        if (method === "POST" && action === "run") {
+          ensureLoop(buildId);
+          sendJson(res, 200, { ok: true, view: viewFor(buildId) });
+          return;
+        }
+
+        if (method === "POST" && (action === "steer" || action === "require")) {
+          const body = await readJsonBody(req);
+          const text = String(body.text || body.statement || "").trim();
+          if (!text) {
+            sendJson(res, 400, {
+              ok: false,
+              code: "TEXT_REQUIRED",
+              message: "Provide text for steer/require.",
+            });
+            return;
+          }
+          const revised =
+            action === "require"
+              ? await controller.reviseIntent(buildId, {
+                  addRequirements: [{ statement: text }],
+                })
+              : await controller.reviseIntent(buildId, { outcome: text });
+          if (revised.ok) ensureLoop(buildId);
+          sendJson(res, revised.ok ? 200 : 400, {
+            ...revised,
+            view: viewFor(buildId),
+          });
+          return;
+        }
+      }
+
+      if (method === "POST" && path === "/api/open-folder") {
+        const body = await readJsonBody(req);
+        const dir =
+          typeof body.path === "string" && body.path.trim()
+            ? resolve(body.path.trim())
+            : "";
+        if (!dir || !existsSync(dir)) {
+          sendJson(res, 400, { ok: false, code: "PATH_REQUIRED" });
+          return;
+        }
+        try {
+          spawn("open", [dir], { detached: true, stdio: "ignore" }).unref();
+          sendJson(res, 200, { ok: true });
+        } catch (err) {
+          sendJson(res, 500, {
+            ok: false,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (method === "POST" && path === "/api/builds") {
+        const body = await readJsonBody(req);
+        const outcome = String(body.outcome || "").trim();
+        if (!outcome) {
+          sendJson(res, 400, {
+            ok: false,
+            code: "OUTCOME_REQUIRED",
+            message: "Describe what you want to build.",
+          });
+          return;
+        }
+
+        let targetDir =
+          typeof body.targetDir === "string" && body.targetDir.trim()
+            ? resolve(body.targetDir.trim())
+            : "";
+        if (!targetDir) {
+          const root = join(homedir(), "PATH Builds");
+          mkdirSync(root, { recursive: true });
+          targetDir = join(
+            root,
+            `${slugifyOutcome(outcome)}-${randomUUID().slice(0, 6)}`,
+          );
+        }
+        mkdirSync(targetDir, { recursive: true });
+
+        const started = await controller.startBuild(outcome, {
+          targetDir,
+          initialCriteria: [
+            {
+              id: "c-runnable",
+              statement:
+                "Core software is runnable with project-native checks",
+              required: true,
+            },
+            {
+              id: "c-outcome",
+              statement: "Software advances the stated outcome",
+              required: true,
+            },
+          ],
+        });
+        if (!started.ok) {
+          sendJson(res, 400, started);
+          return;
+        }
+        ensureLoop(started.build.buildId);
+        sendJson(res, 200, {
+          ok: true,
+          buildId: started.build.buildId,
+          projectRoot: started.projectRoot,
+          view: viewFor(started.build.buildId),
+        });
+        return;
+      }
+
+      res.writeHead(404).end("Not found");
+    } catch (err) {
+      sendJson(res, 500, {
+        ok: false,
+        code: "SURFACE_ERROR",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+
+  const preferred =
+    typeof options.port === "number" && options.port > 0
+      ? options.port
+      : Number(process.env.PATHCODE_BUILD_PORT || 7788) || 7788;
+
+  const port = await new Promise((resolvePort, reject) => {
+    const tryListen = (p) => {
+      const onError = (err) => {
+        server.off("listening", onListening);
+        if (err && err.code === "EADDRINUSE" && p !== 0) {
+          tryListen(0);
+          return;
+        }
+        reject(err);
+      };
+      const onListening = () => {
+        server.off("error", onError);
+        const addr = server.address();
+        resolvePort(typeof addr === "object" && addr ? addr.port : p);
+      };
+      server.once("error", onError);
+      server.once("listening", onListening);
+      server.listen(p, host);
+    };
+    tryListen(preferred);
+  });
+
+  const url = `http://${host}:${port}/`;
+  if (options.openBrowser !== false && process.env.PATHCODE_BUILD_NO_OPEN !== "1") {
+    try {
+      spawn("open", [url], { detached: true, stdio: "ignore" }).unref();
+    } catch {
+      // operator can open manually
+    }
+  }
+
+  return {
+    url,
+    host,
+    port,
+    server,
+    runtimeRoot,
+    fakeMode,
+    stop: () =>
+      new Promise((resolveStop) => {
+        server.close(() => resolveStop());
+      }),
+  };
+}

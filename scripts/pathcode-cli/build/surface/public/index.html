@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PATH Build</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true"></div>
+    <main class="shell">
+      <header class="brand-block">
+        <p class="brand">PATH Build</p>
+        <p class="tagline">Turn an outcome into working software.</p>
+      </header>
+
+      <section class="composer" id="composer">
+        <label class="sr-only" for="outcome">What do you want to build?</label>
+        <textarea
+          id="outcome"
+          name="outcome"
+          rows="3"
+          placeholder="Build me an inventory app for a small warehouse…"
+          autocomplete="off"
+        ></textarea>
+        <div class="composer-actions">
+          <button type="button" class="cta" id="buildBtn">Build</button>
+        </div>
+        <p class="hint" id="hint">
+          Fresh project under ~/PATH Builds. Engines use your real PATH fabric —
+          Cursor, Copilot, or Antigravity.
+        </p>
+      </section>
+
+      <section class="stage" id="stage" hidden>
+        <div class="stage-pulse" id="pulse" aria-hidden="true"></div>
+        <p class="phase-kicker" id="phaseKicker">Working</p>
+        <h1 class="headline" id="headline">Building your product…</h1>
+        <p class="detail" id="detail"></p>
+
+        <div class="meta-row" id="metaRow"></div>
+
+        <div class="lists" id="lists"></div>
+
+        <div class="steer-panel" id="steerPanel" hidden>
+          <label for="steerText">Steer the product</label>
+          <textarea
+            id="steerText"
+            rows="2"
+            placeholder="Change direction, or add a must-have…"
+          ></textarea>
+          <div class="steer-actions">
+            <button type="button" class="ghost" id="steerBtn">Revise outcome</button>
+            <button type="button" class="ghost" id="requireBtn">Add requirement</button>
+          </div>
+        </div>
+
+        <div class="handoff" id="handoff" hidden>
+          <p class="handoff-title">Your project</p>
+          <code class="path" id="projectPath"></code>
+          <div class="handoff-actions">
+            <button type="button" class="cta secondary" id="openFolderBtn">
+              Open folder
+            </button>
+            <button type="button" class="ghost" id="newBuildBtn">New build</button>
+          </div>
+          <p class="hint">
+            PATH Code stays the terminal for engineering an existing repo. This
+            surface is for creating the product.
+          </p>
+        </div>
+      </section>
+
+      <p class="error" id="error" hidden></p>
+    </main>
+    <script src="/assets/app.js" type="module"></script>
+  </body>
+</html>
