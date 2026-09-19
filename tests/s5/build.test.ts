@@ -12,6 +12,7 @@ import {
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { Readable, Writable } from "node:stream";
 
 import {
   ensureBuildOrigin,
@@ -427,4 +428,152 @@ describe("S5 PATH Build", () => {
     expect(refresh.delta.depth).toBe("A");
     expect(refresh.delta.bindingId).toBe(origin.binding.bindingId);
   });
+});
+
+describe("S5 unbound operator entrypoint", () => {
+  /** @type {string} */
+  let emptyDir;
+  /** @type {string | undefined} */
+  let prevCwd;
+  /** @type {Record<string, string | undefined>} */
+  let prevEnv;
+
+  beforeEach(() => {
+    emptyDir = mkdtempSync(join(tmpdir(), "path-s5-empty-"));
+    prevCwd = process.cwd();
+    prevEnv = {
+      PATHCODE_RUNTIME_ROOT: process.env.PATHCODE_RUNTIME_ROOT,
+      PATHCODE_BUILD_FAKE: process.env.PATHCODE_BUILD_FAKE,
+      PATHCODE_GATEWAY_FAKE_ENGINE: process.env.PATHCODE_GATEWAY_FAKE_ENGINE,
+      PATHCODE_USE_GATEWAY: process.env.PATHCODE_USE_GATEWAY,
+    };
+    process.env.PATHCODE_RUNTIME_ROOT = join(emptyDir, ".path-runtime");
+    process.env.PATHCODE_BUILD_FAKE = "1";
+    delete process.env.PATHCODE_GATEWAY_FAKE_ENGINE;
+    process.env.PATHCODE_USE_GATEWAY = "0";
+    process.chdir(emptyDir);
+  });
+
+  afterEach(() => {
+    try {
+      if (prevCwd) process.chdir(prevCwd);
+    } catch {
+      // ignore
+    }
+    for (const [k, v] of Object.entries(prevEnv)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    try {
+      rmSync(emptyDir, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+  });
+
+  function createReplTty(lines: string[]) {
+    const queue = [...lines];
+    const chunks: string[] = [];
+
+    const stdin = new Readable({ read() {} }) as Readable & {
+      isTTY: boolean;
+      isRaw: boolean;
+      setRawMode: (mode: boolean) => Readable;
+    };
+    stdin.isTTY = true;
+    stdin.isRaw = false;
+    stdin.setRawMode = function setRawMode(mode: boolean) {
+      this.isRaw = mode;
+      return this;
+    };
+
+    const feedNext = () => {
+      const next = queue.shift();
+      if (next === undefined) {
+        stdin.push(null);
+        return;
+      }
+      setImmediate(() => stdin.push(`${next}\n`));
+    };
+
+    let feedArmed = true;
+    const stdout = new Writable({
+      write(chunk, _encoding, callback) {
+        const text = String(chunk);
+        chunks.push(text);
+        if (text.includes("\u001b[?2004l")) {
+          feedArmed = true;
+        }
+        if (feedArmed && text.includes("\u001b]7878;path-idle-composer\u0007")) {
+          feedArmed = false;
+          setImmediate(() => feedNext());
+        } else if (feedArmed && text.endsWith("> ")) {
+          feedArmed = false;
+          setImmediate(() => feedNext());
+        }
+        callback();
+      },
+    }) as Writable & { isTTY: boolean; columns: number };
+    stdout.isTTY = true;
+    stdout.columns = 100;
+
+    const stderr = new Writable({
+      write(chunk, _encoding, callback) {
+        chunks.push(String(chunk));
+        callback();
+      },
+    });
+
+    return { stdin, stdout, stderr, output: () => chunks.join("") };
+  }
+
+  it("non-interactive empty dir still exits NOT_A_PROJECT", async () => {
+    const { runPathcodeMain } = await import(
+      new URL("../../scripts/pathcode.mjs", import.meta.url).href
+    );
+    const chunks: string[] = [];
+    const write = (s: string) => {
+      chunks.push(s);
+      return true;
+    };
+    const code = await runPathcodeMain([], {
+      stdin: { isTTY: false },
+      stdout: { isTTY: false, write, columns: 80 },
+      stderr: { isTTY: false, write },
+    });
+    expect(code).toBe(2);
+    expect(chunks.join("")).toMatch(/existing project directory/);
+  });
+
+  it("interactive empty dir opens unbound; /build start git-inits; Code stays honest", async () => {
+    const { runPathcodeMain } = await import(
+      new URL("../../scripts/pathcode.mjs", import.meta.url).href
+    );
+    let ag1Calls = 0;
+    const tty = createReplTty([
+      "please fix the tests",
+      "/build help",
+      "/build start Build a tiny offline hello CLI with a README",
+      "/exit",
+    ]);
+    const code = await runPathcodeMain([], {
+      stdin: tty.stdin,
+      stdout: tty.stdout,
+      stderr: tty.stderr,
+      // After origin the directory is a real project; never run live AG1 here.
+      runAg1Session: async () => {
+        ag1Calls += 1;
+        throw new Error("AG1 must not run in unbound-entry unit test");
+      },
+    });
+    const out = tty.output();
+    expect(code).toBe(0);
+    expect(out).not.toMatch(/PATH needs an existing project directory/);
+    expect(out).toMatch(/Goodbye/);
+    // Unbound Code must refuse before origin — AG1 never runs.
+    expect(ag1Calls).toBe(0);
+    // Origin seam: git-init only, no scaffold manifests.
+    expect(existsSync(join(emptyDir, ".git"))).toBe(true);
+    expect(existsSync(join(emptyDir, "package.json"))).toBe(false);
+  }, 60_000);
 });

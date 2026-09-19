@@ -1,0 +1,49 @@
+{
+  "schema": "s5-operator-entry-proof/v1",
+  "preferredEngine": "copilot",
+  "fakeFabric": false,
+  "fakeGatewayEngine": false,
+  "pathcodeBuildFake": null,
+  "pathcodeGatewayFakeEngine": null,
+  "baseDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-op-entry-Rxrs4c",
+  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-op-entry-Rxrs4c/fresh",
+  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-op-entry-Rxrs4c/runtime",
+  "cliExitCode": 0,
+  "openedUnbound": true,
+  "unboundCodeRefused": true,
+  "buildHelpReachable": true,
+  "buildStartWorked": true,
+  "gitInitByOrigin": true,
+  "originNoteInCli": true,
+  "noScaffoldFromOrigin": true,
+  "buildId": "fee3d33c-e023-491b-812e-7cfdb60533d5",
+  "binding": {
+    "bindingId": "bind-c8d2cb3b",
+    "projectRoot": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-op-entry-Rxrs4c/fresh",
+    "originGitInit": true
+  },
+  "gatewayBound": {
+    "ok": true,
+    "projectRoot": "/private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-op-entry-Rxrs4c/fresh",
+    "unversioned": true
+  },
+  "tickElapsedMs": 910,
+  "tick": {
+    "ok": true,
+    "action": "child_finished",
+    "kind": "engineer"
+  },
+  "engineerChild": {
+    "kind": "engineer",
+    "taskId": "77b37b3e-6a78-486d-80e7-f08406f8528f",
+    "dispatchState": "consumed",
+    "preferredEngine": "copilot"
+  },
+  "engineerSnapshot": {
+    "status": "running",
+    "taskId": "77b37b3e-6a78-486d-80e7-f08406f8528f"
+  },
+  "ok": true,
+  "verdict": "OPERATOR_ENTRY_GREENFIELD_VERIFIED",
+  "cliSample": "ering\n\n  /build start <outcome>   Start Build in cwd (git-init origin if needed)\n  /build status [id]       Show durable Build state\n  /build tick [id]         Run one autonomous loop step\n  /build run [id]          Run until complete/blocked (bounded)\n  /build steer [id] — <text>   Revise product intent\n  /build require [id] — <req>  Add explicit requirement\n\nGreenfield: open PATH in an empty directory, then /build start.\nOrigin is git-init only — first engineer establishes architecture.\nChild kinds: engineer · evaluate · challenge (via S3 fabric).\nBUILD COMPLETE requires proven criteria + satisfied requirements,\nfresh evidence, evaluate + challenge — not merely child VERIFIED.\nPATH * Code > /build start Build a tiny offline hello CLI that prints hello and includes a short README\r\nStarting PATH Build (origin + durable record)…\nPATH Build\n\n  buildId     fee3d33c-e023-491b-812e-7cfdb60533d5\n  status      running\n  revision    r1\n\nOutcome\n  Build a tiny offline hello CLI that prints hello and includes a short README\n\nExplicit requirements\n  (none)\n\nOutcome criteria\n  [UNKNOWN] c-runnable (required) — Core software is runnable with project-native checks\n  [UNKNOWN] c-outcome (required) — Software advances the stated outcome\n\nBindings\n  bind-c8d2cb3b  /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-op-entry-Rxrs4c/fresh  (git-init origin)\n\nChildren\n  (none)\n\nProposed next\n  Establish the software architecture, manifests, and runnable structure required by the outcome.\n\nCommands: /build status · /build tick · /build steer · /build run · /help\n\nOrigin: git-init performed; Gateway bound to ordinary project.\nUse /build tick or /build run to advance autonomously.\nPATH * Code > /build status\r\nPATH Build\n\n  buildId     fee3d33c-e023-491b-812e-7cfdb60533d5\n  status      running\n  revision    r1\n\nOutcome\n  Build a tiny offline hello CLI that prints hello and includes a short README\n\nExplicit requirements\n  (none)\n\nOutcome criteria\n  [UNKNOWN] c-runnable (required) — Core software is runnable with project-native checks\n  [UNKNOWN] c-outcome (required) — Software advances the stated outcome\n\nBindings\n  bind-c8d2cb3b  /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-op-entry-Rxrs4c/fresh  (git-init origin)\n\nChildren\n  (none)\n\nProposed next\n  Establish the software architecture, manifests, and runnable structure required by the outcome.\n\nCommands: /build status · /build tick · /build steer · /build run · /help\nPATH * Code > /exit\r\nGoodbye.\n"
+}

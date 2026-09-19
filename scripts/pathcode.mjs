@@ -265,10 +265,16 @@ async function delegateLegacy(args) {
  *   projectName: string,
  *   branch: string | null,
  *   clean: boolean | null,
+ *   unversioned?: boolean,
+ *   unbound?: boolean,
  * }} info
  */
 function renderQuietStartup(info) {
   const name = info.unicode && !info.plain ? COMPACT_NAME : ASCII_NAME;
+  if (info.unbound) {
+    // Build-capable shell without pretending a project already exists.
+    return `${name}\n${info.projectName} · unbound · /build start <outcome>\n\n`;
+  }
   const branch = info.unversioned
     ? "unversioned"
     : info.branch || "detached";
@@ -281,6 +287,19 @@ function renderQuietStartup(info) {
         : "unknown";
   // Identity only — the session-long cockpit owns the live prompt.
   return `${name}\n${info.projectName} · ${branch} · ${clean}\n\n`;
+}
+
+/** Honest refusal when ordinary PATH Code is asked before a project exists. */
+function unboundCodeRefusal() {
+  return [
+    "PATH is unbound — no admitted project in this directory yet.",
+    "",
+    "Ordinary PATH Code requires an existing project (source or config markers).",
+    "To establish greenfield software from an outcome:",
+    "  /build start <outcome>",
+    "",
+    "Build origin performs git init only, then binds the ordinary PATH project.",
+  ].join("\n");
 }
 
 /**
@@ -409,28 +428,62 @@ export async function runPathcodeMain(argv, testIo = {}) {
     return 2;
   }
 
+  // Project admission: existing projects bind immediately. Empty / non-project
+  // directories stay honest for PATH Code (NOT_A_PROJECT) but an interactive TTY
+  // may open unbound so /build start can run the settled git-init-only origin.
   const project = resolveTargetProjectRoot(process.cwd());
-  if (!project.ok) {
+  /** @type {boolean} */
+  let projectBound = false;
+  /** @type {string} */
+  let projectRoot = "";
+  /** @type {string} */
+  let workingSubdir = "";
+  /** @type {string} */
+  let projectName = "";
+  /** @type {{ branch: string | null, clean: boolean | null, unversioned?: boolean, unbound?: boolean }} */
+  let gitSummary = { branch: null, clean: null };
+
+  if (project.ok) {
+    projectBound = true;
+    projectRoot = project.projectRoot;
+    workingSubdir =
+      typeof project.workingSubdir === "string" ? project.workingSubdir : "";
+    projectName = basename(projectRoot);
+    const admission = admitPrimaryCheckout(projectRoot);
+    if (admission.ok) {
+      if (admission.unversioned) {
+        gitSummary = { branch: "unversioned", clean: null, unversioned: true };
+      } else {
+        gitSummary = {
+          branch: admission.detached ? null : admission.branch,
+          clean: admission.dirty !== true,
+        };
+      }
+    }
+  } else if (project.code === "NOT_A_PROJECT" && interactive) {
+    projectBound = false;
+    try {
+      projectRoot = realpathSync(process.cwd());
+    } catch {
+      projectRoot = process.cwd();
+    }
+    workingSubdir = "";
+    projectName = basename(projectRoot) || "(empty)";
+    gitSummary = { branch: null, clean: null, unbound: true };
+  } else {
     stderr.write(`${project.message}\n`);
     return 2;
   }
-  const projectRoot = project.projectRoot;
-  const workingSubdir =
-    typeof project.workingSubdir === "string" ? project.workingSubdir : "";
-  const projectName = basename(projectRoot);
 
-  /** @type {{ branch: string | null, clean: boolean | null, unversioned?: boolean }} */
-  let gitSummary = { branch: null, clean: null };
-  const admission = admitPrimaryCheckout(projectRoot);
-  if (admission.ok) {
-    if (admission.unversioned) {
-      gitSummary = { branch: "unversioned", clean: null, unversioned: true };
-    } else {
-      gitSummary = {
-        branch: admission.detached ? null : admission.branch,
-        clean: admission.dirty !== true,
-      };
-    }
+  if (
+    !projectBound &&
+    typeof args.issue === "number" &&
+    args.issue > 0
+  ) {
+    stderr.write(
+      "PATH --issue requires an existing project directory (source or config markers).\n",
+    );
+    return 2;
   }
 
   // Quiet runtime bootstrap (venv under PATH_RUNTIME_ROOT). Failures surface later.
@@ -441,13 +494,15 @@ export async function runPathcodeMain(argv, testIo = {}) {
   }
 
   // AG5: reclaim PATH-owned stale worktrees only; never global user prune.
-  try {
-    recoverPathOwnedStaleWorktrees({
-      projectRoot,
-      checkoutRoot: root,
-    });
-  } catch {
-    // non-fatal
+  if (projectBound) {
+    try {
+      recoverPathOwnedStaleWorktrees({
+        projectRoot,
+        checkoutRoot: root,
+      });
+    } catch {
+      // non-fatal
+    }
   }
 
   if (!interactive) {
@@ -459,6 +514,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
         branch: gitSummary.branch,
         clean: gitSummary.clean,
         unversioned: gitSummary.unversioned === true,
+        unbound: gitSummary.unbound === true,
       }).replace(/\nPATH [●*] Code > $/, "\n"),
     );
     stdout.write(
@@ -523,16 +579,18 @@ export async function runPathcodeMain(argv, testIo = {}) {
   /** @type {import('./pathcode-cli/ag10/task-continuity.mjs').ContinuityAssessment[]} */
   let durableRecoverNotice = [];
   const runtimeRootForContinuity = resolvePathRuntimeRoot({ packageRoot: root });
-  try {
-    const startup = reconcileHostStartup({
-      runtimeRoot: runtimeRootForContinuity,
-      projectRoot,
-    });
-    durableRecoverNotice = Array.isArray(startup.recoverable)
-      ? startup.recoverable.slice(0, 5)
-      : [];
-  } catch {
-    durableRecoverNotice = [];
+  if (projectBound) {
+    try {
+      const startup = reconcileHostStartup({
+        runtimeRoot: runtimeRootForContinuity,
+        projectRoot,
+      });
+      durableRecoverNotice = Array.isArray(startup.recoverable)
+        ? startup.recoverable.slice(0, 5)
+        : [];
+    } catch {
+      durableRecoverNotice = [];
+    }
   }
   if (useGateway) {
     const runtimeRoot = runtimeRootForContinuity;
@@ -542,29 +600,31 @@ export async function runPathcodeMain(argv, testIo = {}) {
         runtimeRoot,
       });
       gatewayClient = ensured.client;
-      await gatewayClient.bindProject(projectRoot);
-      try {
-        const listed = await gatewayClient.listTasks();
-        const tasks = Array.isArray(listed?.tasks) ? listed.tasks : [];
-        aliveGatewayNotice = tasks
-          .filter((t) => t && t.status === "running" && typeof t.taskId === "string")
-          .map((t) => ({
-            taskId: t.taskId,
-            status: t.status,
-            objective:
-              typeof t.objective === "string"
-                ? t.objective.slice(0, 120)
-                : undefined,
-          }));
-      } catch {
-        aliveGatewayNotice = [];
-      }
-      if (Array.isArray(ensured.interruptedTaskIds) && ensured.interruptedTaskIds.length) {
+      if (projectBound) {
+        await gatewayClient.bindProject(projectRoot);
         try {
-          const startup = reconcileHostStartup({ runtimeRoot, projectRoot });
-          durableRecoverNotice = startup.recoverable.slice(0, 5);
+          const listed = await gatewayClient.listTasks();
+          const tasks = Array.isArray(listed?.tasks) ? listed.tasks : [];
+          aliveGatewayNotice = tasks
+            .filter((t) => t && t.status === "running" && typeof t.taskId === "string")
+            .map((t) => ({
+              taskId: t.taskId,
+              status: t.status,
+              objective:
+                typeof t.objective === "string"
+                  ? t.objective.slice(0, 120)
+                  : undefined,
+            }));
         } catch {
-          /* keep prior */
+          aliveGatewayNotice = [];
+        }
+        if (Array.isArray(ensured.interruptedTaskIds) && ensured.interruptedTaskIds.length) {
+          try {
+            const startup = reconcileHostStartup({ runtimeRoot, projectRoot });
+            durableRecoverNotice = startup.recoverable.slice(0, 5);
+          } catch {
+            /* keep prior */
+          }
         }
       }
     } else {
@@ -573,7 +633,11 @@ export async function runPathcodeMain(argv, testIo = {}) {
         runtimeRoot,
       });
       try {
-        await gatewayRuntime.bindProject({ cwd: projectRoot });
+        // Unbound shell: start Gateway without bind. /build start runs git-init
+        // origin then binds the resulting ordinary project.
+        if (projectBound) {
+          await gatewayRuntime.bindProject({ cwd: projectRoot });
+        }
         gatewayServer = await startGatewayServer({
           runtime: gatewayRuntime,
           runtimeRoot,
@@ -637,8 +701,14 @@ export async function runPathcodeMain(argv, testIo = {}) {
         branch: gitSummary.branch,
         clean: gitSummary.clean,
         unversioned: gitSummary.unversioned === true,
+        unbound: !projectBound,
       }),
     );
+    if (!projectBound) {
+      stdout.write(
+        "Unbound — ordinary PATH Code closed. Greenfield: /build start <outcome>\n",
+      );
+    }
     stdout.write(promptPrefix(unicode, plain));
   }
 
@@ -1334,18 +1404,23 @@ export async function runPathcodeMain(argv, testIo = {}) {
       inlineStudio.onEvent({
         type: "session.preflight",
         sessionId,
-        branch: gitSummary.unversioned
-          ? "unversioned"
-          : gitSummary.branch || "unknown",
-        dirtySummary: gitSummary.unversioned
-          ? "unversioned"
-          : gitSummary.clean === true
-            ? "clean"
-            : gitSummary.clean === false
-              ? "dirty"
-              : "unknown",
+        branch: !projectBound
+          ? "unbound"
+          : gitSummary.unversioned
+            ? "unversioned"
+            : gitSummary.branch || "unknown",
+        dirtySummary: !projectBound
+          ? "unbound"
+          : gitSummary.unversioned
+            ? "unversioned"
+            : gitSummary.clean === true
+              ? "clean"
+              : gitSummary.clean === false
+                ? "dirty"
+                : "unknown",
         projectName,
         unversioned: gitSummary.unversioned === true,
+        unbound: !projectBound,
       });
       redrawPrompt(prompt, unicode, plain, sessionStats, inlineStudio);
       if (aliveGatewayNotice.length > 0) {
@@ -1427,6 +1502,15 @@ export async function runPathcodeMain(argv, testIo = {}) {
         continue;
       }
       if (cmd === "/attach" || cmd.startsWith("/attach ")) {
+        if (!projectBound) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            unboundCodeRefusal(),
+          );
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
         const parts = cmd.split(/\s+/);
         let idArg = parts[1] || "";
         if (!idArg && aliveGatewayNotice.length === 1) {
@@ -1484,6 +1568,15 @@ export async function runPathcodeMain(argv, testIo = {}) {
         continue;
       }
       if (cmd === "/resume" || cmd.startsWith("/resume ")) {
+        if (!projectBound) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            unboundCodeRefusal(),
+          );
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
         const parts = cmd.split(/\s+/);
         let idArg = parts[1] || "";
         if (!idArg && durableRecoverNotice.length === 1) {
@@ -2390,9 +2483,16 @@ export async function runPathcodeMain(argv, testIo = {}) {
           if (!gatewayClient && !gatewayRuntime) {
             return null;
           }
+          const resolveBindCwd = (arg) => {
+            if (typeof arg === "string" && arg.trim()) return arg.trim();
+            if (arg && typeof arg === "object" && typeof arg.cwd === "string") {
+              return arg.cwd.trim();
+            }
+            return projectRoot;
+          };
           if (gatewayClient) {
             return {
-              bindProject: (cwd) => gatewayClient.bindProject(cwd),
+              bindProject: (arg) => gatewayClient.bindProject(resolveBindCwd(arg)),
               startTask: (objective, extra) =>
                 gatewayClient.startTask(objective, extra),
               resumeTask: (taskId, extra) =>
@@ -2405,7 +2505,8 @@ export async function runPathcodeMain(argv, testIo = {}) {
             };
           }
           return {
-            bindProject: (cwd) => gatewayRuntime.bindProject({ cwd }),
+            bindProject: (arg) =>
+              gatewayRuntime.bindProject({ cwd: resolveBindCwd(arg) }),
             startTask: (objective, extra) =>
               gatewayRuntime.startTask({ objective, ...extra }),
             resumeTask: (taskId, extra) =>
@@ -2452,6 +2553,8 @@ export async function runPathcodeMain(argv, testIo = {}) {
               "  /build steer [id] — <text>   Revise product intent",
               "  /build require [id] — <req>  Add explicit requirement",
               "",
+              "Greenfield: open PATH in an empty directory, then /build start.",
+              "Origin is git-init only — first engineer establishes architecture.",
               "Child kinds: engineer · evaluate · challenge (via S3 fabric).",
               "BUILD COMPLETE requires proven criteria + satisfied requirements,",
               "fresh evidence, evaluate + challenge — not merely child VERIFIED.",
@@ -2500,12 +2603,41 @@ export async function runPathcodeMain(argv, testIo = {}) {
               started.message || started.code || "Build start failed",
             );
           } else {
+            if (typeof started.projectRoot === "string" && started.projectRoot) {
+              projectRoot = started.projectRoot;
+              workingSubdir = "";
+              projectName = basename(projectRoot);
+              projectBound = true;
+              const postOrigin = admitPrimaryCheckout(projectRoot);
+              if (postOrigin.ok) {
+                if (postOrigin.unversioned) {
+                  gitSummary = {
+                    branch: "unversioned",
+                    clean: null,
+                    unversioned: true,
+                  };
+                } else {
+                  gitSummary = {
+                    branch: postOrigin.detached ? null : postOrigin.branch,
+                    clean: postOrigin.dirty !== true,
+                  };
+                }
+              } else {
+                gitSummary = { branch: null, clean: null };
+              }
+            }
+            const originNote =
+              Array.isArray(started.build?.projectBindings) &&
+              started.build.projectBindings.some((b) => b && b.originGitInit)
+                ? "Origin: git-init performed; Gateway bound to ordinary project."
+                : "Gateway bound to existing project.";
             showOperatorReply(
               prompt,
               ttyInline ? inlineStudio : null,
               [
                 formatBuildStatus(started.build),
                 "",
+                originNote,
                 fakeMode
                   ? "Note: Build fake mode (PATHCODE_BUILD_FAKE=1 or no gateway)."
                   : "Use /build tick or /build run to advance autonomously.",
@@ -2772,6 +2904,15 @@ export async function runPathcodeMain(argv, testIo = {}) {
       }
 
       if (cmd === "/trial") {
+        if (!projectBound) {
+          showOperatorReply(
+            prompt,
+            ttyInline ? inlineStudio : null,
+            unboundCodeRefusal(),
+          );
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
         const prereq = resolveRuntimePrerequisites(root);
         if (!prereq.ok) {
           prompt.write(`${prereq.message}\n`);
@@ -2845,6 +2986,15 @@ export async function runPathcodeMain(argv, testIo = {}) {
       }
 
       // Any other line is an engineering task for the project in this directory.
+      if (!projectBound) {
+        showOperatorReply(
+          prompt,
+          ttyInline ? inlineStudio : null,
+          unboundCodeRefusal(),
+        );
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
       const packageCheck = assertPathPackagePresent(root);
       if (!packageCheck.ok) {
         prompt.write(`${packageCheck.message}\n`);
