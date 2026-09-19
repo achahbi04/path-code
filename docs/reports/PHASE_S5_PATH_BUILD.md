@@ -6,7 +6,7 @@
 **OPERATOR ACCEPTANCE:** **READY**  
 **S5 NOT FROZEN**
 
-**Authoritative HEAD:** `git rev-parse HEAD` (worktree-aware mechanical probe + unified runtime for e2e + passing real-engine evidence)  
+**Authoritative HEAD:** `963e04cce89db5f47ef314e6232502f2f708eb50` (worktree-aware mechanical probe + unified runtime for e2e + passing real-engine evidence)  
 **Prior superseded checkpoint:** `357d9328ad2fe0634fd43ad6e0e394d517907a34` (`req-readme` stuck UNKNOWN — probe scanned binding primary only; checkpoints split across runtime roots)
 
 **Mode:** mechanical fake fabric for CI/unit tests; real-engine PATH Build via `node docs/reports/g10-evidence/s5/run-s5-real-e2e.mjs` (no Build fake fabric, no Gateway fake engine)
