@@ -1,0 +1,462 @@
+{
+  "continuedAt": "2026-09-19T19:38:41.241Z",
+  "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+  "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+  "priorAuthSha": "fd7749350c954fab6013139e4a700b1230d94628",
+  "priorAdoptions": [
+    {
+      "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+      "taskId": "e2e3c7e5-a076-4a1b-8b8e-014d7fdeef13",
+      "sourceSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
+      "adoptedSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
+      "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+      "productBranch": "path-build/818ccab1",
+      "mode": "merge",
+      "adoptedAt": "2026-09-19T19:27:12.772Z"
+    },
+    {
+      "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+      "taskId": "76438424-cbec-4bcf-ab0d-b7ede5981793",
+      "sourceSha": "fd7749350c954fab6013139e4a700b1230d94628",
+      "adoptedSha": "fd7749350c954fab6013139e4a700b1230d94628",
+      "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+      "productBranch": "path-build/818ccab1",
+      "mode": "merge",
+      "adoptedAt": "2026-09-19T19:38:04.591Z"
+    }
+  ],
+  "surfaceUrl": "http://127.0.0.1:7788/",
+  "previewReady": {
+    "ok": true,
+    "url": "http://127.0.0.1:4173/",
+    "embed": "/preview/818ccab1-f626-473c-96ca-0ef91931b138/",
+    "authoritativeSha": "fd7749350c954fab6013139e4a700b1230d94628"
+  },
+  "beforeEvidence": {
+    "ok": true,
+    "url": "http://127.0.0.1:4173/",
+    "capturedAt": "2026-09-19T19:38:41.556Z",
+    "htmlPath": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/render-2026-09-19T19-38-41-556Z.html",
+    "screenshotPath": null,
+    "title": "ICE - In Case of Emergency",
+    "textSample": "ICE - In Case of Emergency ICE: In Case of Emergency Your vital information, instantly accessible when it matters most. What is ICE? ICE is a critical application designed to store and display your essential personal and medical information, accessible to first responders and emergency personnel in urgent situations. From emergency contacts and allergies to medical conditions and medications, ICE provides a clear, concise, and immediate overview of what responders need to know to give you the best possible care. Why ICE Matters In an emergency, every second counts. When you're unable to communicate, ICE speaks for you. It eliminates guesswork for paramedics and doctors, ensuring you receive appropriate treatment without delays. It provides peace of mind for you and your loved ones, knowing that critical information is always at hand, even if your phone is locked or you're unconscious. Rapid Response: Instantly inform first responders about allergies, medications, and conditions. Accurate Care: Ensure medical professionals have the full picture for informed decisions. Peace of Mind: For you and your family, knowing your critical data is accessible. Life-Saving Potential: Timely information can directly impact emergency outcomes. See ICE in Action Illustrative screenshots showing the user-friendly interface and key information displays. Get ICE Today Prepare for the unexpected. Download ICE and safeguard your health information. Download on the App Store Get it on Google Play &copy; 2026 ICE - In Case of Emergency. All rights reserved.",
+    "needles": [
+      {
+        "needle": "ICE",
+        "found": true
+      },
+      {
+        "needle": "Emergency",
+        "found": true
+      }
+    ],
+    "consoleErrors": [],
+    "engine": "fetch",
+    "error": null,
+    "status": 200,
+    "contentHash": "eb942e816a16f474",
+    "playwrightError": "browserType.launch: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,ThirdPartyStoragePartitioning,LensOverlay,PlzDedicatedWorker --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --enable-automation --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-use-zoom-for-dsf=false --use-angle --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/playwright_chromiumdev_profile-frAKPR --remote-debugging-pipe --no-startup-window\n<launched> pid=40429\n[pid=40429][err] dlopen /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework: dlopen(/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework, 0x0105): tried: '/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file), '/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file).\nCall log:\n  - <launching> /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,ThirdPartyStoragePartitioning,LensOverlay,PlzDedicatedWorker --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --enable-automation --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-use-zoom-for-dsf=false --use-angle --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/playwright_chromiumdev_profile-frAKPR --remote-debugging-pipe --no-startup-window\n  - <launched> pid=40429\n  - [pid=40429][err] dlopen /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework: dlopen(/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework, 0x0105): tried: '/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file), '/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file).\n",
+    "metaPath": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/meta-2026-09-19T19-38-41-556Z.json"
+  },
+  "beforeMobile": {
+    "ok": true,
+    "contentHash": "eb942e816a16f474",
+    "screenshotPath": null
+  },
+  "steer": {
+    "ok": true,
+    "outcomeRevision": 2
+  },
+  "afterEvidence": {
+    "ok": true,
+    "url": "http://127.0.0.1:4173/",
+    "capturedAt": "2026-09-19T19:42:23.052Z",
+    "htmlPath": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/render-2026-09-19T19-42-23-052Z.html",
+    "screenshotPath": null,
+    "title": "ICE - In Case of Emergency",
+    "textSample": "ICE - In Case of Emergency ICE: In Case of Emergency Your vital information, instantly accessible when it matters most. What is ICE? ICE is a critical application designed to store and display your essential personal and medical information, accessible to first responders and emergency personnel in urgent situations. From emergency contacts and allergies to medical conditions and medications, ICE provides a clear, concise, and immediate overview of what responders need to know to give you the best possible care. Why ICE Matters In an emergency, every second counts. When you're unable to communicate, ICE speaks for you. It eliminates guesswork for paramedics and doctors, ensuring you receive appropriate treatment without delays. It provides peace of mind for you and your loved ones, knowing that critical information is always at hand, even if your phone is locked or you're unconscious. Rapid Response: Instantly inform first responders about allergies, medications, and conditions. Accurate Care: Ensure medical professionals have the full picture for informed decisions. Peace of Mind: For you and your family, knowing your critical data is accessible. Life-Saving Potential: Timely information can directly impact emergency outcomes. See ICE in Action Illustrative screenshots showing the user-friendly interface and key information displays. Get ICE Today Prepare for the unexpected. Download ICE and safeguard your health information. Download on the App Store Get it on Google Play &copy; 2026 ICE - In Case of Emergency. All rights reserved.",
+    "needles": [
+      {
+        "needle": "ICE",
+        "found": true
+      },
+      {
+        "needle": "Emergency",
+        "found": true
+      }
+    ],
+    "consoleErrors": [],
+    "engine": "fetch",
+    "error": null,
+    "status": 200,
+    "contentHash": "8c146c2ae6b5b6f3",
+    "playwrightError": "browserType.launch: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,ThirdPartyStoragePartitioning,LensOverlay,PlzDedicatedWorker --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --enable-automation --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-use-zoom-for-dsf=false --use-angle --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/playwright_chromiumdev_profile-2ZsDgN --remote-debugging-pipe --no-startup-window\n<launched> pid=50125\nCall log:\n  - <launching> /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,ThirdPartyStoragePartitioning,LensOverlay,PlzDedicatedWorker --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --enable-automation --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-use-zoom-for-dsf=false --use-angle --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/playwright_chromiumdev_profile-2ZsDgN --remote-debugging-pipe --no-startup-window\n  - <launched> pid=50125\n",
+    "metaPath": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/meta-2026-09-19T19-42-23-052Z.json"
+  },
+  "visibleChange": true,
+  "adoptionHistory": [
+    {
+      "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+      "taskId": "e2e3c7e5-a076-4a1b-8b8e-014d7fdeef13",
+      "sourceSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
+      "adoptedSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
+      "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+      "productBranch": "path-build/818ccab1",
+      "mode": "merge",
+      "adoptedAt": "2026-09-19T19:27:12.772Z"
+    },
+    {
+      "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+      "taskId": "76438424-cbec-4bcf-ab0d-b7ede5981793",
+      "sourceSha": "fd7749350c954fab6013139e4a700b1230d94628",
+      "adoptedSha": "fd7749350c954fab6013139e4a700b1230d94628",
+      "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+      "productBranch": "path-build/818ccab1",
+      "mode": "merge",
+      "adoptedAt": "2026-09-19T19:38:04.591Z"
+    },
+    {
+      "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+      "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+      "sourceSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+      "adoptedSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+      "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+      "productBranch": "path-build/818ccab1",
+      "mode": "merge",
+      "adoptedAt": "2026-09-19T19:42:18.358Z"
+    }
+  ],
+  "authoritativeSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+  "children": [
+    {
+      "kind": "engineer",
+      "taskId": "e2e3c7e5-a076-4a1b-8b8e-014d7fdeef13",
+      "classification": "NOT_VERIFIED",
+      "dispatchState": "consumed",
+      "adoptedSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
+      "sourceSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
+      "provider": null
+    },
+    {
+      "kind": "evaluate",
+      "taskId": "8250d421-4aea-4f27-872e-49a9bb50e1d2",
+      "classification": "VERIFIED",
+      "dispatchState": "consumed",
+      "adoptedSha": null,
+      "sourceSha": null,
+      "provider": null
+    },
+    {
+      "kind": "engineer",
+      "taskId": "76438424-cbec-4bcf-ab0d-b7ede5981793",
+      "classification": "VERIFIED",
+      "dispatchState": "consumed",
+      "adoptedSha": "fd7749350c954fab6013139e4a700b1230d94628",
+      "sourceSha": "fd7749350c954fab6013139e4a700b1230d94628",
+      "provider": null
+    },
+    {
+      "kind": "evaluate",
+      "taskId": "c545e5c6-1a99-471e-88bb-12b3942b66c0",
+      "dispatchState": "dispatched",
+      "adoptedSha": null,
+      "sourceSha": null,
+      "provider": null
+    },
+    {
+      "kind": "challenge",
+      "taskId": "79752dff-5f88-4f7c-9bc9-2afd7fd3b4ad",
+      "classification": "VERIFIED",
+      "dispatchState": "consumed",
+      "adoptedSha": null,
+      "sourceSha": null,
+      "provider": null
+    },
+    {
+      "kind": "engineer",
+      "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+      "classification": "VERIFIED",
+      "dispatchState": "consumed",
+      "adoptedSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+      "sourceSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+      "provider": null
+    },
+    {
+      "kind": "engineer",
+      "taskId": "5debed34-afe0-4be2-9647-9ae0e011dbca",
+      "dispatchState": "dispatched",
+      "adoptedSha": null,
+      "sourceSha": null,
+      "provider": null
+    }
+  ],
+  "openFolder": {
+    "ok": true,
+    "path": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg"
+  },
+  "openCode": {
+    "ok": true,
+    "path": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg"
+  },
+  "finalStatus": "running",
+  "finalCriteria": [
+    {
+      "id": "c-runnable",
+      "statement": "Core software is runnable with project-native checks",
+      "required": true,
+      "status": "PROVEN",
+      "evidence": [
+        {
+          "kind": "check",
+          "ref": "npm test",
+          "bindingId": "bind-71d4264f",
+          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
+          "configFingerprint": "e215b17c5aab22a19823d30f",
+          "scope": [
+            "package.json",
+            "src/"
+          ],
+          "observedAt": "2026-09-19T19:42:18.946Z"
+        }
+      ],
+      "updatedAt": "2026-09-19T19:42:18.946Z",
+      "source": "default",
+      "challengedByTaskId": "79752dff-5f88-4f7c-9bc9-2afd7fd3b4ad"
+    },
+    {
+      "id": "c-outcome",
+      "statement": "Software advances the stated outcome",
+      "required": true,
+      "status": "PROVEN",
+      "evidence": [
+        {
+          "kind": "check",
+          "ref": "npm test",
+          "bindingId": "bind-71d4264f",
+          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
+          "configFingerprint": "e215b17c5aab22a19823d30f",
+          "scope": [
+            "package.json",
+            "src/"
+          ],
+          "observedAt": "2026-09-19T19:42:18.946Z"
+        }
+      ],
+      "updatedAt": "2026-09-19T19:42:18.946Z",
+      "source": "default"
+    },
+    {
+      "id": "c-db8adf5a39",
+      "statement": "A recognizable product landing page or primary web surface exists",
+      "required": true,
+      "status": "PROVEN",
+      "evidence": [
+        {
+          "kind": "check",
+          "ref": "npm test",
+          "bindingId": "bind-71d4264f",
+          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
+          "configFingerprint": "e215b17c5aab22a19823d30f",
+          "scope": [
+            "package.json",
+            "src/"
+          ],
+          "observedAt": "2026-09-19T19:42:18.946Z"
+        }
+      ],
+      "updatedAt": "2026-09-19T19:42:18.946Z",
+      "source": "derived"
+    },
+    {
+      "id": "c-b820bbc6d6",
+      "statement": "Primary hero or introduction clearly explains the product purpose",
+      "required": true,
+      "status": "PROVEN",
+      "evidence": [
+        {
+          "kind": "check",
+          "ref": "npm test",
+          "bindingId": "bind-71d4264f",
+          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
+          "configFingerprint": "e215b17c5aab22a19823d30f",
+          "scope": [
+            "package.json",
+            "src/"
+          ],
+          "observedAt": "2026-09-19T19:42:18.946Z"
+        }
+      ],
+      "updatedAt": "2026-09-19T19:42:18.946Z",
+      "source": "derived"
+    },
+    {
+      "id": "c-ce37884ae8",
+      "statement": "At least one primary call-to-action is present",
+      "required": true,
+      "status": "PROVEN",
+      "evidence": [
+        {
+          "kind": "check",
+          "ref": "npm test",
+          "bindingId": "bind-71d4264f",
+          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
+          "configFingerprint": "e215b17c5aab22a19823d30f",
+          "scope": [
+            "package.json",
+            "src/"
+          ],
+          "observedAt": "2026-09-19T19:42:18.946Z"
+        }
+      ],
+      "updatedAt": "2026-09-19T19:42:18.946Z",
+      "source": "derived"
+    },
+    {
+      "id": "c-6b5e223492",
+      "statement": "The web surface renders successfully in a local preview",
+      "required": true,
+      "status": "PROVEN",
+      "evidence": [
+        {
+          "kind": "check",
+          "ref": "npm test",
+          "bindingId": "bind-71d4264f",
+          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
+          "configFingerprint": "e215b17c5aab22a19823d30f",
+          "scope": [
+            "package.json",
+            "src/"
+          ],
+          "observedAt": "2026-09-19T19:42:18.946Z"
+        }
+      ],
+      "updatedAt": "2026-09-19T19:42:18.946Z",
+      "source": "derived"
+    },
+    {
+      "id": "c-b8fa3cb0c2",
+      "statement": "Build a professional website for ICE — In Case of Emergency",
+      "required": true,
+      "status": "PROVEN",
+      "evidence": [
+        {
+          "kind": "check",
+          "ref": "npm test",
+          "bindingId": "bind-71d4264f",
+          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
+          "configFingerprint": "e215b17c5aab22a19823d30f",
+          "scope": [
+            "package.json",
+            "src/"
+          ],
+          "observedAt": "2026-09-19T19:42:18.946Z"
+        }
+      ],
+      "updatedAt": "2026-09-19T19:42:18.946Z",
+      "source": "derived"
+    },
+    {
+      "id": "c-ba6a5a9e46",
+      "statement": "It should clearly explain what the product is, why it matters, and present the app visually and professionally",
+      "required": true,
+      "status": "UNKNOWN",
+      "evidence": [],
+      "updatedAt": "2026-09-19T19:19:57.344Z",
+      "source": "derived"
+    }
+  ],
+  "productBrief": {
+    "outcome": "Build a professional website for ICE — In Case of Emergency. It should clearly explain what the product is, why it matters, and present the app visually and professionally.",
+    "productKind": "web",
+    "capabilities": [
+      "Build a professional website for ICE — In Case of Emergency",
+      "It should clearly explain what the product is, why it matters, and present the app visually and professionally"
+    ],
+    "visualRequirements": [
+      "A recognizable product landing page or primary web surface exists",
+      "Primary hero or introduction clearly explains the product purpose",
+      "At least one primary call-to-action is present",
+      "The web surface renders successfully in a local preview",
+      "It should clearly explain what the product is, why it matters, and present the app visually and professionally"
+    ],
+    "functionalRequirements": [
+      "Core software is runnable with project-native checks",
+      "Software advances the stated outcome",
+      "Build a professional website for ICE — In Case of Emergency"
+    ],
+    "nonFunctionalRequirements": [],
+    "constraints": [],
+    "acceptanceCriteria": [
+      {
+        "id": "c-runnable",
+        "statement": "Core software is runnable with project-native checks",
+        "required": true,
+        "source": "default"
+      },
+      {
+        "id": "c-outcome",
+        "statement": "Software advances the stated outcome",
+        "required": true,
+        "source": "default"
+      },
+      {
+        "id": "c-db8adf5a39",
+        "statement": "A recognizable product landing page or primary web surface exists",
+        "required": true,
+        "source": "derived"
+      },
+      {
+        "id": "c-b820bbc6d6",
+        "statement": "Primary hero or introduction clearly explains the product purpose",
+        "required": true,
+        "source": "derived"
+      },
+      {
+        "id": "c-ce37884ae8",
+        "statement": "At least one primary call-to-action is present",
+        "required": true,
+        "source": "derived"
+      },
+      {
+        "id": "c-6b5e223492",
+        "statement": "The web surface renders successfully in a local preview",
+        "required": true,
+        "source": "derived"
+      },
+      {
+        "id": "c-b8fa3cb0c2",
+        "statement": "Build a professional website for ICE — In Case of Emergency",
+        "required": true,
+        "source": "derived"
+      },
+      {
+        "id": "c-ba6a5a9e46",
+        "statement": "It should clearly explain what the product is, why it matters, and present the app visually and professionally",
+        "required": true,
+        "source": "derived"
+      }
+    ],
+    "derivedAt": "2026-09-19T19:19:57.344Z"
+  },
+  "previewUrl": "http://127.0.0.1:4173/",
+  "runtimeHealth": "ok",
+  "bindsHome": false,
+  "endedAt": "2026-09-19T19:42:23.106Z",
+  "verdict": "PASS_PARTIAL_OR_FULL",
+  "complete": false,
+  "operatorAcceptanceReady": false
+}

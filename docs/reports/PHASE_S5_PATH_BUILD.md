@@ -2,49 +2,52 @@
 # PATH BUILD (visual builder closure pass)
 
 **S5 NOT FROZEN**  
-**OPERATOR ACCEPTANCE:** **NOT YET** — awaiting real-engine ICE visual E2E operator confirmation  
+**OPERATOR ACCEPTANCE:** **NOT YET**  
 **PRODUCT SURFACE:** visual builder workspace (`path-build`) over Gateway / S3 / S5 controller
 
-**Substrate checkpoint:** `c931421`  
-**Closure work:** uncommitted on top of substrate until committed in this pass
+| Checkpoint | SHA |
+| --- | --- |
+| Visual-builder substrate | `c931421` |
+| Adoption + visual gates | `caf9a42` |
+| public/ static preview fix | `6846f7e` |
+| Authoritative HEAD | `6846f7e` (see `git rev-parse HEAD`) |
 
-**Product entry:**
-
-```bash
-node scripts/path-build.mjs
-# or: path-build
-```
-
-Opens a local **builder workspace**: conversation + **live product preview** (iframe via `/preview/:buildId/*`), not a status dashboard as the primary surface.
-
-**PATH Code** remains the terminal for engineering an **existing** repo.
+**Product entry:** `node scripts/path-build.mjs`
 
 ---
 
 ## Authoritative Build product revision
 
-| Concept | Definition |
-| --- | --- |
-| Authoritative tree | Build binding `projectRoot` checked out on `path-build/<buildIdPrefix>` |
-| Engineer isolation | Gateway task worktree on `path/task-*` |
-| Adoption | `git merge path/task-*` into product branch via `build/adopt.mjs` (no `cp -R`) |
-| Runtime / preview / Open Folder / Open in PATH Code | All bind to the same `projectRoot` after adoption |
+Build binding `projectRoot` on branch `path-build/<buildIdPrefix>`. Engineer isolation via Gateway `path/task-*` worktrees. Adoption via `git merge` in `build/adopt.mjs` (no `cp -R`). Runtime, preview proxy, Open Folder, and Open in PATH Code all use the same binding root after adoption.
 
-Persisted per adoption: `buildId`, `taskId`, `sourceSha`, `adoptedSha`, `projectRoot`, `productBranch`, `adoptedAt`.
+---
+
+## Real-engine ICE E2E (partial)
+
+- **buildId:** `818ccab1-f626-473c-96ca-0ef91931b138`
+- **projectRoot:** `/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg`
+- **Result:** `REAL_VISUAL_E2E_PARTIAL` — preview + adoption + conversational visible change proven; **BUILD COMPLETE not reached**
+- Evidence: `docs/reports/g10-evidence/s5/s5-real-visual-e2e.json` and runtime `metadata/build-evidence/real-visual-e2e/continue-report.json`
+
+### Remaining before operator acceptance
+
+1. Loop must reach `complete` with all derived criteria PROVEN and post-revision evaluate+challenge VERIFIED  
+2. Playwright Chromium install incomplete in this environment — HTML/DOM evidence works; screenshots null  
+3. Element-select → engineer context not proven in this E2E run  
+4. Bounded S4-style durability (controller/runtime/builder reopen) not exercised in this run  
+5. Child provider provenance not persisted onto Build child records (available in task reports: `cursor native_sdk`)
 
 ---
 
 ## Artifact presentation matrix
 
-See `scripts/pathcode-cli/build/runtime/presentation.mjs` — web is fully interactive in-builder; desktop/mobile/multi_service unsupported; api/cli/service partial.
+See `scripts/pathcode-cli/build/runtime/presentation.mjs`.
 
 ---
 
 ## Regression
 
 ```bash
-npx vitest run tests/s5/
-node scripts/pathcode-cli/build/proof-visual-builder.mjs
-# Real engine (no fake env):
+npx vitest run tests/s5/   # 29/29
 PATHCODE_BUILD_NO_OPEN=1 node scripts/pathcode-cli/build/real-visual-e2e.mjs
 ```
