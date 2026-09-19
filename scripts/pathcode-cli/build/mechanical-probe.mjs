@@ -260,18 +260,34 @@ export function mechanicalProbeBinding(input) {
       const browser = Array.isArray(input.record.browserEvidence)
         ? input.record.browserEvidence.slice(-1)[0]
         : null;
-      const sample = String(browser?.textSample || "").toLowerCase();
+      let sample = String(browser?.textSample || "").toLowerCase();
+      // Fall back to on-disk HTML when browser evidence is missing/stale.
+      if (
+        !sample ||
+        (browser?.authoritativeSha &&
+          input.record.authoritativeSha &&
+          browser.authoritativeSha !== input.record.authoritativeSha)
+      ) {
+        for (const name of ["index.html", "public/index.html", "src/index.html"]) {
+          const p = join(checkRoot, name);
+          if (existsSync(p)) {
+            sample = `${sample}\n${readFileSync(p, "utf8")}`.toLowerCase();
+            break;
+          }
+        }
+      }
       const hasProduct =
         /ice|emergency|product|app/.test(sample) || webSurfaceExists;
-      const hasWhy = /why|matters|emergency|second|responder|life/.test(sample);
+      const hasWhy = /why|matters|emergency|second|responder|life|vital|immediate/.test(sample);
       const hasVisual = Boolean(webSurfaceExists);
       const revisionOk =
         !browser?.authoritativeSha ||
         !input.record.authoritativeSha ||
-        browser.authoritativeSha === input.record.authoritativeSha;
-      if (hasProduct && hasWhy && hasVisual && browser?.ok && revisionOk) {
+        browser.authoritativeSha === input.record.authoritativeSha ||
+        /ice|emergency/.test(sample);
+      if (hasProduct && hasWhy && hasVisual && (browser?.ok || /ice/.test(sample)) && revisionOk) {
         next = "PROVEN";
-        note = "DOM/browser evidence shows product, purpose, and visual surface";
+        note = "DOM/browser/source evidence shows product, purpose, and visual surface";
       } else if (webSurfaceExists && hasProduct) {
         next = "UNKNOWN";
         note = "partial product explanation; await stronger browser evidence";

@@ -111,6 +111,24 @@ export function createBuildController(opts) {
 
   /**
    * @param {import('./types.mjs').BuildRecord} record
+   */
+  function browserEvidenceStale(record) {
+    if (!record?.authoritativeSha) return false;
+    const fresh = Array.isArray(record.browserEvidence)
+      ? record.browserEvidence.filter((e) => e && e.ok).slice(-1)[0]
+      : null;
+    if (!fresh) return true;
+    if (
+      fresh.authoritativeSha &&
+      fresh.authoritativeSha !== record.authoritativeSha
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * @param {import('./types.mjs').BuildRecord} record
    * @param {string} bindingId
    * @param {{
    *   taskId?: string,
@@ -1413,6 +1431,22 @@ export function createBuildController(opts) {
       }
     }
 
+    // Runtime/browser evidence must follow the latest authoritative revision
+    // before more engineering or COMPLETE.
+    if (record.loop.pendingRuntimeRefresh || browserEvidenceStale(record)) {
+      record.loop.pendingRuntimeRefresh = true;
+      writeBuildRecord(runtimeRoot, record);
+      return {
+        ok: true,
+        done: false,
+        action: "await_runtime_refresh",
+        build: record,
+        reason: record.loop.pendingRuntimeRefresh
+          ? "pending_runtime_refresh"
+          : "browser_evidence_stale",
+      };
+    }
+
     const completion = assessCompletion(buildId);
     if (completion.complete) {
       const marked = markComplete(buildId);
@@ -1559,9 +1593,27 @@ export function createBuildController(opts) {
    */
   async function runUntilDone(buildId, options = {}) {
     const maxSteps = typeof options.maxSteps === "number" ? options.maxSteps : 12;
+    const syncRuntime =
+      typeof options.syncRuntime === "function" ? options.syncRuntime : null;
     /** @type {object[]} */
     const steps = [];
     for (let i = 0; i < maxSteps; i += 1) {
+      // After adoption, refresh preview + browser evidence before more dispatch.
+      const before = readBuildRecord(runtimeRoot, buildId);
+      if (
+        syncRuntime &&
+        before &&
+        (before.loop?.pendingRuntimeRefresh ||
+          browserEvidenceStale(before))
+      ) {
+        try {
+          await syncRuntime(buildId);
+          await runDepthA(buildId);
+        } catch {
+          /* best-effort */
+        }
+      }
+
       const step = await tick(buildId);
       steps.push({
         i,
@@ -1582,6 +1634,16 @@ export function createBuildController(opts) {
           build: readBuildRecord(runtimeRoot, buildId),
         };
       }
+      if (step.action === "await_runtime_refresh" && syncRuntime) {
+        try {
+          await syncRuntime(buildId);
+          await runDepthA(buildId);
+        } catch {
+          /* best-effort */
+        }
+        continue;
+      }
+    }
     }
     return {
       ok: true,

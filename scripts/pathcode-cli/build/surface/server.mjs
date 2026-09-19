@@ -248,7 +248,10 @@ export async function startPathBuildSurface(options) {
     if (loops.has(buildId)) return;
     const startedAt = new Date().toISOString();
     const promise = controller
-      .runUntilDone(buildId, { maxSteps: 48 })
+      .runUntilDone(buildId, {
+        maxSteps: 48,
+        syncRuntime: (id) => syncRuntimeForBuild(id),
+      })
       .then(async (result) => {
         if (opts.autoPreview !== false) {
           await syncRuntimeForBuild(buildId);
