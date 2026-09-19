@@ -1644,7 +1644,6 @@ export function createBuildController(opts) {
         continue;
       }
     }
-    }
     return {
       ok: true,
       done: false,
