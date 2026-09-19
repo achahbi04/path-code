@@ -167,6 +167,7 @@ export function projectBuildForSurface(build, extras = {}) {
     status,
     outcome: build.intent?.outcome || "",
     outcomeRevision: build.intent?.outcomeRevision || 1,
+    authoritativeSha: build.authoritativeSha || null,
     projectRoot,
     originGitInit: Boolean(binding?.originGitInit),
     originKind: binding?.originKind || build.originKind || null,

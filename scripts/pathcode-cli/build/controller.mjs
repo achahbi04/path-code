@@ -1432,8 +1432,11 @@ export function createBuildController(opts) {
     }
 
     // Runtime/browser evidence must follow the latest authoritative revision
-    // before more engineering or COMPLETE.
-    if (record.loop.pendingRuntimeRefresh || browserEvidenceStale(record)) {
+    // before more engineering or COMPLETE (real mode only).
+    if (
+      !fakeMode &&
+      (record.loop.pendingRuntimeRefresh || browserEvidenceStale(record))
+    ) {
       record.loop.pendingRuntimeRefresh = true;
       writeBuildRecord(runtimeRoot, record);
       return {

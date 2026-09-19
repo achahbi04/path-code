@@ -1,195 +1,252 @@
 {
-  "continuedAt": "2026-09-19T19:38:41.241Z",
+  "startedAt": "2026-09-19T21:08:49.486Z",
   "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
   "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
-  "priorAuthSha": "fd7749350c954fab6013139e4a700b1230d94628",
-  "priorAdoptions": [
-    {
-      "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
-      "taskId": "e2e3c7e5-a076-4a1b-8b8e-014d7fdeef13",
-      "sourceSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
-      "adoptedSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
-      "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
-      "productBranch": "path-build/818ccab1",
-      "mode": "merge",
-      "adoptedAt": "2026-09-19T19:27:12.772Z"
-    },
-    {
-      "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
-      "taskId": "76438424-cbec-4bcf-ab0d-b7ede5981793",
-      "sourceSha": "fd7749350c954fab6013139e4a700b1230d94628",
-      "adoptedSha": "fd7749350c954fab6013139e4a700b1230d94628",
-      "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
-      "productBranch": "path-build/818ccab1",
-      "mode": "merge",
-      "adoptedAt": "2026-09-19T19:38:04.591Z"
-    }
-  ],
+  "priorStatus": "running",
+  "priorAuth": "27f25bfccb2dc3f3f66477bc30f5feafaf476c20",
   "surfaceUrl": "http://127.0.0.1:7788/",
-  "previewReady": {
-    "ok": true,
-    "url": "http://127.0.0.1:4173/",
-    "embed": "/preview/818ccab1-f626-473c-96ca-0ef91931b138/",
-    "authoritativeSha": "fd7749350c954fab6013139e4a700b1230d94628"
-  },
-  "beforeEvidence": {
-    "ok": true,
-    "url": "http://127.0.0.1:4173/",
-    "capturedAt": "2026-09-19T19:38:41.556Z",
-    "htmlPath": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/render-2026-09-19T19-38-41-556Z.html",
-    "screenshotPath": null,
-    "title": "ICE - In Case of Emergency",
-    "textSample": "ICE - In Case of Emergency ICE: In Case of Emergency Your vital information, instantly accessible when it matters most. What is ICE? ICE is a critical application designed to store and display your essential personal and medical information, accessible to first responders and emergency personnel in urgent situations. From emergency contacts and allergies to medical conditions and medications, ICE provides a clear, concise, and immediate overview of what responders need to know to give you the best possible care. Why ICE Matters In an emergency, every second counts. When you're unable to communicate, ICE speaks for you. It eliminates guesswork for paramedics and doctors, ensuring you receive appropriate treatment without delays. It provides peace of mind for you and your loved ones, knowing that critical information is always at hand, even if your phone is locked or you're unconscious. Rapid Response: Instantly inform first responders about allergies, medications, and conditions. Accurate Care: Ensure medical professionals have the full picture for informed decisions. Peace of Mind: For you and your family, knowing your critical data is accessible. Life-Saving Potential: Timely information can directly impact emergency outcomes. See ICE in Action Illustrative screenshots showing the user-friendly interface and key information displays. Get ICE Today Prepare for the unexpected. Download ICE and safeguard your health information. Download on the App Store Get it on Google Play &copy; 2026 ICE - In Case of Emergency. All rights reserved.",
-    "needles": [
+  "initialView": {
+    "status": "running",
+    "complete": false,
+    "preview": {
+      "capability": "web",
+      "mode": "static",
+      "url": "http://127.0.0.1:4173/",
+      "port": 4173,
+      "status": "ready",
+      "embedPath": "/preview/818ccab1-f626-473c-96ca-0ef91931b138/"
+    },
+    "criteria": [
       {
-        "needle": "ICE",
-        "found": true
+        "id": "c-runnable",
+        "statement": "Core software is runnable with project-native checks",
+        "status": "PROVEN",
+        "required": true,
+        "source": "default"
       },
       {
-        "needle": "Emergency",
-        "found": true
-      }
-    ],
-    "consoleErrors": [],
-    "engine": "fetch",
-    "error": null,
-    "status": 200,
-    "contentHash": "eb942e816a16f474",
-    "playwrightError": "browserType.launch: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,ThirdPartyStoragePartitioning,LensOverlay,PlzDedicatedWorker --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --enable-automation --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-use-zoom-for-dsf=false --use-angle --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/playwright_chromiumdev_profile-frAKPR --remote-debugging-pipe --no-startup-window\n<launched> pid=40429\n[pid=40429][err] dlopen /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework: dlopen(/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework, 0x0105): tried: '/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file), '/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file).\nCall log:\n  - <launching> /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,ThirdPartyStoragePartitioning,LensOverlay,PlzDedicatedWorker --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --enable-automation --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-use-zoom-for-dsf=false --use-angle --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/playwright_chromiumdev_profile-frAKPR --remote-debugging-pipe --no-startup-window\n  - <launched> pid=40429\n  - [pid=40429][err] dlopen /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework: dlopen(/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework, 0x0105): tried: '/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file), '/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/../Frameworks/Chromium Framework.framework/Versions/131.0.6778.33/Chromium Framework' (no such file).\n",
-    "metaPath": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/meta-2026-09-19T19-38-41-556Z.json"
-  },
-  "beforeMobile": {
-    "ok": true,
-    "contentHash": "eb942e816a16f474",
-    "screenshotPath": null
-  },
-  "steer": {
-    "ok": true,
-    "outcomeRevision": 2
-  },
-  "afterEvidence": {
-    "ok": true,
-    "url": "http://127.0.0.1:4173/",
-    "capturedAt": "2026-09-19T19:42:23.052Z",
-    "htmlPath": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/render-2026-09-19T19-42-23-052Z.html",
-    "screenshotPath": null,
-    "title": "ICE - In Case of Emergency",
-    "textSample": "ICE - In Case of Emergency ICE: In Case of Emergency Your vital information, instantly accessible when it matters most. What is ICE? ICE is a critical application designed to store and display your essential personal and medical information, accessible to first responders and emergency personnel in urgent situations. From emergency contacts and allergies to medical conditions and medications, ICE provides a clear, concise, and immediate overview of what responders need to know to give you the best possible care. Why ICE Matters In an emergency, every second counts. When you're unable to communicate, ICE speaks for you. It eliminates guesswork for paramedics and doctors, ensuring you receive appropriate treatment without delays. It provides peace of mind for you and your loved ones, knowing that critical information is always at hand, even if your phone is locked or you're unconscious. Rapid Response: Instantly inform first responders about allergies, medications, and conditions. Accurate Care: Ensure medical professionals have the full picture for informed decisions. Peace of Mind: For you and your family, knowing your critical data is accessible. Life-Saving Potential: Timely information can directly impact emergency outcomes. See ICE in Action Illustrative screenshots showing the user-friendly interface and key information displays. Get ICE Today Prepare for the unexpected. Download ICE and safeguard your health information. Download on the App Store Get it on Google Play &copy; 2026 ICE - In Case of Emergency. All rights reserved.",
-    "needles": [
-      {
-        "needle": "ICE",
-        "found": true
+        "id": "c-outcome",
+        "statement": "Software advances the stated outcome",
+        "status": "PROVEN",
+        "required": true,
+        "source": "default"
       },
       {
-        "needle": "Emergency",
-        "found": true
+        "id": "c-db8adf5a39",
+        "statement": "A recognizable product landing page or primary web surface exists",
+        "status": "PROVEN",
+        "required": true,
+        "source": "derived"
+      },
+      {
+        "id": "c-b820bbc6d6",
+        "statement": "Primary hero or introduction clearly explains the product purpose",
+        "status": "PROVEN",
+        "required": true,
+        "source": "derived"
+      },
+      {
+        "id": "c-ce37884ae8",
+        "statement": "At least one primary call-to-action is present",
+        "status": "PROVEN",
+        "required": true,
+        "source": "derived"
+      },
+      {
+        "id": "c-6b5e223492",
+        "statement": "The web surface renders successfully in a local preview",
+        "status": "PROVEN",
+        "required": true,
+        "source": "derived"
+      },
+      {
+        "id": "c-b8fa3cb0c2",
+        "statement": "Build a professional website for ICE — In Case of Emergency",
+        "status": "PROVEN",
+        "required": true,
+        "source": "derived"
+      },
+      {
+        "id": "c-ba6a5a9e46",
+        "statement": "It should clearly explain what the product is, why it matters, and present the app visually and professionally",
+        "status": "PROVEN",
+        "required": true,
+        "source": "derived"
       }
-    ],
-    "consoleErrors": [],
-    "engine": "fetch",
-    "error": null,
-    "status": 200,
-    "contentHash": "8c146c2ae6b5b6f3",
-    "playwrightError": "browserType.launch: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,ThirdPartyStoragePartitioning,LensOverlay,PlzDedicatedWorker --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --enable-automation --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-use-zoom-for-dsf=false --use-angle --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/playwright_chromiumdev_profile-2ZsDgN --remote-debugging-pipe --no-startup-window\n<launched> pid=50125\nCall log:\n  - <launching> /var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/cursor-sandbox-cache/65ad0048eb752bc1ee52b4167c700bb7/playwright/chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-extensions --disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,ThirdPartyStoragePartitioning,LensOverlay,PlzDedicatedWorker --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --enable-automation --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-use-zoom-for-dsf=false --use-angle --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/playwright_chromiumdev_profile-2ZsDgN --remote-debugging-pipe --no-startup-window\n  - <launched> pid=50125\n",
-    "metaPath": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/meta-2026-09-19T19-42-23-052Z.json"
+    ]
   },
-  "visibleChange": true,
-  "adoptionHistory": [
-    {
-      "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
-      "taskId": "e2e3c7e5-a076-4a1b-8b8e-014d7fdeef13",
-      "sourceSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
-      "adoptedSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
-      "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
-      "productBranch": "path-build/818ccab1",
-      "mode": "merge",
-      "adoptedAt": "2026-09-19T19:27:12.772Z"
+  "before": {
+    "ok": true,
+    "hash": "cf22179ce0b2b6c9",
+    "shot": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/shot-desktop-2026-09-19T21-08-49-780Z.png",
+    "mobile": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/shot-mobile-2026-09-19T21-08-49-780Z.png",
+    "provider": "cached_chromium_headless_shell-1234",
+    "hero": {
+      "tag": "header",
+      "text": "ICE: In Case of *Emergency*\n\nEvery second counts. Get immediate help. Your vital info, always available.\n\nDownload Now",
+      "backgroundColor": "rgb(0, 0, 51)",
+      "color": "rgb(255, 255, 255)",
+      "fontSize": "16px",
+      "fontWeight": "400"
     },
-    {
-      "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
-      "taskId": "76438424-cbec-4bcf-ab0d-b7ede5981793",
-      "sourceSha": "fd7749350c954fab6013139e4a700b1230d94628",
-      "adoptedSha": "fd7749350c954fab6013139e4a700b1230d94628",
-      "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
-      "productBranch": "path-build/818ccab1",
-      "mode": "merge",
-      "adoptedAt": "2026-09-19T19:38:04.591Z"
+    "heading": {
+      "tag": "h1",
+      "text": "ICE: In Case of *Emergency*",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "color": "rgb(255, 255, 255)",
+      "fontSize": "112px",
+      "fontWeight": "700"
     },
-    {
+    "cta": {
+      "tag": "a",
+      "text": "Download Now",
+      "backgroundColor": "rgb(217, 83, 79)",
+      "color": "rgb(255, 255, 255)",
+      "fontSize": "24px",
+      "fontWeight": "400"
+    },
+    "text": "ICE: In Case of *Emergency* Every second counts. Get immediate help. Your vital info, always available. Download Now What is ICE? ICE is a critical emergency response application designed to provide immediate access to your vital information when you're unable to communicate. In an unexpected medica"
+  },
+  "strongSteer": {
+    "ok": true,
+    "rev": 5,
+    "status": "running",
+    "skipped": true
+  },
+  "afterStrong": {
+    "ok": true,
+    "hash": "cf22179ce0b2b6c9",
+    "shot": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/shot-desktop-2026-09-19T21-08-49-780Z.png",
+    "mobile": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/shot-mobile-2026-09-19T21-08-49-780Z.png",
+    "provider": "cached_chromium_headless_shell-1234",
+    "hero": {
+      "tag": "header",
+      "text": "ICE: In Case of *Emergency*\n\nEvery second counts. Get immediate help. Your vital info, always available.\n\nDownload Now",
+      "backgroundColor": "rgb(0, 0, 51)",
+      "color": "rgb(255, 255, 255)",
+      "fontSize": "16px",
+      "fontWeight": "400"
+    },
+    "heading": {
+      "tag": "h1",
+      "text": "ICE: In Case of *Emergency*",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "color": "rgb(255, 255, 255)",
+      "fontSize": "112px",
+      "fontWeight": "700"
+    },
+    "cta": {
+      "tag": "a",
+      "text": "Download Now",
+      "backgroundColor": "rgb(217, 83, 79)",
+      "color": "rgb(255, 255, 255)",
+      "fontSize": "24px",
+      "fontWeight": "400"
+    },
+    "auth": "27f25bfccb2dc3f3f66477bc30f5feafaf476c20",
+    "hashChanged": true,
+    "styleChanged": true,
+    "alreadyPresent": true
+  },
+  "selection": {
+    "ok": true,
+    "payload": {
       "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
-      "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
-      "sourceSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-      "adoptedSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-      "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
-      "productBranch": "path-build/818ccab1",
-      "mode": "merge",
-      "adoptedAt": "2026-09-19T19:42:18.358Z"
+      "authoritativeRevision": "27f25bfccb2dc3f3f66477bc30f5feafaf476c20",
+      "selector": "h1",
+      "tagName": "H1",
+      "text": "ICE: In Case of *Emergency*",
+      "attributes": {
+        "class": "hero-title"
+      },
+      "domPath": "html > body > header > h1",
+      "boundingRect": {
+        "x": 40,
+        "y": 80,
+        "width": 600,
+        "height": 120
+      },
+      "computedStyleSubset": {
+        "fontSize": "112px",
+        "color": "rgb(255, 255, 255)"
+      },
+      "sourceFile": "index.html",
+      "framework": "static-html"
+    },
+    "rev": 6
+  },
+  "afterSelection": {
+    "ok": true,
+    "auth": "10b63e9ff004e860aec5e88fd8410774b42fcae0",
+    "shot": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/818ccab1-f626-473c-96ca-0ef91931b138/shot-desktop-2026-09-19T21-16-09-364Z.png",
+    "heading": {
+      "tag": "h1",
+      "text": "ICE: In Case of *Emergency*",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "color": "rgb(255, 255, 255)",
+      "fontSize": "80px",
+      "fontWeight": "700"
     }
-  ],
-  "authoritativeSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-  "children": [
-    {
-      "kind": "engineer",
-      "taskId": "e2e3c7e5-a076-4a1b-8b8e-014d7fdeef13",
-      "classification": "NOT_VERIFIED",
-      "dispatchState": "consumed",
-      "adoptedSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
-      "sourceSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
-      "provider": null
-    },
-    {
-      "kind": "evaluate",
-      "taskId": "8250d421-4aea-4f27-872e-49a9bb50e1d2",
-      "classification": "VERIFIED",
-      "dispatchState": "consumed",
-      "adoptedSha": null,
-      "sourceSha": null,
-      "provider": null
-    },
-    {
-      "kind": "engineer",
-      "taskId": "76438424-cbec-4bcf-ab0d-b7ede5981793",
-      "classification": "VERIFIED",
-      "dispatchState": "consumed",
-      "adoptedSha": "fd7749350c954fab6013139e4a700b1230d94628",
-      "sourceSha": "fd7749350c954fab6013139e4a700b1230d94628",
-      "provider": null
-    },
-    {
-      "kind": "evaluate",
-      "taskId": "c545e5c6-1a99-471e-88bb-12b3942b66c0",
-      "dispatchState": "dispatched",
-      "adoptedSha": null,
-      "sourceSha": null,
-      "provider": null
-    },
-    {
-      "kind": "challenge",
-      "taskId": "79752dff-5f88-4f7c-9bc9-2afd7fd3b4ad",
-      "classification": "VERIFIED",
-      "dispatchState": "consumed",
-      "adoptedSha": null,
-      "sourceSha": null,
-      "provider": null
-    },
-    {
-      "kind": "engineer",
-      "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
-      "classification": "VERIFIED",
-      "dispatchState": "consumed",
-      "adoptedSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-      "sourceSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-      "provider": null
-    },
-    {
-      "kind": "engineer",
-      "taskId": "5debed34-afe0-4be2-9647-9ae0e011dbca",
-      "dispatchState": "dispatched",
-      "adoptedSha": null,
-      "sourceSha": null,
-      "provider": null
-    }
-  ],
+  },
+  "recomplete": {
+    "ok": true,
+    "status": "complete",
+    "criteria": [
+      {
+        "id": "c-runnable",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-outcome",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-db8adf5a39",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-b820bbc6d6",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-ce37884ae8",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-6b5e223492",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-b8fa3cb0c2",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-ba6a5a9e46",
+        "status": "PROVEN"
+      }
+    ]
+  },
+  "controllerRecovery": {
+    "ok": false,
+    "status": "complete",
+    "conversationLen": 11
+  },
+  "postCompleteSteer": {
+    "ok": true,
+    "rev": 7,
+    "status": "running"
+  },
+  "postComplete": {
+    "ok": true,
+    "status": "complete",
+    "rev": 7,
+    "auth": "10b63e9ff004e860aec5e88fd8410774b42fcae0"
+  },
+  "runtimeRecovery": {
+    "ok": true,
+    "url": "http://127.0.0.1:4173/",
+    "authUnchanged": true
+  },
   "openFolder": {
     "ok": true,
     "path": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg"
@@ -198,265 +255,425 @@
     "ok": true,
     "path": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg"
   },
-  "finalStatus": "running",
-  "finalCriteria": [
-    {
-      "id": "c-runnable",
-      "statement": "Core software is runnable with project-native checks",
-      "required": true,
-      "status": "PROVEN",
-      "evidence": [
-        {
-          "kind": "check",
-          "ref": "npm test",
-          "bindingId": "bind-71d4264f",
-          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
-          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
-          "configFingerprint": "e215b17c5aab22a19823d30f",
-          "scope": [
-            "package.json",
-            "src/"
-          ],
-          "observedAt": "2026-09-19T19:42:18.946Z"
-        }
-      ],
-      "updatedAt": "2026-09-19T19:42:18.946Z",
-      "source": "default",
-      "challengedByTaskId": "79752dff-5f88-4f7c-9bc9-2afd7fd3b4ad"
-    },
-    {
-      "id": "c-outcome",
-      "statement": "Software advances the stated outcome",
-      "required": true,
-      "status": "PROVEN",
-      "evidence": [
-        {
-          "kind": "check",
-          "ref": "npm test",
-          "bindingId": "bind-71d4264f",
-          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
-          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
-          "configFingerprint": "e215b17c5aab22a19823d30f",
-          "scope": [
-            "package.json",
-            "src/"
-          ],
-          "observedAt": "2026-09-19T19:42:18.946Z"
-        }
-      ],
-      "updatedAt": "2026-09-19T19:42:18.946Z",
-      "source": "default"
-    },
-    {
-      "id": "c-db8adf5a39",
-      "statement": "A recognizable product landing page or primary web surface exists",
-      "required": true,
-      "status": "PROVEN",
-      "evidence": [
-        {
-          "kind": "check",
-          "ref": "npm test",
-          "bindingId": "bind-71d4264f",
-          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
-          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
-          "configFingerprint": "e215b17c5aab22a19823d30f",
-          "scope": [
-            "package.json",
-            "src/"
-          ],
-          "observedAt": "2026-09-19T19:42:18.946Z"
-        }
-      ],
-      "updatedAt": "2026-09-19T19:42:18.946Z",
-      "source": "derived"
-    },
-    {
-      "id": "c-b820bbc6d6",
-      "statement": "Primary hero or introduction clearly explains the product purpose",
-      "required": true,
-      "status": "PROVEN",
-      "evidence": [
-        {
-          "kind": "check",
-          "ref": "npm test",
-          "bindingId": "bind-71d4264f",
-          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
-          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
-          "configFingerprint": "e215b17c5aab22a19823d30f",
-          "scope": [
-            "package.json",
-            "src/"
-          ],
-          "observedAt": "2026-09-19T19:42:18.946Z"
-        }
-      ],
-      "updatedAt": "2026-09-19T19:42:18.946Z",
-      "source": "derived"
-    },
-    {
-      "id": "c-ce37884ae8",
-      "statement": "At least one primary call-to-action is present",
-      "required": true,
-      "status": "PROVEN",
-      "evidence": [
-        {
-          "kind": "check",
-          "ref": "npm test",
-          "bindingId": "bind-71d4264f",
-          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
-          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
-          "configFingerprint": "e215b17c5aab22a19823d30f",
-          "scope": [
-            "package.json",
-            "src/"
-          ],
-          "observedAt": "2026-09-19T19:42:18.946Z"
-        }
-      ],
-      "updatedAt": "2026-09-19T19:42:18.946Z",
-      "source": "derived"
-    },
-    {
-      "id": "c-6b5e223492",
-      "statement": "The web surface renders successfully in a local preview",
-      "required": true,
-      "status": "PROVEN",
-      "evidence": [
-        {
-          "kind": "check",
-          "ref": "npm test",
-          "bindingId": "bind-71d4264f",
-          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
-          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
-          "configFingerprint": "e215b17c5aab22a19823d30f",
-          "scope": [
-            "package.json",
-            "src/"
-          ],
-          "observedAt": "2026-09-19T19:42:18.946Z"
-        }
-      ],
-      "updatedAt": "2026-09-19T19:42:18.946Z",
-      "source": "derived"
-    },
-    {
-      "id": "c-b8fa3cb0c2",
-      "statement": "Build a professional website for ICE — In Case of Emergency",
-      "required": true,
-      "status": "PROVEN",
-      "evidence": [
-        {
-          "kind": "check",
-          "ref": "npm test",
-          "bindingId": "bind-71d4264f",
-          "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
-          "headSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
-          "dirtyFingerprint": "f549c4c69a78184c6e31aa19",
-          "configFingerprint": "e215b17c5aab22a19823d30f",
-          "scope": [
-            "package.json",
-            "src/"
-          ],
-          "observedAt": "2026-09-19T19:42:18.946Z"
-        }
-      ],
-      "updatedAt": "2026-09-19T19:42:18.946Z",
-      "source": "derived"
-    },
-    {
-      "id": "c-ba6a5a9e46",
-      "statement": "It should clearly explain what the product is, why it matters, and present the app visually and professionally",
-      "required": true,
-      "status": "UNKNOWN",
-      "evidence": [],
-      "updatedAt": "2026-09-19T19:19:57.344Z",
-      "source": "derived"
-    }
-  ],
-  "productBrief": {
-    "outcome": "Build a professional website for ICE — In Case of Emergency. It should clearly explain what the product is, why it matters, and present the app visually and professionally.",
-    "productKind": "web",
-    "capabilities": [
-      "Build a professional website for ICE — In Case of Emergency",
-      "It should clearly explain what the product is, why it matters, and present the app visually and professionally"
-    ],
-    "visualRequirements": [
-      "A recognizable product landing page or primary web surface exists",
-      "Primary hero or introduction clearly explains the product purpose",
-      "At least one primary call-to-action is present",
-      "The web surface renders successfully in a local preview",
-      "It should clearly explain what the product is, why it matters, and present the app visually and professionally"
-    ],
-    "functionalRequirements": [
-      "Core software is runnable with project-native checks",
-      "Software advances the stated outcome",
-      "Build a professional website for ICE — In Case of Emergency"
-    ],
-    "nonFunctionalRequirements": [],
-    "constraints": [],
-    "acceptanceCriteria": [
+  "final": {
+    "status": "complete",
+    "auth": "10b63e9ff004e860aec5e88fd8410774b42fcae0",
+    "rev": 7,
+    "criteria": [
       {
         "id": "c-runnable",
-        "statement": "Core software is runnable with project-native checks",
-        "required": true,
-        "source": "default"
+        "status": "PROVEN",
+        "statement": "Core software is runnable with project-native checks"
       },
       {
         "id": "c-outcome",
-        "statement": "Software advances the stated outcome",
-        "required": true,
-        "source": "default"
+        "status": "PROVEN",
+        "statement": "Software advances the stated outcome"
       },
       {
         "id": "c-db8adf5a39",
-        "statement": "A recognizable product landing page or primary web surface exists",
-        "required": true,
-        "source": "derived"
+        "status": "PROVEN",
+        "statement": "A recognizable product landing page or primary web surface exists"
       },
       {
         "id": "c-b820bbc6d6",
-        "statement": "Primary hero or introduction clearly explains the product purpose",
-        "required": true,
-        "source": "derived"
+        "status": "PROVEN",
+        "statement": "Primary hero or introduction clearly explains the product purpose"
       },
       {
         "id": "c-ce37884ae8",
-        "statement": "At least one primary call-to-action is present",
-        "required": true,
-        "source": "derived"
+        "status": "PROVEN",
+        "statement": "At least one primary call-to-action is present"
       },
       {
         "id": "c-6b5e223492",
-        "statement": "The web surface renders successfully in a local preview",
-        "required": true,
-        "source": "derived"
+        "status": "PROVEN",
+        "statement": "The web surface renders successfully in a local preview"
       },
       {
         "id": "c-b8fa3cb0c2",
-        "statement": "Build a professional website for ICE — In Case of Emergency",
-        "required": true,
-        "source": "derived"
+        "status": "PROVEN",
+        "statement": "Build a professional website for ICE — In Case of Emergency"
       },
       {
         "id": "c-ba6a5a9e46",
-        "statement": "It should clearly explain what the product is, why it matters, and present the app visually and professionally",
-        "required": true,
-        "source": "derived"
+        "status": "PROVEN",
+        "statement": "It should clearly explain what the product is, why it matters, and present the app visually and professionally"
       }
     ],
-    "derivedAt": "2026-09-19T19:19:57.344Z"
+    "children": [
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "NOT_VERIFIED",
+        "taskId": "e2e3c7e5-a076-4a1b-8b8e-014d7fdeef13",
+        "adoptedSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "8250d421-4aea-4f27-872e-49a9bb50e1d2"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "76438424-cbec-4bcf-ab0d-b7ede5981793",
+        "adoptedSha": "fd7749350c954fab6013139e4a700b1230d94628"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "ABANDONED_ORPHAN",
+        "taskId": "c545e5c6-1a99-471e-88bb-12b3942b66c0"
+      },
+      {
+        "kind": "challenge",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "79752dff-5f88-4f7c-9bc9-2afd7fd3b4ad"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+        "adoptedSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "5debed34-afe0-4be2-9647-9ae0e011dbca",
+        "adoptedSha": "ed82af77542bbe8af6df336df370019df405e2ad"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "b5dc61c6-4c09-4f9a-af40-ea10e2a1505a"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "2c6a11c9-a53a-4f3e-98d4-58394c36ec16"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "d0480a75-dfc3-49ed-9978-986c40736bd1",
+        "adoptedSha": "a25f2de2313e3811cc72fbdb2f9fe42694b9b315"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "NOT_VERIFIED",
+        "taskId": "a7df70c6-a648-40c9-b5a6-defa1b0d293d",
+        "adoptedSha": "a25f2de2313e3811cc72fbdb2f9fe42694b9b315"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "9047c795-f386-4217-ade1-16d1c3499c89"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "2279824f-5ef4-44ef-a051-eae729888f40"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "0ca10f85-9c38-4c92-bdb7-c2a6357dc795",
+        "adoptedSha": "9ac0d6bfbc3267ee9788a9ba974924be4d0d28ba"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "b9ffc0c1-9bc4-45d3-90cd-ba55385a1087",
+        "adoptedSha": "972c5a3b4b8866d6fb377ef118c9717005dc10bf"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "taskId": "01bce98d-1343-41bb-88c9-3f9b99095e0f"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "655bb944-ebce-4e56-8d48-a8fdfc0264b3"
+      },
+      {
+        "kind": "challenge",
+        "state": "consumed",
+        "class": "ABANDONED_SUPERSEDED_BY_STEER",
+        "taskId": "980416df-db64-4485-9a5b-2637396a501a"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "e4c27656-6694-4fec-8c3f-88dae2a85ccd",
+        "adoptedSha": "6bfb458d59907736047e8bdd1fabcf297c6f6686"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "3ca55b66-4996-4e4a-bafd-c26670084ffb",
+        "adoptedSha": "8b99539492b1a8f43d94db0578cc743255a571ac"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "d705688b-d451-444b-a403-19ba70d9da8d"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "3c2cba97-e528-4ea7-af28-861ff8061172"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "ef6bb594-5123-40ab-bb36-22fdccb3bcde",
+        "adoptedSha": "8b99539492b1a8f43d94db0578cc743255a571ac"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "d22785e7-e45b-4dc2-ad59-fc7456bee329",
+        "adoptedSha": "27f25bfccb2dc3f3f66477bc30f5feafaf476c20"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "aeecc127-e059-44e8-b355-10fd540c981d"
+      },
+      {
+        "kind": "challenge",
+        "state": "consumed",
+        "class": "ABANDONED_SUPERSEDED_BY_STEER",
+        "taskId": "1e2228a4-466a-421c-9cd2-02000f33e579"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "ABANDONED_RESTART",
+        "taskId": "cd512790-8117-4c59-a78b-63fa38fe7cdf"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "500fb41e-7f70-4507-809d-12720a8f83e2",
+        "adoptedSha": "10b63e9ff004e860aec5e88fd8410774b42fcae0"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "bef42cf7-cbd9-4698-b837-d589aa7323ee"
+      },
+      {
+        "kind": "challenge",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "7f29295c-1925-444f-b82f-3a4f911d679f"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "cd647b2b-eff6-4ef5-b5a9-86c102f55b40",
+        "adoptedSha": "10b63e9ff004e860aec5e88fd8410774b42fcae0"
+      },
+      {
+        "kind": "evaluate",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "0d5fdfc6-cb86-4689-97cc-f74601461f95"
+      },
+      {
+        "kind": "challenge",
+        "state": "consumed",
+        "class": "VERIFIED",
+        "provider": "cursor",
+        "taskId": "208890cd-e3fd-4e27-9884-a0e4793c859e"
+      }
+    ],
+    "adoptions": [
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "e2e3c7e5-a076-4a1b-8b8e-014d7fdeef13",
+        "sourceSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
+        "adoptedSha": "33436691dd8611f5b5fb9c9e1e0b40f1aed70f9d",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T19:27:12.772Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "76438424-cbec-4bcf-ab0d-b7ede5981793",
+        "sourceSha": "fd7749350c954fab6013139e4a700b1230d94628",
+        "adoptedSha": "fd7749350c954fab6013139e4a700b1230d94628",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T19:38:04.591Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "0fadc87e-2178-45f1-b65c-d965ac8f4ba1",
+        "sourceSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+        "adoptedSha": "7a44f4f7caf5e4bd2d03481ee73ab04ab9b318ba",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T19:42:18.358Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "5debed34-afe0-4be2-9647-9ae0e011dbca",
+        "sourceSha": "ed82af77542bbe8af6df336df370019df405e2ad",
+        "adoptedSha": "ed82af77542bbe8af6df336df370019df405e2ad",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T19:45:31.403Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "d0480a75-dfc3-49ed-9978-986c40736bd1",
+        "sourceSha": "a25f2de2313e3811cc72fbdb2f9fe42694b9b315",
+        "adoptedSha": "a25f2de2313e3811cc72fbdb2f9fe42694b9b315",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T20:06:43.471Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "a7df70c6-a648-40c9-b5a6-defa1b0d293d",
+        "sourceSha": null,
+        "adoptedSha": "a25f2de2313e3811cc72fbdb2f9fe42694b9b315",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T20:09:05.804Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "0ca10f85-9c38-4c92-bdb7-c2a6357dc795",
+        "sourceSha": "9ac0d6bfbc3267ee9788a9ba974924be4d0d28ba",
+        "adoptedSha": "9ac0d6bfbc3267ee9788a9ba974924be4d0d28ba",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T20:14:50.750Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "b9ffc0c1-9bc4-45d3-90cd-ba55385a1087",
+        "sourceSha": "972c5a3b4b8866d6fb377ef118c9717005dc10bf",
+        "adoptedSha": "972c5a3b4b8866d6fb377ef118c9717005dc10bf",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T20:17:02.076Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "e4c27656-6694-4fec-8c3f-88dae2a85ccd",
+        "sourceSha": "6bfb458d59907736047e8bdd1fabcf297c6f6686",
+        "adoptedSha": "6bfb458d59907736047e8bdd1fabcf297c6f6686",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T20:48:05.792Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "3ca55b66-4996-4e4a-bafd-c26670084ffb",
+        "sourceSha": "8b99539492b1a8f43d94db0578cc743255a571ac",
+        "adoptedSha": "8b99539492b1a8f43d94db0578cc743255a571ac",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T20:56:26.198Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "ef6bb594-5123-40ab-bb36-22fdccb3bcde",
+        "sourceSha": "260aee4979e15b48a307cdf9cd4883b4759adcb7",
+        "adoptedSha": "8b99539492b1a8f43d94db0578cc743255a571ac",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T21:03:50.974Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "d22785e7-e45b-4dc2-ad59-fc7456bee329",
+        "sourceSha": "27f25bfccb2dc3f3f66477bc30f5feafaf476c20",
+        "adoptedSha": "27f25bfccb2dc3f3f66477bc30f5feafaf476c20",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T21:05:11.676Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "500fb41e-7f70-4507-809d-12720a8f83e2",
+        "sourceSha": "10b63e9ff004e860aec5e88fd8410774b42fcae0",
+        "adoptedSha": "10b63e9ff004e860aec5e88fd8410774b42fcae0",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T21:16:08.375Z"
+      },
+      {
+        "buildId": "818ccab1-f626-473c-96ca-0ef91931b138",
+        "taskId": "cd647b2b-eff6-4ef5-b5a9-86c102f55b40",
+        "sourceSha": "ffe75ac04c47b75d508f036fd996905787d5767c",
+        "adoptedSha": "10b63e9ff004e860aec5e88fd8410774b42fcae0",
+        "projectRoot": "/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg",
+        "productBranch": "path-build/818ccab1",
+        "mode": "merge",
+        "adoptedAt": "2026-09-19T21:21:10.452Z"
+      }
+    ]
   },
-  "previewUrl": "http://127.0.0.1:4173/",
-  "runtimeHealth": "ok",
   "bindsHome": false,
-  "endedAt": "2026-09-19T19:42:23.106Z",
-  "verdict": "PASS_PARTIAL_OR_FULL",
-  "complete": false,
-  "operatorAcceptanceReady": false
+  "endedAt": "2026-09-19T21:22:14.189Z",
+  "verdict": "PASS",
+  "operatorAcceptanceReady": true
 }

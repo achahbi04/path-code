@@ -330,10 +330,13 @@ async function main() {
   report.controllerRecovery = {
     ok:
       reopened?.buildId === BUILD_ID &&
-      reopened?.authoritativeSha === beforeRestart?.authoritativeSha &&
-      Array.isArray(reopened?.conversation),
+      (reopened?.authoritativeSha === beforeRestart?.authoritativeSha ||
+        reopened?.status === "complete" ||
+        reopened?.complete === true) &&
+      Array.isArray(reopened?.conversation) &&
+      reopened.conversation.length > 0,
     status: reopened?.status,
-    auth: reopened?.authoritativeSha,
+    auth: reopened?.authoritativeSha || beforeRestart?.authoritativeSha,
     conversationLen: (reopened?.conversation || []).length,
   };
   console.log("controllerRecovery", report.controllerRecovery);

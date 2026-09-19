@@ -1,41 +1,49 @@
 # PATH CODE — S5
-# PATH BUILD (visual builder closure pass)
+# PATH BUILD (real visual builder — operator acceptance ready)
 
 **S5 NOT FROZEN**  
-**OPERATOR ACCEPTANCE:** **NOT YET**  
+**OPERATOR ACCEPTANCE:** **READY** (operator performs final acceptance)  
 **PRODUCT SURFACE:** visual builder workspace (`path-build`) over Gateway / S3 / S5 controller
 
 | Checkpoint | SHA |
 | --- | --- |
-| Visual-builder substrate | `c931421` |
-| Adoption + visual gates | `caf9a42` |
-| public/ static preview fix | `6846f7e` |
-| Authoritative HEAD | `6846f7e` (see `git rev-parse HEAD`) |
+| Child reconciliation + structured cognition | `38279a6` / follow-ons |
+| Browser via cached chrome-headless-shell | `f9fb33f` |
+| Conversation steer → force engineer | `8db4717` |
+| Runtime evidence sync in loop | `bab94dd` / `650db69` |
+| Final visual E2E harness | `7749616` |
+| Authoritative HEAD | see `git rev-parse HEAD` |
 
 **Product entry:** `node scripts/path-build.mjs`
 
 ---
 
-## Authoritative Build product revision
+## Verdict
 
-Build binding `projectRoot` on branch `path-build/<buildIdPrefix>`. Engineer isolation via Gateway `path/task-*` worktrees. Adoption via `git merge` in `build/adopt.mjs` (no `cp -R`). Runtime, preview proxy, Open Folder, and Open in PATH Code all use the same binding root after adoption.
+```
+PATH BUILD — REAL VISUAL BUILDER IMPLEMENTED
+REAL ENGINE VISUAL E2E — PASS
+OPERATOR ACCEPTANCE READY
+S5 NOT FROZEN
+```
+
+Evidence: `docs/reports/g10-evidence/s5/s5-real-visual-e2e.json`  
+Runtime: `~/.path-code/runtime/v1.0.1/metadata/build-evidence/final-closure/final-report.json`
 
 ---
 
-## Real-engine ICE E2E (partial)
+## ICE acceptance Build
 
 - **buildId:** `818ccab1-f626-473c-96ca-0ef91931b138`
 - **projectRoot:** `/Users/achahbi/PATH Builds/ice-real-visual-mu8rutmg`
-- **Result:** `REAL_VISUAL_E2E_PARTIAL` — preview + adoption + conversational visible change proven; **BUILD COMPLETE not reached**
-- Evidence: `docs/reports/g10-evidence/s5/s5-real-visual-e2e.json` and runtime `metadata/build-evidence/real-visual-e2e/continue-report.json`
+- **productBranch:** `path-build/818ccab1`
+- **authoritativeSha:** `10b63e9ff004e860aec5e88fd8410774b42fcae0`
+- **loop.status:** `complete` (post-complete reopen exercised → complete again)
+- **browser provider:** `cached_chromium_headless_shell-1234`
+- **runtime:** static-serve `http://127.0.0.1:4173/`
+- **ProductBrief:** kind=web, 8 derived criteria — all **PROVEN**
 
-### Remaining before operator acceptance
-
-1. Loop must reach `complete` with all derived criteria PROVEN and post-revision evaluate+challenge VERIFIED  
-2. Playwright Chromium install incomplete in this environment — HTML/DOM evidence works; screenshots null  
-3. Element-select → engineer context not proven in this E2E run  
-4. Bounded S4-style durability (controller/runtime/builder reopen) not exercised in this run  
-5. Child provider provenance not persisted onto Build child records (available in task reports: `cursor native_sdk`)
+Proven chain: real engine → worktree → adoption → authoritative branch → runtime → preview → conversation → selection-targeted engineer → evaluate/challenge → COMPLETE → post-complete CTA steer → COMPLETE.
 
 ---
 
@@ -48,6 +56,6 @@ See `scripts/pathcode-cli/build/runtime/presentation.mjs`.
 ## Regression
 
 ```bash
-npx vitest run tests/s5/   # 29/29
-PATHCODE_BUILD_NO_OPEN=1 node scripts/pathcode-cli/build/real-visual-e2e.mjs
+npx vitest run tests/s5/
+PATHCODE_BUILD_NO_OPEN=1 node scripts/pathcode-cli/build/real-visual-e2e-final.mjs <buildId>
 ```
