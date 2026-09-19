@@ -6,7 +6,7 @@
 **OPERATOR ACCEPTANCE:** **READY** (entrypoint defect closed — unbound shell + `/build start` from empty dir)  
 **S5 NOT FROZEN**
 
-**Authoritative HEAD:** `e03639296d013b1a12c0b5219d405cdc171e286c` (S5 operator-entry defect closed; unbound shell + Build origin; supersedes `a1709c8`)
+**Authoritative HEAD:** `847c9c38947a9e0326881f1859d7c9d539afe800` (S5 pre-acceptance reconciled tip after operator-entry repair; implementation in `e036392`; supersedes stale `a1709c8`)
 **Operator-entry proof:** [`g10-evidence/s5/s5-operator-entry-proof.json`](./g10-evidence/s5/s5-operator-entry-proof.json) — `OPERATOR_ENTRY_GREENFIELD_VERIFIED`  
 **Prior superseded checkpoint:** `a1709c8706eaf120ef508a9179889d7c94787201` (acceptance blocked: empty cwd exited `NOT_A_PROJECT` before `/build`)
 
@@ -63,8 +63,8 @@ PATH Build v1 is a **durable product control loop** over one or more project bin
 | `headless.mjs` | Headless CLI + mechanical greenfield proof |
 | `index.mjs` | Public exports for CLI and tests |
 
-**Tests:** `tests/s5/build.test.ts` (probe does-not-materialize README; worktree + task-branch README detection)  
-**Regression:** `tests/s4/*` — pass with `npx vitest run tests/s5 tests/s4 --reporter=dot`
+**Tests:** `tests/s5/build.test.ts` (15) — probe, control loop, unbound operator entrypoint  
+**Regression:** `tests/s4/*` (12) — pass with `npx vitest run tests/s5 tests/s4 --reporter=dot`
 
 ---
 
@@ -72,10 +72,13 @@ PATH Build v1 is a **durable product control loop** over one or more project bin
 
 | Check | Result |
 | --- | --- |
-| `npx vitest run tests/s5 tests/s4 --reporter=dot` | 25 / 25 pass (requires git available for origin tests) |
+| `npx vitest run tests/s5 --reporter=dot` | **15 / 15** pass |
+| `npx vitest run tests/s4 --reporter=dot` | **12 / 12** pass |
+| `npx vitest run tests/s5 tests/s4 --reporter=dot` | **27 / 27** pass (requires git available for origin / entry tests) |
 | `node scripts/pathcode-cli/build/headless.mjs proof` | **MECHANICAL CONTROL-LOOP VERIFIED** |
 | `node --check scripts/pathcode-cli/build/controller.mjs` | OK |
 | `node --check docs/reports/g10-evidence/s5/run-s5-real-e2e.mjs` | OK |
+| `node --check docs/reports/g10-evidence/s5/run-s5-operator-entry-proof.mjs` | OK |
 
 ---
 
