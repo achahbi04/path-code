@@ -290,17 +290,20 @@ export function createBuildRuntimeManager(opts) {
 
     try {
       if (plan.kind === "static") {
-        const handle = await startStaticPreviewServer(root, port);
+        const staticRoot = plan.cwd || root;
+        const handle = await startStaticPreviewServer(staticRoot, port);
         entry.staticHandle = handle;
         entry.url = handle.url;
         entry.port = handle.port;
         entry.status = "ready";
         entry.health = "ok";
+        entry.staticRoot = staticRoot;
         persist(buildId, {
           runtimeId,
           buildId,
           bindingId: entry.bindingId,
           projectRoot: root,
+          staticRoot,
           status: "ready",
           port: entry.port,
           url: entry.url,

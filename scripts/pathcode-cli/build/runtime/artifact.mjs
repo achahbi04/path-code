@@ -72,6 +72,26 @@ export function detectBuildArtifact(projectRoot, opts = {}) {
 
   const pkg = readJsonSafe(root, "package.json");
   const hasIndexHtml = existsSync(join(root, "index.html"));
+  /** @type {string | null} */
+  let staticServeRoot = null;
+  if (hasIndexHtml) {
+    staticServeRoot = ".";
+  } else {
+    const nested = [
+      ["public", "public/index.html"],
+      ["dist", "dist/index.html"],
+      ["build", "build/index.html"],
+      ["out", "out/index.html"],
+      ["docs", "docs/index.html"],
+    ];
+    for (const [dir, rel] of nested) {
+      if (existsSync(join(root, rel))) {
+        staticServeRoot = dir;
+        break;
+      }
+    }
+  }
+  const hasStaticHtml = Boolean(staticServeRoot);
   const hasVite = Boolean(
     firstExisting(root, [
       "vite.config.ts",
@@ -137,12 +157,15 @@ export function detectBuildArtifact(projectRoot, opts = {}) {
     artifact.preview.capability = "web";
     artifact.preview.mode = "dev_server";
     artifact.signals.push("node_web_scripts");
-  } else if (hasIndexHtml) {
+  } else if (hasIndexHtml || hasStaticHtml) {
     artifact.kind = "web";
     artifact.framework = "static";
     artifact.preview.capability = "web";
     artifact.preview.mode = "static";
-    artifact.signals.push("static_index_html");
+    artifact.signals.push(
+      hasIndexHtml ? "static_index_html" : `static_${staticServeRoot}_index_html`,
+    );
+    artifact.staticRoot = staticServeRoot || ".";
     // Keep PATH-owned static serve — do not spawn npx serve for plain static trees.
   } else if (pkg?.bin || (scripts.start && /\bcli\b|commander|yargs/i.test(JSON.stringify(deps)))) {
     artifact.kind = "cli";
@@ -203,13 +226,21 @@ export function resolveArtifactStartPlan(artifact, opts) {
   };
 
   if (artifact.preview.mode === "static" || (artifact.framework === "static" && !artifact.startCommand && !artifact.devCommand)) {
+    const staticRel =
+      typeof artifact.staticRoot === "string" && artifact.staticRoot
+        ? artifact.staticRoot
+        : ".";
     return {
       kind: "static",
       port: opts.port,
-      cwd: artifact.projectRoot,
+      cwd:
+        staticRel === "."
+          ? artifact.projectRoot
+          : join(artifact.projectRoot, staticRel),
       cmd: null,
       args: [],
       env: {},
+      staticRoot: staticRel,
     };
   }
 
@@ -236,14 +267,21 @@ export function resolveArtifactStartPlan(artifact, opts) {
     };
   }
 
-  if (artifact.kind === "web" && existsSync(join(artifact.projectRoot, "index.html"))) {
+  if (artifact.kind === "web" && (
+    existsSync(join(artifact.projectRoot, "index.html")) ||
+    existsSync(join(artifact.projectRoot, "public", "index.html"))
+  )) {
+    const cwd = existsSync(join(artifact.projectRoot, "index.html"))
+      ? artifact.projectRoot
+      : join(artifact.projectRoot, "public");
     return {
       kind: "static",
       port: opts.port,
-      cwd: artifact.projectRoot,
+      cwd,
       cmd: null,
       args: [],
       env: {},
+      staticRoot: cwd === artifact.projectRoot ? "." : "public",
     };
   }
 
