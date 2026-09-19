@@ -7,7 +7,9 @@ import {
   rmSync,
   writeFileSync,
   existsSync,
+  mkdirSync,
 } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -295,6 +297,83 @@ describe("S5 PATH Build", () => {
       bindingId: origin.binding.bindingId,
     });
     expect(probe.ok).toBe(true);
+    expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
+  });
+
+  it("mechanical probe: README on task worktree satisfies req-readme", () => {
+    const target = join(dir, "readme-worktree");
+    const origin = ensureBuildOrigin({ targetDir: target });
+    expect(origin.ok).toBe(true);
+    if (!origin.ok) return;
+    const worktree = join(dir, "readme-worktree-wt");
+    mkdirSync(worktree, { recursive: true });
+    writeFileSync(
+      join(origin.binding.projectRoot, "package.json"),
+      JSON.stringify({ scripts: { test: "node -e \"process.exit(0)\"" } }),
+    );
+    writeFileSync(
+      join(worktree, "README.md"),
+      "# Demo\n\nRun tests with `npm test`.\n",
+    );
+    const rec = createBuildRecordSkeleton({ outcome: "demo" });
+    rec.projectBindings.push(origin.binding);
+    rec.intent.explicitRequirements.push({
+      id: "req-readme",
+      statement: "Include a short README.md describing how to run tests",
+      required: true,
+      status: "UNKNOWN",
+      evidence: [],
+    });
+    const probe = mechanicalProbeBinding({
+      record: rec,
+      bindingId: origin.binding.bindingId,
+      worktreePath: worktree,
+    });
+    expect(probe.ok).toBe(true);
+    expect(existsSync(join(origin.binding.projectRoot, "README.md"))).toBe(
+      false,
+    );
+    expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
+  });
+
+  it("mechanical probe: README on task branch via git show satisfies req-readme", () => {
+    const target = join(dir, "readme-git-branch");
+    const origin = ensureBuildOrigin({ targetDir: target });
+    expect(origin.ok).toBe(true);
+    if (!origin.ok) return;
+    const root = origin.binding.projectRoot;
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({ scripts: { test: "node -e \"process.exit(0)\"" } }),
+    );
+    spawnSync("git", ["add", "package.json"], { cwd: root });
+    spawnSync("git", ["commit", "-m", "pkg"], { cwd: root });
+    writeFileSync(
+      join(root, "README.md"),
+      "# Demo\n\nRun tests with `npm test`.\n",
+    );
+    spawnSync("git", ["checkout", "-b", "path/task-readme"], { cwd: root });
+    spawnSync("git", ["add", "README.md"], { cwd: root });
+    spawnSync("git", ["commit", "-m", "readme"], { cwd: root });
+    spawnSync("git", ["checkout", "main"], { cwd: root });
+
+    const rec = createBuildRecordSkeleton({ outcome: "demo" });
+    rec.projectBindings.push(origin.binding);
+    rec.intent.explicitRequirements.push({
+      id: "req-readme",
+      statement: "Include a short README.md describing how to run tests",
+      required: true,
+      status: "UNKNOWN",
+      evidence: [],
+    });
+    const probe = mechanicalProbeBinding({
+      record: rec,
+      bindingId: origin.binding.bindingId,
+      taskBranch: "path/task-readme",
+      changedFiles: ["README.md"],
+    });
+    expect(probe.ok).toBe(true);
+    expect(existsSync(join(root, "README.md"))).toBe(false);
     expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
   });
 

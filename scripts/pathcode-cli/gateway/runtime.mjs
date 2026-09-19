@@ -673,6 +673,7 @@ export function createGatewayRuntime(options = {}) {
               ? params.sessionBaseCommit
               : null,
           signal: abort.signal,
+          runtimeRoot,
           ...(preferredEngine ? { preferredEngine } : {}),
         });
 

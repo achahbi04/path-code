@@ -40,6 +40,8 @@
  * @property {string} [roleHint]
  * @property {string} [createdByTaskId]
  * @property {boolean} [originGitInit]
+ * @property {string} [activeWorktreePath] Latest engineer task worktree when distinct from projectRoot
+ * @property {string} [activeTaskBranch] Task branch carrying unmerged engineer commits (e.g. README)
  *
  * @typedef {object} BuildChild
  * @property {string} taskId

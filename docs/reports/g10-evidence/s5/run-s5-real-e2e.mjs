@@ -109,6 +109,7 @@ async function main() {
   const runtimeRoot = join(base, "runtime");
   const projectDir = join(base, "product");
   mkdirSync(runtimeRoot, { recursive: true });
+  process.env.PATHCODE_RUNTIME_ROOT = runtimeRoot;
   evidence.baseDir = base;
   evidence.runtimeRoot = runtimeRoot;
   evidence.projectDir = projectDir;

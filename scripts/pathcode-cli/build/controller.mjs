@@ -3,7 +3,9 @@
  */
 
 import { createHash, randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { readTaskCheckpoint } from "../ag10/task-checkpoint.mjs";
+import { resolvePathRuntimeRoot } from "../paths.mjs";
 import {
   engineeringReportExists,
   resolveEngineeringReportPath,
@@ -67,6 +69,123 @@ export function createBuildController(opts) {
           process.env.PATHCODE_PREFERRED_ENGINE.trim()
         ? process.env.PATHCODE_PREFERRED_ENGINE.trim()
         : null;
+
+  /**
+   * @param {string} taskId
+   */
+  function resolveTaskCheckpoint(taskId) {
+    const local = readTaskCheckpoint(runtimeRoot, taskId);
+    if (local) return local;
+    try {
+      const fallback = resolvePathRuntimeRoot();
+      if (fallback && fallback !== runtimeRoot) {
+        return readTaskCheckpoint(fallback, taskId);
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+
+  /**
+   * @param {string} taskId
+   */
+  function gatewayProbeHints(taskId) {
+    if (typeof gateway.snapshotTask !== "function") return null;
+    try {
+      return gateway.snapshotTask(taskId);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * @param {import('./types.mjs').BuildRecord} record
+   * @param {string} bindingId
+   * @param {{
+   *   taskId?: string,
+   *   changedFiles?: string[],
+   *   worktreePath?: string,
+   *   taskBranch?: string,
+   *   taskSha?: string,
+   * }} ctx
+   */
+  function buildProbeInput(record, bindingId, ctx = {}) {
+    const binding = (record.projectBindings || []).find(
+      (b) => b.bindingId === bindingId,
+    );
+    const bindingWorktree =
+      binding?.activeWorktreePath && existsSync(binding.activeWorktreePath)
+        ? binding.activeWorktreePath
+        : undefined;
+    return {
+      record,
+      bindingId,
+      taskId: ctx.taskId,
+      changedFiles: ctx.changedFiles || [],
+      worktreePath: ctx.worktreePath || bindingWorktree,
+      taskBranch: ctx.taskBranch || binding?.activeTaskBranch,
+      taskSha: ctx.taskSha,
+    };
+  }
+
+  /**
+   * @param {ReturnType<typeof resolveTaskCheckpoint>} cp
+   * @param {ReturnType<typeof gatewayProbeHints>} snap
+   * @param {ReturnType<typeof captureBindingReality>|null} reality
+   */
+  function probeContextFromChild(cp, snap, reality) {
+    const changedFiles =
+      (Array.isArray(cp?.changedFiles) && cp.changedFiles) ||
+      (Array.isArray(snap?.result?.changedFiles) && snap.result.changedFiles) ||
+      reality?.changedFiles ||
+      [];
+    const worktreePath =
+      (typeof cp?.worktreePath === "string" && cp.worktreePath) ||
+      (typeof snap?.worktreePath === "string" && snap.worktreePath) ||
+      undefined;
+    const taskBranch =
+      (typeof cp?.branch === "string" && cp.branch) ||
+      (typeof snap?.taskBranch === "string" && snap.taskBranch) ||
+      undefined;
+    const taskSha =
+      (typeof cp?.sha === "string" && cp.sha) ||
+      (typeof snap?.commitSha === "string" && snap.commitSha) ||
+      undefined;
+    return { changedFiles, worktreePath, taskBranch, taskSha };
+  }
+
+  /**
+   * @param {import('./types.mjs').BuildRecord} record
+   * @param {import('./types.mjs').BuildChild} child
+   * @param {ReturnType<typeof resolveTaskCheckpoint>} cp
+   * @param {ReturnType<typeof gatewayProbeHints>} snap
+   * @param {string} classification
+   */
+  function noteEngineerProductRoots(record, child, cp, snap, classification) {
+    if (child.kind !== "engineer" || !/VERIFIED/i.test(classification)) return;
+    const binding = (record.projectBindings || []).find(
+      (b) => b.bindingId === child.bindingId,
+    );
+    if (!binding) return;
+    const wt =
+      (typeof cp?.worktreePath === "string" && cp.worktreePath) ||
+      (typeof snap?.worktreePath === "string" && snap.worktreePath) ||
+      null;
+    const branch =
+      (typeof cp?.branch === "string" && cp.branch) ||
+      (typeof snap?.taskBranch === "string" && snap.taskBranch) ||
+      null;
+    if (wt && wt !== binding.projectRoot && existsSync(wt)) {
+      binding.activeWorktreePath = wt;
+    } else if (
+      binding.activeWorktreePath &&
+      !existsSync(binding.activeWorktreePath)
+    ) {
+      delete binding.activeWorktreePath;
+    }
+    if (branch) binding.activeTaskBranch = branch;
+  }
 
   /**
    * @param {import('./types.mjs').BuildTaskKind} kind
@@ -171,7 +290,7 @@ export function createBuildController(opts) {
     // Repair selected→dispatched if task checkpoint exists
     for (const child of record.children) {
       if (child.dispatchState === "selected") {
-        const cp = readTaskCheckpoint(runtimeRoot, child.taskId);
+        const cp = resolveTaskCheckpoint(child.taskId);
         if (cp) {
           child.dispatchState = "dispatched";
           child.dispatchedAt = child.dispatchedAt || new Date().toISOString();
@@ -181,7 +300,7 @@ export function createBuildController(opts) {
         child.dispatchState === "dispatched" ||
         child.dispatchState === "terminal_seen"
       ) {
-        const cp = readTaskCheckpoint(runtimeRoot, child.taskId);
+        const cp = resolveTaskCheckpoint(child.taskId);
         const terminal =
           cp &&
           (cp.finalState === "completed" ||
@@ -250,12 +369,21 @@ export function createBuildController(opts) {
     writeBuildRecord(runtimeRoot, record);
 
     try {
-      const probe = mechanicalProbeBinding({
-        record,
-        bindingId: binding.bindingId,
-        taskId: childTaskId,
-        changedFiles: refresh.delta?.changedFiles || [],
-      });
+      const cp = childTaskId ? resolveTaskCheckpoint(childTaskId) : null;
+      const snap = childTaskId ? gatewayProbeHints(childTaskId) : null;
+      const ctx = probeContextFromChild(cp, snap, null);
+      const probe = mechanicalProbeBinding(
+        buildProbeInput(record, binding.bindingId, {
+          taskId: childTaskId,
+          changedFiles:
+            refresh.delta?.changedFiles?.length
+              ? refresh.delta.changedFiles
+              : ctx.changedFiles,
+          worktreePath: ctx.worktreePath,
+          taskBranch: ctx.taskBranch,
+          taskSha: ctx.taskSha,
+        }),
+      );
       if (probe.ok && Array.isArray(probe.updates) && probe.updates.length) {
         writeBuildRecord(runtimeRoot, record);
       }
@@ -279,7 +407,7 @@ export function createBuildController(opts) {
     if (!child?.taskId) return "";
     let cls = String(child.classification || "");
     if (/VERIFIED/i.test(cls)) return cls;
-    const cp = readTaskCheckpoint(runtimeRoot, child.taskId);
+    const cp = resolveTaskCheckpoint(child.taskId);
     cls = String(
       cls ||
         (cp?.validation && cp.validation.classification) ||
@@ -406,7 +534,7 @@ export function createBuildController(opts) {
         buildId,
       });
     } else {
-      const cp = readTaskCheckpoint(runtimeRoot, taskId);
+      const cp = resolveTaskCheckpoint(taskId);
       if (cp && (cp.finalState === "interrupted" || !cp.finalState)) {
         started = gateway.resumeTask
           ? await gateway.resumeTask(taskId, startExtra)
@@ -538,7 +666,8 @@ export function createBuildController(opts) {
       return { ok: true, deduped: true, build: record };
     }
 
-    const cp = readTaskCheckpoint(runtimeRoot, taskId);
+    const cp = resolveTaskCheckpoint(taskId);
+    const snap = gatewayProbeHints(taskId);
     const reportPath = engineeringReportExists(taskId, runtimeRoot)
       ? resolveEngineeringReportPath(taskId, runtimeRoot)
       : null;
@@ -547,6 +676,7 @@ export function createBuildController(opts) {
     const reality = binding
       ? captureBindingReality(binding.projectRoot)
       : null;
+    const probeCtx = probeContextFromChild(cp, snap, reality);
 
     const resultFingerprint = createHash("sha256")
       .update(
@@ -570,11 +700,14 @@ export function createBuildController(opts) {
     }
 
     // Engineer progress / no-progress
-    const classification = String(
+    let classification = String(
       (cp?.validation && cp.validation.classification) ||
         cp?.finalState ||
         "",
     );
+    if (!classification && snap?.classification) {
+      classification = String(snap.classification);
+    }
     const failed =
       cp?.finalState === "failed" ||
       /FAIL|NOT_VERIFIED|BLOCKED/i.test(classification);
@@ -616,6 +749,8 @@ export function createBuildController(opts) {
     record.loop.lastConsumedActionId = child.actionId;
     record.loop.pendingReinspect = true;
 
+    noteEngineerProductRoots(record, child, cp, snap, classification);
+
     writeBuildRecord(runtimeRoot, record);
 
     // Depth A immediately after consume
@@ -626,12 +761,12 @@ export function createBuildController(opts) {
     try {
       const rec2 = readBuildRecord(runtimeRoot, buildId);
       if (rec2) {
-        probe = mechanicalProbeBinding({
-          record: rec2,
-          bindingId: child.bindingId,
-          taskId,
-          changedFiles: cp?.changedFiles || reality?.changedFiles || [],
-        });
+        probe = mechanicalProbeBinding(
+          buildProbeInput(rec2, child.bindingId, {
+            taskId,
+            ...probeCtx,
+          }),
+        );
         if (probe.ok && Array.isArray(probe.updates) && probe.updates.length) {
           writeBuildRecord(runtimeRoot, rec2);
         }
@@ -872,11 +1007,11 @@ export function createBuildController(opts) {
     if (bindingForProbe) {
       try {
         const reality = captureBindingReality(bindingForProbe.projectRoot);
-        const probe = mechanicalProbeBinding({
-          record,
-          bindingId: bindingForProbe.bindingId,
-          changedFiles: reality?.changedFiles || [],
-        });
+        const probe = mechanicalProbeBinding(
+          buildProbeInput(record, bindingForProbe.bindingId, {
+            changedFiles: reality?.changedFiles || [],
+          }),
+        );
         if (probe.ok && Array.isArray(probe.updates) && probe.updates.length) {
           writeBuildRecord(runtimeRoot, record);
           record = readBuildRecord(runtimeRoot, buildId) || record;

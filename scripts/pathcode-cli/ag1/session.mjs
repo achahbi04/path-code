@@ -313,6 +313,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
 
   const boot = await ensureAg1Runtime({
     ...(options.checkoutRoot ? { packageRoot: options.checkoutRoot } : {}),
+    ...(typeof options.runtimeRoot === "string" && options.runtimeRoot.trim()
+      ? { runtimeRoot: options.runtimeRoot.trim() }
+      : {}),
   });
   if (!boot.ok) {
     write(`${boot.message}\n`);
@@ -519,9 +522,12 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     })),
   });
 
-  const runtimeRoot = resolvePathRuntimeRoot({
-    ...(options.checkoutRoot ? { packageRoot: options.checkoutRoot } : {}),
-  });
+  const runtimeRoot =
+    typeof options.runtimeRoot === "string" && options.runtimeRoot.trim()
+      ? resolve(options.runtimeRoot.trim())
+      : resolvePathRuntimeRoot({
+          ...(options.checkoutRoot ? { packageRoot: options.checkoutRoot } : {}),
+        });
   /** @type {any} */
   let preparedEnv = null;
   /** @type {typeof import("../ag9/prepare.mjs") | null} */

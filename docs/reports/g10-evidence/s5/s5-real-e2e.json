@@ -1,6 +1,6 @@
 {
   "schema": "pathcode.s5.real-e2e.v1",
-  "verdict": "REAL_LIVE_VERIFICATION_NOT_YET_PASSING",
+  "verdict": "REAL_PATH_BUILD_END_TO_END_VERIFIED",
   "labels": {
     "mechanicalControlLoop": "see s5-build-proof.json",
     "gatewayDispatch": "see s5-gateway-fake-dispatch.json",
@@ -13,7 +13,7 @@
     {
       "step": "origin_start",
       "ok": true,
-      "buildId": "62d7bba8-fc4a-47e7-958c-b720d1694421",
+      "buildId": "81bbd2d7-0801-49ac-9cc8-d9f1f74e1f7e",
       "git": true,
       "noPackageYet": true
     },
@@ -23,8 +23,8 @@
       "ok": true,
       "action": "child_finished",
       "kind": "engineer",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526",
-      "actionId": "engineer:44f6093f0eee2c0cef4f",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef",
+      "actionId": "engineer:aea4889f7ab3fefe8dea",
       "classification": "VERIFIED",
       "gatewayStatus": "completed",
       "engineEvents": [
@@ -82,7 +82,7 @@
           "status": "SATISFIED"
         }
       ],
-      "elapsedMs": 37576,
+      "elapsedMs": 69701,
       "loopStatus": "running",
       "pendingReinspect": false,
       "packageJson": true,
@@ -91,8 +91,8 @@
     {
       "step": "depth_a_after_engineer",
       "ok": true,
-      "headSha": "13436dd0ed70d58c10654bd94d2d991d469a4592",
-      "dirtyFingerprint": "2224a3c20a7f57ca333d8d46",
+      "headSha": "8bbbbd6a18c41a962e520d3aae03b0de7b5b2844",
+      "dirtyFingerprint": "272496f31e129397c7e49f5d",
       "changedFiles": [],
       "packageJson": true
     },
@@ -102,8 +102,8 @@
       "ok": true,
       "action": "child_finished",
       "kind": "evaluate",
-      "taskId": "8cdcf945-c81f-4fd2-87b5-2f28a1af2816",
-      "actionId": "evaluate:bdf946a05a33842cab58",
+      "taskId": "46119ba6-c5ac-4258-9e50-f595b014ca10",
+      "actionId": "evaluate:b7c5fe0acb64b16bf492",
       "classification": "VERIFIED",
       "gatewayStatus": "completed",
       "engineEvents": [
@@ -161,7 +161,7 @@
           "status": "SATISFIED"
         }
       ],
-      "elapsedMs": 26685,
+      "elapsedMs": 70170,
       "loopStatus": "running",
       "pendingReinspect": false,
       "packageJson": true,
@@ -173,8 +173,8 @@
       "ok": true,
       "action": "complete",
       "kind": "challenge",
-      "taskId": "446d54d2-a2ce-4d52-9354-8c6dcd555e49",
-      "actionId": "challenge:9275e05d57da74c4ae62",
+      "taskId": "7115f99d-40d1-420c-827f-9554401ae83a",
+      "actionId": "challenge:20d05b1c3435b518903c",
       "classification": "VERIFIED",
       "gatewayStatus": "completed",
       "engineEvents": [
@@ -232,7 +232,7 @@
           "status": "SATISFIED"
         }
       ],
-      "elapsedMs": 27104,
+      "elapsedMs": 22759,
       "loopStatus": "complete",
       "pendingReinspect": false,
       "packageJson": true,
@@ -250,9 +250,9 @@
       "label": "post_steer_1",
       "ok": true,
       "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "4bd32a03-d80b-44f6-9796-cdaa57db0bb4",
-      "actionId": "engineer:44e8d0683b68a6345e73",
+      "kind": "evaluate",
+      "taskId": "67006862-fca6-49d7-bb86-0c66f9d2adcd",
+      "actionId": "evaluate:db5536c849260a50a1fa",
       "classification": "VERIFIED",
       "gatewayStatus": "completed",
       "engineEvents": [
@@ -311,10 +311,10 @@
         },
         {
           "id": "req-readme",
-          "status": "UNKNOWN"
+          "status": "SATISFIED"
         }
       ],
-      "elapsedMs": 22599,
+      "elapsedMs": 24661,
       "loopStatus": "running",
       "pendingReinspect": false,
       "packageJson": true,
@@ -324,10 +324,10 @@
       "step": "post_steer_2",
       "label": "post_steer_2",
       "ok": true,
-      "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "99dc50e5-5351-4c89-981b-48fa8ef11091",
-      "actionId": "engineer:83eb91f2c455d4f46efd",
+      "action": "complete",
+      "kind": "challenge",
+      "taskId": "90a0bb01-b9ee-4cc9-a289-cbd39c8facf8",
+      "actionId": "challenge:85940e6ac30c5051c71f",
       "classification": "VERIFIED",
       "gatewayStatus": "completed",
       "engineEvents": [
@@ -386,311 +386,11 @@
         },
         {
           "id": "req-readme",
-          "status": "UNKNOWN"
-        }
-      ],
-      "elapsedMs": 25881,
-      "loopStatus": "running",
-      "pendingReinspect": false,
-      "packageJson": true,
-      "hasSrc": true
-    },
-    {
-      "step": "post_steer_3",
-      "label": "post_steer_3",
-      "ok": true,
-      "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "326de510-75f0-4741-bb95-0b2f8f7cf98a",
-      "actionId": "engineer:71ca496705d9820e76ec",
-      "classification": "VERIFIED",
-      "gatewayStatus": "completed",
-      "engineEvents": [
-        {
-          "type": "session.engineering.activity"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.plan"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.running"
-        },
-        {
-          "type": "session.validation.result"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.engineering.result",
-          "engine": "cursor"
-        },
-        {
-          "type": "session.engineering.report"
-        },
-        {
-          "type": "session.terminal"
-        },
-        {
-          "type": "session.engineering.result"
-        },
-        {
-          "type": "gateway.task.finished"
-        }
-      ],
-      "criteria": [
-        {
-          "id": "c-runnable",
-          "status": "PROVEN"
-        },
-        {
-          "id": "c-outcome",
-          "status": "PROVEN"
-        }
-      ],
-      "requirements": [
-        {
-          "id": "req-offline",
           "status": "SATISFIED"
-        },
-        {
-          "id": "req-readme",
-          "status": "UNKNOWN"
         }
       ],
-      "elapsedMs": 22524,
-      "loopStatus": "running",
-      "pendingReinspect": false,
-      "packageJson": true,
-      "hasSrc": true
-    },
-    {
-      "step": "post_steer_4",
-      "label": "post_steer_4",
-      "ok": true,
-      "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "357dc41f-7cba-4bc8-95af-d28ff2e06efd",
-      "actionId": "engineer:472302c956c226f2dd94",
-      "classification": "VERIFIED",
-      "gatewayStatus": "completed",
-      "engineEvents": [
-        {
-          "type": "session.engineering.activity"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.plan"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.running"
-        },
-        {
-          "type": "session.validation.result"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.engineering.result",
-          "engine": "cursor"
-        },
-        {
-          "type": "session.engineering.report"
-        },
-        {
-          "type": "session.terminal"
-        },
-        {
-          "type": "session.engineering.result"
-        },
-        {
-          "type": "gateway.task.finished"
-        }
-      ],
-      "criteria": [
-        {
-          "id": "c-runnable",
-          "status": "PROVEN"
-        },
-        {
-          "id": "c-outcome",
-          "status": "PROVEN"
-        }
-      ],
-      "requirements": [
-        {
-          "id": "req-offline",
-          "status": "SATISFIED"
-        },
-        {
-          "id": "req-readme",
-          "status": "UNKNOWN"
-        }
-      ],
-      "elapsedMs": 22548,
-      "loopStatus": "running",
-      "pendingReinspect": false,
-      "packageJson": true,
-      "hasSrc": true
-    },
-    {
-      "step": "post_steer_5",
-      "label": "post_steer_5",
-      "ok": true,
-      "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "2d23b25c-0c7d-499e-b413-77daac4f7778",
-      "actionId": "engineer:0778ca202ba20de7cb92",
-      "classification": "VERIFIED",
-      "gatewayStatus": "completed",
-      "engineEvents": [
-        {
-          "type": "session.engineering.activity"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.plan"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.running"
-        },
-        {
-          "type": "session.validation.result"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.engineering.result",
-          "engine": "cursor"
-        },
-        {
-          "type": "session.engineering.report"
-        },
-        {
-          "type": "session.terminal"
-        },
-        {
-          "type": "session.engineering.result"
-        },
-        {
-          "type": "gateway.task.finished"
-        }
-      ],
-      "criteria": [
-        {
-          "id": "c-runnable",
-          "status": "PROVEN"
-        },
-        {
-          "id": "c-outcome",
-          "status": "PROVEN"
-        }
-      ],
-      "requirements": [
-        {
-          "id": "req-offline",
-          "status": "SATISFIED"
-        },
-        {
-          "id": "req-readme",
-          "status": "UNKNOWN"
-        }
-      ],
-      "elapsedMs": 25079,
-      "loopStatus": "running",
-      "pendingReinspect": false,
-      "packageJson": true,
-      "hasSrc": true
-    },
-    {
-      "step": "post_steer_6",
-      "label": "post_steer_6",
-      "ok": true,
-      "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "7899047b-bc81-4375-b958-43283d843573",
-      "actionId": "engineer:16526ebfcae2f7ac9994",
-      "classification": "VERIFIED",
-      "gatewayStatus": "completed",
-      "engineEvents": [
-        {
-          "type": "session.engineering.activity"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.plan"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.running"
-        },
-        {
-          "type": "session.validation.result"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.engineering.result",
-          "engine": "cursor"
-        },
-        {
-          "type": "session.engineering.report"
-        },
-        {
-          "type": "session.terminal"
-        },
-        {
-          "type": "session.engineering.result"
-        },
-        {
-          "type": "gateway.task.finished"
-        }
-      ],
-      "criteria": [
-        {
-          "id": "c-runnable",
-          "status": "PROVEN"
-        },
-        {
-          "id": "c-outcome",
-          "status": "PROVEN"
-        }
-      ],
-      "requirements": [
-        {
-          "id": "req-offline",
-          "status": "SATISFIED"
-        },
-        {
-          "id": "req-readme",
-          "status": "UNKNOWN"
-        }
-      ],
-      "elapsedMs": 24899,
-      "loopStatus": "running",
+      "elapsedMs": 24027,
+      "loopStatus": "complete",
       "pendingReinspect": false,
       "packageJson": true,
       "hasSrc": true
@@ -706,10 +406,10 @@
       "step": "revalidate_after_impact",
       "label": "revalidate_after_impact",
       "ok": true,
-      "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "2f8fb890-0d3a-483c-aafb-a04e150b20be",
-      "actionId": "engineer:25d2eeaa3d1cc790bc13",
+      "action": "already_complete",
+      "kind": "challenge",
+      "taskId": "90a0bb01-b9ee-4cc9-a289-cbd39c8facf8",
+      "actionId": "challenge:85940e6ac30c5051c71f",
       "classification": "VERIFIED",
       "gatewayStatus": "completed",
       "engineEvents": [
@@ -754,11 +454,11 @@
       "criteria": [
         {
           "id": "c-runnable",
-          "status": "PROVEN"
+          "status": "UNKNOWN"
         },
         {
           "id": "c-outcome",
-          "status": "PROVEN"
+          "status": "UNKNOWN"
         }
       ],
       "requirements": [
@@ -768,11 +468,11 @@
         },
         {
           "id": "req-readme",
-          "status": "UNKNOWN"
+          "status": "SATISFIED"
         }
       ],
-      "elapsedMs": 32292,
-      "loopStatus": "running",
+      "elapsedMs": 2,
+      "loopStatus": "complete",
       "pendingReinspect": false,
       "packageJson": true,
       "hasSrc": true
@@ -784,319 +484,19 @@
       "pendingCleared": true
     },
     {
-      "step": "final_1",
-      "label": "final_1",
-      "ok": true,
-      "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "cf42741c-e6ab-4dc9-aeef-46884f249182",
-      "actionId": "engineer:0dabbe5213fab24fb7cc",
-      "classification": "VERIFIED",
-      "gatewayStatus": "completed",
-      "engineEvents": [
-        {
-          "type": "session.engineering.activity"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.plan"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.running"
-        },
-        {
-          "type": "session.validation.result"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.engineering.result",
-          "engine": "cursor"
-        },
-        {
-          "type": "session.engineering.report"
-        },
-        {
-          "type": "session.terminal"
-        },
-        {
-          "type": "session.engineering.result"
-        },
-        {
-          "type": "gateway.task.finished"
-        }
-      ],
-      "criteria": [
-        {
-          "id": "c-runnable",
-          "status": "PROVEN"
-        },
-        {
-          "id": "c-outcome",
-          "status": "PROVEN"
-        }
-      ],
-      "requirements": [
-        {
-          "id": "req-offline",
-          "status": "SATISFIED"
-        },
-        {
-          "id": "req-readme",
-          "status": "UNKNOWN"
-        }
-      ],
-      "elapsedMs": 24552,
-      "loopStatus": "running",
-      "pendingReinspect": false,
-      "packageJson": true,
-      "hasSrc": true
-    },
-    {
-      "step": "final_2",
-      "label": "final_2",
-      "ok": true,
-      "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "26af4200-df0a-44fe-80e2-55795c30e8bb",
-      "actionId": "engineer:c05724ddc7c11a38e3fa",
-      "classification": "VERIFIED",
-      "gatewayStatus": "completed",
-      "engineEvents": [
-        {
-          "type": "session.engineering.activity"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.plan"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.running"
-        },
-        {
-          "type": "session.validation.result"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.engineering.result",
-          "engine": "cursor"
-        },
-        {
-          "type": "session.engineering.report"
-        },
-        {
-          "type": "session.terminal"
-        },
-        {
-          "type": "session.engineering.result"
-        },
-        {
-          "type": "gateway.task.finished"
-        }
-      ],
-      "criteria": [
-        {
-          "id": "c-runnable",
-          "status": "PROVEN"
-        },
-        {
-          "id": "c-outcome",
-          "status": "PROVEN"
-        }
-      ],
-      "requirements": [
-        {
-          "id": "req-offline",
-          "status": "SATISFIED"
-        },
-        {
-          "id": "req-readme",
-          "status": "UNKNOWN"
-        }
-      ],
-      "elapsedMs": 28863,
-      "loopStatus": "running",
-      "pendingReinspect": false,
-      "packageJson": true,
-      "hasSrc": true
-    },
-    {
-      "step": "final_3",
-      "label": "final_3",
-      "ok": true,
-      "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "87583048-10f5-4d8b-aad7-f5ea046e7e68",
-      "actionId": "engineer:26b0f5c3e1d1804f7dc2",
-      "classification": "VERIFIED",
-      "gatewayStatus": "completed",
-      "engineEvents": [
-        {
-          "type": "session.engineering.activity"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.plan"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.running"
-        },
-        {
-          "type": "session.validation.result"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.engineering.result",
-          "engine": "cursor"
-        },
-        {
-          "type": "session.engineering.report"
-        },
-        {
-          "type": "session.terminal"
-        },
-        {
-          "type": "session.engineering.result"
-        },
-        {
-          "type": "gateway.task.finished"
-        }
-      ],
-      "criteria": [
-        {
-          "id": "c-runnable",
-          "status": "PROVEN"
-        },
-        {
-          "id": "c-outcome",
-          "status": "PROVEN"
-        }
-      ],
-      "requirements": [
-        {
-          "id": "req-offline",
-          "status": "SATISFIED"
-        },
-        {
-          "id": "req-readme",
-          "status": "UNKNOWN"
-        }
-      ],
-      "elapsedMs": 23506,
-      "loopStatus": "running",
-      "pendingReinspect": false,
-      "packageJson": true,
-      "hasSrc": true
-    },
-    {
-      "step": "final_4",
-      "label": "final_4",
-      "ok": true,
-      "action": "child_finished",
-      "kind": "engineer",
-      "taskId": "f2693c64-feb4-4e03-8715-7d2d81a39ba9",
-      "actionId": "engineer:d3f2dc036506a001947b",
-      "classification": "VERIFIED",
-      "gatewayStatus": "completed",
-      "engineEvents": [
-        {
-          "type": "session.engineering.activity"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.plan"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.validation.running"
-        },
-        {
-          "type": "session.validation.result"
-        },
-        {
-          "type": "session.engineering.busy"
-        },
-        {
-          "type": "session.engineering.result",
-          "engine": "cursor"
-        },
-        {
-          "type": "session.engineering.report"
-        },
-        {
-          "type": "session.terminal"
-        },
-        {
-          "type": "session.engineering.result"
-        },
-        {
-          "type": "gateway.task.finished"
-        }
-      ],
-      "criteria": [
-        {
-          "id": "c-runnable",
-          "status": "PROVEN"
-        },
-        {
-          "id": "c-outcome",
-          "status": "PROVEN"
-        }
-      ],
-      "requirements": [
-        {
-          "id": "req-offline",
-          "status": "SATISFIED"
-        },
-        {
-          "id": "req-readme",
-          "status": "UNKNOWN"
-        }
-      ],
-      "elapsedMs": 27504,
-      "loopStatus": "running",
-      "pendingReinspect": false,
-      "packageJson": true,
-      "hasSrc": true
-    },
-    {
       "step": "code_continuation",
       "ok": true,
       "classification": "VERIFIED",
-      "taskId": "bf8775ee-7b45-43e7-8e06-5b033b6a49f5",
+      "taskId": "c3a7570f-990c-43e1-b0f6-609de43d8803",
       "markerInMain": false
     }
   ],
-  "baseDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-KIidEo",
-  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-KIidEo/runtime",
-  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-KIidEo/product",
-  "buildId": "62d7bba8-fc4a-47e7-958c-b720d1694421",
+  "baseDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-pMYAWj",
+  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-pMYAWj/runtime",
+  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-pMYAWj/product",
+  "buildId": "81bbd2d7-0801-49ac-9cc8-d9f1f74e1f7e",
   "finalBuild": {
-    "status": "running",
+    "status": "complete",
     "criteria": [
       {
         "id": "c-runnable",
@@ -1107,18 +507,19 @@
           {
             "kind": "check",
             "ref": "npm test",
-            "bindingId": "bind-d1b391d6",
-            "headSha": "13436dd0ed70d58c10654bd94d2d991d469a4592",
-            "dirtyFingerprint": "19845103fdd81c8b931598c1",
-            "configFingerprint": "d1b8598805c525038f336f17",
+            "bindingId": "bind-682dee5b",
+            "taskId": "90a0bb01-b9ee-4cc9-a289-cbd39c8facf8",
+            "headSha": "8bbbbd6a18c41a962e520d3aae03b0de7b5b2844",
+            "dirtyFingerprint": "19f13e44e44407326a661fad",
+            "configFingerprint": "ec990581bdded17025368dca",
             "scope": [
               "package.json",
               "src/"
             ],
-            "observedAt": "2026-09-19T07:19:57.936Z"
+            "observedAt": "2026-09-19T07:31:16.883Z"
           }
         ],
-        "updatedAt": "2026-09-19T07:19:57.936Z"
+        "updatedAt": "2026-09-19T07:31:16.883Z"
       },
       {
         "id": "c-outcome",
@@ -1129,18 +530,19 @@
           {
             "kind": "check",
             "ref": "npm test",
-            "bindingId": "bind-d1b391d6",
-            "headSha": "13436dd0ed70d58c10654bd94d2d991d469a4592",
-            "dirtyFingerprint": "19845103fdd81c8b931598c1",
-            "configFingerprint": "d1b8598805c525038f336f17",
+            "bindingId": "bind-682dee5b",
+            "taskId": "90a0bb01-b9ee-4cc9-a289-cbd39c8facf8",
+            "headSha": "8bbbbd6a18c41a962e520d3aae03b0de7b5b2844",
+            "dirtyFingerprint": "19f13e44e44407326a661fad",
+            "configFingerprint": "ec990581bdded17025368dca",
             "scope": [
               "package.json",
               "src/"
             ],
-            "observedAt": "2026-09-19T07:19:57.936Z"
+            "observedAt": "2026-09-19T07:31:16.883Z"
           }
         ],
-        "updatedAt": "2026-09-19T07:19:57.936Z"
+        "updatedAt": "2026-09-19T07:31:16.883Z"
       }
     ],
     "requirements": [
@@ -1153,15 +555,15 @@
           {
             "kind": "check",
             "ref": "npm test (local)",
-            "bindingId": "bind-d1b391d6",
-            "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526",
-            "headSha": "13436dd0ed70d58c10654bd94d2d991d469a4592",
-            "dirtyFingerprint": "2224a3c20a7f57ca333d8d46",
-            "configFingerprint": "d1b8598805c525038f336f17",
+            "bindingId": "bind-682dee5b",
+            "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef",
+            "headSha": "8bbbbd6a18c41a962e520d3aae03b0de7b5b2844",
+            "dirtyFingerprint": "272496f31e129397c7e49f5d",
+            "configFingerprint": "ec990581bdded17025368dca",
             "scope": [
               "package.json"
             ],
-            "observedAt": "2026-09-19T07:16:38.901Z"
+            "observedAt": "2026-09-19T07:28:53.220Z"
           }
         ]
       },
@@ -1169,95 +571,57 @@
         "id": "req-readme",
         "statement": "Include a short README.md describing how to run tests",
         "required": true,
-        "status": "UNKNOWN",
-        "evidence": []
+        "status": "SATISFIED",
+        "evidence": [
+          {
+            "kind": "fs",
+            "ref": "README.md",
+            "bindingId": "bind-682dee5b",
+            "headSha": "8bbbbd6a18c41a962e520d3aae03b0de7b5b2844",
+            "dirtyFingerprint": "272496f31e129397c7e49f5d",
+            "configFingerprint": "ec990581bdded17025368dca",
+            "scope": [
+              "README.md"
+            ],
+            "observedAt": "2026-09-19T07:30:27.314Z"
+          }
+        ]
       }
     ],
     "children": [
       {
         "kind": "engineer",
-        "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526",
-        "actionId": "engineer:44f6093f0eee2c0cef4f",
+        "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef",
+        "actionId": "engineer:aea4889f7ab3fefe8dea",
+        "classification": "VERIFIED",
         "dispatchState": "consumed"
       },
       {
         "kind": "evaluate",
-        "taskId": "8cdcf945-c81f-4fd2-87b5-2f28a1af2816",
-        "actionId": "evaluate:bdf946a05a33842cab58",
+        "taskId": "46119ba6-c5ac-4258-9e50-f595b014ca10",
+        "actionId": "evaluate:b7c5fe0acb64b16bf492",
         "classification": "VERIFIED",
         "dispatchState": "consumed"
       },
       {
         "kind": "challenge",
-        "taskId": "446d54d2-a2ce-4d52-9354-8c6dcd555e49",
-        "actionId": "challenge:9275e05d57da74c4ae62",
+        "taskId": "7115f99d-40d1-420c-827f-9554401ae83a",
+        "actionId": "challenge:20d05b1c3435b518903c",
         "classification": "VERIFIED",
         "dispatchState": "consumed"
       },
       {
-        "kind": "engineer",
-        "taskId": "4bd32a03-d80b-44f6-9796-cdaa57db0bb4",
-        "actionId": "engineer:44e8d0683b68a6345e73",
+        "kind": "evaluate",
+        "taskId": "67006862-fca6-49d7-bb86-0c66f9d2adcd",
+        "actionId": "evaluate:db5536c849260a50a1fa",
+        "classification": "VERIFIED",
         "dispatchState": "consumed"
       },
       {
-        "kind": "engineer",
-        "taskId": "99dc50e5-5351-4c89-981b-48fa8ef11091",
-        "actionId": "engineer:83eb91f2c455d4f46efd",
-        "dispatchState": "consumed"
-      },
-      {
-        "kind": "engineer",
-        "taskId": "326de510-75f0-4741-bb95-0b2f8f7cf98a",
-        "actionId": "engineer:71ca496705d9820e76ec",
-        "dispatchState": "consumed"
-      },
-      {
-        "kind": "engineer",
-        "taskId": "357dc41f-7cba-4bc8-95af-d28ff2e06efd",
-        "actionId": "engineer:472302c956c226f2dd94",
-        "dispatchState": "consumed"
-      },
-      {
-        "kind": "engineer",
-        "taskId": "2d23b25c-0c7d-499e-b413-77daac4f7778",
-        "actionId": "engineer:0778ca202ba20de7cb92",
-        "dispatchState": "consumed"
-      },
-      {
-        "kind": "engineer",
-        "taskId": "7899047b-bc81-4375-b958-43283d843573",
-        "actionId": "engineer:16526ebfcae2f7ac9994",
-        "dispatchState": "consumed"
-      },
-      {
-        "kind": "engineer",
-        "taskId": "2f8fb890-0d3a-483c-aafb-a04e150b20be",
-        "actionId": "engineer:25d2eeaa3d1cc790bc13",
-        "dispatchState": "consumed"
-      },
-      {
-        "kind": "engineer",
-        "taskId": "cf42741c-e6ab-4dc9-aeef-46884f249182",
-        "actionId": "engineer:0dabbe5213fab24fb7cc",
-        "dispatchState": "consumed"
-      },
-      {
-        "kind": "engineer",
-        "taskId": "26af4200-df0a-44fe-80e2-55795c30e8bb",
-        "actionId": "engineer:c05724ddc7c11a38e3fa",
-        "dispatchState": "consumed"
-      },
-      {
-        "kind": "engineer",
-        "taskId": "87583048-10f5-4d8b-aad7-f5ea046e7e68",
-        "actionId": "engineer:26b0f5c3e1d1804f7dc2",
-        "dispatchState": "consumed"
-      },
-      {
-        "kind": "engineer",
-        "taskId": "f2693c64-feb4-4e03-8715-7d2d81a39ba9",
-        "actionId": "engineer:d3f2dc036506a001947b",
+        "kind": "challenge",
+        "taskId": "90a0bb01-b9ee-4cc9-a289-cbd39c8facf8",
+        "actionId": "challenge:85940e6ac30c5051c71f",
+        "classification": "VERIFIED",
         "dispatchState": "consumed"
       }
     ],
@@ -1268,210 +632,206 @@
     "hasEngineer": true,
     "hasEvaluate": true,
     "hasChallenge": true,
-    "realComplete": false,
+    "realComplete": true,
     "critProven": true,
-    "reqSat": false,
+    "reqSat": true,
     "codeContinuationOk": true,
-    "childCount": 14
+    "childCount": 5
   },
-  "ok": false,
-  "statusCard": "PATH Build\n\n  buildId     62d7bba8-fc4a-47e7-958c-b720d1694421\n  status      running\n  revision    r2\n\nOutcome\n  Build a small local Node.js CLI package named path-s5-proof. It must include package.json with a test script, src/main.js that writes and reads data/store.json, and npm test must exit 0. No cloud SaaS dependencies.\n\nExplicit requirements\n  [SATISFIED] req-offline — Must run fully offline / locally without cloud SaaS\n  [UNKNOWN] req-readme — Include a short README.md describing how to run tests\n\nOutcome criteria\n  [PROVEN] c-runnable (required) — Core software is runnable with project-native checks (npm test)\n  [PROVEN] c-outcome (required) — CLI + persistence surface advances the stated outcome (src/main.js + data/store.json)\n\nBindings\n  bind-d1b391d6  /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-KIidEo/product  (git-init origin)\n\nChildren\n  engineer  consumed       357dc41f…\n  engineer  consumed       2d23b25c…\n  engineer  consumed       7899047b…\n  engineer  consumed       2f8fb890…\n  engineer  consumed       cf42741c…\n  engineer  consumed       26af4200…\n  engineer  consumed       87583048…\n  engineer  consumed       f2693c64…\n\nProposed next\n  MUST satisfy now: Include a short README.md describing how to run tests\n\nHypotheses (non-authoritative)\n  Steer: real-e2e steer: add README requirement\n  Intent revised to r2\n\nCommands: /build status · /build tick · /build steer · /build run · /help",
+  "ok": true,
+  "statusCard": "PATH Build\n\n  buildId     81bbd2d7-0801-49ac-9cc8-d9f1f74e1f7e\n  status      complete\n  revision    r2\n\nOutcome\n  Build a small local Node.js CLI package named path-s5-proof. It must include package.json with a test script, src/main.js that writes and reads data/store.json, and npm test must exit 0. No cloud SaaS dependencies.\n\nExplicit requirements\n  [SATISFIED] req-offline — Must run fully offline / locally without cloud SaaS\n  [SATISFIED] req-readme — Include a short README.md describing how to run tests\n\nOutcome criteria\n  [PROVEN] c-runnable (required) — Core software is runnable with project-native checks (npm test)\n  [PROVEN] c-outcome (required) — CLI + persistence surface advances the stated outcome (src/main.js + data/store.json)\n\nBindings\n  bind-682dee5b  /private/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-real-e2e-pMYAWj/product  (git-init origin)\n\nChildren\n  engineer  consumed       6b2855a0…  VERIFIED\n  evaluate  consumed       46119ba6…  VERIFIED\n  challenge consumed       7115f99d…  VERIFIED\n  evaluate  consumed       67006862…  VERIFIED\n  challenge consumed       90a0bb01…  VERIFIED\n\nProposed next\n  MUST satisfy now: Include a short README.md describing how to run tests\n\nHypotheses (non-authoritative)\n  Steer: real-e2e steer: add README requirement\n  Intent revised to r2\n\nCommands: /build status · /build tick · /build steer · /build run · /help",
   "eventSample": [
     {
       "type": "session.task.received",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.preparing",
       "detail": "Admitting project and preparing environment",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.collaborate",
       "engine": "cursor",
       "detail": "preferred engine: cursor",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.preparing",
       "detail": "Admitting project and preparing environment",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.preflight",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.preparing",
       "detail": "Unversioned project — engineering in place until source control is established",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.workspace",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.recovery.checkpoint",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.discovered",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.mcp",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.preparing",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.provisioning",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.provisioning",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.affected",
       "classification": "UNAVAILABLE",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.ready",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.task.received",
       "detail": "PATH Build engineer task — intentional product mutation is allowed.\nClose the following product gap with real engineerin",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.collaborate",
       "engine": "copilot",
       "detail": "Copilot SDK session ready",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.collaborate",
       "engine": "copilot",
       "detail": "Copilot native_sdk ready",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.collaborate",
       "engine": "cursor",
       "detail": "Cursor SDK local session ready",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.collaborate",
       "engine": "cursor",
       "detail": "Cursor native_sdk ready",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.bridge",
       "detail": "starting engineering bridge",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.collaborate",
       "engine": "cursor",
       "detail": "preferred Cursor engine taking the primary turn",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.capability.collaborate",
       "engine": "cursor",
       "detail": "continuing repair in the task workspace",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "Planning a Node.js CLI",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "I will create a Node.js",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "package named `path-s5-proof`.",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "CLI package named `path-s5-proof`",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "The package.json will",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "in a greenfield repository.",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "include a test script.",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "The package.json needs",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "The main.js file will",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "a test script. src/main.js",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "write to and read from",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "will read and write",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "a local data/store.json",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "data/store.json. Tests",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "file.",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "must run fully offline",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "npm test must exit",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "without SaaS dependencies.",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "zero. No cloud SaaS",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "The initial git commit",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "dependencies are allowed.",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "will follow project",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
       "type": "session.engineering.activity",
-      "detail": "The package must run",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "detail": "setup.",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
-      "type": "session.engineering.activity",
-      "detail": "fully offline. An initial",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "type": "session.engineering.narration",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
-      "type": "session.engineering.activity",
-      "detail": "git commit is required.",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "type": "session.engineering.narration",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
-      "type": "session.engineering.activity",
-      "detail": "Workspace contents",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "type": "session.engineering.narration",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     },
     {
-      "type": "session.engineering.activity",
-      "detail": "will be checked before",
-      "taskId": "4d974ab9-e9fe-4582-b8fc-05b139886526"
+      "type": "session.engineering.narration",
+      "taskId": "6b2855a0-421f-4154-915d-c6f10598a6ef"
     }
   ]
 }
