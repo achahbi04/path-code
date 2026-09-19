@@ -6,7 +6,7 @@
 **OPERATOR ACCEPTANCE:** **READY**  
 **S5 NOT FROZEN**
 
-**Authoritative HEAD:** `088aba65886890ef8ad129c918f891379c8933ec` (PHASE doc pointer fix; real e2e evidence at `963e04c` lineage)  
+**Authoritative HEAD:** `e724e22ba47e399b807eafbab08e6bbdb88af6e4` (operator acceptance tip; real e2e evidence at `963e04c` lineage)  
 **Prior superseded checkpoint:** `357d9328ad2fe0634fd43ad6e0e394d517907a34` (`req-readme` stuck UNKNOWN — probe scanned binding primary only; checkpoints split across runtime roots)
 
 **Mode:** mechanical fake fabric for CI/unit tests; real-engine PATH Build via `node docs/reports/g10-evidence/s5/run-s5-real-e2e.mjs` (no Build fake fabric, no Gateway fake engine)
