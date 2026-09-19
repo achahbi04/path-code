@@ -6,7 +6,7 @@
 **OPERATOR ACCEPTANCE:** **READY** (entrypoint defect closed — unbound shell + `/build start` from empty dir)  
 **S5 NOT FROZEN**
 
-**Authoritative HEAD:** `847c9c38947a9e0326881f1859d7c9d539afe800` (S5 pre-acceptance reconciled tip after operator-entry repair; implementation in `e036392`; supersedes stale `a1709c8`)
+**Authoritative HEAD:** `d9a2e38616a97d80ada62d1200308ac44fa86e1b` (S5 pre-acceptance reconciled tip; operator-entry repair in `e036392`; real e2e in `963e04c` lineage; supersedes stale `a1709c8` / mismatched `e036392` pointer)
 **Operator-entry proof:** [`g10-evidence/s5/s5-operator-entry-proof.json`](./g10-evidence/s5/s5-operator-entry-proof.json) — `OPERATOR_ENTRY_GREENFIELD_VERIFIED`  
 **Prior superseded checkpoint:** `a1709c8706eaf120ef508a9179889d7c94787201` (acceptance blocked: empty cwd exited `NOT_A_PROJECT` before `/build`)
 
