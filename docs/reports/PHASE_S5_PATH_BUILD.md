@@ -7,7 +7,7 @@
 **OPERATOR ACCEPTANCE:** **READY for product-surface acceptance** (`node scripts/path-build.mjs`)  
 **S5 NOT FROZEN**
 
-**Authoritative HEAD:** `(pending tip)`  
+**Authoritative HEAD:** `b51710e896865ff248ca2055e45d35f3b64dc587` (PATH Build product surface: path-build browser builder)
 **Control-loop e2e:** [`g10-evidence/s5/s5-real-e2e.json`](./g10-evidence/s5/s5-real-e2e.json)  
 **Operator-entry (legacy CLI path):** [`g10-evidence/s5/s5-operator-entry-proof.json`](./g10-evidence/s5/s5-operator-entry-proof.json) — superseded as **product** entry; retained as control-loop evidence  
 
@@ -73,7 +73,7 @@ PATH Build v1 = **durable product control loop** + **dedicated product surface**
 
 | Check | Result |
 | --- | --- |
-| `npx vitest run tests/s5 tests/s4 --reporter=dot` | run after tip |
+| `npx vitest run tests/s5 tests/s4 --reporter=dot` | **30 / 30** pass (S5 surface + loop + S4) |
 | `node --check scripts/path-build.mjs` | OK |
 | Product launch | `PATHCODE_BUILD_NO_OPEN=1 node scripts/path-build.mjs` → `http://127.0.0.1:7788/` |
 
