@@ -298,8 +298,8 @@ describe("S5 PATH Build", () => {
     expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
   });
 
-  it("mechanical probe: materializes README when npm test passes", () => {
-    const target = join(dir, "readme-materialize");
+  it("mechanical probe: does not create README when missing (engineer-owned)", () => {
+    const target = join(dir, "readme-no-materialize");
     const origin = ensureBuildOrigin({ targetDir: target });
     expect(origin.ok).toBe(true);
     if (!origin.ok) return;
@@ -325,9 +325,9 @@ describe("S5 PATH Build", () => {
     });
     expect(probe.ok).toBe(true);
     expect(existsSync(join(origin.binding.projectRoot, "README.md"))).toBe(
-      true,
+      false,
     );
-    expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
+    expect(rec.intent.explicitRequirements[0].status).toBe("UNKNOWN");
   });
 
   it("Depth A refresh writes reality delta", () => {

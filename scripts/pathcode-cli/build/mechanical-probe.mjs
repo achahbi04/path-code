@@ -3,7 +3,7 @@
  * Complements fabric evaluate; does not replace it for judgment-heavy claims.
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import {
@@ -46,28 +46,6 @@ function findReadmeFile(root) {
     if (existsSync(p)) return p;
   }
   return null;
-}
-
-/**
- * When npm test is green but engineers skipped docs, establish minimal operator README.
- * @param {string} root
- * @param {string} [title]
- */
-function materializeMinimalReadme(root, title = "Project") {
-  const path = join(root, "README.md");
-  if (existsSync(path)) return path;
-  const body = [
-    `# ${title}`,
-    "",
-    "Run tests:",
-    "",
-    "```bash",
-    "npm test",
-    "```",
-    "",
-  ].join("\n");
-  writeFileSync(path, body, "utf8");
-  return path;
 }
 
 export function mechanicalProbeBinding(input) {
@@ -170,25 +148,7 @@ export function mechanicalProbeBinding(input) {
   for (const r of input.record.intent.explicitRequirements || []) {
     const stmt = String(r.statement || "").toLowerCase();
     if (/readme/i.test(stmt + String(r.id || "").toLowerCase())) {
-      let readmePath = findReadmeFile(root);
-      if (
-        !readmePath &&
-        r.status !== "SATISFIED" &&
-        testOk &&
-        hasPkg &&
-        hasTestScript
-      ) {
-        let title = "Project";
-        try {
-          const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-          if (typeof pkg?.name === "string" && pkg.name.trim()) {
-            title = pkg.name.trim();
-          }
-        } catch {
-          // keep default title
-        }
-        readmePath = materializeMinimalReadme(root, title);
-      }
+      const readmePath = findReadmeFile(root);
       const changed = (input.changedFiles || []).map((f) =>
         String(f).replace(/\\/g, "/"),
       );
