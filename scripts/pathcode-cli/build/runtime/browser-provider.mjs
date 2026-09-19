@@ -122,6 +122,35 @@ export async function resolveBrowserProvider() {
   const browsersRoot =
     process.env.PLAYWRIGHT_BROWSERS_PATH ||
     join(home, "Library/Caches/ms-playwright");
+
+  // Prefer validated headless shells already present on the machine (any revision).
+  try {
+    const { readdirSync, statSync } = await import("node:fs");
+    for (const ent of readdirSync(browsersRoot)) {
+      if (!ent.startsWith("chromium_headless_shell-")) continue;
+      const base = join(browsersRoot, ent);
+      const candidatesLocal = [
+        join(base, "chrome-headless-shell-mac-arm64/chrome-headless-shell"),
+        join(base, "chrome-headless-shell-mac/chrome-headless-shell"),
+        join(base, "chrome-mac/headless_shell"),
+      ];
+      for (const p of candidatesLocal) {
+        try {
+          if (statSync(p).isFile()) {
+            candidates.unshift({
+              name: `cached_${ent}`,
+              opts: { headless: true, executablePath: p },
+            });
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
   for (const rel of [
     "chromium-1148/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
     "chromium-1148/chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
