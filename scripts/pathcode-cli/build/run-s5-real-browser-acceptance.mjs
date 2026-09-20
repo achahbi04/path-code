@@ -92,22 +92,16 @@ async function main() {
   });
   const page = await browser.newPage();
   const network = [];
-  page.on("response", async (res) => {
+  page.on("response", (res) => {
     try {
       const url = res.url();
       if (!url.includes("/api/")) return;
       const req = res.request();
-      let bodyText = "";
-      try {
-        bodyText = await res.text();
-      } catch {
-        bodyText = "";
-      }
+      // Do NOT read res.text() here — it can consume the body before the page fetch.
       network.push({
         method: req.method(),
         url,
         status: res.status(),
-        body: bodyText.slice(0, 2_000),
       });
     } catch {
       /* ignore */
@@ -116,51 +110,66 @@ async function main() {
 
   // 1–4: landing → fill → click Build
   await page.goto(surface.url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  // If a prior Build was auto-resumed, return to a clean landing first.
+  const workspaceUp = await page.locator("#workspace").isVisible().catch(() => false);
+  if (workspaceUp) {
+    await page.locator("#drawer").evaluate((el) => {
+      el.hidden = true;
+    }).catch(() => null);
+    await page.click("#newBuildBtn", { force: true });
+    await page.waitForTimeout(300);
+  }
+  await page.waitForSelector("#landing:not([hidden])", { timeout: 10_000 });
   await page.fill("#outcome", OUTCOME);
   const btnBefore = await page.locator("#buildBtn").innerText();
   report.buttonBefore = btnBefore;
 
+  const postWait = page.waitForResponse(
+    (r) => r.request().method() === "POST" && r.url().includes("/api/builds") && !r.url().includes("/api/builds/"),
+    { timeout: 120_000 },
+  );
   await page.click("#buildBtn");
-  await page.waitForTimeout(500);
-  const btnDuring = await page.locator("#buildBtn").innerText().catch(() => "");
-  report.buttonDuring = btnDuring;
+  const postRes = await postWait;
+  let postJson = null;
+  try {
+    postJson = await postRes.json();
+  } catch {
+    postJson = null;
+  }
+  report.buildPost = {
+    status: postRes.status(),
+    ok: postJson?.ok,
+    buildId: postJson?.buildId,
+    projectRoot: postJson?.projectRoot,
+    message: postJson?.message || postJson?.code || null,
+  };
+  console.log("buildPost", report.buildPost);
 
   // Wait for workspace (Build must not silently return to idle landing)
   const entered = await waitFor(
     async () => {
       const landingHidden = await page.locator("#landing").isHidden();
       const workspaceVisible = await page.locator("#workspace").isVisible();
-      const post = network.find(
-        (n) => n.method === "POST" && n.url.endsWith("/api/builds"),
-      );
-      if (landingHidden && workspaceVisible && post && post.status === 200) {
-        let parsed = null;
-        try {
-          parsed = JSON.parse(post.body);
-        } catch {
-          parsed = null;
-        }
+      const err = await page.locator("#landingError").innerText().catch(() => "");
+      if (postJson?.ok && postJson.buildId && (landingHidden || workspaceVisible)) {
         return {
           ok: true,
-          buildId: parsed?.buildId,
-          projectRoot: parsed?.projectRoot,
-          post,
+          buildId: postJson.buildId,
+          projectRoot: postJson.projectRoot,
         };
       }
-      // Failure path: landing error visible
-      const err = await page.locator("#landingError").innerText().catch(() => "");
-      if (err && !landingHidden) {
-        return { ok: false, landingError: err, post };
+      if (err && !workspaceVisible) {
+        return { ok: false, landingError: err };
       }
       return {
         ok: false,
         landingHidden,
         workspaceVisible,
         btn: await page.locator("#buildBtn").innerText().catch(() => ""),
-        post,
+        err,
       };
     },
-    { timeoutMs: 60_000, label: "enter_workspace" },
+    { timeoutMs: 30_000, label: "enter_workspace" },
   );
   report.enterWorkspace = {
     ok: entered.ok,
@@ -328,7 +337,7 @@ async function main() {
     auth: afterChange.auth,
   });
 
-  // 16–17: Open Folder + Open in PATH Code via real UI buttons
+  // 16–17: Open Folder + Open in PATH Code via real UI buttons (Activity drawer)
   const [folderRes, codeRes] = await Promise.all([
     page.evaluate(async (id) => {
       const res = await fetch("/api/open-folder", {
@@ -347,9 +356,11 @@ async function main() {
       return { status: res.status, body: await res.json() };
     }, buildId),
   ]);
-  // Also click the buttons (covers client handlers)
-  await page.click("#openFolderBtn");
-  await page.click("#openCodeBtn");
+  // Open Activity drawer then click the real product buttons.
+  await page.click("#detailsBtn", { force: true });
+  await page.waitForSelector("#drawer:not([hidden])", { timeout: 5_000 });
+  await page.click("#openFolderBtn", { force: true });
+  await page.click("#openCodeBtn", { force: true });
   await sleep(1500);
 
   report.openFolder = {
