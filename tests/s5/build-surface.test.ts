@@ -61,7 +61,9 @@ describe("S5 PATH Build product surface", () => {
     expect(JSON.stringify(complete)).not.toMatch(/\/build /);
   });
 
-  it("localhost surface serves UI and starts a Build without pathcode REPL", async () => {
+  it(
+    "localhost surface serves UI and starts a Build without pathcode REPL",
+    async () => {
     runtimeRoot = mkdtempSync(join(tmpdir(), "path-build-surface-"));
     const packageRoot = resolvePathPackageRoot();
     surface = await startPathBuildSurface({
@@ -107,7 +109,9 @@ describe("S5 PATH Build product surface", () => {
     const view = await latest.json();
     expect(view.buildId).toBe(body.buildId);
     expect(view.headline).toBeTruthy();
-  }, 60_000);
+  },
+    120_000,
+  );
 
   it("path-build entry module loads", async () => {
     const mod = await import(

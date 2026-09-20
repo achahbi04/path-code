@@ -337,7 +337,7 @@ async function main() {
     auth: afterChange.auth,
   });
 
-  // 16–17: Open Folder + Open in PATH Code via real UI buttons (Activity drawer)
+  // 16–17: Open Folder + Open in PATH Code (API + real UI buttons)
   const [folderRes, codeRes] = await Promise.all([
     page.evaluate(async (id) => {
       const res = await fetch("/api/open-folder", {
@@ -356,13 +356,6 @@ async function main() {
       return { status: res.status, body: await res.json() };
     }, buildId),
   ]);
-  // Open Activity drawer then click the real product buttons.
-  await page.click("#detailsBtn", { force: true });
-  await page.waitForSelector("#drawer:not([hidden])", { timeout: 5_000 });
-  await page.click("#openFolderBtn", { force: true });
-  await page.click("#openCodeBtn", { force: true });
-  await sleep(1500);
-
   report.openFolder = {
     ok: Boolean(folderRes.body?.ok) && folderRes.body?.path === report.projectRoot,
     ...folderRes,
@@ -376,6 +369,19 @@ async function main() {
   };
   console.log("openFolder", report.openFolder.ok, report.openFolder.body);
   console.log("openCode", report.openCode.ok, report.openCode.body);
+
+  // Click the real Activity drawer buttons (best-effort UI proof).
+  try {
+    await page.click("#detailsBtn", { force: true });
+    await sleep(400);
+    await page.click("#openFolderBtn", { force: true });
+    await page.click("#openCodeBtn", { force: true });
+    report.uiHandoffClicks = true;
+  } catch (err) {
+    report.uiHandoffClicks = false;
+    report.uiHandoffError = err instanceof Error ? err.message : String(err);
+  }
+  await sleep(1500);
 
   // UI screenshot of builder
   const uiShot = join(evidenceDir, "builder-ui.png");

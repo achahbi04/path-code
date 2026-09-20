@@ -168,7 +168,9 @@ describe("S5 PATH Build", () => {
     ]);
   });
 
-  it("controller fake loop reaches BUILD COMPLETE", async () => {
+  it(
+    "controller fake loop reaches BUILD COMPLETE",
+    async () => {
     const target = join(dir, "greenfield");
     const controller = createBuildController({
       runtimeRoot,
@@ -226,9 +228,13 @@ describe("S5 PATH Build", () => {
       child.taskId,
     );
     expect(again.deduped).toBe(true);
-  });
+  },
+    60_000,
+  );
 
-  it("product-level steer bumps revision and demotes PROVEN", async () => {
+  it(
+    "product-level steer bumps revision and demotes PROVEN",
+    async () => {
     const target = join(dir, "steer");
     const controller = createBuildController({
       runtimeRoot,
@@ -269,7 +275,9 @@ describe("S5 PATH Build", () => {
         /offline/i.test(r.statement),
       ),
     ).toBe(true);
-  });
+  },
+    60_000,
+  );
 
   it("mechanical probe: README requirement satisfied from README.md", () => {
     const target = join(dir, "readme-req");

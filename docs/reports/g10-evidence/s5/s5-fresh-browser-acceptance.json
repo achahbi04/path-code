@@ -1,0 +1,240 @@
+{
+  "startedAt": "2026-09-20T05:33:17.749Z",
+  "runtimeRoot": "/Users/achahbi/.path-code/runtime/v1.0.1",
+  "packageRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+  "surfaceUrl": "http://127.0.0.1:51331/",
+  "buttonBefore": "Build",
+  "buildPost": {
+    "status": 200,
+    "ok": true,
+    "buildId": "96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+    "projectRoot": "/Users/achahbi/PATH Builds/build-a-website-that-tells-about-ice-c0d549",
+    "message": null
+  },
+  "enterWorkspace": {
+    "ok": true,
+    "buildId": "96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+    "projectRoot": "/Users/achahbi/PATH Builds/build-a-website-that-tells-about-ice-c0d549",
+    "landingError": null
+  },
+  "buildId": "96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+  "projectRoot": "/Users/achahbi/PATH Builds/build-a-website-that-tells-about-ice-c0d549",
+  "engineer": {
+    "ok": true,
+    "taskId": "3b3b0f93-b0a5-45b0-9077-8edaa50b3d4b",
+    "state": "dispatched",
+    "statusPill": "Building…",
+    "activityHasEngineer": true
+  },
+  "preview": {
+    "ok": true,
+    "auth": "adae8271e2a109191486558cfee984e40226c629",
+    "adoptions": 1,
+    "preview": {
+      "capability": "web",
+      "mode": "static",
+      "url": "http://127.0.0.1:4174/",
+      "port": 4174,
+      "status": "ready",
+      "embedPath": "/preview/96d6d96f-958f-4a5f-bc2e-e91f9631e769/"
+    },
+    "iframeSrc": "/preview/96d6d96f-958f-4a5f-bc2e-e91f9631e769/"
+  },
+  "productEvidence": {
+    "ok": true,
+    "shot": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/96d6d96f-958f-4a5f-bc2e-e91f9631e769/shot-desktop-2026-09-20T05-35-58-910Z.png",
+    "mobile": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/96d6d96f-958f-4a5f-bc2e-e91f9631e769/shot-mobile-2026-09-20T05-35-58-910Z.png",
+    "hash": "576dc5fb1cb79cba",
+    "provider": "cached_chromium_headless_shell-1234",
+    "text": "Your Lifeline in Emergencies: The ICE App Accidents happen. Be prepared with the In Case of Emergency (ICE) App – a simple, yet powerful tool that provides critical information to first responders and loved ones when every second counts. What is the ICE App? The ICE App securely stores your essentia"
+  },
+  "conversationChange": {
+    "ok": true,
+    "auth": "474e135afa1ae17ad1560ba2c07edb5030562858",
+    "hash": "f40a84285e363e20",
+    "shot": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/96d6d96f-958f-4a5f-bc2e-e91f9631e769/shot-desktop-2026-09-20T05-38-57-979Z.png"
+  },
+  "openFolder": {
+    "ok": true,
+    "status": 200,
+    "body": {
+      "ok": true,
+      "path": "/Users/achahbi/PATH Builds/build-a-website-that-tells-about-ice-c0d549",
+      "launched": true,
+      "pid": 83234
+    }
+  },
+  "openCode": {
+    "ok": true,
+    "status": 200,
+    "body": {
+      "ok": true,
+      "path": "/Users/achahbi/PATH Builds/build-a-website-that-tells-about-ice-c0d549",
+      "launched": true,
+      "method": "terminal.app",
+      "pid": 83264
+    }
+  },
+  "uiHandoffClicks": true,
+  "builderUiShot": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/fresh-browser-acceptance/builder-ui.png",
+  "final": {
+    "status": "running",
+    "auth": "474e135afa1ae17ad1560ba2c07edb5030562858",
+    "children": [
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "taskId": "3b3b0f93-b0a5-45b0-9077-8edaa50b3d4b",
+        "provider": "cursor",
+        "classification": "NOT_VERIFIED"
+      },
+      {
+        "kind": "engineer",
+        "state": "consumed",
+        "taskId": "f7f21ce6-04ab-4879-b99d-d137132ee06c",
+        "provider": "cursor",
+        "classification": "VERIFIED"
+      },
+      {
+        "kind": "evaluate",
+        "state": "dispatched",
+        "taskId": "d062053f-4034-4bb6-98db-6a9b3db845bb"
+      }
+    ],
+    "criteria": [
+      {
+        "id": "c-runnable",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-outcome",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-db8adf5a39",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-b820bbc6d6",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-ce37884ae8",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-6b5e223492",
+        "status": "PROVEN"
+      },
+      {
+        "id": "c-f42623c8db",
+        "status": "PROVEN"
+      }
+    ]
+  },
+  "verdict": "PATH BUILD — REAL FRESH-USER BROWSER FLOW PASS",
+  "operatorAcceptanceReady": true,
+  "endedAt": "2026-09-20T05:39:22.449Z",
+  "network": [
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:51331/api/open-folder",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:51331/api/open-code",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:51331/api/open-folder",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:51331/api/open-code",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:51331/api/builds/96d6d96f-958f-4a5f-bc2e-e91f9631e769",
+      "status": 200
+    }
+  ]
+}
