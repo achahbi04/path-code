@@ -18,6 +18,7 @@ import {
   ensureBuildOrigin,
   createBuildController,
   deriveProductBrief,
+  parseProductBriefResult,
   detectBuildArtifact,
   createBuildRuntimeManager,
   startPathBuildSurface,
@@ -26,7 +27,7 @@ import {
 import { resolveTargetProjectRoot } from "../../scripts/pathcode-cli/paths.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
 
-function canon(p) {
+function canon(p: string) {
   try {
     return realpathSync(p);
   } catch {
@@ -35,8 +36,7 @@ function canon(p) {
 }
 
 describe("S5 Build exact-origin identity", () => {
-  /** @type {string[]} */
-  const temps = [];
+  const temps: string[] = [];
 
   afterEach(() => {
     for (const t of temps.splice(0)) {
@@ -98,8 +98,8 @@ describe("S5 Build exact-origin identity", () => {
     expect(started.ok).toBe(true);
     if (!started.ok) return;
     expect(started.projectRoot).toBe(canon(target));
-    expect(started.build.projectBindings[0].projectRoot).toBe(canon(target));
-    expect(started.build.projectBindings[0].originKind).toBe("build-created");
+    expect(started.build.projectBindings[0]!.projectRoot).toBe(canon(target));
+    expect(started.build.projectBindings[0]!.originKind).toBe("build-created");
     expect(started.build.outcomeCriteria.length).toBeGreaterThan(2);
     expect(
       started.build.outcomeCriteria.some((c) => /landing|hero|cta|render|website|page/i.test(c.statement)),
@@ -117,6 +117,44 @@ describe("S5 product brief + artifact detection", () => {
     const ids = brief.acceptanceCriteria.map((c) => c.id);
     expect(ids).toContain("c-runnable");
     expect(ids).toContain("c-outcome");
+  });
+
+  it("validates cognitive ProductBrief envelopes and rejects stale intent", () => {
+    const envelope = {
+      version: 1,
+      buildId: "build-1",
+      intentRevision: 3,
+      revision: 2,
+      productKind: "web",
+      summary: "A focused emergency response site",
+      functionalRequirements: ["Explain the response workflow"],
+      visualRequirements: ["Present a clear primary action"],
+      nonFunctionalRequirements: ["Responsive"],
+      constraints: ["Runs locally"],
+      acceptanceCriteria: [
+        {
+          id: "c-action",
+          statement: "The primary action is visible and usable",
+          required: true,
+          evidenceKinds: ["evaluation", "challenge"],
+        },
+      ],
+      assumptions: [],
+      openQuestions: [],
+    };
+    const accepted = parseProductBriefResult(
+      `\`\`\`path-build-product-brief\n${JSON.stringify(envelope)}\n\`\`\``,
+      { buildId: "build-1", intentRevision: 3 },
+    );
+    expect(accepted.ok).toBe(true);
+    expect(accepted.brief?.source).toBe("cognitive");
+
+    const stale = parseProductBriefResult(
+      `\`\`\`path-build-product-brief\n${JSON.stringify(envelope)}\n\`\`\``,
+      { buildId: "build-1", intentRevision: 4 },
+    );
+    expect(stale.ok).toBe(false);
+    expect(stale.errors).toContain("intentRevision_mismatch");
   });
 
   it("detects static web artifact from index.html", () => {
@@ -140,12 +178,9 @@ describe("S5 product brief + artifact detection", () => {
 });
 
 describe("S5 runtime manager + surface builder", () => {
-  /** @type {Awaited<ReturnType<typeof startPathBuildSurface>> | null} */
-  let surface = null;
-  /** @type {string | null} */
-  let runtimeRoot = null;
-  /** @type {ReturnType<typeof createBuildRuntimeManager> | null} */
-  let manager = null;
+  let surface: Awaited<ReturnType<typeof startPathBuildSurface>> | null = null;
+  let runtimeRoot: string | null = null;
+  let manager: ReturnType<typeof createBuildRuntimeManager> | null = null;
 
   afterEach(async () => {
     if (manager) {
@@ -178,6 +213,7 @@ describe("S5 runtime manager + surface builder", () => {
       bindingId: "bind-1",
     });
     expect(started.ok).toBe(true);
+    if (!started.ok) return;
     expect(canon(started.runtime.projectRoot)).toBe(canon(project));
     expect(started.runtime.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\//);
     const page = await fetch(started.runtime.url);
@@ -209,7 +245,14 @@ describe("S5 runtime manager + surface builder", () => {
         originKind: "build-created",
       }),
     });
-    const body = await started.json();
+    const body = (await started.json()) as {
+      ok: boolean;
+      projectRoot: string;
+      view: {
+        criteria: unknown[];
+        conversation?: unknown[];
+      };
+    };
     expect(started.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(canon(body.projectRoot)).toBe(canon(targetDir));

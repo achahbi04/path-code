@@ -479,6 +479,137 @@ export function markTaskMerged(opts) {
 }
 
 /**
+ * Shared local adoption primitive for PATH Code and PATH Build.
+ *
+ * Callers own presentation and confirmation. This function owns the actual
+ * merge and the single durable lifecycle transition, so product and Code
+ * surfaces cannot report different merge truth.
+ *
+ * @param {{
+ *   runtimeRoot: string,
+ *   projectRoot: string,
+ *   entry: any,
+ *   sourceRef?: string | null,
+ *   requireAdoptable?: boolean,
+ *   validateResult?: ((result: { beforeSha: string | null, adoptedSha: string | null }) =>
+ *     { ok: boolean, code?: string, message?: string }) | null,
+ * }} opts
+ */
+export function adoptTaskResult(opts) {
+  const entry = opts.entry || {};
+  const sourceRef = String(opts.sourceRef || entry.branch || "").trim();
+  const durableLifecycle = entry.taskId
+    ? readLifecycleFromCheckpoint(
+        readTaskCheckpoint(opts.runtimeRoot, entry.taskId),
+      ).status
+    : null;
+  const lifecycle = String(
+    durableLifecycle || entry.lifecycleStatus || "",
+  ).toUpperCase();
+  if (["DISCARDED", "MERGED", "PR_OPEN"].includes(lifecycle)) {
+    return {
+      ok: false,
+      code: `ALREADY_${lifecycle}`,
+      message: `Task result lifecycle is already ${lifecycle}.`,
+    };
+  }
+  if (
+    opts.requireAdoptable !== false &&
+    (!Array.isArray(entry.changedFiles) || entry.changedFiles.length === 0)
+  ) {
+    return {
+      ok: false,
+      code: "NOT_ADOPTABLE",
+      message: "Task result has no recorded file changes.",
+    };
+  }
+  if (!sourceRef || !/^path\/task-/.test(sourceRef)) {
+    return {
+      ok: false,
+      code: "INVALID_TASK_BRANCH",
+      message: "Adoption requires a path/task-* branch.",
+    };
+  }
+
+  const dirty = git(opts.projectRoot, ["status", "--porcelain=v1", "-uall"]);
+  if (dirty.status !== 0) {
+    return {
+      ok: false,
+      code: "GIT_STATUS_FAILED",
+      message: dirty.stderr || dirty.stdout || "git status failed",
+    };
+  }
+  if (dirty.stdout) {
+    return {
+      ok: false,
+      code: "PRIMARY_DIRTY",
+      message: "Cannot adopt into a dirty primary checkout.",
+    };
+  }
+
+  const before = git(opts.projectRoot, ["rev-parse", "HEAD"]);
+  const merged = git(opts.projectRoot, ["merge", "--no-edit", sourceRef]);
+  if (merged.status !== 0) {
+    git(opts.projectRoot, ["merge", "--abort"]);
+    return {
+      ok: false,
+      code: "MERGE_FAILED",
+      message: merged.stderr || merged.stdout || "task-branch merge failed",
+      beforeSha: before.status === 0 ? before.stdout : null,
+    };
+  }
+  const after = git(opts.projectRoot, ["rev-parse", "HEAD"]);
+  if (typeof opts.validateResult === "function") {
+    const validation = opts.validateResult({
+      beforeSha: before.status === 0 ? before.stdout : null,
+      adoptedSha: after.status === 0 ? after.stdout : null,
+    });
+    if (!validation?.ok) {
+      if (before.status === 0 && before.stdout) {
+        git(opts.projectRoot, ["reset", "--hard", before.stdout]);
+      }
+      return {
+        ok: false,
+        code: validation?.code || "ADOPTION_VALIDATION_FAILED",
+        message: validation?.message || "Adopted result failed validation.",
+        rolledBack: true,
+        beforeSha: before.status === 0 ? before.stdout : null,
+      };
+    }
+  }
+  const marked = markTaskMerged({
+    runtimeRoot: opts.runtimeRoot,
+    projectRoot: opts.projectRoot,
+    entry: {
+      ...entry,
+      branch: sourceRef,
+    },
+  });
+  if (!marked.ok) {
+    if (before.status === 0 && before.stdout) {
+      git(opts.projectRoot, ["reset", "--hard", before.stdout]);
+    }
+    return {
+      ok: false,
+      code: marked.code || "LIFECYCLE_WRITE_FAILED",
+      message:
+        marked.message ||
+        "Durable MERGED lifecycle could not be persisted; merge was rolled back.",
+      rolledBack: true,
+      beforeSha: before.status === 0 ? before.stdout : null,
+    };
+  }
+  return {
+    ok: true,
+    code: "MERGED",
+    sourceRef,
+    beforeSha: before.status === 0 ? before.stdout : null,
+    adoptedSha: after.status === 0 ? after.stdout : null,
+    lifecycle: marked.lifecycle,
+  };
+}
+
+/**
  * Format confirmation / preview panels.
  * @param {any} preview
  * @param {any} entry

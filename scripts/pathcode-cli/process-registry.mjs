@@ -84,11 +84,15 @@ const byTask = new Map();
  *   command?: string,
  *   child?: import('node:child_process').ChildProcess | null,
  *   pid?: number | null,
+ *   id?: string,
+ *   startKey?: string,
+ *   startedAt?: string,
  *   runtimeRoot?: string,
  * }} opts
  */
 export function registerProcess(opts) {
-  const id = randomUUID();
+  const id =
+    typeof opts.id === "string" && opts.id.trim() ? opts.id.trim() : randomUUID();
   const child = opts.child && typeof opts.child === "object" ? opts.child : null;
   const pid =
     typeof opts.pid === "number"
@@ -109,8 +113,14 @@ export function registerProcess(opts) {
     command: typeof opts.command === "string" ? opts.command.slice(0, 500) : "",
     pid,
     pgid: pid,
-    startKey: identity?.startKey || "",
-    startedAt: new Date().toISOString(),
+    startKey:
+      typeof opts.startKey === "string"
+        ? opts.startKey
+        : identity?.startKey || "",
+    startedAt:
+      typeof opts.startedAt === "string" && opts.startedAt
+        ? opts.startedAt
+        : new Date().toISOString(),
     endedAt: null,
     exitCode: null,
     signal: null,

@@ -2,16 +2,23 @@
  * S5 — PATH Build product surface smoke (not PATH Code CLI).
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync, realpathSync } from "node:fs";
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  readFileSync,
+  realpathSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 
 import { projectBuildForSurface } from "../../scripts/pathcode-cli/build/surface/product-view.mjs";
 import { startPathBuildSurface } from "../../scripts/pathcode-cli/build/surface/server.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
 
-function canon(p) {
+function canon(p: string) {
   try {
     return realpathSync(p);
   } catch {
@@ -20,10 +27,8 @@ function canon(p) {
 }
 
 describe("S5 PATH Build product surface", () => {
-  /** @type {Awaited<ReturnType<typeof startPathBuildSurface>> | null} */
-  let surface = null;
-  /** @type {string | null} */
-  let runtimeRoot = null;
+  let surface: Awaited<ReturnType<typeof startPathBuildSurface>> | null = null;
+  let runtimeRoot: string | null = null;
 
   afterEach(async () => {
     if (surface) {
@@ -38,6 +43,20 @@ describe("S5 PATH Build product surface", () => {
       }
       runtimeRoot = null;
     }
+  });
+
+  it("reports the package version without a product-surface suffix", () => {
+    const packageRoot = resolvePathPackageRoot();
+    const run = spawnSync(
+      process.execPath,
+      [join(packageRoot, "scripts/path-build.mjs"), "--version"],
+      { cwd: packageRoot, encoding: "utf8" },
+    );
+    expect(run.status).toBe(0);
+    const pkg = JSON.parse(
+      readFileSync(join(packageRoot, "package.json"), "utf8"),
+    );
+    expect(run.stdout.trim()).toBe(`path-build ${pkg.version}`);
   });
 
   it("product view speaks product language for idle and complete", () => {
@@ -95,7 +114,15 @@ describe("S5 PATH Build product surface", () => {
         targetDir,
       }),
     });
-    const body = await started.json();
+    const body = (await started.json()) as {
+      ok: boolean;
+      buildId: string;
+      view: {
+        phase: string;
+        projectRoot: string;
+        criteria?: unknown[];
+      };
+    };
     expect(started.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(body.buildId).toBeTruthy();
@@ -106,7 +133,10 @@ describe("S5 PATH Build product surface", () => {
     expect(body.view.criteria?.length || 0).toBeGreaterThan(0);
 
     const latest = await fetch(new URL("/api/builds/latest", surface.url));
-    const view = await latest.json();
+    const view = (await latest.json()) as {
+      buildId: string;
+      headline: string;
+    };
     expect(view.buildId).toBe(body.buildId);
     expect(view.headline).toBeTruthy();
   },

@@ -160,6 +160,8 @@ export function mechanicalProbeBinding(input) {
   const reality = captureBindingReality(binding.projectRoot);
   /** @type {Array<{ id: string, layer: 'criterion'|'requirement', status: string, note: string }>} */
   const updates = [];
+  /** @type {Array<{ id: string, layer: 'criterion'|'requirement', observed: boolean, note: string }>} */
+  const observations = [];
 
   const pkgPath = join(checkRoot, "package.json");
   const hasPkg = existsSync(pkgPath);
@@ -207,8 +209,10 @@ export function mechanicalProbeBinding(input) {
     /** @type {string|null} */
     let next = null;
     let note = "";
+    let mechanicalStatusEligible = false;
 
     if (/runnable|test|check|npm test|project-native/i.test(stmt + id)) {
+      mechanicalStatusEligible = true;
       if (testOk) {
         next = "PROVEN";
         note = testNote;
@@ -224,13 +228,13 @@ export function mechanicalProbeBinding(input) {
       }
     } else if (/outcome|architecture|software|api|service|cli|surface/i.test(stmt + id)) {
       if (hasPkg && srcExists) {
-        next = testOk ? "PROVEN" : "UNKNOWN";
+        next = "UNKNOWN";
         note = testOk
-          ? "package + src + npm test ok"
+          ? "Observed package + source + green checks; semantic outcome awaits evaluation"
           : "package/src present; checks not green yet";
       } else if (webSurfaceExists && testOk) {
-        next = "PROVEN";
-        note = "web surface + project-native checks ok";
+        next = "UNKNOWN";
+        note = "Observed web surface + green checks; semantic outcome awaits evaluation";
       } else if (webSurfaceExists) {
         next = "UNKNOWN";
         note = "web surface present; await checks/evidence";
@@ -243,8 +247,8 @@ export function mechanicalProbeBinding(input) {
       }
     } else if (/landing|hero|cta|call-to-action|render|preview|website|page/i.test(stmt)) {
       if (webSurfaceExists && testOk) {
-        next = "PROVEN";
-        note = "web surface present and checks green";
+        next = "UNKNOWN";
+        note = "Observed web surface and green checks; semantic/visual proof awaits evaluation";
       } else if (webSurfaceExists) {
         next = "UNKNOWN";
         note = "web surface present; checks pending";
@@ -286,8 +290,8 @@ export function mechanicalProbeBinding(input) {
         browser.authoritativeSha === input.record.authoritativeSha ||
         /ice|emergency/.test(sample);
       if (hasProduct && hasWhy && hasVisual && (browser?.ok || /ice/.test(sample)) && revisionOk) {
-        next = "PROVEN";
-        note = "DOM/browser/source evidence shows product, purpose, and visual surface";
+        next = "UNKNOWN";
+        note = "Observed matching text and visual surface; semantic proof awaits evaluation";
       } else if (webSurfaceExists && hasProduct) {
         next = "UNKNOWN";
         note = "partial product explanation; await stronger browser evidence";
@@ -297,7 +301,15 @@ export function mechanicalProbeBinding(input) {
       }
     }
 
-    if (next && next !== c.status) {
+    if (note) {
+      observations.push({
+        id,
+        layer: "criterion",
+        observed: next !== "UNMET",
+        note,
+      });
+    }
+    if (mechanicalStatusEligible && next && next !== c.status) {
       const ev = [
         makeEvidenceRef(
           {
@@ -398,27 +410,12 @@ export function mechanicalProbeBinding(input) {
     }
     if (/local|offline|no cloud|without.*saas/i.test(stmt)) {
       if (testOk && hasPkg) {
-        if (r.status !== "SATISFIED") {
-          r.status = "SATISFIED";
-          r.evidence = [
-            makeEvidenceRef(
-              {
-                kind: "check",
-                ref: "npm test (local)",
-                bindingId: binding.bindingId,
-                taskId: input.taskId,
-                scope: ["package.json"],
-              },
-              reality,
-            ),
-          ];
-          updates.push({
-            id: r.id,
-            layer: "requirement",
-            status: "SATISFIED",
-            note: "local npm test succeeded",
-          });
-        }
+        observations.push({
+          id: r.id,
+          layer: "requirement",
+          observed: true,
+          note: "Observed local npm test success; this alone does not prove offline/no-cloud semantics",
+        });
       } else if (!hasPkg) {
         if (r.status === "SATISFIED") r.status = "UNKNOWN";
       }
@@ -434,6 +431,7 @@ export function mechanicalProbeBinding(input) {
     hasTestScript,
     testOk,
     srcExists,
+    observations,
     updates,
     reality,
   };

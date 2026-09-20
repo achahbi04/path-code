@@ -370,6 +370,7 @@ function showOperatorReply(prompt, inlineStudio, text) {
  *   runTrial?: Function,
  *   runRecover?: Function,
  *   runGeneralSession?: Function,
+ *   ensureRuntime?: typeof ensureAg1Runtime,
  * }} [testIo]
  */
 export async function runPathcodeMain(argv, testIo = {}) {
@@ -488,7 +489,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
 
   // Quiet runtime bootstrap (venv under PATH_RUNTIME_ROOT). Failures surface later.
   try {
-    await ensureAg1Runtime({ packageRoot: root });
+    await (testIo.ensureRuntime ?? ensureAg1Runtime)({ packageRoot: root });
   } catch {
     // non-fatal at shell open; task start will re-check
   }
@@ -2120,26 +2121,21 @@ export async function runPathcodeMain(argv, testIo = {}) {
             redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
             continue;
           }
-          const merged = spawnSync("git", ["merge", "--no-edit", branch], {
-            cwd: projectRoot,
-            encoding: "utf8",
-            env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+          const { adoptTaskResult } = await import(
+            "./pathcode-cli/result-lifecycle.mjs"
+          );
+          const merged = adoptTaskResult({
+            runtimeRoot,
+            projectRoot,
+            entry: entry || {
+              taskId: branch.slice("path/task-".length),
+              branch,
+              changedFiles: ["(session result)"],
+            },
+            sourceRef: branch,
+            requireAdoptable: true,
           });
-          if (merged.status === 0) {
-            if (entry?.taskId) {
-              try {
-                const { markTaskMerged } = await import(
-                  "./pathcode-cli/result-lifecycle.mjs"
-                );
-                markTaskMerged({
-                  runtimeRoot,
-                  projectRoot,
-                  entry,
-                });
-              } catch {
-                // merge succeeded; lifecycle mark is best-effort
-              }
-            }
+          if (merged.ok) {
             showOperatorReply(
               prompt,
               ttyInline ? inlineStudio : null,
@@ -2158,7 +2154,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
             showOperatorReply(
               prompt,
               ttyInline ? inlineStudio : null,
-              `Merge failed:\n${(merged.stderr || merged.stdout || "git merge failed").trim()}`,
+              `Merge failed (${merged.code || "FAILED"}):\n${merged.message || "git merge failed"}`,
             );
           }
         } catch (err) {

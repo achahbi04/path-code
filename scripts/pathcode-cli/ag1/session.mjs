@@ -1097,7 +1097,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         cursorPrimaryDone = true;
         cursorPrimarySummary =
           typeof turn.text === "string" && turn.text.trim()
-            ? turn.text.trim().slice(0, 8_000)
+            ? turn.text.trim().slice(0, 32_000)
             : turn.detail || "Cursor primary turn completed";
         const turnNarration = extractEngineeringNarration(cursorPrimarySummary);
         if (turnNarration.text) {
@@ -2430,6 +2430,14 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
           : classification,
     classification:
       terminalDisposition === "CANCELLED" ? "NOT_VERIFIED" : classification,
+    // Preserve the provider's actual final response as authoritative cognitive
+    // task output. Engineering reports are intentionally human-oriented and
+    // may abbreviate structured envelopes needed by Build brief/evaluation/
+    // challenge consumers.
+    engineResultText: String(
+      cursorPrimarySummary ||
+        (typeof terminalMsg?.summary === "string" ? terminalMsg.summary : ""),
+    ).slice(0, 32_000),
     taskId: worktree.taskId,
     taskBranch: worktree.taskBranch,
     commitSha,

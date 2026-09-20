@@ -15,6 +15,7 @@ import {
 import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { ensureAg9RuntimeDirs } from "../ag9/layout.mjs";
+import { appendBuildTransitionEvents } from "./events.mjs";
 
 export const BUILD_RECORD_SCHEMA = "pathcode.s5.build-record.v1";
 
@@ -108,6 +109,7 @@ export function createBuildRecordSkeleton(input) {
  */
 export function writeBuildRecord(runtimeRoot, record) {
   const path = resolveBuildRecordPath(runtimeRoot, record.buildId);
+  const previous = readBuildRecord(runtimeRoot, record.buildId);
   mkdirSync(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
   const next = {
@@ -121,6 +123,11 @@ export function writeBuildRecord(runtimeRoot, record) {
     updateBuildIndex(runtimeRoot, next);
   } catch {
     // non-fatal
+  }
+  try {
+    appendBuildTransitionEvents(runtimeRoot, previous, next);
+  } catch {
+    // Build state remains authoritative if event projection fails.
   }
   return next;
 }

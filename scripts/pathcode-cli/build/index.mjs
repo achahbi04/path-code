@@ -13,6 +13,12 @@ export {
   resolveBuildRecordPath,
   resolveBuildsDir,
 } from "./record.mjs";
+export {
+  appendBuildEvent,
+  readBuildEvents,
+  resolveBuildEventPath,
+  sanitizeBuildEventValue,
+} from "./events.mjs";
 
 export { ensureBuildOrigin, isBindableProject, hasGitDir } from "./origin.mjs";
 export {
@@ -20,7 +26,14 @@ export {
   HOME_BINDING_GUARD,
 } from "../paths.mjs";
 
-export { deriveProductBrief, briefToOutcomeCriteria, inferProductKind } from "./brief.mjs";
+export {
+  deriveProductBrief,
+  briefToOutcomeCriteria,
+  inferProductKind,
+  parseProductBriefResult,
+  validateProductBriefEnvelope,
+  productBriefObjective,
+} from "./brief.mjs";
 export { classifyConversationMessage } from "./conversation.mjs";
 export { detectBuildArtifact, resolveArtifactStartPlan } from "./runtime/artifact.mjs";
 export { createBuildRuntimeManager } from "./runtime/manager.mjs";
@@ -72,6 +85,15 @@ export {
 } from "./objectives.mjs";
 
 export { createBuildController } from "./controller.mjs";
+export { createBuildRuntimeSync } from "./runtime/sync.mjs";
+export { createBuildCoordinatorService } from "./coordinator/service.mjs";
+export {
+  startBuildCoordinatorServer,
+  resolveBuildCoordinatorSocketPath,
+  resolveBuildCoordinatorPidPath,
+} from "./coordinator/server.mjs";
+export { createBuildCoordinatorClient } from "./coordinator/client.mjs";
+export { ensureBuildCoordinator } from "./coordinator/ensure.mjs";
 export { formatBuildStatus, formatBuildCard } from "./format.mjs";
 export { projectBuildForSurface } from "./surface/product-view.mjs";
 export { startPathBuildSurface } from "./surface/server.mjs";

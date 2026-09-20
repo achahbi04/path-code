@@ -13,8 +13,17 @@ import {
   createBuildController,
   gitHeadSha,
 } from "../../scripts/pathcode-cli/build/index.mjs";
+import {
+  adoptTaskResult,
+  readLifecycleFromCheckpoint,
+} from "../../scripts/pathcode-cli/result-lifecycle.mjs";
+import { readTaskCheckpoint } from "../../scripts/pathcode-cli/ag10/task-checkpoint.mjs";
 
-function git(cwd, args, env = {}) {
+function git(
+  cwd: string,
+  args: string[],
+  env: NodeJS.ProcessEnv = {},
+) {
   return spawnSync("git", args, {
     cwd,
     encoding: "utf8",
@@ -31,6 +40,93 @@ function git(cwd, args, env = {}) {
 }
 
 describe("S5 Build authoritative adoption", () => {
+  it("uses the same MERGED lifecycle truth as PATH Code adoption", () => {
+    const dir = mkdtempSync(join(tmpdir(), "path-shared-adopt-"));
+    const runtimeRoot = join(dir, "rt");
+    mkdirSync(runtimeRoot);
+
+    const makeResult = (name: string, productBranch: string) => {
+      const root = join(dir, name);
+      mkdirSync(root);
+      git(root, ["init", "--template="]);
+      git(root, ["config", "user.email", "shared@path.local"]);
+      git(root, ["config", "user.name", "Shared Adopt"]);
+      writeFileSync(join(root, "README.md"), "base\n");
+      git(root, ["add", "README.md"]);
+      git(root, ["commit", "-m", "base"]);
+      git(root, ["checkout", "-b", productBranch]);
+      const taskId = `${name}-aaaa-bbbb-cccc-ddddeeee0001`;
+      const branch = `path/task-${taskId}`;
+      git(root, ["checkout", "-b", branch]);
+      writeFileSync(join(root, `${name}.txt`), `${name}\n`);
+      git(root, ["add", "."]);
+      git(root, ["commit", "-m", `${name} result`]);
+      const sha = gitHeadSha(root)!;
+      git(root, ["checkout", productBranch]);
+      return { root, taskId, branch, sha };
+    };
+
+    const code = makeResult("code", "main-product");
+    const codeAdopted = adoptTaskResult({
+      runtimeRoot,
+      projectRoot: code.root,
+      sourceRef: code.branch,
+      requireAdoptable: true,
+      entry: {
+        taskId: code.taskId,
+        branch: code.branch,
+        sha: code.sha,
+        changedFiles: ["code.txt"],
+      },
+    });
+    expect(codeAdopted.ok).toBe(true);
+
+    const build = makeResult("build", "path-build/shared");
+    const buildAdopted = adoptEngineerResultIntoBuild({
+      runtimeRoot,
+      buildId: "build-shared",
+      projectRoot: build.root,
+      productBranch: "path-build/shared",
+      taskId: build.taskId,
+      taskBranch: build.branch,
+      sourceSha: build.sha,
+    });
+    expect(buildAdopted.ok).toBe(true);
+
+    for (const taskId of [code.taskId, build.taskId]) {
+      expect(
+        readLifecycleFromCheckpoint(
+          readTaskCheckpoint(runtimeRoot, taskId),
+        ).status,
+      ).toBe("MERGED");
+    }
+    expect(
+      adoptTaskResult({
+        runtimeRoot,
+        projectRoot: code.root,
+        sourceRef: code.branch,
+        entry: {
+          taskId: code.taskId,
+          branch: code.branch,
+          changedFiles: ["code.txt"],
+        },
+      }).code,
+    ).toBe("ALREADY_MERGED");
+    expect(
+      adoptEngineerResultIntoBuild({
+        runtimeRoot,
+        buildId: "build-shared",
+        projectRoot: build.root,
+        productBranch: "path-build/shared",
+        taskId: build.taskId,
+        taskBranch: build.branch,
+        sourceSha: build.sha,
+      }).code,
+    ).toBe("ALREADY_MERGED");
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("merges path/task-* into path-build branch and updates HEAD", () => {
     const root = mkdtempSync(join(tmpdir(), "path-adopt-"));
     const runtimeRoot = mkdtempSync(join(tmpdir(), "path-adopt-rt-"));
@@ -107,6 +203,55 @@ describe("S5 Build authoritative adoption", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("requires a branchless engineer SHA to already be in product HEAD", () => {
+    const dir = mkdtempSync(join(tmpdir(), "path-branchless-adopt-"));
+    const runtimeRoot = join(dir, "rt");
+    mkdirSync(runtimeRoot);
+    const root = join(dir, "project");
+    mkdirSync(root);
+    git(root, ["init", "--template="]);
+    git(root, ["config", "user.email", "t@t"]);
+    git(root, ["config", "user.name", "t"]);
+    writeFileSync(join(root, "README.md"), "base\n");
+    git(root, ["add", "."]);
+    git(root, ["commit", "-m", "base"]);
+    const productBranch = "path-build/branchless";
+    git(root, ["checkout", "-b", productBranch]);
+    const productSha = gitHeadSha(root)!;
+
+    git(root, ["checkout", "-b", "unrelated-result"]);
+    writeFileSync(join(root, "result.txt"), "not adopted\n");
+    git(root, ["add", "."]);
+    git(root, ["commit", "-m", "unrelated result"]);
+    const sourceSha = gitHeadSha(root)!;
+    git(root, ["checkout", productBranch]);
+
+    const rejected = adoptEngineerResultIntoBuild({
+      runtimeRoot,
+      buildId: "build-branchless",
+      projectRoot: root,
+      productBranch,
+      taskId: "branchless-task",
+      sourceSha,
+    });
+    expect(rejected.ok).toBe(false);
+    expect(rejected.code).toBe("SOURCE_NOT_ADOPTED");
+
+    const accepted = adoptEngineerResultIntoBuild({
+      runtimeRoot,
+      buildId: "build-branchless",
+      projectRoot: root,
+      productBranch,
+      taskId: "branchless-task",
+      sourceSha: productSha,
+    });
+    expect(accepted.ok).toBe(true);
+    expect(accepted.mode).toBe("already_adopted");
+    expect(accepted.adoptedSha).toBe(productSha);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("visual completion requires browser evidence when not fake", async () => {
     const dir = mkdtempSync(join(tmpdir(), "path-vis-complete-"));
     const runtimeRoot = join(dir, "rt");
@@ -140,8 +285,11 @@ describe("S5 Build authoritative adoption", () => {
         taskId: "e1",
         dispatchState: "consumed",
         classification: "VERIFIED",
+        semanticProofAccepted: true,
+        intentRevision: build.intent.outcomeRevision,
+        authoritativeSha: "abc123",
         selectedAt: build.intent.revisedAt,
-        bindingId: build.projectBindings[0].bindingId,
+        bindingId: build.projectBindings[0]!.bindingId,
         actionId: "evaluate:1",
       },
       {
@@ -149,8 +297,11 @@ describe("S5 Build authoritative adoption", () => {
         taskId: "c1",
         dispatchState: "consumed",
         classification: "VERIFIED",
+        semanticProofAccepted: true,
+        intentRevision: build.intent.outcomeRevision,
+        authoritativeSha: "abc123",
         selectedAt: build.intent.revisedAt,
-        bindingId: build.projectBindings[0].bindingId,
+        bindingId: build.projectBindings[0]!.bindingId,
         actionId: "challenge:1",
       },
     ];

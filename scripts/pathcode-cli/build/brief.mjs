@@ -131,8 +131,14 @@ export function deriveProductBrief(outcome, opts = {}) {
   });
 
   return {
+    version: 1,
+    buildId: opts.buildId || null,
+    intentRevision: Number(opts.intentRevision) || 1,
+    revision: Number(opts.revision) || 0,
+    source: "mechanical",
     outcome: text,
     productKind,
+    summary: text.slice(0, 1_000),
     capabilities,
     visualRequirements: unique.filter((s) =>
       /hero|landing|render|visual|page|cta|call-to-action|design/i.test(s),
@@ -147,7 +153,11 @@ export function deriveProductBrief(outcome, opts = {}) {
       statement,
       required: true,
       source: i < 2 ? "default" : "derived",
+      evidenceKinds:
+        i === 0 ? ["check", "runtime"] : ["evaluation", "challenge"],
     })),
+    assumptions: [],
+    openQuestions: [],
     derivedAt: new Date().toISOString(),
   };
 }
@@ -167,4 +177,205 @@ export function briefToOutcomeCriteria(brief) {
     updatedAt: now,
     source: c.source || "derived",
   }));
+}
+
+const BRIEF_FENCE = /```(?:json|path-build-product-brief)?\s*([\s\S]*?)```/gi;
+const PRODUCT_KINDS = new Set([
+  "web",
+  "api",
+  "cli",
+  "desktop",
+  "mobile",
+  "service",
+  "multi_service",
+  "unknown",
+]);
+
+function stringList(value, limit = 40) {
+  if (!Array.isArray(value)) return null;
+  return value
+    .map((item) =>
+      typeof item === "string"
+        ? item
+        : item && typeof item.statement === "string"
+          ? item.statement
+          : "",
+    )
+    .filter((item) => item.trim())
+    .map((item) => item.trim().slice(0, 1_000))
+    .slice(0, limit);
+}
+
+/**
+ * Validate and normalize a cognitive ProductBrief envelope.
+ */
+export function validateProductBriefEnvelope(value, expected = {}) {
+  const errors = [];
+  if (!value || typeof value !== "object") {
+    return { ok: false, errors: ["envelope_required"], brief: null };
+  }
+  if (Number(value.version) !== 1) errors.push("version_invalid");
+  if (typeof value.buildId !== "string" || !value.buildId.trim()) {
+    errors.push("buildId_required");
+  } else if (expected.buildId && value.buildId !== expected.buildId) {
+    errors.push("buildId_mismatch");
+  }
+  if (!Number.isSafeInteger(value.intentRevision) || value.intentRevision < 1) {
+    errors.push("intentRevision_invalid");
+  } else if (
+    Number.isSafeInteger(expected.intentRevision) &&
+    value.intentRevision !== expected.intentRevision
+  ) {
+    errors.push("intentRevision_mismatch");
+  }
+  if (!PRODUCT_KINDS.has(value.productKind)) errors.push("productKind_invalid");
+  if (typeof value.summary !== "string" || !value.summary.trim()) {
+    errors.push("summary_required");
+  }
+  const functionalRequirements = stringList(value.functionalRequirements);
+  const visualRequirements = stringList(value.visualRequirements);
+  const nonFunctionalRequirements = stringList(value.nonFunctionalRequirements);
+  const constraints = stringList(value.constraints);
+  const assumptions = stringList(value.assumptions);
+  const openQuestions = stringList(value.openQuestions);
+  if (!functionalRequirements) errors.push("functionalRequirements_invalid");
+  if (!visualRequirements) errors.push("visualRequirements_invalid");
+  if (!nonFunctionalRequirements) errors.push("nonFunctionalRequirements_invalid");
+  if (!constraints) errors.push("constraints_invalid");
+  if (!assumptions) errors.push("assumptions_invalid");
+  if (!openQuestions) errors.push("openQuestions_invalid");
+  if (!Array.isArray(value.acceptanceCriteria) || value.acceptanceCriteria.length === 0) {
+    errors.push("acceptanceCriteria_required");
+  }
+  const acceptanceCriteria = [];
+  const ids = new Set();
+  for (const [index, criterion] of (value.acceptanceCriteria || []).entries()) {
+    const statement =
+      typeof criterion?.statement === "string" ? criterion.statement.trim() : "";
+    const evidenceKinds = stringList(criterion?.evidenceKinds, 12);
+    const id =
+      typeof criterion?.id === "string" && criterion.id.trim()
+        ? criterion.id.trim().slice(0, 120)
+        : slugId(statement);
+    if (!statement || !evidenceKinds?.length || ids.has(id)) {
+      errors.push(`acceptanceCriteria_${index}_invalid`);
+      continue;
+    }
+    ids.add(id);
+    acceptanceCriteria.push({
+      id,
+      statement: statement.slice(0, 2_000),
+      required: criterion.required !== false,
+      evidenceKinds,
+      source: "cognitive",
+    });
+  }
+  if (errors.length) return { ok: false, errors, brief: null };
+  return {
+    ok: true,
+    errors: [],
+    brief: {
+      version: 1,
+      buildId: value.buildId,
+      intentRevision: value.intentRevision,
+      revision: Number.isSafeInteger(value.revision)
+        ? value.revision
+        : Number(expected.revision) || 1,
+      source: "cognitive",
+      productKind: value.productKind,
+      summary: value.summary.trim().slice(0, 2_000),
+      functionalRequirements,
+      visualRequirements,
+      nonFunctionalRequirements,
+      constraints,
+      acceptanceCriteria,
+      assumptions,
+      openQuestions,
+      derivedAt: new Date().toISOString(),
+    },
+  };
+}
+
+export function parseProductBriefResult(reportText, expected = {}) {
+  const candidates = [];
+  let match;
+  const source = String(reportText || "");
+  while ((match = BRIEF_FENCE.exec(source))) {
+    try {
+      const parsed = JSON.parse(String(match[1] || "").trim());
+      if (parsed && typeof parsed === "object") candidates.push(parsed);
+    } catch {
+      // validation reports malformed/missing envelope below
+    }
+  }
+  for (const candidate of candidates) {
+    const validated = validateProductBriefEnvelope(candidate, expected);
+    if (validated.ok) return validated;
+    if (
+      validated.errors.includes("buildId_mismatch") ||
+      validated.errors.includes("intentRevision_mismatch")
+    ) {
+      return validated;
+    }
+  }
+  return {
+    ok: false,
+    errors: candidates.length ? ["brief_envelope_invalid"] : ["brief_envelope_missing"],
+    brief: null,
+  };
+}
+
+export function productBriefObjective(record) {
+  const bootstrap = record.productBrief || {};
+  return [
+    "PATH Build ProductBrief task — cognitive product interpretation only.",
+    "READ-ONLY. Do not edit product files.",
+    "Analyze the operator intent and produce a concrete, testable product brief.",
+    "This is a normal need-fit PATH fabric task; do not choose or rank providers.",
+    "Do not create or save a product_brief.json file. Do not use a brain/artifact path.",
+    "Your FINAL RESPONSE itself must be exactly one path-build-product-brief fenced JSON envelope.",
+    "Do not summarize the brief, mention a saved file, or add prose before or after the envelope.",
+    "Keep the complete envelope under 12,000 characters.",
+    "Requirement, constraint, assumption, and open-question arrays must contain concise strings, not objects.",
+    ...(record.productBriefError
+      ? [
+          `A prior cognitive attempt was rejected: ${(record.productBriefError.errors || []).join(", ")}.`,
+          "Correct that schema failure in this final response.",
+        ]
+      : []),
+    `Build ID: ${record.buildId}`,
+    `Intent revision: ${record.intent?.outcomeRevision}`,
+    `Outcome: ${record.intent?.outcome || ""}`,
+    `Mechanical bootstrap hint: ${bootstrap.productKind || "unknown"} — ${bootstrap.summary || ""}`,
+    "",
+    "Emit exactly one validated envelope:",
+    "```path-build-product-brief",
+    JSON.stringify(
+      {
+        version: 1,
+        buildId: record.buildId,
+        intentRevision: record.intent?.outcomeRevision,
+        revision: (Number(bootstrap.revision) || 0) + 1,
+        productKind: bootstrap.productKind || "unknown",
+        summary: "Concise product definition",
+        functionalRequirements: [],
+        visualRequirements: [],
+        nonFunctionalRequirements: [],
+        constraints: [],
+        acceptanceCriteria: [
+          {
+            id: "c-example",
+            statement: "Observable acceptance condition",
+            required: true,
+            evidenceKinds: ["evaluation", "challenge"],
+          },
+        ],
+        assumptions: [],
+        openQuestions: [],
+      },
+      null,
+      2,
+    ),
+    "```",
+  ].join("\n");
 }

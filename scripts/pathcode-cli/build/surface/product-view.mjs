@@ -9,6 +9,7 @@
  *   runtime?: object | null,
  *   artifact?: object | null,
  *   uiState?: string | null,
+ *   events?: object[],
  * }} [extras]
  */
 export function projectBuildForSurface(build, extras = {}) {
@@ -46,6 +47,7 @@ export function projectBuildForSurface(build, extras = {}) {
   const status = String(build.loop?.status || "unknown");
   const complete = status === "complete";
   const blocked = status === "blocked";
+  const paused = status === "paused";
   const binding = (build.projectBindings || [])[0] || null;
   const projectRoot = binding?.projectRoot || null;
   const kids = Array.isArray(build.children) ? build.children : [];
@@ -65,7 +67,13 @@ export function projectBuildForSurface(build, extras = {}) {
   /** @type {string | null} */
   let progressLabel = "Building…";
 
-  if (complete) {
+  if (paused) {
+    phase = "paused";
+    uiState = "paused";
+    headline = "Paused";
+    detail = "Engineering is paused. Resume to continue from durable state.";
+    progressLabel = "Paused";
+  } else if (complete) {
     phase = "complete";
     uiState = "ready";
     headline = "Ready";
@@ -159,13 +167,23 @@ export function projectBuildForSurface(build, extras = {}) {
         },
       ];
 
-  const activity = kids.slice(-12).map((c) => ({
-    kind: c.kind,
-    taskId: c.taskId,
-    dispatchState: c.dispatchState,
-    classification: c.classification || null,
-    at: c.consumedAt || c.dispatchedAt || c.selectedAt || null,
-  }));
+  const durableEvents = Array.isArray(extras.events) ? extras.events : [];
+  const activity = durableEvents.length
+    ? durableEvents.slice(-20).map((event) => ({
+        kind: event.type,
+        taskId: event.data?.taskId || null,
+        dispatchState: event.data?.status || null,
+        classification: event.data?.message || null,
+        at: event.at || null,
+        eventId: event.id,
+      }))
+    : kids.slice(-12).map((c) => ({
+        kind: c.kind,
+        taskId: c.taskId,
+        dispatchState: c.dispatchState,
+        classification: c.classification || null,
+        at: c.consumedAt || c.dispatchedAt || c.selectedAt || null,
+      }));
 
   return {
     ok: true,
@@ -203,6 +221,9 @@ export function projectBuildForSurface(build, extras = {}) {
     blockedReason: build.loop?.blockedReason || null,
     complete,
     canSteer: !blocked,
+    canStop: status === "running",
+    canResume: paused || blocked,
+    selectedElement: build.loop?.pendingSelectedElement || null,
     preview,
     runtime,
     artifact: artifact

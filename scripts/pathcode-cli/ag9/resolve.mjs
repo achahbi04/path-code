@@ -283,7 +283,10 @@ function lspMiseMap(langId) {
       npmPackage: "typescript-language-server",
     },
     python: { bins: ["basedpyright", "pyright", "pylsp"], miseTool: "pipx:pyright" },
-    go: { bins: ["gopls"], miseTool: "gopls" },
+    go: {
+      bins: ["gopls"],
+      miseTool: "go:golang.org/x/tools/gopls",
+    },
     rust: { bins: ["rust-analyzer"], miseTool: "rust-analyzer" },
     java: { bins: ["jdtls", "java-language-server"], eclipseJdtls: true },
     c_cpp: { bins: ["clangd"], miseTool: "llvm" },

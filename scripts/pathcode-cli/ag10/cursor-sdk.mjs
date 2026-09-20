@@ -579,7 +579,7 @@ export async function createCursorEngine(options) {
       const text =
         typeof result.result === "string"
           ? result.result
-          : narrationChunks.join("").slice(0, 8_000);
+          : narrationChunks.join("").slice(0, 32_000);
       const changedFiles = listChangedFiles(cwd, options.toolEnv);
 
       if (status === "cancelled") {
@@ -589,7 +589,7 @@ export async function createCursorEngine(options) {
             mode: "native_sdk",
             code: "CANCELLED",
             detail: "Cursor run cancelled",
-            text: text.slice(0, 8_000),
+            text: text.slice(0, 32_000),
             changedFiles,
             sessionId: activeAgentId,
             runId: typeof result.id === "string" ? result.id : null,
@@ -604,7 +604,7 @@ export async function createCursorEngine(options) {
             mode: "native_sdk",
             code: "SDK_FAILURE",
             detail: String(result.error || "Cursor run error").slice(0, 300),
-            text: text.slice(0, 8_000),
+            text: text.slice(0, 32_000),
             changedFiles,
             sessionId: activeAgentId,
             runId: typeof result.id === "string" ? result.id : null,
@@ -617,7 +617,7 @@ export async function createCursorEngine(options) {
         {
           ok: true,
           mode: "native_sdk",
-          text: text.slice(0, 8_000),
+          text: text.slice(0, 32_000),
           detail: "Cursor SDK turn completed",
           changedFiles,
           sessionId: activeAgentId,

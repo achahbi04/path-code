@@ -45,6 +45,18 @@ async function loadAg9() {
 }
 
 describe("G9 failure matrix — corrupt / cancel recovery", () => {
+  it("uses mise's Go backend identifier for gopls", async () => {
+    const { requirementToMiseSpec } = await loadAg9();
+    expect(
+      requirementToMiseSpec({
+        id: "lsp:go",
+        kind: "lsp",
+        miseTool: "go:golang.org/x/tools/gopls",
+        version: { version: "latest" },
+      }),
+    ).toBe("go:golang.org/x/tools/gopls@latest");
+  });
+
   it("classifies corrupt PATH-runtime binary as BROKEN", async () => {
     const { ensureAg9RuntimeDirs, classifyRequirement } = await loadAg9();
     const runtimeRoot = tmpFixture("corrupt-rt");

@@ -6,7 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { markTaskMerged } from "../result-lifecycle.mjs";
+import { adoptTaskResult } from "../result-lifecycle.mjs";
 import { resolveGitIdentity } from "../ag1/task-commit.mjs";
 
 /**
@@ -305,9 +305,23 @@ export function adoptEngineerResultIntoBuild(input) {
   // In-place / unversioned engineering: already on product tree — record adoption of HEAD.
   if (
     (!taskBranch || taskBranch === productBranch) &&
-    (!input.worktreePath || resolve(input.worktreePath) === root)
+    input.worktreePath &&
+    resolve(input.worktreePath) === root
   ) {
     const sha = gitHeadSha(root);
+    if (
+      sourceSha &&
+      (!gitObjectExists(root, sourceSha) ||
+        !sha ||
+        git(root, ["merge-base", "--is-ancestor", sourceSha, sha]).status !== 0)
+    ) {
+      return {
+        ok: false,
+        code: "SOURCE_NOT_ADOPTED",
+        message:
+          "In-place engineer source commit is not contained in product HEAD.",
+      };
+    }
     return {
       ok: true,
       mode: "inplace",
@@ -322,34 +336,41 @@ export function adoptEngineerResultIntoBuild(input) {
   }
 
   if (!taskBranch || !/^path\/task-/.test(taskBranch)) {
-    // No task branch — if sourceSha exists on primary, still record HEAD as adopted.
+    // A provider may omit task-branch metadata after the commit has already
+    // reached the product branch. Accept that shape only when Git proves the
+    // exact source commit is contained in current product HEAD.
     if (sourceSha) {
+      const adoptedSha = gitHeadSha(root);
+      if (
+        !gitObjectExists(root, sourceSha) ||
+        !adoptedSha ||
+        git(root, ["merge-base", "--is-ancestor", sourceSha, adoptedSha])
+          .status !== 0
+      ) {
+        return {
+          ok: false,
+          code: "SOURCE_NOT_ADOPTED",
+          message:
+            "Engineer source commit is not contained in the product branch.",
+        };
+      }
       return {
         ok: true,
-        mode: "sha_recorded",
+        mode: "already_adopted",
         buildId: input.buildId,
         taskId,
         sourceSha,
-        adoptedSha: gitHeadSha(root),
+        adoptedSha,
         productBranch,
         projectRoot: root,
         adoptedAt: new Date().toISOString(),
-        note: "no path/task-* branch; recorded current HEAD",
+        note: "no path/task-* branch; source commit already contained in HEAD",
       };
     }
     return {
       ok: false,
       code: "NO_TASK_BRANCH",
       message: "Engineer result has no adoptable path/task-* branch",
-    };
-  }
-
-  const dirty = git(root, ["status", "--porcelain=v1", "-uall"]);
-  if (dirty.status === 0 && String(dirty.stdout || "").trim()) {
-    return {
-      ok: false,
-      code: "PRIMARY_DIRTY",
-      message: "Cannot adopt: Build product tree is dirty",
     };
   }
 
@@ -363,67 +384,50 @@ export function adoptEngineerResultIntoBuild(input) {
     if (!recovered.ok) return recovered;
   }
 
-  const beforeSha = gitHeadSha(root);
-  const merged = git(root, ["merge", "--no-edit", taskBranch]);
-  if (merged.status !== 0) {
-    // Attempt abort to leave tree clean
-    git(root, ["merge", "--abort"]);
-    return {
-      ok: false,
-      code: "MERGE_FAILED",
-      message: (merged.stderr || merged.stdout || "git merge failed").trim(),
-      beforeSha,
-    };
-  }
-
-  const adoptedSha = gitHeadSha(root);
-
-  // Honest empty adoption: claimed engineer SHA never landed in the product tree.
-  if (
-    sourceSha &&
-    beforeSha &&
-    adoptedSha &&
-    beforeSha === adoptedSha &&
-    sourceSha !== adoptedSha &&
-    !gitObjectExists(root, sourceSha)
-  ) {
-    return {
-      ok: false,
-      code: "EMPTY_ADOPTION",
-      message:
-        "Adoption merge did not advance HEAD and the engineer commit is still missing from the Build repo.",
-      beforeSha,
-      sourceSha,
-      adoptedSha,
-    };
-  }
-
-  if (isEmptyProductTree(root) && sourceSha && sourceSha !== adoptedSha) {
-    return {
-      ok: false,
-      code: "EMPTY_PRODUCT_TREE",
-      message:
-        "Adoption left an empty Build product tree (no files beyond .git). Engineer result was not applied.",
-      beforeSha,
-      sourceSha,
-      adoptedSha,
-    };
-  }
-
-  try {
-    markTaskMerged({
-      runtimeRoot: input.runtimeRoot,
-      projectRoot: root,
-      entry: {
-        taskId,
-        branch: taskBranch,
-        sha: sourceSha || adoptedSha,
-        worktreePath: input.worktreePath || null,
-      },
-    });
-  } catch {
-    /* best-effort lifecycle mark */
-  }
+  const adopted = adoptTaskResult({
+    runtimeRoot: input.runtimeRoot,
+    projectRoot: root,
+    sourceRef: taskBranch,
+    requireAdoptable: false,
+    entry: {
+      taskId,
+      branch: taskBranch,
+      sha: sourceSha,
+      worktreePath: input.worktreePath || null,
+    },
+    validateResult({ beforeSha, adoptedSha }) {
+      if (
+        sourceSha &&
+        adoptedSha &&
+        git(root, ["merge-base", "--is-ancestor", sourceSha, adoptedSha])
+          .status !== 0
+      ) {
+        return {
+          ok: false,
+          code: "EMPTY_ADOPTION",
+          message:
+            "Adoption did not include the authoritative engineer commit.",
+        };
+      }
+      if (isEmptyProductTree(root) && sourceSha && sourceSha !== adoptedSha) {
+        return {
+          ok: false,
+          code: "EMPTY_PRODUCT_TREE",
+          message:
+            "Adoption left an empty Build product tree (no files beyond .git).",
+        };
+      }
+      if (sourceSha && beforeSha === adoptedSha && sourceSha !== adoptedSha) {
+        return {
+          ok: false,
+          code: "EMPTY_ADOPTION",
+          message: "Adoption did not advance or include the engineer result.",
+        };
+      }
+      return { ok: true };
+    },
+  });
+  if (!adopted.ok) return adopted;
 
   return {
     ok: true,
@@ -431,8 +435,8 @@ export function adoptEngineerResultIntoBuild(input) {
     buildId: input.buildId,
     taskId,
     sourceSha: sourceSha || null,
-    adoptedSha,
-    beforeSha,
+    adoptedSha: adopted.adoptedSha,
+    beforeSha: adopted.beforeSha,
     productBranch,
     projectRoot: root,
     taskBranch,

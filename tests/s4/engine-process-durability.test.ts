@@ -62,6 +62,84 @@ function tmpGitRepo() {
 }
 
 describe("S4.2 engine/process durability", () => {
+  it("reconstructs and restarts dedicated static Build runtimes by pid+startKey", async () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "s42-build-runtime-"));
+    const projectRoot = mkdtempSync(join(tmpdir(), "s42-static-product-"));
+    temps.push(runtimeRoot, projectRoot);
+    writeFileSync(join(projectRoot, "index.html"), "<h1>durable preview</h1>");
+    const { createBuildRuntimeManager } = await load(
+      join(CLI, "build/runtime/manager.mjs"),
+    );
+    const buildId = `build-${randomUUID()}`;
+    const context = {
+      bindingId: "binding-1",
+      outcomeHint: "Build a web page",
+      authoritativeSha: "authoritative-sha-1",
+      descriptor: { buildId, kind: "static-product" },
+      restartAllowed: true,
+    };
+    const first = createBuildRuntimeManager({ runtimeRoot });
+    const started = await first.start(buildId, projectRoot, context);
+    expect(started.ok).toBe(true);
+    expect(started.runtime.mode).toBe("static");
+    expect(started.runtime.pid).toBeTypeOf("number");
+    expect(started.runtime.startKey).toBeTruthy();
+
+    const restartedHost = createBuildRuntimeManager({ runtimeRoot });
+    const reconstructed = await restartedHost.inspect(buildId);
+    expect(reconstructed.live).toBe(true);
+    expect(reconstructed.runtime.pid).toBe(started.runtime.pid);
+    expect(reconstructed.runtime.startKey).toBe(started.runtime.startKey);
+    expect(reconstructed.runtime.authoritativeSha).toBe("authoritative-sha-1");
+    expect(reconstructed.runtime.descriptor).toEqual(
+      expect.objectContaining({ kind: "static-product" }),
+    );
+
+    process.kill(started.runtime.pid, "SIGKILL");
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const thirdHost = createBuildRuntimeManager({ runtimeRoot });
+    const recovered = await thirdHost.reconcile(
+      buildId,
+      projectRoot,
+      context,
+    );
+    expect(recovered.ok).toBe(true);
+    expect(recovered.runtime.pid).not.toBe(started.runtime.pid);
+    expect(recovered.runtime.startKey).toBeTruthy();
+    expect(recovered.runtime.authoritativeSha).toBe("authoritative-sha-1");
+    await thirdHost.stop(buildId);
+
+    const reusedId = `build-${randomUUID()}`;
+    writeFileSync(
+      join(
+        runtimeRoot,
+        "metadata",
+        "build-runtimes",
+        `${reusedId}.runtime.json`,
+      ),
+      JSON.stringify({
+        runtimeId: "forged-reused-pid",
+        buildId: reusedId,
+        projectRoot,
+        status: "ready",
+        mode: "static",
+        url: "http://127.0.0.1:1/",
+        pid: process.pid,
+        startKey: "ps:1:Not The Current Process",
+        authoritativeSha: "authoritative-sha-reused",
+        descriptor: { buildId: reusedId, kind: "static-product" },
+        restartAllowed: false,
+      }),
+    );
+    const reused = await thirdHost.inspect(reusedId);
+    expect(reused.live).toBe(false);
+    expect(reused.runtime.status).toBe("stale");
+    expect(reused.runtime.staleReason).toBe("dead_or_reused_pid");
+    expect(reused.runtime.authoritativeSha).toBe(
+      "authoritative-sha-reused",
+    );
+  });
+
   it("records process startKey and treats PID-mismatch as stale lock", async () => {
     const { captureProcessIdentity, processMatchesIdentity } = await load(
       join(CLI, "process-identity.mjs"),

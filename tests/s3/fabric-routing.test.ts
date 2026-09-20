@@ -53,6 +53,26 @@ describe("S3.2 fabric routing", () => {
     expect(assess.needs).toContain("assessment");
   });
 
+  it("routes ProductBrief cognition as a normal assessment need", async () => {
+    const { inferTurnNeeds, explainEngineSelection } = await load(
+      join(AG10, "engine-contract.mjs"),
+    );
+    const inferred = inferTurnNeeds({
+      role: "collab",
+      objective:
+        "ProductBrief task. READ-ONLY: analyze intent and report a structured brief.",
+    });
+    expect(inferred.needs).toContain("assessment");
+    const selected = explainEngineSelection({
+      role: "collab",
+      ready: { antigravity: true, copilot: true, cursor: true },
+      needs: inferred.needs,
+      preferContinuity: false,
+    });
+    expect(selected.candidates.length).toBeGreaterThan(1);
+    expect(selected.reason).not.toMatch(/provider|hierarchy|rank/i);
+  });
+
   it("routes inflight-steer needs to Cursor when ready", async () => {
     const { explainEngineSelection } = await load(
       join(AG10, "engine-contract.mjs"),

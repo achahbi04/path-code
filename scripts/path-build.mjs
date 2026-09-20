@@ -14,12 +14,21 @@
 
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 
 import { resolvePathPackageRoot, resolvePathRuntimeRoot } from "./pathcode-cli/paths.mjs";
 import { startPathBuildSurface } from "./pathcode-cli/build/surface/server.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+function packageVersion() {
+  try {
+    const pkg = JSON.parse(readFileSync(join(HERE, "..", "package.json"), "utf8"));
+    return typeof pkg.version === "string" ? pkg.version : "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
 
 function printHelp() {
   process.stdout.write(
@@ -53,7 +62,7 @@ export async function runPathBuildMain(argv = process.argv.slice(2)) {
     return 0;
   }
   if (argv.includes("--version") || argv.includes("-v")) {
-    process.stdout.write("path-build 1.0.1-s5-surface\n");
+    process.stdout.write(`path-build ${packageVersion()}\n`);
     return 0;
   }
 

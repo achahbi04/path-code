@@ -109,6 +109,7 @@ describe("B1 Part 1 — honest greenfield origin (F1–F3)", () => {
 
     const refuse = assertAllowedProjectRoot(home);
     expect(refuse.ok).toBe(false);
+    if (refuse.ok) return;
     expect(refuse.code).toMatch(/HOME/);
 
     const controller = createBuildController({
@@ -223,7 +224,8 @@ describe("B1 Part 1 — honest greenfield origin (F1–F3)", () => {
       };
       expect(open.status).toBe(200);
       expect(openBody.ok).toBe(true);
-      expect(canon(openBody.path)).toBe(bound);
+      expect(openBody.path).toBeDefined();
+      expect(canon(openBody.path!)).toBe(bound);
       expect(openBody.launched).toBe(true);
     } finally {
       await surface.stop();

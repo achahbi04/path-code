@@ -8,6 +8,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   registerProcess,
@@ -15,11 +16,15 @@ import {
   markProcessEnded,
   isProcessRecordAlive,
 } from "../../process-registry.mjs";
+import { processMatchesIdentity } from "../../process-identity.mjs";
 import {
   detectBuildArtifact,
   resolveArtifactStartPlan,
 } from "./artifact.mjs";
-import { startStaticPreviewServer } from "./static-serve.mjs";
+
+const STATIC_SERVER_MAIN = fileURLToPath(
+  new URL("./static-server-main.mjs", import.meta.url),
+);
 
 /**
  * @param {number} [from]
@@ -153,6 +158,57 @@ export function createBuildRuntimeManager(opts) {
   }
 
   /**
+   * Reconstruct a live runtime after the coordinator host restarts. A PID is
+   * accepted only when its recorded start identity still matches.
+   * @param {string} buildId
+   */
+  function hydrate(buildId) {
+    if (live.has(buildId)) return live.get(buildId);
+    const state = loadPersisted(buildId);
+    if (!state || !["ready", "starting", "unhealthy"].includes(state.status)) {
+      return null;
+    }
+    if (
+      typeof state.pid !== "number" ||
+      !state.startKey ||
+      !processMatchesIdentity(state.pid, state.startKey)
+    ) {
+      persist(buildId, {
+        ...state,
+        status: "stale",
+        health: "down",
+        staleReason:
+          typeof state.pid === "number" ? "dead_or_reused_pid" : "missing_process_identity",
+        reconciledAt: new Date().toISOString(),
+      });
+      return null;
+    }
+    const proc = registerProcess({
+      id: state.processId,
+      taskId: state.ownerTaskId || `build-runtime:${buildId}`,
+      kind: "build_preview_runtime",
+      command: state.command || "",
+      pid: state.pid,
+      startKey: state.startKey,
+      startedAt: state.startedAt,
+      runtimeRoot,
+    });
+    const entry = {
+      ...state,
+      processRecord: proc,
+      ownerTaskId: state.ownerTaskId || `build-runtime:${buildId}`,
+      plan: {
+        kind: state.mode === "static" ? "static" : "spawn",
+      },
+      stdout: "",
+      stderr: "",
+      artifact: state.artifact || null,
+    };
+    live.set(buildId, entry);
+    return entry;
+  }
+
+  /**
    * @param {string} buildId
    * @param {string} projectRoot
    * @param {{ bindingId?: string, outcomeHint?: string }} [ctx]
@@ -169,7 +225,7 @@ export function createBuildRuntimeManager(opts) {
    * @param {string} buildId
    */
   async function stop(buildId) {
-    const cur = live.get(buildId);
+    const cur = live.get(buildId) || hydrate(buildId);
     if (!cur) {
       const persisted = loadPersisted(buildId);
       if (persisted) {
@@ -181,15 +237,23 @@ export function createBuildRuntimeManager(opts) {
       }
       return { ok: true, stopped: false };
     }
-    try {
-      if (cur.staticHandle?.stop) await cur.staticHandle.stop();
-    } catch {
-      /* ignore */
-    }
     if (cur.processRecord?.id) {
       try {
         if (cur.processRecord.child) {
           killProcessTree(cur.processRecord.child, "SIGTERM");
+        } else if (
+          typeof cur.processRecord.pid === "number" &&
+          isProcessRecordAlive(cur.processRecord)
+        ) {
+          try {
+            if (process.platform !== "win32") {
+              process.kill(-cur.processRecord.pid, "SIGTERM");
+            } else {
+              process.kill(cur.processRecord.pid, "SIGTERM");
+            }
+          } catch {
+            process.kill(cur.processRecord.pid, "SIGTERM");
+          }
         }
         markProcessEnded(cur.processRecord.id, { cleanup: "ok" });
       } catch {
@@ -202,6 +266,12 @@ export function createBuildRuntimeManager(opts) {
       buildId,
       bindingId: cur.bindingId,
       projectRoot: cur.projectRoot,
+      authoritativeSha: cur.authoritativeSha || null,
+      descriptor: cur.descriptor || null,
+      artifact: cur.artifact || null,
+      restartAllowed: cur.restartAllowed !== false,
+      pid: cur.processRecord?.pid || cur.pid || null,
+      startKey: cur.processRecord?.startKey || cur.startKey || null,
       status: "stopped",
       stoppedAt: new Date().toISOString(),
     };
@@ -212,10 +282,17 @@ export function createBuildRuntimeManager(opts) {
   /**
    * @param {string} buildId
    * @param {string} projectRoot
-   * @param {{ bindingId?: string, outcomeHint?: string, forceRestart?: boolean }} [ctx]
+   * @param {{
+   *   bindingId?: string,
+   *   outcomeHint?: string,
+   *   forceRestart?: boolean,
+   *   authoritativeSha?: string | null,
+   *   descriptor?: object | null,
+   *   restartAllowed?: boolean,
+   * }} [ctx]
    */
   async function start(buildId, projectRoot, ctx = {}) {
-    const existing = live.get(buildId);
+    const existing = live.get(buildId) || hydrate(buildId);
     if (existing && !ctx.forceRestart) {
       const health = await inspect(buildId);
       if (health.ok && health.runtime?.status === "ready") {
@@ -268,8 +345,10 @@ export function createBuildRuntimeManager(opts) {
       stdout: "",
       stderr: "",
       processRecord: null,
-      staticHandle: null,
       ownerTaskId,
+      authoritativeSha: ctx.authoritativeSha || null,
+      descriptor: ctx.descriptor || null,
+      restartAllowed: ctx.restartAllowed !== false,
     };
 
     if (plan.kind === "none") {
@@ -289,36 +368,25 @@ export function createBuildRuntimeManager(opts) {
       port,
       url: entry.url,
       startedAt: entry.startedAt,
-      command: plan.cmd ? `${plan.cmd} ${plan.args.join(" ")}` : "static",
+      command:
+        plan.kind === "static"
+          ? `${process.execPath} ${STATIC_SERVER_MAIN} ${plan.cwd || root} ${port}`
+          : `${plan.cmd} ${plan.args.join(" ")}`,
+      authoritativeSha: entry.authoritativeSha,
+      descriptor: entry.descriptor,
+      artifact,
+      restartAllowed: entry.restartAllowed,
     });
 
     try {
-      if (plan.kind === "static") {
-        const staticRoot = plan.cwd || root;
-        const handle = await startStaticPreviewServer(staticRoot, port);
-        entry.staticHandle = handle;
-        entry.url = handle.url;
-        entry.port = handle.port;
-        entry.status = "ready";
-        entry.health = "ok";
-        entry.staticRoot = staticRoot;
-        persist(buildId, {
-          runtimeId,
-          buildId,
-          bindingId: entry.bindingId,
-          projectRoot: root,
-          staticRoot,
-          status: "ready",
-          port: entry.port,
-          url: entry.url,
-          mode: "static",
-          startedAt: entry.startedAt,
-          command: "static-serve",
-        });
-        return { ok: true, runtime: snapshot(entry), artifact };
-      }
-
-      const child = spawn(plan.cmd, plan.args, {
+      const staticRoot = plan.kind === "static" ? plan.cwd || root : null;
+      const command =
+        plan.kind === "static" ? process.execPath : plan.cmd;
+      const args =
+        plan.kind === "static"
+          ? [STATIC_SERVER_MAIN, staticRoot, String(port)]
+          : plan.args;
+      const child = spawn(command, args, {
         cwd: root,
         env: {
           ...process.env,
@@ -334,11 +402,19 @@ export function createBuildRuntimeManager(opts) {
       const proc = registerProcess({
         taskId: ownerTaskId,
         kind: "build_preview_runtime",
-        command: `${plan.cmd} ${plan.args.join(" ")}`.slice(0, 500),
+        command: `${command} ${args.join(" ")}`.slice(0, 500),
         child,
         runtimeRoot,
       });
       entry.processRecord = proc;
+      persist(buildId, {
+        ...snapshot(entry),
+        status: "starting",
+        command: `${command} ${args.join(" ")}`,
+        mode: plan.kind === "static" ? "static" : "spawn",
+        staticRoot,
+        artifact,
+      });
 
       const onData = (buf, stream) => {
         const chunk = buf.toString("utf8");
@@ -399,10 +475,17 @@ export function createBuildRuntimeManager(opts) {
         status: "ready",
         port: entry.port,
         url: entry.url,
-        mode: "spawn",
-        command: `${plan.cmd} ${plan.args.join(" ")}`,
+        command: `${command} ${args.join(" ")}`,
         processId: proc.id,
         pid: proc.pid,
+        startKey: proc.startKey,
+        ownerTaskId,
+        staticRoot,
+        mode: plan.kind === "static" ? "static" : "spawn",
+        authoritativeSha: entry.authoritativeSha,
+        descriptor: entry.descriptor,
+        artifact,
+        restartAllowed: entry.restartAllowed,
         startedAt: entry.startedAt,
       });
       return { ok: true, runtime: snapshot(entry), artifact };
@@ -439,6 +522,11 @@ export function createBuildRuntimeManager(opts) {
       health: entry.health || null,
       processId: entry.processRecord?.id || null,
       pid: entry.processRecord?.pid || null,
+      startKey: entry.processRecord?.startKey || entry.startKey || null,
+      ownerTaskId: entry.ownerTaskId || null,
+      authoritativeSha: entry.authoritativeSha || null,
+      descriptor: entry.descriptor || null,
+      restartAllowed: entry.restartAllowed !== false,
       artifactKind: entry.artifact?.kind || null,
       framework: entry.artifact?.framework || null,
       error: entry.error || null,
@@ -453,7 +541,7 @@ export function createBuildRuntimeManager(opts) {
    * @param {string} buildId
    */
   async function inspect(buildId) {
-    const entry = live.get(buildId);
+    const entry = live.get(buildId) || hydrate(buildId);
     if (entry) {
       if (entry.status === "ready" && entry.url) {
         const health = await waitForHttpReady(entry.url, 3_000);
@@ -471,7 +559,7 @@ export function createBuildRuntimeManager(opts) {
     }
     return {
       ok: true,
-      runtime: { ...persisted, status: persisted.status === "ready" ? "stale" : persisted.status },
+      runtime: persisted,
       live: false,
     };
   }
@@ -521,6 +609,32 @@ export function createBuildRuntimeManager(opts) {
     return start(buildId, projectRoot, { ...ctx, forceRestart: true });
   }
 
+  /**
+   * Restore a persisted runtime if its identity is live, otherwise restart it
+   * only when the persisted policy allows.
+   */
+  async function reconcile(buildId, projectRoot, ctx = {}) {
+    const persisted = loadPersisted(buildId);
+    const restored = hydrate(buildId);
+    if (restored) return inspect(buildId);
+    if (
+      persisted &&
+      ["ready", "starting", "unhealthy", "stale", "exited"].includes(
+        persisted.status,
+      ) &&
+      persisted.restartAllowed !== false
+    ) {
+      return start(buildId, projectRoot, {
+        ...ctx,
+        authoritativeSha:
+          persisted.authoritativeSha ?? ctx.authoritativeSha ?? null,
+        descriptor: persisted.descriptor ?? ctx.descriptor ?? null,
+        restartAllowed: true,
+      });
+    }
+    return { ok: true, runtime: persisted, live: false, restarted: false };
+  }
+
   async function stopAll() {
     const ids = [...live.keys()];
     for (const id of ids) {
@@ -540,6 +654,7 @@ export function createBuildRuntimeManager(opts) {
     start,
     stop,
     refresh,
+    reconcile,
     inspect,
     getPreviewDescriptor,
     getLiveTarget,

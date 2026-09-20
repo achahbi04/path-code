@@ -50,7 +50,7 @@ export const LSP_SERVERS = Object.freeze({
   },
   go: {
     bins: ["gopls"],
-    miseTool: "gopls",
+    miseTool: "go:golang.org/x/tools/gopls",
   },
   rust: {
     bins: ["rust-analyzer"],

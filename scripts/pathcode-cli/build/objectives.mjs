@@ -45,14 +45,12 @@ export function frameEngineerObjective(record, gap) {
       ].join("\n")
     : "Continue engineering toward the outcome with project-native validation.";
 
-  const lastUser = [...(record.conversation || [])]
-    .reverse()
-    .find((m) => m.role === "user" && m.element);
-  const selectionBlock = lastUser?.element
+  const selectedElement = record.loop?.pendingSelectedElement || null;
+  const selectionBlock = selectedElement
     ? [
         "",
-        "Operator selected a preview element — prioritize editing that source/render target:",
-        JSON.stringify(lastUser.element).slice(0, 1_500),
+        "Operator selected this exact preview element payload. Use it as DOM/render context; do not infer a source file unless project evidence proves that mapping:",
+        JSON.stringify(selectedElement),
       ].join("\n")
     : "";
 
@@ -86,21 +84,21 @@ export function frameEvaluateObjective(record, opts = {}) {
     "PATH Build evaluate task — assessment only.",
     "READ-ONLY assessment. Do not modify, change, edit, write, or alter product files.",
     "Disposable probes must be revertible if absolutely required; prefer inspection of existing FS/Git/tests/reports.",
+    "Inspect the current task worktree's HTML/CSS/source and run read-only checks when browser evidence alone is insufficient.",
+    "The absolute productRoot is provenance; use the current task worktree for file inspection.",
     "",
     intentBlock(record),
     "",
     "Determine:",
     "1) What currently exists toward the outcome",
     "2) What remains missing",
-    "3) Status of each criterion/requirement: PROVEN/SATISFIED, UNMET/VIOLATED, or UNKNOWN",
+    "3) Criterion status must be exactly PROVEN, UNMET, or UNKNOWN; requirement status must be exactly SATISFIED, VIOLATED, or UNKNOWN",
     "4) Whether architecture/gap hypotheses remain valid",
     "5) The single highest-value next engineering action",
     "",
-    "Emit machine-readable lines (required):",
-    "CRITERION <id>: PROVEN|UNMET|UNKNOWN — <evidence note>",
-    "REQUIREMENT <id>: SATISFIED|VIOLATED|UNKNOWN — <evidence note>",
-    "NEXT: <proposed engineer objective>",
-    "HYPOTHESIS: <updated architecture/gap notes>",
+    "Your final response must contain only the structured path-build-evaluation envelope below.",
+    "Do not add prose or legacy CRITERION/REQUIREMENT lines outside the envelope.",
+    "Keep each reason concise (maximum 160 characters) and the entire envelope under 12,000 characters.",
     opts.evidencePackage
       ? `\nCross-binding evidence package:\n${opts.evidencePackage}`
       : "",
@@ -120,20 +118,16 @@ export function frameChallengeObjective(record, claim, opts = {}) {
     "PATH Build challenge task — assessment only.",
     "READ-ONLY challenge. Do not modify, change, edit, write, or alter product files except disposable revertible probes.",
     "Attempt to FALSIFY the claim using real FS/Git/runtime/test/report evidence.",
+    "Inspect the current task worktree directly; treat the absolute productRoot only as provenance.",
     "",
     intentBlock(record),
     "",
     "Claim to falsify:",
     claim,
     "",
-    "Return exactly one of:",
-    "CLAIM STANDS — with concrete evidence refs",
-    "CLAIM FALSIFIED — with concrete counter-evidence",
-    "EVIDENCE INSUFFICIENT — what is missing",
-    "",
-    "Also emit machine-readable lines:",
-    "CRITERION <id>: PROVEN|UNMET|UNKNOWN — … (if claim maps to a criterion)",
-    "REQUIREMENT <id>: SATISFIED|VIOLATED|UNKNOWN — … (if applicable)",
+    "Your final response must contain only the structured path-build-challenge envelope below.",
+    "Do not add prose or legacy CLAIM/CRITERION/REQUIREMENT lines outside the envelope.",
+    "Keep each reason concise (maximum 160 characters) and the entire envelope under 12,000 characters.",
     opts.preferPeerHint
       ? "Prefer independent verification against FS/Git/tests over trusting prior engineer narrative."
       : "",

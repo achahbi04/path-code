@@ -15,6 +15,7 @@ describe("S5 Build handoff", () => {
       launcherPath: join(tmpdir(), "missing-launcher.mjs"),
     });
     expect(r.ok).toBe(false);
+    if (r.ok) return;
     expect(r.code).toBe("PATH_REQUIRED");
   });
 
@@ -35,6 +36,7 @@ describe("S5 Build handoff", () => {
       launcherPath: launcher,
     });
     expect(r.ok).toBe(true);
+    if (!r.ok) return;
     expect(r.projectRoot).toBe(project);
     expect(r.method).toBeTruthy();
     // On macOS this should be Terminal.app

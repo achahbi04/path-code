@@ -1,9 +1,9 @@
 /**
  * @typedef {'PROVEN'|'UNMET'|'UNKNOWN'} CriterionStatus
  * @typedef {'SATISFIED'|'VIOLATED'|'UNKNOWN'} RequirementStatus
- * @typedef {'engineer'|'evaluate'|'challenge'} BuildTaskKind
+ * @typedef {'brief'|'engineer'|'evaluate'|'challenge'} BuildTaskKind
  * @typedef {'selected'|'dispatched'|'terminal_seen'|'consumed'} ChildDispatchState
- * @typedef {'running'|'blocked'|'complete'} BuildLoopStatus
+ * @typedef {'running'|'paused'|'blocked'|'complete'} BuildLoopStatus
  *
  * @typedef {object} EvidenceRef
  * @property {'git'|'fs'|'check'|'runtime'|'report'|'validation'} kind
@@ -82,6 +82,9 @@
  * @property {string} [selectedAt]
  * @property {string} [dispatchedAt]
  * @property {string} [consumedAt]
+ * @property {number} [intentRevision]
+ * @property {string|null} [authoritativeSha]
+ * @property {boolean} [semanticProofAccepted]
  *
  * @typedef {object} BuildHypotheses
  * @property {string} [architectureNotes]
@@ -119,8 +122,10 @@
  * @property {BuildLoop} loop
  * @property {OriginKind} [originKind]
  * @property {object} [productBrief]
+ * @property {'caller'} [criteriaAuthority]
  * @property {ConversationMessage[]} [conversation]
  * @property {string} [productBranch]
+ * @property {{ autoRun: boolean, owner: string }} [coordinator]
  * @property {string} createdAt
  * @property {string} updatedAt
  */

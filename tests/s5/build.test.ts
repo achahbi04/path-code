@@ -27,16 +27,15 @@ import {
   readBuildRecord,
   parseStatusDirectives,
   realityRefreshDepthA,
+  frameEngineerObjective,
   frameEvaluateObjective,
   mechanicalProbeBinding,
 } from "../../scripts/pathcode-cli/build/index.mjs";
 import { isReadOnlyAssessmentObjective } from "../../scripts/pathcode-cli/ag1/task-worktree.mjs";
 
 describe("S5 PATH Build", () => {
-  /** @type {string} */
-  let dir;
-  /** @type {string} */
-  let runtimeRoot;
+  let dir: string;
+  let runtimeRoot: string;
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "path-s5-"));
@@ -93,7 +92,9 @@ describe("S5 PATH Build", () => {
     rec.intent.explicitRequirements.push({
       id: "req-1",
       statement: "Must run locally",
+      required: true,
       status: "UNKNOWN",
+      evidence: [],
     });
     rec.outcomeCriteria.push({
       id: "c1",
@@ -155,7 +156,7 @@ describe("S5 PATH Build", () => {
       },
     });
     expect(demoted).toContain("c1");
-    expect(rec.outcomeCriteria[0].status).toBe("UNKNOWN");
+    expect(rec.outcomeCriteria[0]!.status).toBe("UNKNOWN");
   });
 
   it("parseStatusDirectives reads criterion lines", () => {
@@ -223,9 +224,10 @@ describe("S5 PATH Build", () => {
 
     // Idempotent consume
     const child = ran.build.children[0];
+    expect(child).toBeDefined();
     const again = await controller.consumeChildResult(
       started.build.buildId,
-      child.taskId,
+      child!.taskId,
     );
     expect(again.deduped).toBe(true);
   },
@@ -270,14 +272,97 @@ describe("S5 PATH Build", () => {
     rec = revised.build;
     expect(rec.intent.outcomeRevision).toBeGreaterThan(1);
     expect(rec.loop.status).toBe("running");
+    expect(rec.productBrief?.intentRevision).toBe(rec.intent.outcomeRevision);
+    expect(rec.productBrief?.stale).toBe(true);
+    expect(rec.outcomeCriteria.every((c) => c.status === "UNKNOWN")).toBe(true);
     expect(
       rec.intent.explicitRequirements.some((r) =>
         /offline/i.test(r.statement),
       ),
     ).toBe(true);
+    const reran = await controller.runUntilDone(started.build.buildId, {
+      maxSteps: 8,
+    });
+    expect(reran.done).toBe(true);
+    expect(reran.build.intent.outcomeRevision).toBe(rec.intent.outcomeRevision);
+    const changed = await controller.applyConversation(started.build.buildId, {
+      message: "Make the product output friendlier",
+    });
+    expect(changed.ok).toBe(true);
+    expect(changed.build.loop.status).toBe("running");
+    expect(changed.build.productBrief?.intentRevision).toBe(
+      changed.build.intent.outcomeRevision,
+    );
+    expect(
+      changed.build.outcomeCriteria.every((c) => c.status === "UNKNOWN"),
+    ).toBe(true);
+    const changedRun = await controller.runUntilDone(started.build.buildId, {
+      maxSteps: 8,
+    });
+    expect(changedRun.done).toBe(true);
   },
     60_000,
   );
+
+  it("persists selected element exactly for the next engineer objective", async () => {
+    const target = join(dir, "selected-element");
+    const controller = createBuildController({
+      runtimeRoot,
+      fakeMode: true,
+      gateway: {
+        async bindProject() {
+          return { ok: true };
+        },
+        async startTask() {
+          return { ok: true };
+        },
+        async awaitTask() {
+          return {};
+        },
+      },
+    });
+    const started = await controller.startBuild("Build a small web page", {
+      targetDir: target,
+      initialCriteria: [
+        { id: "c-runnable", statement: "runnable", required: true },
+        { id: "c-outcome", statement: "outcome", required: true },
+      ],
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    const supplied = {
+      buildId: started.build.buildId,
+      tag: "h1",
+      text: "Original title",
+      selector: "main > h1",
+      rect: { x: 1, y: 2, width: 300, height: 40 },
+      sourceFile: "invented.tsx",
+      sourceHint: "also-invented",
+    };
+    const changed = await controller.applyConversation(started.build.buildId, {
+      message: "Make this title warmer",
+      element: supplied,
+    });
+    expect(changed.ok).toBe(true);
+    const record = readBuildRecord(runtimeRoot, started.build.buildId);
+    expect(record).not.toBeNull();
+    if (!record) return;
+    const persisted = record.loop.pendingSelectedElement;
+    expect(persisted).toBeTruthy();
+    if (!persisted) return;
+    expect(persisted.sourceFile).toBeUndefined();
+    expect(persisted.sourceHint).toBeUndefined();
+    const objective = frameEngineerObjective(record, "Apply the change.");
+    expect(objective).toContain(JSON.stringify(persisted));
+
+    await controller.tick(started.build.buildId);
+    const after = readBuildRecord(runtimeRoot, started.build.buildId);
+    expect(after).not.toBeNull();
+    if (!after) return;
+    const engineer = [...after.children].reverse().find((c) => c.kind === "engineer");
+    expect(engineer?.objective).toContain(JSON.stringify(persisted));
+    expect(after.loop.pendingSelectedElement).toBeNull();
+  });
 
   it("mechanical probe: README requirement satisfied from README.md", () => {
     const target = join(dir, "readme-req");
@@ -306,7 +391,37 @@ describe("S5 PATH Build", () => {
       bindingId: origin.binding.bindingId,
     });
     expect(probe.ok).toBe(true);
-    expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
+    expect(rec.intent.explicitRequirements[0]!.status).toBe("SATISFIED");
+  });
+
+  it("mechanical text and filenames do not prove semantic criteria", () => {
+    const target = join(dir, "semantic-proof");
+    const origin = ensureBuildOrigin({ targetDir: target });
+    expect(origin.ok).toBe(true);
+    if (!origin.ok) return;
+    writeFileSync(
+      join(origin.binding.projectRoot, "package.json"),
+      JSON.stringify({ scripts: { test: "node -e \"process.exit(0)\"" } }),
+    );
+    writeFileSync(
+      join(origin.binding.projectRoot, "index.html"),
+      "<h1>Emergency response</h1><button>Get help</button>",
+    );
+    const rec = createBuildRecordSkeleton({ outcome: "Emergency response site" });
+    rec.projectBindings.push(origin.binding);
+    rec.outcomeCriteria.push({
+      id: "c-semantic",
+      statement: "Clearly explains why the emergency product matters",
+      required: true,
+      status: "UNKNOWN",
+      evidence: [],
+    });
+    const probe = mechanicalProbeBinding({
+      record: rec,
+      bindingId: origin.binding.bindingId,
+    });
+    expect(rec.outcomeCriteria[0]!.status).toBe("UNKNOWN");
+    expect(probe.observations.some((row) => row.id === "c-semantic")).toBe(true);
   });
 
   it("mechanical probe: README on task worktree satisfies req-readme", () => {
@@ -342,7 +457,7 @@ describe("S5 PATH Build", () => {
     expect(existsSync(join(origin.binding.projectRoot, "README.md"))).toBe(
       false,
     );
-    expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
+    expect(rec.intent.explicitRequirements[0]!.status).toBe("SATISFIED");
   });
 
   it("mechanical probe: README on task branch via git show satisfies req-readme", () => {
@@ -383,7 +498,7 @@ describe("S5 PATH Build", () => {
     });
     expect(probe.ok).toBe(true);
     expect(existsSync(join(root, "README.md"))).toBe(false);
-    expect(rec.intent.explicitRequirements[0].status).toBe("SATISFIED");
+    expect(rec.intent.explicitRequirements[0]!.status).toBe("SATISFIED");
   });
 
   it("mechanical probe: does not create README when missing (engineer-owned)", () => {
@@ -415,7 +530,7 @@ describe("S5 PATH Build", () => {
     expect(existsSync(join(origin.binding.projectRoot, "README.md"))).toBe(
       false,
     );
-    expect(rec.intent.explicitRequirements[0].status).toBe("UNKNOWN");
+    expect(rec.intent.explicitRequirements[0]!.status).toBe("UNKNOWN");
   });
 
   it("Depth A refresh writes reality delta", () => {
@@ -439,12 +554,9 @@ describe("S5 PATH Build", () => {
 });
 
 describe("S5 unbound operator entrypoint", () => {
-  /** @type {string} */
-  let emptyDir;
-  /** @type {string | undefined} */
-  let prevCwd;
-  /** @type {Record<string, string | undefined>} */
-  let prevEnv;
+  let emptyDir: string;
+  let prevCwd: string | undefined;
+  let prevEnv: Record<string, string | undefined>;
 
   beforeEach(() => {
     emptyDir = mkdtempSync(join(tmpdir(), "path-s5-empty-"));
@@ -573,6 +685,9 @@ describe("S5 unbound operator entrypoint", () => {
         ag1Calls += 1;
         throw new Error("AG1 must not run in unbound-entry unit test");
       },
+      // Runtime bootstrap is unrelated to this REPL protocol regression and can
+      // install/repair a venv; keep this unit test deterministic.
+      ensureRuntime: async () => ({ ok: true }),
     });
     const out = tty.output();
     expect(code).toBe(0);
@@ -583,5 +698,5 @@ describe("S5 unbound operator entrypoint", () => {
     // Origin seam: git-init only, no scaffold manifests.
     expect(existsSync(join(emptyDir, ".git"))).toBe(true);
     expect(existsSync(join(emptyDir, "package.json"))).toBe(false);
-  }, 60_000);
+  }, 10_000);
 });

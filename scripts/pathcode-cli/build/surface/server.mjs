@@ -16,23 +16,20 @@ import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 
-import { createGatewayRuntime } from "../../gateway/runtime.mjs";
 import {
-  createBuildController,
   readBuildRecord,
   findLatestActiveBuild,
   listBuildRecords,
 } from "../index.mjs";
 import { projectBuildForSurface } from "./product-view.mjs";
-import { createBuildRuntimeManager } from "../runtime/manager.mjs";
 import { detectBuildArtifact } from "../runtime/artifact.mjs";
 import {
   proxyPreviewHttp,
   proxyPreviewWs,
 } from "../runtime/proxy.mjs";
-import { captureBrowserEvidence } from "../runtime/browser-evidence.mjs";
-import { deriveProductBrief } from "../brief.mjs";
 import { launchPathCodeInTerminal } from "./handoff.mjs";
+import { ensureBuildCoordinator } from "../coordinator/ensure.mjs";
+import { sanitizeBuildEventValue } from "../events.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(HERE, "public");
@@ -136,177 +133,15 @@ export async function startPathBuildSurface(options) {
     process.env.PATHCODE_GATEWAY_FAKE_ENGINE === "1";
   const autoLoop = options.autoLoop !== false;
 
-  const gatewayRuntime = createGatewayRuntime({
+  const coordinatorHandle = await ensureBuildCoordinator({
     packageRoot,
     runtimeRoot,
-    // Fake/surface unit tests must not block on AG1 runtime bootstrap.
-    skipBootstrap: fakeMode,
-  });
-
-  const runtimeManager = createBuildRuntimeManager({ runtimeRoot });
-
-  /** @type {ReturnType<typeof createBuildController>} */
-  const controller = createBuildController({
-    runtimeRoot,
-    preferredEngine,
     fakeMode,
-    gateway: {
-      bindProject: (cwd) =>
-        gatewayRuntime.bindProject({
-          cwd: typeof cwd === "string" ? cwd : cwd?.cwd,
-        }),
-      startTask: (objective, extra) =>
-        gatewayRuntime.startTask({ objective, ...extra }),
-      resumeTask: (taskId, extra) =>
-        gatewayRuntime.resumeTask({ taskId, ...extra }),
-      awaitTask: (taskId, timeoutMs) =>
-        gatewayRuntime.awaitTask(taskId, timeoutMs),
-      steerTask: (taskId, text) => gatewayRuntime.steerTask(taskId, text),
-      snapshotTask: (taskId) => gatewayRuntime.snapshotTask(taskId),
-      cancelTask: (taskId) => gatewayRuntime.cancelTask(taskId),
-    },
+    preferredEngine,
   });
-
-  /** @type {Map<string, { promise: Promise<unknown>, startedAt: string }>} */
-  const loops = new Map();
-  /** @type {string | null} */
-  let surfaceBaseUrl = null;
-
-  /**
-   * Keep product runtime + browser evidence aligned with authoritative Build revision.
-   * @param {string} buildId
-   */
-  async function syncRuntimeForBuild(buildId) {
-    const gate = assertBuildRoot(buildId);
-    if (!gate.ok) return gate;
-    const build = gate.build;
-    const root = gate.projectRoot;
-    const artifact = detectBuildArtifact(root, {
-      outcomeHint: build.intent?.outcome,
-    });
-    if (artifact.preview.capability !== "web") {
-      controller.patchRuntimeState?.(buildId, {
-        previewUrl: null,
-        runtimeHealth: "n/a",
-        clearRuntimeRefresh: true,
-      });
-      return { ok: true, skipped: true, reason: "non_web" };
-    }
-    if ((artifact.signals || []).includes("empty_tree")) {
-      // No product yet — clear refresh so the Build loop can dispatch the first engineer.
-      controller.patchRuntimeState?.(buildId, {
-        previewUrl: null,
-        runtimeHealth: "awaiting_product",
-        clearRuntimeRefresh: true,
-      });
-      return { ok: true, skipped: true, reason: "empty_tree" };
-    }
-
-    const force = Boolean(build.loop?.pendingRuntimeRefresh);
-    const started = force
-      ? await runtimeManager.refresh(buildId, root, {
-          bindingId: gate.binding.bindingId,
-          outcomeHint: build.intent?.outcome,
-        })
-      : await runtimeManager.start(buildId, root, {
-          bindingId: gate.binding.bindingId,
-          outcomeHint: build.intent?.outcome,
-        });
-
-    if (!started.ok) {
-      controller.patchRuntimeState?.(buildId, {
-        previewUrl: null,
-        runtimeHealth: "failed",
-        clearRuntimeRefresh: true,
-      });
-      return started;
-    }
-
-    const preview = runtimeManager.getPreviewDescriptor(buildId);
-    const directUrl = started.runtime?.url || preview?.url || null;
-    const embedUrl =
-      surfaceBaseUrl && preview?.embedPath
-        ? new URL(preview.embedPath, surfaceBaseUrl).toString()
-        : null;
-    const evidence = await captureBrowserEvidence({
-      url: embedUrl || directUrl,
-      buildId,
-      runtimeRoot,
-      authoritativeSha: build.authoritativeSha || null,
-      intentRevision: build.intent?.outcomeRevision ?? null,
-      bindingId: gate.binding.bindingId,
-      expectText: String(build.intent?.outcome || "")
-        .split(/\s+/)
-        .filter((w) => w.length > 3)
-        .slice(0, 8),
-    });
-    evidence.authoritativeSha = build.authoritativeSha || null;
-
-    controller.patchRuntimeState?.(buildId, {
-      previewUrl: directUrl,
-      runtimeHealth: started.runtime?.status === "ready" ? "ok" : "down",
-      browserEvidence: evidence,
-      clearRuntimeRefresh: true,
-      authoritativeSha: build.authoritativeSha || null,
-    });
-
-    return { ok: true, runtime: started.runtime, evidence, preview };
-  }
-
-  function ensureLoop(buildId, opts = {}) {
-    if (loops.has(buildId)) return;
-    const startedAt = new Date().toISOString();
-    const promise = controller
-      .runUntilDone(buildId, {
-        maxSteps: 48,
-        syncRuntime: (id) => syncRuntimeForBuild(id),
-      })
-      .then(async (result) => {
-        if (opts.autoPreview !== false) {
-          await syncRuntimeForBuild(buildId);
-        }
-        if (result && result.ok === false) {
-          console.error("[path-build] runUntilDone failed", buildId, result);
-        }
-        return result;
-      })
-      .catch((err) => {
-        console.error("[path-build] runUntilDone threw", buildId, err);
-        return {
-          ok: false,
-          message: err instanceof Error ? err.message : String(err),
-        };
-      })
-      .finally(() => {
-        // Allow a later conversation steer / recovery to start a new loop.
-        const cur = loops.get(buildId);
-        if (cur && cur.promise === promise) loops.delete(buildId);
-      });
-    loops.set(buildId, { promise, startedAt });
-  }
-
-  /**
-   * @param {string} buildId
-   */
-  async function maybeStartPreview(buildId) {
-    const build = readBuildRecord(runtimeRoot, buildId);
-    const root = build?.projectBindings?.[0]?.projectRoot;
-    if (!root || !existsSync(root)) return null;
-    const artifact = detectBuildArtifact(root, {
-      outcomeHint: build?.intent?.outcome,
-    });
-    if (artifact.preview.capability !== "web") return null;
-    // Need some product files before starting
-    if ((artifact.signals || []).includes("empty_tree")) return null;
-    try {
-      return await runtimeManager.start(buildId, root, {
-        bindingId: build.projectBindings[0].bindingId,
-        outcomeHint: build.intent?.outcome,
-      });
-    } catch {
-      return null;
-    }
-  }
+  const coordinator = coordinatorHandle.client;
+  const syncRuntimeForBuild = (buildId) => coordinator.syncRuntime(buildId);
+  const ensureLoop = (buildId) => coordinator.ensureLoop(buildId);
 
   /**
    * @param {string} [buildId]
@@ -326,38 +161,24 @@ export async function startPathBuildSurface(options) {
       root && existsSync(root)
         ? detectBuildArtifact(root, { outcomeHint: build?.intent?.outcome })
         : null;
-    const inspected = id ? await runtimeManager.inspect(id) : { runtime: null };
-    let preview = id ? runtimeManager.getPreviewDescriptor(id) : null;
-
-    // Opportunistic preview / revision sync
-    if (
-      id &&
-      root &&
-      artifact?.preview?.capability === "web" &&
-      !(artifact.signals || []).includes("empty_tree")
-    ) {
-      const needs =
-        build?.loop?.pendingRuntimeRefresh ||
-        !inspected.runtime ||
-        inspected.runtime.status === "stopped" ||
-        inspected.runtime.status === "stale" ||
-        inspected.runtime.status === "idle" ||
-        inspected.runtime.status === "unavailable";
-      if (needs) {
-        void syncRuntimeForBuild(id);
-      }
-    }
-
-    preview = id ? runtimeManager.getPreviewDescriptor(id) : preview;
+    const state = id
+      ? await coordinator.getRuntime(id)
+      : { runtime: null, preview: null };
+    const eventState = id
+      ? await coordinator.getBuildEvents(id, { afterId: 0, limit: 1_000 })
+      : { events: [] };
     const view = projectBuildForSurface(build, {
-      preview,
-      runtime: inspected.runtime,
+      preview: state.preview,
+      runtime: state.runtime,
       artifact,
+      events: eventState.events || [],
     });
-    const loop = id ? loops.get(id) : null;
+    const coordinatorStatus = id ? await coordinator.status() : { loops: [] };
     return {
       ...view,
-      loopRunning: Boolean(loop),
+      loopRunning: Boolean(
+        coordinatorStatus.loops?.some((loop) => loop.buildId === id),
+      ),
       fakeMode,
       preferredEngine: preferredEngine || null,
     };
@@ -386,9 +207,9 @@ export async function startPathBuildSurface(options) {
       const previewMatch = path.match(/^\/preview\/([^/]+)(?:\/(.*))?$/);
       if (previewMatch && (method === "GET" || method === "HEAD" || method === "POST")) {
         const buildId = decodeURIComponent(previewMatch[1]);
-        const live = runtimeManager.getLiveTarget(buildId);
-        const desc = runtimeManager.getPreviewDescriptor(buildId);
-        const targetUrl = live?.url || desc?.url;
+        const runtimeState = await coordinator.getRuntime(buildId);
+        const targetUrl =
+          runtimeState.runtime?.url || runtimeState.preview?.url;
         if (!targetUrl) {
           sendJson(res, 503, {
             ok: false,
@@ -467,25 +288,82 @@ export async function startPathBuildSurface(options) {
         }
 
         if (method === "GET" && action === "events") {
+          const headerCursor = Number(req.headers["last-event-id"] || 0);
+          const queryCursor = Number(url.searchParams.get("cursor") || 0);
+          let cursor = Math.max(
+            0,
+            Number.isFinite(queryCursor) ? queryCursor : 0,
+            Number.isFinite(headerCursor) ? headerCursor : 0,
+          );
           res.writeHead(200, {
             "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
           });
+          let pushing = false;
           const push = async () => {
-            const payload = JSON.stringify(await viewFor(buildId));
-            res.write(`data: ${payload}\n\n`);
+            if (pushing) return;
+            pushing = true;
+            try {
+              const replay = await coordinator.getBuildEvents(buildId, {
+                afterId: cursor,
+                limit: 250,
+              });
+              for (const event of replay.events || []) {
+                const payload = JSON.stringify({
+                  event,
+                  view: sanitizeBuildEventValue(await viewFor(buildId)),
+                });
+                res.write(`id: ${event.id}\n`);
+                res.write(`event: build\n`);
+                res.write(`data: ${payload}\n\n`);
+                cursor = event.id;
+              }
+              // Snapshot is bootstrap/fallback only when no durable event exists.
+              if (cursor === 0 && (replay.events || []).length === 0) {
+                res.write(
+                  `event: snapshot\ndata: ${JSON.stringify({
+                    view: sanitizeBuildEventValue(await viewFor(buildId)),
+                    fallback: true,
+                  })}\n\n`,
+                );
+              }
+            } finally {
+              pushing = false;
+            }
           };
           await push();
           const timer = setInterval(() => {
-            void push();
-          }, 1200);
-          req.on("close", () => clearInterval(timer));
+            void push().catch((error) => {
+              // Coordinator restart is an expected S4 recovery condition.
+              // Keep the client connection honest without crashing the
+              // surface; EventSource will reconnect after this stream closes.
+              try {
+                res.write(
+                  `event: backend-unavailable\ndata: ${JSON.stringify({
+                    code: error?.code || "COORDINATOR_UNAVAILABLE",
+                    message:
+                      error instanceof Error ? error.message : String(error),
+                  })}\n\n`,
+                );
+                res.end();
+              } catch {
+                /* connection already closed */
+              }
+              clearInterval(timer);
+            });
+          }, 250);
+          const heartbeat = setInterval(() => res.write(": keepalive\n\n"), 15_000);
+          req.on("close", () => {
+            clearInterval(timer);
+            clearInterval(heartbeat);
+          });
           return;
         }
 
         if (method === "POST" && action === "tick") {
-          const step = await controller.tick(buildId);
+          const step = await coordinator.tickBuild(buildId);
           if (step.ok) await syncRuntimeForBuild(buildId);
           sendJson(res, step.ok ? 200 : 400, {
             ...step,
@@ -496,16 +374,32 @@ export async function startPathBuildSurface(options) {
 
         if (method === "POST" && action === "message") {
           const body = await readJsonBody(req);
-          const applied = await controller.applyConversation(buildId, {
+          const applied = await coordinator.messageBuild(buildId, {
             message: String(body.message || ""),
             element: body.element || null,
           });
           if (applied.ok) {
-            loops.delete(buildId);
-            ensureLoop(buildId);
+            await ensureLoop(buildId);
           }
           sendJson(res, applied.ok ? 200 : 400, {
             ...applied,
+            view: await viewFor(buildId),
+          });
+          return;
+        }
+
+        if (
+          method === "POST" &&
+          (action === "stop" || action === "resume" || action === "recover")
+        ) {
+          const controlled =
+            action === "stop"
+              ? await coordinator.stopBuild(buildId)
+              : action === "recover"
+                ? await coordinator.recoverBuild(buildId)
+                : await coordinator.resumeBuild(buildId);
+          sendJson(res, controlled.ok ? 200 : 400, {
+            ...controlled,
             view: await viewFor(buildId),
           });
           return;
@@ -515,13 +409,12 @@ export async function startPathBuildSurface(options) {
           // Back-compat — prefer /message
           const body = await readJsonBody(req);
           const text = String(body.text || body.message || "").trim();
-          const applied = await controller.applyConversation(buildId, {
+          const applied = await coordinator.messageBuild(buildId, {
             message: text,
             element: body.element || null,
           });
           if (applied.ok) {
-            loops.delete(buildId);
-            ensureLoop(buildId);
+            await ensureLoop(buildId);
           }
           sendJson(res, applied.ok ? 200 : 400, {
             ...applied,
@@ -539,28 +432,12 @@ export async function startPathBuildSurface(options) {
           }
 
           if (method === "GET" && !sub) {
-            const inspected = await runtimeManager.inspect(buildId);
-            sendJson(res, 200, {
-              ok: true,
-              runtime: inspected.runtime,
-              preview: runtimeManager.getPreviewDescriptor(buildId),
-              artifact: detectBuildArtifact(gate.projectRoot, {
-                outcomeHint: gate.build.intent?.outcome,
-              }),
-            });
+            sendJson(res, 200, await coordinator.getRuntime(buildId));
             return;
           }
 
           if (method === "POST" && sub === "start") {
-            const started = await runtimeManager.start(
-              buildId,
-              gate.projectRoot,
-              {
-                bindingId: gate.binding.bindingId,
-                outcomeHint: gate.build.intent?.outcome,
-                forceRestart: false,
-              },
-            );
+            const started = await coordinator.startRuntime(buildId);
             sendJson(res, started.ok ? 200 : 400, {
               ...started,
               view: await viewFor(buildId),
@@ -569,14 +446,7 @@ export async function startPathBuildSurface(options) {
           }
 
           if (method === "POST" && sub === "restart") {
-            const started = await runtimeManager.refresh(
-              buildId,
-              gate.projectRoot,
-              {
-                bindingId: gate.binding.bindingId,
-                outcomeHint: gate.build.intent?.outcome,
-              },
-            );
+            const started = await coordinator.restartRuntime(buildId);
             sendJson(res, started.ok ? 200 : 400, {
               ...started,
               view: await viewFor(buildId),
@@ -585,35 +455,14 @@ export async function startPathBuildSurface(options) {
           }
 
           if (method === "POST" && sub === "evidence") {
-            const preview = runtimeManager.getPreviewDescriptor(buildId);
-            if (!preview?.url) {
-              sendJson(res, 400, {
-                ok: false,
-                code: "NO_PREVIEW_URL",
-              });
-              return;
-            }
-            const brief = gate.build.productBrief || deriveProductBrief(gate.build.intent?.outcome || "");
-            const expectText = (brief.acceptanceCriteria || [])
-              .map((c) => c.statement)
-              .slice(0, 6);
-            // Prefer short product tokens from outcome
-            const tokens = String(gate.build.intent?.outcome || "")
-              .split(/\s+/)
-              .filter((w) => w.length > 3)
-              .slice(0, 8);
-            const evidence = await captureBrowserEvidence({
-              url: preview.url,
-              buildId,
-              runtimeRoot,
-              expectText: [...tokens, ...expectText].slice(0, 10),
-            });
-            sendJson(res, 200, { ok: evidence.ok, evidence });
+            const captured =
+              await coordinator.captureRuntimeEvidence(buildId);
+            sendJson(res, captured.ok ? 200 : 400, captured);
             return;
           }
 
           if (method === "DELETE" && !sub) {
-            const stopped = await runtimeManager.stop(buildId);
+            const stopped = await coordinator.stopRuntime(buildId);
             sendJson(res, 200, { ...stopped, view: await viewFor(buildId) });
             return;
           }
@@ -748,9 +597,10 @@ export async function startPathBuildSurface(options) {
         }
         mkdirSync(targetDir, { recursive: true });
 
-        const started = await controller.startBuild(outcome, {
+        const started = await coordinator.startBuild(outcome, {
           targetDir,
           originKind,
+          autoRun: autoLoop,
           // Criteria come from product brief inside startBuild.
         });
         if (!started.ok) {
@@ -782,15 +632,13 @@ export async function startPathBuildSurface(options) {
         // Defer loop so HTTP response returns immediately (tests + UX).
         if (autoLoop) {
           setImmediate(() => {
-            try {
-              ensureLoop(started.build.buildId, { autoPreview: true });
-            } catch (err) {
+            void ensureLoop(started.build.buildId).catch((err) => {
               console.error(
                 "[path-build] ensureLoop failed",
                 started.build.buildId,
                 err,
               );
-            }
+            });
           });
         }
         sendJson(res, 200, {
@@ -805,6 +653,14 @@ export async function startPathBuildSurface(options) {
 
       res.writeHead(404).end("Not found");
     } catch (err) {
+      if (res.headersSent) {
+        try {
+          res.end();
+        } catch {
+          /* connection already closed */
+        }
+        return;
+      }
       sendJson(res, 500, {
         ok: false,
         code: "SURFACE_ERROR",
@@ -814,28 +670,31 @@ export async function startPathBuildSurface(options) {
   });
 
   server.on("upgrade", (req, socket, head) => {
-    try {
-      const url = new URL(req.url || "/", `http://${host}`);
-      const previewMatch = url.pathname.match(/^\/preview\/([^/]+)/);
-      if (!previewMatch) {
-        socket.destroy();
-        return;
-      }
-      const buildId = decodeURIComponent(previewMatch[1]);
-      const live = runtimeManager.getLiveTarget(buildId);
-      const targetUrl = live?.url;
-      if (!targetUrl) {
-        socket.destroy();
-        return;
-      }
-      proxyPreviewWs(req, socket, head, { targetUrl });
-    } catch {
+    void (async () => {
       try {
-        socket.destroy();
+        const url = new URL(req.url || "/", `http://${host}`);
+        const previewMatch = url.pathname.match(/^\/preview\/([^/]+)/);
+        if (!previewMatch) {
+          socket.destroy();
+          return;
+        }
+        const buildId = decodeURIComponent(previewMatch[1]);
+        const runtimeState = await coordinator.getRuntime(buildId);
+        const targetUrl =
+          runtimeState.runtime?.url || runtimeState.preview?.url;
+        if (!targetUrl) {
+          socket.destroy();
+          return;
+        }
+        proxyPreviewWs(req, socket, head, { targetUrl });
       } catch {
-        /* ignore */
+        try {
+          socket.destroy();
+        } catch {
+          /* ignore */
+        }
       }
-    }
+    })();
   });
 
   const preferred =
@@ -866,7 +725,6 @@ export async function startPathBuildSurface(options) {
   });
 
   const url = `http://${host}:${port}/`;
-  surfaceBaseUrl = url;
   if (options.openBrowser !== false && process.env.PATHCODE_BUILD_NO_OPEN !== "1") {
     try {
       spawn("open", [url], { detached: true, stdio: "ignore" }).unref();
@@ -882,12 +740,21 @@ export async function startPathBuildSurface(options) {
     server,
     runtimeRoot,
     fakeMode,
-    runtimeManager,
+    coordinator,
     stop: async () => {
-      await runtimeManager.stopAll();
       await new Promise((resolveStop) => {
         server.close(() => resolveStop());
       });
+      // Fake coordinators are test/proof hosts and must not leak detached
+      // processes. Real coordinators deliberately outlive browser surfaces.
+      if (fakeMode) {
+        try {
+          await coordinator.shutdown();
+        } catch {
+          // it may already be stopping
+        }
+      }
+      coordinator.close();
     },
   };
 }

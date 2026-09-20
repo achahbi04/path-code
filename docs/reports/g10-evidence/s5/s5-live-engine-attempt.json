@@ -1,8 +1,8 @@
 {
   "schema": "pathcode.s5.live-engine-attempt.v1",
-  "verdict": "LIVE-ENGINE-ATTEMPTED",
-  "ok": true,
-  "skipReason": null,
+  "verdict": "AUTH_REQUIRED",
+  "ok": false,
+  "skipReason": "Engine reachable but authentication required for live turn.",
   "engines": {
     "copilot": {
       "available": true,
@@ -13,27 +13,27 @@
     "skipReason": null
   },
   "timeoutMs": 180000,
-  "baseDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-live-eng-XnchF7",
-  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-live-eng-XnchF7/runtime",
-  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-live-eng-XnchF7/product",
+  "baseDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-live-eng-R8RBD6",
+  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-live-eng-R8RBD6/runtime",
+  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-live-eng-R8RBD6/product",
   "steps": [
     {
       "step": "start",
       "ok": true,
-      "buildId": "1982c4de-e8a2-47c3-9f26-80023f82b2dc",
+      "buildId": "ea9ae25a-3878-4260-ad50-050400f7d371",
       "git": true
     },
     {
       "step": "single_engineer_tick",
       "ok": true,
-      "taskId": "e9c06fb0-ac8a-42a7-9a96-b423f75b00d2",
-      "kind": "engineer",
+      "taskId": "ea9f2284-5f66-49dc-bbd9-8af08c9543fe",
+      "kind": "brief",
       "action": "child_finished",
       "preferredEngine": "copilot",
       "gatewayStatus": "failed",
       "gatewayClassification": "NOT_VERIFIED",
-      "markerExists": true,
-      "elapsedMs": 47124,
+      "markerExists": false,
+      "elapsedMs": 67893,
       "eventTypes": [
         "session.task.received",
         "session.capability.preparing",
@@ -49,9 +49,6 @@
         "session.engineering.activity",
         "session.engineering.bridge",
         "session.engineering.busy",
-        "session.applying",
-        "session.engineering.tool",
-        "session.edit.summary",
         "session.engineering.narration",
         "session.engineering.handoff",
         "session.validation.plan",
@@ -63,5 +60,5 @@
       "collaborated": true
     }
   ],
-  "buildId": "1982c4de-e8a2-47c3-9f26-80023f82b2dc"
+  "buildId": "ea9ae25a-3878-4260-ad50-050400f7d371"
 }

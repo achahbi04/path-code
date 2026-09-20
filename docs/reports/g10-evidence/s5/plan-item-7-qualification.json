@@ -1,0 +1,141 @@
+{
+  "schema": "pathcode.s5.plan-item-7-qualification.v1",
+  "capturedAt": "2026-09-20T20:34:13+02:00",
+  "verdict": {
+    "mechanicalQualification": "PASS",
+    "packedProduct": "PASS",
+    "liveProduct": "NOT_PASS",
+    "liveBlocker": "A bounded real-engine Build reached genuine engineering events and a terminal report, but the selected Copilot engine required authentication and returned NOT_VERIFIED."
+  },
+  "qualification": {
+    "focusedTests": {
+      "command": "npx vitest run tests/s1/s1-gateway.test.ts tests/s2/engineering-surface.test.ts tests/s2/result-lifecycle.test.ts tests/s2/installed-product.test.ts tests/s3/engineering-report-fabric.test.ts tests/s3/fabric-routing.test.ts tests/s3/result-capture.test.ts tests/s4/engine-process-durability.test.ts tests/s5/build.test.ts tests/s5/build-adoption.test.ts tests/s5/build-builder.test.ts tests/s5/build-coordinator.test.ts tests/s5/build-handoff.test.ts tests/s5/build-reconcile.test.ts tests/s5/build-surface.test.ts tests/general-session/cli.test.ts tests/general-session/preflight.test.ts tests/general-session/session-flow.test.ts tests/general-session/session-loop.test.ts tests/g9/g9-failure-matrix.test.ts",
+      "result": "20 files passed; 164 tests passed; exit 0",
+      "scope": [
+        "engineering event and result capture",
+        "terminal state, report, history, inspect",
+        "steering and cancellation",
+        "result lifecycle",
+        "coordinator and process reopen durability",
+        "greenfield/non-Git origin plus dirty and detached Git handling",
+        "shared Build adoption and reconciliation"
+      ]
+    },
+    "finalRegressionTests": {
+      "command": "npx vitest run tests/s5/build-surface.test.ts tests/s5/build-coordinator.test.ts tests/g9/g9-failure-matrix.test.ts",
+      "result": "3 files passed; 13 tests passed; exit 0"
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "result": "exit 0"
+    },
+    "liveAttempt": {
+      "command": "node docs/reports/g10-evidence/s5/run-s5-live-engine-attempt.mjs",
+      "result": "exit 1; AUTH_REQUIRED; task terminal NOT_VERIFIED",
+      "evidence": "docs/reports/g10-evidence/s5/s5-live-engine-attempt.json",
+      "realEventsObserved": [
+        "session.capability.preparing",
+        "session.capability.collaborate",
+        "session.engineering.activity",
+        "session.engineering.bridge",
+        "session.engineering.narration",
+        "session.engineering.result",
+        "session.engineering.report",
+        "session.terminal",
+        "gateway.task.finished"
+      ],
+      "claimBoundary": "This proves a bounded live dispatch/event/report path, not successful live engineering or product PASS."
+    },
+    "polyglotPrepare": {
+      "command": "node docs/reports/g9-evidence/run-prepare.mjs <label> <fixture> <output>",
+      "fixtures": {
+        "javascript": "node, npm, and TypeScript LSP ready",
+        "python": "python, uv, pip, pytest, and Python LSP ready",
+        "goBeforeFix": "Go ready; gopls acquisition failed because mise rejected the legacy top-level gopls identifier",
+        "goAfterFix": "Go HOST_READY and lsp:go PATH_RUNTIME_READY; no failed requirements"
+      }
+    }
+  },
+  "defectsFixed": [
+    {
+      "area": "Go prepare",
+      "defect": "mise 2026.9.7 rejects gopls@latest and requires go:golang.org/x/tools/gopls@latest",
+      "fix": "Use the Go backend identifier in requirement resolution, provisioning, and direct LSP acquisition; add a regression test."
+    },
+    {
+      "area": "Coordinator qualification",
+      "defect": "The durable stop/resume/recover integration test's valid 15-17 second path exceeded Vitest's default 20 second whole-test budget under suite load.",
+      "fix": "Give that bounded integration case an explicit 60 second timeout."
+    },
+    {
+      "area": "Packed CLI version parity",
+      "defect": "path-build --version was hard-coded as 1.0.1-s5-surface while package.json and pathcode report 1.0.1.",
+      "fix": "Resolve path-build's version from the installed package metadata and cover it with a surface regression test."
+    },
+    {
+      "area": "Coordinator recovery and shared adoption",
+      "defect": "Coordinator recovery omitted live Gateway snapshots, complete records skipped startup reconciliation, interruption controls could race long autonomous loops, and branchless adoption could claim success without proving the source commit reached product HEAD.",
+      "fix": "Expose snapshotTask, recover every durable record on startup, release the mutation gate between cognitive children while preempting active Gateway tasks before serialized stop/message mutation, and require Git ancestry proof for branchless/in-place source commits."
+    }
+  ],
+  "canonicalCheck": {
+    "command": "npm run check",
+    "result": "CHECK_EXIT:0; 179 test files and 1553 tests passed; typecheck, build, CLI smoke, and ledger verification passed"
+  },
+  "package": {
+    "buildCommand": "npm run build",
+    "packCommand": "npm pack --json --pack-destination /tmp/pathcode-s5-pack-20260920",
+    "tarball": "/tmp/pathcode-s5-pack-final/path-code-1.0.1.tgz",
+    "version": "1.0.1",
+    "packedBytes": 919675,
+    "unpackedBytes": 4239398,
+    "fileCount": 1122,
+    "sha256": "d20cf91e9ad2544fb9d425baf34fc93803f1c8dacfd2d29cf420108e37c16093",
+    "isolatedPrefix": "/tmp/pathcode-s5-installed-final/prefix",
+    "installResult": "npm install -g tarball --prefix isolated-prefix: exit 0",
+    "pathcode": {
+      "versionOutput": "PATH * Code 1.0.1",
+      "help": "exit 0 with history/report/inspect/merge/discard/pr/attach/resume/build commands",
+      "launch": "exit 0 from isolated Git project; reported project, main, clean without checkout coupling"
+    },
+    "pathBuild": {
+      "versionOutput": "path-build 1.0.1",
+      "help": "exit 0",
+      "launch": "packed binary started isolated fake surface at http://127.0.0.1:7798/; HTTP index contained PATH Build; process stopped cleanly"
+    },
+    "requiredContentsObserved": [
+      "package/dist/index.js",
+      "package/package.json",
+      "package/scripts/pathcode.mjs",
+      "package/scripts/path-build.mjs",
+      "package/scripts/pathcode-cli/ag9/prepare.mjs",
+      "package/scripts/pathcode-cli/build/coordinator/server.mjs"
+    ]
+  },
+  "releaseAudit": {
+    "command": "node scripts/audit-release.mjs --tarball /tmp/pathcode-s5-pack-final/path-code-1.0.1.tgz",
+    "result": "audit-release PASS; 919675 packed bytes; 1122 files"
+  },
+  "publicDrift": {
+    "registryQuery": "npm view path-code version dist.tarball --json",
+    "publishedVersion": "1.0.1",
+    "localVersion": "1.0.1",
+    "versionDrift": false,
+    "contentDrift": true,
+    "publicSha256": "3b146a6b7061bb3c749c88f841b556e3e287769fe3377d20c0c8429c401de389",
+    "publicPackedBytes": 594210,
+    "publicUnpackedBytes": 2865783,
+    "publicFileCount": 1002,
+    "localOnlyPaths": 120,
+    "publicOnlyPaths": 0,
+    "examplesAbsentFromPublic101": [
+      "package/scripts/path-build.mjs",
+      "package/scripts/pathcode-cli/ag9/prepare.mjs",
+      "package/scripts/pathcode-cli/result-lifecycle.mjs",
+      "package/scripts/pathcode-cli/build/coordinator/server.mjs",
+      "package/scripts/pathcode-cli/build/events.mjs",
+      "package/scripts/pathcode-cli/build/runtime/sync.mjs"
+    ],
+    "finding": "The registry and checkout both identify as 1.0.1, but the public artifact is an older strict subset with different content. A new publication must not reuse 1.0.1."
+  }
+}

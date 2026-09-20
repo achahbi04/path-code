@@ -47,6 +47,54 @@ import {
 } from "./objectives.mjs";
 import { formatBuildStatus } from "./format.mjs";
 import { mechanicalProbeBinding } from "./mechanical-probe.mjs";
+import {
+  briefToOutcomeCriteria,
+  deriveProductBrief,
+  parseProductBriefResult,
+  productBriefObjective,
+} from "./brief.mjs";
+
+function normalizeSelectedElement(value) {
+  if (!value || typeof value !== "object") return null;
+  const text = (key, limit) =>
+    typeof value[key] === "string" && value[key].trim()
+      ? value[key].trim().slice(0, limit)
+      : null;
+  const rect =
+    value.rect && typeof value.rect === "object"
+      ? Object.fromEntries(
+          ["x", "y", "width", "height"]
+            .filter((key) => Number.isFinite(value.rect[key]))
+            .map((key) => [key, Number(value.rect[key])]),
+        )
+      : null;
+  const dataAttrs =
+    value.dataAttrs && typeof value.dataAttrs === "object"
+      ? Object.fromEntries(
+          Object.entries(value.dataAttrs)
+            .filter(
+              ([key, item]) =>
+                /^data-[\w:-]+$/.test(key) && typeof item === "string",
+            )
+            .slice(0, 20)
+            .map(([key, item]) => [key, item.slice(0, 300)]),
+        )
+      : null;
+  const element = {
+    buildId: text("buildId", 120),
+    tag: text("tag", 80),
+    id: text("id", 200),
+    className: text("className", 500),
+    text: text("text", 1_000),
+    selector: text("selector", 1_000),
+    path: text("path", 1_000),
+    ...(rect && Object.keys(rect).length ? { rect } : {}),
+    ...(dataAttrs && Object.keys(dataAttrs).length ? { dataAttrs } : {}),
+  };
+  return Object.fromEntries(
+    Object.entries(element).filter(([, item]) => item !== null),
+  );
+}
 
 /**
  * @typedef {{
@@ -265,13 +313,14 @@ export function createBuildController(opts) {
     record.originKind = originKind;
 
     // Product brief → concrete acceptance criteria (not only c-runnable/c-outcome).
-    const { deriveProductBrief, briefToOutcomeCriteria } = await import(
-      "./brief.mjs"
-    );
-    const brief = deriveProductBrief(String(outcome || ""), {});
+    const brief = deriveProductBrief(String(outcome || ""), {
+      buildId: record.buildId,
+      intentRevision: record.intent.outcomeRevision,
+    });
     record.productBrief = brief;
 
     if (Array.isArray(options.initialCriteria) && options.initialCriteria.length) {
+      record.criteriaAuthority = "caller";
       // Caller-supplied criteria are authoritative (tests / harnesses).
       const now = new Date().toISOString();
       record.outcomeCriteria = options.initialCriteria.map((c, i) => ({
@@ -456,6 +505,53 @@ export function createBuildController(opts) {
    */
   async function recover(buildId) {
     return reconcileBuildChildren(buildId);
+  }
+
+  async function stopBuild(buildId) {
+    const record = readBuildRecord(runtimeRoot, buildId);
+    if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    const active = [...(record.children || [])]
+      .reverse()
+      .find(
+        (child) =>
+          child.dispatchState === "selected" ||
+          child.dispatchState === "dispatched",
+      );
+    if (active && typeof gateway.cancelTask === "function") {
+      try {
+        await gateway.cancelTask(active.taskId);
+      } catch (error) {
+        record.loop.lastControlError = {
+          operation: "stop",
+          message: error instanceof Error ? error.message : String(error),
+          at: new Date().toISOString(),
+        };
+      }
+    }
+    record.loop.status = "paused";
+    record.loop.pausedAt = new Date().toISOString();
+    record.loop.pausedTaskId = active?.taskId || null;
+    writeBuildRecord(runtimeRoot, record);
+    return { ok: true, build: readBuildRecord(runtimeRoot, buildId) };
+  }
+
+  async function resumeBuild(buildId) {
+    let record = readBuildRecord(runtimeRoot, buildId);
+    if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (record.loop.status === "complete") {
+      return { ok: true, alreadyComplete: true, build: record, decisions: [] };
+    }
+    record.loop.status = "running";
+    record.loop.resumedAt = new Date().toISOString();
+    record.loop.blockedReason = undefined;
+    writeBuildRecord(runtimeRoot, record);
+    const reconciled = await reconcileBuildChildren(buildId);
+    record = readBuildRecord(runtimeRoot, buildId) || record;
+    return {
+      ok: reconciled.ok !== false,
+      build: record,
+      decisions: reconciled.decisions || [],
+    };
   }
 
   /**
@@ -673,6 +769,8 @@ export function createBuildController(opts) {
         actionId,
         dispatchState: "selected",
         objective: objective.slice(0, 4_000),
+        intentRevision: record.intent.outcomeRevision,
+        authoritativeSha: record.authoritativeSha || null,
         selectedAt: now,
       });
       writeBuildRecord(runtimeRoot, record);
@@ -766,6 +864,34 @@ export function createBuildController(opts) {
       reportBody += "Created src/path-build-marker.txt and package.json\n";
     }
 
+    if (input.kind === "brief") {
+      const rec = readBuildRecord(runtimeRoot, input.buildId);
+      const bootstrap = rec?.productBrief || {};
+      reportBody += [
+        "```path-build-product-brief",
+        JSON.stringify(
+          {
+            version: 1,
+            buildId: input.buildId,
+            intentRevision: rec?.intent?.outcomeRevision || 1,
+            revision: (Number(bootstrap.revision) || 0) + 1,
+            productKind: bootstrap.productKind || "unknown",
+            summary: bootstrap.summary || rec?.intent?.outcome || "Product",
+            functionalRequirements: bootstrap.functionalRequirements || [],
+            visualRequirements: bootstrap.visualRequirements || [],
+            nonFunctionalRequirements: bootstrap.nonFunctionalRequirements || [],
+            constraints: bootstrap.constraints || [],
+            acceptanceCriteria: bootstrap.acceptanceCriteria || [],
+            assumptions: bootstrap.assumptions || [],
+            openQuestions: bootstrap.openQuestions || [],
+          },
+          null,
+          2,
+        ),
+        "```",
+      ].join("\n");
+    }
+
     if (input.kind === "evaluate" || input.kind === "challenge") {
       const rec = readBuildRecord(runtimeRoot, input.buildId);
       if (rec) {
@@ -832,11 +958,28 @@ export function createBuildController(opts) {
     }
 
     const cp = resolveTaskCheckpoint(taskId);
-    const snap = gatewayProbeHints(taskId);
+    let snap = gatewayProbeHints(taskId);
     const reportPath = engineeringReportExists(taskId, runtimeRoot)
       ? resolveEngineeringReportPath(taskId, runtimeRoot)
       : null;
     const reportText = reportPath ? readReportText(reportPath) : "";
+    let engineResultText = "";
+    if (!fakeMode && typeof gateway.getResult === "function") {
+      try {
+        const gatewayResult = await gateway.getResult(taskId);
+        snap = gatewayResult?.snapshot || snap;
+        engineResultText = String(
+          gatewayResult?.result?.engineResultText ||
+            gatewayResult?.snapshot?.result?.engineResultText ||
+            "",
+        );
+      } catch {
+        // The durable engineering report remains the recovery fallback.
+      }
+    }
+    const cognitiveText = [engineResultText, reportText]
+      .filter((value) => value && value.trim())
+      .join("\n\n");
     const binding = record.projectBindings.find((b) => b.bindingId === child.bindingId);
     const reality = binding
       ? captureBindingReality(binding.projectRoot)
@@ -845,10 +988,32 @@ export function createBuildController(opts) {
 
     const resultFingerprint = createHash("sha256")
       .update(
-        `${taskId}:${cp?.finalState || ""}:${cp?.sha || ""}:${cp?.diffFingerprint || ""}:${reportText.slice(0, 500)}`,
+        `${taskId}:${cp?.finalState || ""}:${cp?.sha || ""}:${cp?.diffFingerprint || ""}:${cognitiveText.slice(0, 500)}`,
       )
       .digest("hex")
       .slice(0, 24);
+
+    if (!child.orphanAbandoned && child.kind === "brief") {
+      const parsedBrief = parseProductBriefResult(cognitiveText, {
+        buildId: record.buildId,
+        intentRevision: record.intent.outcomeRevision,
+        revision: (Number(record.productBrief?.revision) || 0) + 1,
+      });
+      if (parsedBrief.ok) {
+        record.productBrief = parsedBrief.brief;
+        record.productBriefError = undefined;
+        if (record.criteriaAuthority !== "caller") {
+          record.outcomeCriteria = briefToOutcomeCriteria(parsedBrief.brief);
+        }
+      } else {
+        record.productBriefError = {
+          errors: parsedBrief.errors,
+          taskId,
+          at: new Date().toISOString(),
+        };
+        record.loop.forceNextKind = "brief";
+      }
+    }
 
     // Apply assessment directives from engineering reports
     if (
@@ -857,12 +1022,15 @@ export function createBuildController(opts) {
         child.kind === "challenge" ||
         child.kind === "engineer")
     ) {
-      applyAssessmentToRecord(record, reportText, {
+      const assessment = applyAssessmentToRecord(record, cognitiveText, {
         taskId,
         bindingId: child.bindingId,
         reality,
         kind: child.kind,
       });
+      if (child.kind === "evaluate" || child.kind === "challenge") {
+        child.semanticProofAccepted = assessment.structuredAccepted;
+      }
     }
 
     // Engineer progress / no-progress
@@ -879,7 +1047,7 @@ export function createBuildController(opts) {
       /FAIL|NOT_VERIFIED|BLOCKED/i.test(classification);
     const noValidationCandidates = /no discoverable project validation/i.test(
       String(
-        (cp?.validation && cp.validation.reason) || reportText || "",
+        (cp?.validation && cp.validation.reason) || cognitiveText || "",
       ),
     );
     if (failed && !(noValidationCandidates && child.kind === "engineer")) {
@@ -913,7 +1081,7 @@ export function createBuildController(opts) {
     child.classification = childVerificationClass(child) || child.classification;
     child.terminalAt = child.terminalAt || new Date().toISOString();
     {
-      const provenance = extractProviderProvenance(cp, snap, reportText);
+      const provenance = extractProviderProvenance(cp, snap, cognitiveText);
       if (provenance.provider) child.provider = provenance.provider;
       if (provenance.engineMode) child.engineMode = provenance.engineMode;
     }
@@ -1072,9 +1240,12 @@ export function createBuildController(opts) {
         taskId: ctx.taskId,
         kind: ctx.kind,
       };
-      // Do not mutate criteria from mismatched structured result; prose may still apply.
+      // Do not mutate real semantic truth from a mismatched envelope. Legacy
+      // prose directives remain available only to deterministic fake fixtures.
     }
-    const directives = cognitiveResultToDirectives(parsed);
+    const directives = cognitiveResultToDirectives(parsed).filter(
+      (directive) => fakeMode || directive.source.startsWith("structured"),
+    );
     const now = new Date().toISOString();
     const reality = ctx.reality;
 
@@ -1096,19 +1267,6 @@ export function createBuildController(opts) {
 
       const criterion = (record.outcomeCriteria || []).find((c) => c.id === d.id);
       if (criterion && /PROVEN|UNMET|UNKNOWN/.test(d.status)) {
-        // Structured revision mismatch already nulled structured; prose can still update.
-        if (
-          d.source.startsWith("structured") &&
-          parsed.errors.includes("authoritativeRevision_mismatch")
-        ) {
-          continue;
-        }
-        if (
-          d.source.startsWith("structured") &&
-          parsed.errors.includes("intentRevision_mismatch")
-        ) {
-          continue;
-        }
         criterion.status = /** @type {any} */ (d.status);
         criterion.evidence = ev;
         criterion.updatedAt = now;
@@ -1197,6 +1355,7 @@ export function createBuildController(opts) {
         },
       ];
     }
+    return { structuredAccepted: Boolean(parsed.structured) };
   }
 
   /**
@@ -1291,7 +1450,13 @@ export function createBuildController(opts) {
       .reverse()
       .find((c) => c.kind === "challenge");
     const assessVerified = (child) =>
-      child && /VERIFIED/i.test(childVerificationClass(child));
+      child &&
+      /VERIFIED/i.test(childVerificationClass(child)) &&
+      (fakeMode ||
+        (child.semanticProofAccepted === true &&
+          child.intentRevision === record.intent.outcomeRevision &&
+          (child.authoritativeSha || null) ===
+            (record.authoritativeSha || null)));
     const hasEvaluate = assessVerified(lastEvaluate);
     const hasChallenge = assessVerified(lastChallenge);
     if (!critOk || !reqOk) {
@@ -1407,6 +1572,15 @@ export function createBuildController(opts) {
 
     if (record.loop.status === "complete") {
       return { ok: true, done: true, build: record, action: "already_complete" };
+    }
+    if (record.loop.status === "paused") {
+      return {
+        ok: true,
+        done: false,
+        paused: true,
+        build: record,
+        action: "paused",
+      };
     }
     if (record.loop.status === "blocked") {
       return {
@@ -1542,9 +1716,16 @@ export function createBuildController(opts) {
     }
 
     // Decide next kind
-    const engineers = record.children.filter((c) => c.kind === "engineer");
-    const evaluates = record.children.filter((c) => c.kind === "evaluate");
-    const challenges = record.children.filter((c) => c.kind === "challenge");
+    // Action sequencing is revision-local. Historical children from a prior
+    // completed product iteration must not bias the new engineer → evaluate →
+    // challenge cycle.
+    const currentRevision = record.intent.outcomeRevision;
+    const revisionChildren = record.children.filter(
+      (c) => c.intentRevision === currentRevision && !c.orphanAbandoned,
+    );
+    const engineers = revisionChildren.filter((c) => c.kind === "engineer");
+    const evaluates = revisionChildren.filter((c) => c.kind === "evaluate");
+    const challenges = revisionChildren.filter((c) => c.kind === "challenge");
     const demoted =
       (record.loop.lastRealityDelta &&
         Array.isArray(record.loop.lastRealityDelta.demotedIds) &&
@@ -1565,7 +1746,17 @@ export function createBuildController(opts) {
     let kind = "engineer";
     let objective = "";
 
-    if (forceEngineer) {
+    const briefCurrent =
+      fakeMode ||
+      (record.productBrief?.source === "cognitive" &&
+        record.productBrief?.intentRevision === record.intent.outcomeRevision);
+
+    if (!briefCurrent || record.loop.forceNextKind === "brief") {
+      kind = "brief";
+      objective = productBriefObjective(record);
+      record.loop.forceNextKind = undefined;
+      writeBuildRecord(runtimeRoot, record);
+    } else if (forceEngineer) {
       kind = "engineer";
       objective = frameEngineerObjective(
         record,
@@ -1583,6 +1774,13 @@ export function createBuildController(opts) {
         record,
         record.hypotheses.proposedNextAction || "",
       );
+    } else if (revisionChildren.at(-1)?.kind === "engineer") {
+      // Every engineering turn, including a no-op verification turn, must be
+      // followed by fresh assessment before another mutation is authorized.
+      kind = "evaluate";
+      objective = frameEvaluateObjective(record, {
+        evidencePackage: buildEvidencePackage(record),
+      });
     } else if (completion.reason === "requirements_unsatisfied") {
       kind = "engineer";
       const openReqs = (record.intent.explicitRequirements || []).filter(
@@ -1656,6 +1854,13 @@ export function createBuildController(opts) {
         : {}),
     });
     if (!dispatched.ok) return dispatched;
+    if (kind === "engineer" && record.loop.pendingSelectedElement) {
+      const latest = readBuildRecord(runtimeRoot, buildId);
+      if (latest) {
+        latest.loop.pendingSelectedElement = null;
+        writeBuildRecord(runtimeRoot, latest);
+      }
+    }
 
     const consumed = await awaitAndConsume(buildId, dispatched.taskId);
     record = readBuildRecord(runtimeRoot, buildId);
@@ -1720,14 +1925,16 @@ export function createBuildController(opts) {
         taskId: step.taskId,
         done: step.done,
         blocked: step.blocked,
+        paused: step.paused,
         reason: step.reason || step.completionReason,
       });
       if (!step.ok) return { ok: false, steps, error: step };
-      if (step.done || step.blocked) {
+      if (step.done || step.blocked || step.paused) {
         return {
           ok: true,
           done: Boolean(step.done),
           blocked: Boolean(step.blocked),
+          paused: Boolean(step.paused),
           steps,
           build: readBuildRecord(runtimeRoot, buildId),
         };
@@ -1765,9 +1972,10 @@ export function createBuildController(opts) {
     if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
     const text = String(input.message || "").trim();
     if (!text) return { ok: false, code: "MESSAGE_REQUIRED" };
+    const selectedElement = normalizeSelectedElement(input.element);
 
     const classified = classifyConversationMessage(text, {
-      hasSelection: Boolean(input.element),
+      hasSelection: Boolean(selectedElement),
     });
     if (!Array.isArray(record.conversation)) record.conversation = [];
     record.conversation.push({
@@ -1776,8 +1984,11 @@ export function createBuildController(opts) {
       text,
       at: new Date().toISOString(),
       kind: classified.kind,
-      element: input.element || undefined,
+      element: selectedElement || undefined,
     });
+    if (selectedElement) {
+      record.loop.pendingSelectedElement = selectedElement;
+    }
     record.hypotheses.proposedNextAction = classified.engineerObjectiveHint;
     writeBuildRecord(runtimeRoot, record);
 
@@ -1785,8 +1996,8 @@ export function createBuildController(opts) {
     const revision = {
       note: [
         classified.steerNote,
-        input.element
-          ? `Selected element: ${JSON.stringify(input.element).slice(0, 1_500)}`
+        selectedElement
+          ? `Selected element: ${JSON.stringify(selectedElement)}`
           : "",
       ]
         .filter(Boolean)
@@ -1861,6 +2072,18 @@ export function createBuildController(opts) {
         });
       }
     }
+    const priorBrief = record.productBrief || {};
+    record.productBrief = {
+      ...priorBrief,
+      buildId: record.buildId,
+      intentRevision: record.intent.outcomeRevision,
+      revision: (Number(priorBrief.revision) || 0) + 1,
+      source: "mechanical-revision",
+      outcome: record.intent.outcome,
+      stale: true,
+      revisionContext: String(revision.note || "").slice(0, 2_000),
+      derivedAt: now,
+    };
     // Hypotheses are disposable; force next engineering toward new requirements.
     const newReqGap = (revision.addRequirements || [])
       .map((r) => String(r.statement || "").trim())
@@ -1885,6 +2108,7 @@ export function createBuildController(opts) {
     // Outcome text change OR demoteAll (conversation change) → demote criteria.
     if (
       revision.demoteAll ||
+      (revision.addRequirements || []).length > 0 ||
       (typeof revision.outcome === "string" && revision.outcome.trim())
     ) {
       for (const c of record.outcomeCriteria || []) {
@@ -1895,7 +2119,9 @@ export function createBuildController(opts) {
       }
     }
     record.loop.pendingReinspect = true;
-    // Product steers must engineer before re-evaluate — never leave evaluate stuck.
+    // Product steers must engineer before re-evaluate. Real mode first renews
+    // the revision-bound S3 ProductBrief, then the brief lifecycle selects the
+    // engineer; fake mode can select the engineer directly.
     if (revision.demoteAll || revision.note || revision.outcome) {
       record.loop.forceNextKind = "engineer";
       record.loop.pendingConversationSteer = true;
@@ -1903,6 +2129,7 @@ export function createBuildController(opts) {
     // Require fresh evaluate/challenge for this revision before COMPLETE.
     record.loop.lastEvaluateTaskId = undefined;
     record.loop.lastChallengeTaskId = undefined;
+    if (!fakeMode) record.loop.forceNextKind = "brief";
     if (record.loop.status === "complete") {
       record.loop.status = "running";
     }
@@ -1969,7 +2196,7 @@ export function createBuildController(opts) {
         ? [
             `browserEvidence: ok=${lastBrowser.ok} sha=${lastBrowser.authoritativeSha || "?"} title=${lastBrowser.title || ""}`,
             `  html=${lastBrowser.htmlPath || ""} shot=${lastBrowser.screenshotPath || ""}`,
-            `  textSample=${String(lastBrowser.textSample || "").slice(0, 500)}`,
+            `  textSample=${String(lastBrowser.textSample || "").slice(0, 4_000)}`,
             `  consoleErrors=${(lastBrowser.consoleErrors || []).slice(0, 5).join("; ")}`,
           ].join("\n")
         : "browserEvidence: (none)",
@@ -2030,6 +2257,8 @@ export function createBuildController(opts) {
     applyConversation,
     load,
     recover,
+    stopBuild,
+    resumeBuild,
     reconcileBuildChildren,
     runDepthA,
     dispatchChild,

@@ -59,8 +59,7 @@ ${metaTag}
       rect: { x: r.x, y: r.y, width: r.width, height: r.height },
       dataAttrs: Array.prototype.slice.call(el.attributes || []).filter(function(a){
         return a.name.indexOf("data-") === 0;
-      }).reduce(function(acc, a){ acc[a.name]=a.value; return acc; }, {}),
-      sourceHint: el.getAttribute("data-path-id") || el.getAttribute("data-source") || null
+      }).reduce(function(acc, a){ acc[a.name]=a.value; return acc; }, {})
     };
   }
   window.addEventListener("message", function(ev){

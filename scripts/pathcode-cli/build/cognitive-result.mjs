@@ -88,24 +88,24 @@ export function parseBuildCognitiveResult(reportText, opts = {}) {
   if (structured) {
     if (
       opts.expectedBuildId &&
-      structured.buildId &&
       structured.buildId !== opts.expectedBuildId
     ) {
       errors.push("buildId_mismatch");
       structured = null;
     }
     if (
+      structured &&
       typeof opts.expectedIntentRevision === "number" &&
-      typeof structured?.intentRevision === "number" &&
       structured.intentRevision !== opts.expectedIntentRevision
     ) {
       errors.push("intentRevision_mismatch");
       structured = null;
     }
+    const resultSha =
+      structured?.authoritativeSha ?? structured?.authoritativeRevision;
     if (
-      opts.expectedAuthoritativeRevision &&
-      structured?.authoritativeRevision &&
-      structured.authoritativeRevision !== opts.expectedAuthoritativeRevision
+      Object.prototype.hasOwnProperty.call(opts, "expectedAuthoritativeRevision") &&
+      resultSha !== opts.expectedAuthoritativeRevision
     ) {
       errors.push("authoritativeRevision_mismatch");
       structured = null;
@@ -132,7 +132,9 @@ export function cognitiveResultToDirectives(parsed) {
   if (s && Array.isArray(s.criteria)) {
     for (const c of s.criteria) {
       const id = String(c.criterionId || c.id || "").trim();
-      const status = String(c.status || "").toUpperCase();
+      const rawStatus = String(c.status || "").toUpperCase();
+      const status =
+        rawStatus === "PROVEN/SATISFIED" ? "PROVEN" : rawStatus;
       if (!id || !/^(PROVEN|UNMET|UNKNOWN)$/.test(status)) continue;
       rows.push({
         id,
@@ -145,7 +147,9 @@ export function cognitiveResultToDirectives(parsed) {
   if (s && Array.isArray(s.requirements)) {
     for (const r of s.requirements) {
       const id = String(r.requirementId || r.id || "").trim();
-      const status = String(r.status || "").toUpperCase();
+      const rawStatus = String(r.status || "").toUpperCase();
+      const status =
+        rawStatus === "PROVEN/SATISFIED" ? "SATISFIED" : rawStatus;
       if (!id || !/^(SATISFIED|VIOLATED|UNKNOWN)$/.test(status)) continue;
       rows.push({
         id,
@@ -203,7 +207,7 @@ export function structuredResultContractBlock(kind, record) {
           version: 1,
           buildId: record.buildId,
           intentRevision: record.intent?.outcomeRevision,
-          authoritativeRevision: record.authoritativeSha || null,
+          authoritativeSha: record.authoritativeSha || null,
           criteria: (record.outcomeCriteria || []).map((c) => ({
             criterionId: c.id,
             status: "UNKNOWN",
@@ -237,7 +241,7 @@ export function structuredResultContractBlock(kind, record) {
         version: 1,
         buildId: record.buildId,
         intentRevision: record.intent?.outcomeRevision,
-        authoritativeRevision: record.authoritativeSha || null,
+        authoritativeSha: record.authoritativeSha || null,
         challengedClaims: [],
         claims: (record.outcomeCriteria || [])
           .filter((c) => c.status === "PROVEN")

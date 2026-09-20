@@ -20,6 +20,9 @@ const els = {
   drawer: document.getElementById("drawer"),
   drawerBody: document.getElementById("drawerBody"),
   projectPath: document.getElementById("projectPath"),
+  stopBuildBtn: document.getElementById("stopBuildBtn"),
+  resumeBuildBtn: document.getElementById("resumeBuildBtn"),
+  recoverBuildBtn: document.getElementById("recoverBuildBtn"),
   selectModeBtn: document.getElementById("selectModeBtn"),
   refreshPreviewBtn: document.getElementById("refreshPreviewBtn"),
   openExternalBtn: document.getElementById("openExternalBtn"),
@@ -196,6 +199,13 @@ function render(view) {
   renderChat(view);
   renderDrawer(view);
   updatePreview(view);
+  els.stopBuildBtn.hidden = !view.canStop;
+  els.resumeBuildBtn.hidden = !view.canResume;
+  els.recoverBuildBtn.hidden = view.status === "running";
+
+  if (!selectedElement && view.selectedElement) {
+    selectedElement = view.selectedElement;
+  }
 
   if (selectedElement) {
     els.selectionChip.hidden = false;
@@ -213,16 +223,20 @@ function subscribe(buildId) {
     events = null;
   }
   events = new EventSource(`/api/builds/${encodeURIComponent(buildId)}/events`);
-  events.onmessage = (ev) => {
+  const receive = (ev) => {
     try {
-      const view = JSON.parse(ev.data);
-      render(view);
+      const payload = JSON.parse(ev.data);
+      render(payload?.view || payload);
     } catch {
       /* ignore */
     }
   };
+  events.addEventListener("build", receive);
+  events.addEventListener("snapshot", receive);
+  events.onopen = () => stopTruthPoll();
   events.onerror = () => {
-    /* browser will retry */
+    // EventSource retries with Last-Event-ID; polling is only a transport fallback.
+    startTruthPoll(buildId);
   };
 }
 
@@ -267,7 +281,6 @@ async function startBuild() {
       els.statusPill.textContent = "Building…";
     }
     subscribe(body.buildId);
-    startTruthPoll(body.buildId);
   } catch (err) {
     showLandingError(err instanceof Error ? err.message : String(err));
   } finally {
@@ -332,6 +345,13 @@ async function sendMessage(text) {
       },
     );
     const body = await res.json();
+    if (!res.ok || !body?.ok) {
+      showHandoffResult("Change", {
+        ok: false,
+        message: body?.message || body?.code || `HTTP ${res.status}`,
+      });
+      return;
+    }
     if (body.view) render(body.view);
     selectedElement = null;
     els.selectionChip.hidden = true;
@@ -351,6 +371,39 @@ async function sendMessage(text) {
   }
 }
 
+async function controlBuild(action) {
+  if (!activeBuildId) return;
+  const button =
+    action === "stop"
+      ? els.stopBuildBtn
+      : action === "resume"
+        ? els.resumeBuildBtn
+        : els.recoverBuildBtn;
+  button.disabled = true;
+  try {
+    const res = await fetch(
+      `/api/builds/${encodeURIComponent(activeBuildId)}/${action}`,
+      { method: "POST" },
+    );
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body?.ok) {
+      showHandoffResult(action, {
+        ok: false,
+        message: body?.message || body?.code || `HTTP ${res.status}`,
+      });
+      return;
+    }
+    if (body.view) render(body.view);
+  } catch (error) {
+    showHandoffResult(action, {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    button.disabled = false;
+  }
+}
+
 els.buildBtn.addEventListener("click", () => void startBuild());
 els.outcome.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -363,6 +416,9 @@ els.chatForm.addEventListener("submit", (e) => {
   e.preventDefault();
   void sendMessage(els.chatInput.value);
 });
+els.stopBuildBtn.addEventListener("click", () => void controlBuild("stop"));
+els.resumeBuildBtn.addEventListener("click", () => void controlBuild("resume"));
+els.recoverBuildBtn.addEventListener("click", () => void controlBuild("recover"));
 
 els.newBuildBtn.addEventListener("click", () => {
   if (events) events.close();
