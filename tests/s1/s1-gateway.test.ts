@@ -72,7 +72,7 @@ describe("S1 gateway extraction", () => {
     expect(caps.engines.some((e: { id: string }) => e.id === "cursor")).toBe(
       true,
     );
-    expect(caps.extensibility.workflows).toContain("path_build_slot");
+    expect(caps.extensibility.workflows).toContain("path_build");
     expect(caps.extensibility.clients).toContain("studio_slot");
   });
 

@@ -71,6 +71,42 @@ describe("S5 Build authoritative adoption", () => {
     rmSync(runtimeRoot, { recursive: true, force: true });
   });
 
+  it("refuses empty adoption when engineer SHA is missing from Build repo", () => {
+    const dir = mkdtempSync(join(tmpdir(), "path-empty-adopt-"));
+    const runtimeRoot = join(dir, "rt");
+    mkdirSync(runtimeRoot);
+    const root = join(dir, "project");
+    mkdirSync(root);
+    git(root, ["init", "--template="]);
+    git(root, ["config", "user.email", "t@t"]);
+    git(root, ["config", "user.name", "t"]);
+    writeFileSync(join(root, ".gitignore"), "\n");
+    git(root, ["add", ".gitignore"]);
+    git(root, ["commit", "-m", "origin"]);
+    const productBranch = "path-build/empty01";
+    git(root, ["checkout", "-b", productBranch]);
+    const taskBranch = "path/task-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    git(root, ["checkout", "-b", taskBranch]);
+    // Task branch stays at origin; sourceSha invents a nested-repo commit.
+    const fakeSha = "0123456789abcdef0123456789abcdef01234567";
+    git(root, ["checkout", productBranch]);
+
+    const adopted = adoptEngineerResultIntoBuild({
+      runtimeRoot,
+      buildId: "build-empty",
+      projectRoot: root,
+      productBranch,
+      taskId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      taskBranch,
+      sourceSha: fakeSha,
+      worktreePath: join(dir, "missing-wt"),
+    });
+    expect(adopted.ok).toBe(false);
+    expect(String(adopted.code)).toMatch(/SOURCE_SHA|EMPTY/);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("visual completion requires browser evidence when not fake", async () => {
     const dir = mkdtempSync(join(tmpdir(), "path-vis-complete-"));
     const runtimeRoot = join(dir, "rt");

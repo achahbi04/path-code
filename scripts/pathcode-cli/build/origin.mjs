@@ -3,11 +3,14 @@
  * Build-created roots bind the EXACT target directory — never walk to $HOME.
  */
 
-import { existsSync, mkdirSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { resolveTargetProjectRoot } from "../paths.mjs";
+import {
+  resolveTargetProjectRoot,
+  assertAllowedProjectRoot,
+} from "../paths.mjs";
 import { admitPrimaryCheckout } from "../ag1/admission.mjs";
 
 /**
@@ -84,8 +87,9 @@ export function ensureBuildOrigin(input) {
 
   targetDir = realpathOrResolve(targetDir);
 
-  const inside = git(targetDir, ["rev-parse", "--is-inside-work-tree"]);
-  if (inside.status !== 0 || inside.stdout.trim() !== "true") {
+  // Exact-root and nested-under-$HOME-git: require a .git directory *inside*
+  // targetDir. Parent worktrees must not satisfy "already a repo".
+  if (!hasGitDir(targetDir)) {
     const init = git(targetDir, ["init", "--template="]);
     if (init.status !== 0) {
       return {
@@ -106,6 +110,15 @@ export function ensureBuildOrigin(input) {
         ok: false,
         code: "ORIGIN_ROOT_MISMATCH",
         message: `Build origin git toplevel ${JSON.stringify(toplevel)} does not match target ${JSON.stringify(targetDir)}.`,
+      };
+    }
+
+    const allowed = assertAllowedProjectRoot(targetDir);
+    if (!allowed.ok) {
+      return {
+        ok: false,
+        code: allowed.code,
+        message: allowed.message,
       };
     }
 
@@ -154,6 +167,15 @@ export function ensureBuildOrigin(input) {
     };
   }
 
+  const allowed = assertAllowedProjectRoot(discovered.projectRoot);
+  if (!allowed.ok) {
+    return {
+      ok: false,
+      code: allowed.code,
+      message: allowed.message,
+    };
+  }
+
   const admission = admitPrimaryCheckout(discovered.projectRoot);
   if (!admission.ok) {
     return {
@@ -181,11 +203,23 @@ export function ensureBuildOrigin(input) {
 
 /**
  * True when cwd is already a bindable PATH project (Git or markers).
+ * Empty / freshly-mkdir'd directories are NEVER bindable — they are greenfield
+ * origins to establish, not existing projects to discover upward.
  * @param {string} cwd
  */
 export function isBindableProject(cwd) {
-  const discovered = resolveTargetProjectRoot(cwd);
-  return discovered.ok === true;
+  const root = resolve(String(cwd || ""));
+  if (!existsSync(root)) return false;
+  try {
+    const entries = readdirSync(root).filter((n) => n !== ".DS_Store");
+    if (entries.length === 0) return false;
+  } catch {
+    return false;
+  }
+  const discovered = resolveTargetProjectRoot(root);
+  if (!discovered.ok) return false;
+  const allowed = assertAllowedProjectRoot(discovered.projectRoot);
+  return allowed.ok === true;
 }
 
 /**

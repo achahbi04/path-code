@@ -34,12 +34,13 @@ export function frameEngineerObjective(record, gap) {
   const binding = (record.projectBindings || [])[0];
   const greenfieldHint = binding?.originGitInit
     ? [
-        "Greenfield context: this binding began as git-init-only.",
+        "Greenfield context: this binding began as git-init-only — the Build folder IS already a git repository.",
+        "CRITICAL: Do NOT run `git init`. Do NOT create a nested .git. Commit on the existing repo / task branch only.",
         "You MUST establish a real software project in this turn:",
-        "- package.json (or equivalent manifests for the chosen stack)",
-        "- source entrypoints",
-        "- at least one project-native check/test script that exits 0",
-        "- make an initial git commit of the established project",
+        "- package.json (or equivalent manifests for the chosen stack) OR a static index.html",
+        "- source entrypoints in THIS worktree (the Build project root)",
+        "- at least one project-native check/test script that exits 0 (for Node) OR a static index.html that renders",
+        "- git add + git commit on the existing repository (never re-init)",
         "Do not stop at a marker file alone.",
       ].join("\n")
     : "Continue engineering toward the outcome with project-native validation.";

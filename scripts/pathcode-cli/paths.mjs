@@ -128,18 +128,100 @@ export function looksLikeExistingProject(dir) {
 }
 
 /**
+ * Hard invariant: $HOME and ancestors of $HOME are never Build/project roots.
+ * Toggle `.enabled` only in falsification tests (corrupt → restore).
+ * @type {{ enabled: boolean }}
+ */
+export const HOME_BINDING_GUARD = { enabled: true };
+
+/**
+ * @param {string} a
+ * @param {string} b
+ */
+function samePath(a, b) {
+  let left = resolve(a);
+  let right = resolve(b);
+  try {
+    left = realpathSync(left);
+  } catch {
+    /* keep */
+  }
+  try {
+    right = realpathSync(right);
+  } catch {
+    /* keep */
+  }
+  return left === right;
+}
+
+/**
+ * True when `ancestor` is a strict ancestor of `child` (not equal).
+ * @param {string} ancestor
+ * @param {string} child
+ */
+function isStrictAncestor(ancestor, child) {
+  const rel = relative(resolve(ancestor), resolve(child));
+  return Boolean(rel) && !rel.startsWith("..") && !rel.includes(`..${sep}`);
+}
+
+/**
+ * Refuse $HOME and any ancestor of $HOME as a bindable project root.
+ * @param {string} candidate
+ * @param {{ home?: string }} [opts]
+ * @returns {{ ok: true, projectRoot: string } | { ok: false, code: string, message: string, projectRoot: string }}
+ */
+export function assertAllowedProjectRoot(candidate, opts = {}) {
+  const projectRoot = resolve(String(candidate || ""));
+  if (!HOME_BINDING_GUARD.enabled) {
+    return { ok: true, projectRoot };
+  }
+  const home = resolve(opts.home ?? process.env.HOME ?? homedir());
+  if (samePath(projectRoot, home)) {
+    return {
+      ok: false,
+      code: "HOME_BINDING_FORBIDDEN",
+      message:
+        "PATH refuses to bind $HOME as a project root. Use a project folder (e.g. ~/PATH Builds/<name>).",
+      projectRoot,
+    };
+  }
+  if (isStrictAncestor(projectRoot, home)) {
+    return {
+      ok: false,
+      code: "HOME_ANCESTOR_BINDING_FORBIDDEN",
+      message:
+        "PATH refuses to bind an ancestor of $HOME as a project root.",
+      projectRoot,
+    };
+  }
+  return { ok: true, projectRoot };
+}
+
+/**
  * Walk upward from cwd for an existing-project root (Git optional).
- * Stops at the user's home directory.
+ * Never crosses $HOME: home is a stop boundary, not a candidate (unless the
+ * HOME_BINDING_GUARD is intentionally disabled for falsification).
  * @param {string} cwd
  * @returns {string | null}
  */
 function findUnversionedProjectRoot(cwd) {
   let cur = resolve(cwd);
   const home = resolve(homedir());
-  const stopAt = new Set([home, resolve("/")]);
+  const filesystemRoot = resolve("/");
   for (let i = 0; i < 48; i += 1) {
+    // Stop at $HOME / filesystem root BEFORE marker checks — macOS $HOME often
+    // looks "bindable" (Public/ + *.json) and must never win.
+    if (cur === home || cur === filesystemRoot) {
+      if (
+        !HOME_BINDING_GUARD.enabled &&
+        cur === home &&
+        looksLikeExistingProject(cur)
+      ) {
+        return cur;
+      }
+      return null;
+    }
     if (looksLikeExistingProject(cur)) return cur;
-    if (stopAt.has(cur)) return null;
     const parent = dirname(cur);
     if (parent === cur) return null;
     cur = parent;
@@ -248,6 +330,15 @@ export function resolveTargetProjectRoot(cwd = process.cwd()) {
       };
     }
 
+    const allowed = assertAllowedProjectRoot(projectRoot);
+    if (!allowed.ok) {
+      return {
+        ok: false,
+        code: allowed.code,
+        message: allowed.message,
+      };
+    }
+
     const rel = relative(projectRoot, invocationCwd);
     if (rel.startsWith("..") || rel.includes(`..${sep}`)) {
       return {
@@ -288,6 +379,14 @@ export function resolveTargetProjectRoot(cwd = process.cwd()) {
     projectRoot = realpathSync(found);
   } catch {
     // keep
+  }
+  const allowed = assertAllowedProjectRoot(projectRoot);
+  if (!allowed.ok) {
+    return {
+      ok: false,
+      code: allowed.code,
+      message: allowed.message,
+    };
   }
   const rel = relative(projectRoot, invocationCwd);
   if (rel.startsWith("..") || rel.includes(`..${sep}`)) {

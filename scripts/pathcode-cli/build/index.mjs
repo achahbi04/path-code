@@ -15,6 +15,10 @@ export {
 } from "./record.mjs";
 
 export { ensureBuildOrigin, isBindableProject, hasGitDir } from "./origin.mjs";
+export {
+  assertAllowedProjectRoot,
+  HOME_BINDING_GUARD,
+} from "../paths.mjs";
 
 export { deriveProductBrief, briefToOutcomeCriteria, inferProductKind } from "./brief.mjs";
 export { classifyConversationMessage } from "./conversation.mjs";
@@ -25,6 +29,7 @@ export {
   adoptEngineerResultIntoBuild,
   ensureBuildProductBranch,
   gitHeadSha,
+  isEmptyProductTree,
 } from "./adopt.mjs";
 export {
   decideChildReconciliation,

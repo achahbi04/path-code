@@ -47,11 +47,15 @@ export async function findFreePort(from = 4173) {
 /**
  * @param {string} url
  * @param {number} [timeoutMs]
+ * @param {(() => boolean) | null} [shouldAbort]
  */
-export async function waitForHttpReady(url, timeoutMs = 45_000) {
+export async function waitForHttpReady(url, timeoutMs = 45_000, shouldAbort = null) {
   const start = Date.now();
   let lastErr = "";
   while (Date.now() - start < timeoutMs) {
+    if (typeof shouldAbort === "function" && shouldAbort()) {
+      return { ok: false, error: lastErr || "process_exited", url, aborted: true };
+    }
     try {
       const res = await fetch(url, {
         method: "GET",
@@ -345,30 +349,39 @@ export function createBuildRuntimeManager(opts) {
       };
       child.stdout?.on("data", (b) => onData(b, "out"));
       child.stderr?.on("data", (b) => onData(b, "err"));
+      /** @type {number | null} */
+      let earlyExitCode = null;
       child.on("exit", (code) => {
+        earlyExitCode = typeof code === "number" ? code : 1;
         if (live.get(buildId) === entry) {
           entry.status = "exited";
-          entry.exitCode = code;
+          entry.exitCode = earlyExitCode;
           persist(buildId, {
             ...snapshot(entry),
             status: "exited",
-            exitCode: code,
+            exitCode: earlyExitCode,
           });
           live.delete(buildId);
         }
       });
 
-      const ready = await waitForHttpReady(entry.url, 60_000);
+      const ready = await waitForHttpReady(entry.url, 60_000, () => earlyExitCode !== null);
       if (!ready.ok) {
+        const exited = earlyExitCode !== null;
         await stop(buildId);
         return {
           ok: false,
-          code: "RUNTIME_START_TIMEOUT",
-          message: ready.error,
+          code: exited ? "RUNTIME_EXITED" : "RUNTIME_START_TIMEOUT",
+          message: exited
+            ? `Preview process exited with code ${earlyExitCode}`
+            : ready.error,
           runtime: {
             ...snapshot(entry),
             status: "failed",
-            error: ready.error,
+            exitCode: earlyExitCode,
+            error: exited
+              ? `exited(${earlyExitCode})`
+              : ready.error,
             stdoutTail: entry.stdout.slice(-2_000),
             stderrTail: entry.stderr.slice(-2_000),
           },
@@ -430,6 +443,9 @@ export function createBuildRuntimeManager(opts) {
       framework: entry.artifact?.framework || null,
       error: entry.error || null,
       reason: entry.reason || null,
+      exitCode: typeof entry.exitCode === "number" ? entry.exitCode : null,
+      stdoutTail: typeof entry.stdout === "string" ? entry.stdout.slice(-2_000) : null,
+      stderrTail: typeof entry.stderr === "string" ? entry.stderr.slice(-2_000) : null,
     };
   }
 

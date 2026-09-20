@@ -84,6 +84,9 @@ export function createGatewayRuntime(options = {}) {
     typeof options.gatewayId === "string" && options.gatewayId
       ? options.gatewayId
       : `gw-${randomUUID()}`;
+  const skipBootstrap =
+    options.skipBootstrap === true ||
+    process.env.PATHCODE_GATEWAY_SKIP_BOOTSTRAP === "1";
 
   const bus = new EventEmitter();
   bus.setMaxListeners(100);
@@ -201,6 +204,15 @@ export function createGatewayRuntime(options = {}) {
     if (!discovered.ok) {
       return { ok: false, code: discovered.code || "PROJECT_BIND_FAILED", message: discovered.message };
     }
+    const { assertAllowedProjectRoot } = await import("../paths.mjs");
+    const allowed = assertAllowedProjectRoot(discovered.projectRoot);
+    if (!allowed.ok) {
+      return {
+        ok: false,
+        code: allowed.code,
+        message: allowed.message,
+      };
+    }
     const projectRoot = discovered.projectRoot;
     const workingSubdir =
       typeof discovered.workingSubdir === "string" ? discovered.workingSubdir : "";
@@ -221,14 +233,14 @@ export function createGatewayRuntime(options = {}) {
     }
 
     try {
-      if (process.env.PATHCODE_GATEWAY_SKIP_BOOTSTRAP !== "1") {
+      if (!skipBootstrap) {
         await ensureAg1Runtime({ packageRoot, runtimeRoot });
       }
     } catch {
       // non-fatal at bind; task start re-checks
     }
     try {
-      if (process.env.PATHCODE_GATEWAY_SKIP_BOOTSTRAP !== "1") {
+      if (!skipBootstrap) {
         recoverPathOwnedStaleWorktrees({
           projectRoot,
           checkoutRoot: packageRoot,

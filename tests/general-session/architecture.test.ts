@@ -80,7 +80,10 @@ describe("5G-E: the scope profile is provider-neutral", () => {
       readFileSync(join(CHECKOUT_ROOT, "package.json"), "utf8"),
     ) as Record<string, any>;
     expect(pkg.private).not.toBe(true);
-    expect(pkg.bin).toEqual({ pathcode: "./scripts/pathcode.mjs" });
+    expect(pkg.bin).toEqual({
+      pathcode: "./scripts/pathcode.mjs",
+      "path-build": "./scripts/path-build.mjs",
+    });
     expect(pkg.dependencies ?? {}).toEqual({});
     expect(pkg.exports).toEqual({
       ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },

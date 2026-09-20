@@ -19,6 +19,7 @@ import {
   scrubBuildTempFiles,
 } from "./record.mjs";
 import { ensureBuildOrigin, isBindableProject } from "./origin.mjs";
+import { isEmptyProductTree } from "./adopt.mjs";
 import {
   captureBindingReality,
   makeEvidenceRef,
@@ -314,13 +315,23 @@ export function createBuildController(opts) {
       record.projectBindings.push(origin.binding);
       projectRoot = origin.binding.projectRoot;
     } else {
-      const { resolveTargetProjectRoot } = await import("../paths.mjs");
+      const { resolveTargetProjectRoot, assertAllowedProjectRoot } = await import(
+        "../paths.mjs"
+      );
       const discovered = resolveTargetProjectRoot(projectRoot);
       if (!discovered.ok) {
         return {
           ok: false,
           code: discovered.code,
           message: discovered.message,
+        };
+      }
+      const allowed = assertAllowedProjectRoot(discovered.projectRoot);
+      if (!allowed.ok) {
+        return {
+          ok: false,
+          code: allowed.code,
+          message: allowed.message,
         };
       }
       record.projectBindings.push({
@@ -330,6 +341,18 @@ export function createBuildController(opts) {
         originKind: "existing-project",
       });
       projectRoot = discovered.projectRoot;
+    }
+
+    {
+      const { assertAllowedProjectRoot } = await import("../paths.mjs");
+      const allowed = assertAllowedProjectRoot(projectRoot);
+      if (!allowed.ok) {
+        return {
+          ok: false,
+          code: allowed.code,
+          message: allowed.message,
+        };
+      }
     }
 
     const bound = await gateway.bindProject(projectRoot);
@@ -962,6 +985,16 @@ export function createBuildController(opts) {
             delete binding.activeWorktreePath;
             child.adoptedSha = adoption.adoptedSha;
             child.sourceSha = adoption.sourceSha;
+
+            // Greenfield honesty: "VERIFIED" with no product files is not progress.
+            if (isEmptyProductTree(binding.projectRoot)) {
+              child.classification = "NOT_VERIFIED";
+              child.adoptionEmpty = true;
+              record.loop.forceNextKind = "engineer";
+              record.loop.pendingRuntimeRefresh = false;
+              record.hypotheses.proposedNextAction =
+                "Previous engineer claimed success but left an empty Build folder. Establish real product files (index.html or package + start) in this binding — do NOT run git init (the folder is already a git repo).";
+            }
           } else if (adoption && !adoption.ok) {
             record.loop.lastAdoptionError = {
               code: adoption.code,
@@ -969,6 +1002,19 @@ export function createBuildController(opts) {
               at: new Date().toISOString(),
               taskId,
             };
+            if (/VERIFIED|SUCCESS/i.test(String(child.classification || ""))) {
+              child.classification = "NOT_VERIFIED";
+            }
+            child.adoptionError = {
+              code: adoption.code,
+              message: adoption.message,
+            };
+            record.loop.forceNextKind = "engineer";
+            record.loop.pendingRuntimeRefresh = false;
+            if (isEmptyProductTree(binding.projectRoot)) {
+              record.hypotheses.proposedNextAction =
+                `Adoption failed (${adoption.code}): ${adoption.message}. Re-establish the product in the Build folder without nested git init.`;
+            }
           }
         }
       }
@@ -1504,9 +1550,16 @@ export function createBuildController(opts) {
         Array.isArray(record.loop.lastRealityDelta.demotedIds) &&
         record.loop.lastRealityDelta.demotedIds) ||
       [];
+    const bindingRoot =
+      record.projectBindings?.[0]?.projectRoot ||
+      record.projectBindings?.[0]?.path ||
+      "";
+    const productStillEmpty =
+      Boolean(bindingRoot) && isEmptyProductTree(bindingRoot);
     const forceEngineer =
       record.loop.forceNextKind === "engineer" ||
-      Boolean(record.loop.pendingConversationSteer);
+      Boolean(record.loop.pendingConversationSteer) ||
+      productStillEmpty;
 
     /** @type {import('./types.mjs').BuildTaskKind} */
     let kind = "engineer";
@@ -1516,7 +1569,10 @@ export function createBuildController(opts) {
       kind = "engineer";
       objective = frameEngineerObjective(
         record,
-        record.hypotheses.proposedNextAction || "",
+        productStillEmpty
+          ? record.hypotheses.proposedNextAction ||
+              "Establish a real runnable web product in this Build folder (index.html or package.json + start). Do not run git init — the repository already exists."
+          : record.hypotheses.proposedNextAction || "",
       );
       record.loop.forceNextKind = undefined;
       record.loop.pendingConversationSteer = false;

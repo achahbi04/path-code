@@ -139,6 +139,8 @@ export async function startPathBuildSurface(options) {
   const gatewayRuntime = createGatewayRuntime({
     packageRoot,
     runtimeRoot,
+    // Fake/surface unit tests must not block on AG1 runtime bootstrap.
+    skipBootstrap: fakeMode,
   });
 
   const runtimeManager = createBuildRuntimeManager({ runtimeRoot });

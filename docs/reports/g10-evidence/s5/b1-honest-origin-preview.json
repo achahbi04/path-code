@@ -1,0 +1,52 @@
+{
+  "startedAt": "2026-09-20T12:47:12.687Z",
+  "runtimeRoot": "/Users/achahbi/.path-code/runtime/v1.0.1",
+  "packageRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+  "surfaceUrl": "http://127.0.0.1:7788/",
+  "phase": "conversation_changed",
+  "buildPost": {
+    "status": 200,
+    "ok": true,
+    "buildId": "058612c6-c70f-459a-b667-7fa709cb9922",
+    "projectRoot": "/Users/achahbi/PATH Builds/build-a-website-that-tells-about-ice-76898a",
+    "message": null,
+    "code": null
+  },
+  "buildId": "058612c6-c70f-459a-b667-7fa709cb9922",
+  "projectRoot": "/Users/achahbi/PATH Builds/build-a-website-that-tells-about-ice-76898a",
+  "bindsHome": false,
+  "underPathBuilds": true,
+  "uiProjectPath": "/Users/achahbi/PATH Builds/build-a-website-that-tells-about-ice-76898a",
+  "originGitInit": true,
+  "originKind": "build-created",
+  "poll": {
+    "preview": "idle",
+    "children": [],
+    "at": "2026-09-20T12:47:23.584Z"
+  },
+  "preview": {
+    "url": "http://127.0.0.1:4174/",
+    "embedPath": "/preview/058612c6-c70f-459a-b667-7fa709cb9922/",
+    "auth": "61436c5e0c13f9de89fcc658d519964aa6960bc9"
+  },
+  "servedHash1": "129894c0cf413c36904db076be7c5406f7a64b66dc159ee60e222151a3e7f07c",
+  "diskHash1": "129894c0cf413c36904db076be7c5406f7a64b66dc159ee60e222151a3e7f07c",
+  "servedMatchesDisk": true,
+  "liveProductShot": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/b1-honest-origin-preview/live-product.png",
+  "conversationChange": {
+    "hash": "d8a33423439ffa59f882bcc77d4e0699c8b2eb57ea1e34fc50a9a21a0e888be0",
+    "text": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>ICE — Your Emergency Lifeline</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</he"
+  },
+  "changeShot": "/Users/achahbi/.path-code/runtime/v1.0.1/metadata/build-evidence/b1-honest-origin-preview/after-change.png",
+  "openFolder": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "path": "/Users/achahbi/PATH Builds/build-a-website-that-tells-about-ice-76898a",
+      "launched": true,
+      "pid": 80519
+    }
+  },
+  "verdict": "B1 — HONEST ORIGIN + LIVE PRODUCT PREVIEW PASS",
+  "endedAt": "2026-09-20T12:55:50.684Z"
+}

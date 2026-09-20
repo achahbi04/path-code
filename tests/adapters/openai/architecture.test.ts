@@ -115,6 +115,7 @@ describe("openai adapter architecture", () => {
     // Installed dependency count unchanged: only prior devDependencies.
     expect(Object.keys(pkg.devDependencies ?? {}).sort()).toEqual([
       "@types/node",
+      "playwright",
       "tsx",
       "typescript",
       "vitest",

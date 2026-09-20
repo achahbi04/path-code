@@ -79,11 +79,22 @@ export function projectBuildForSurface(build, extras = {}) {
       build.loop?.blockedReason ||
       "PATH could not advance honestly. Adjust the request and continue.";
     progressLabel = "Blocked";
-  } else if (runtime?.status === "failed" || runtime?.status === "unhealthy") {
+  } else if (
+    runtime?.status === "failed" ||
+    runtime?.status === "unhealthy" ||
+    runtime?.status === "exited" ||
+    runtime?.status === "unavailable"
+  ) {
     phase = "runtime_error";
     uiState = "error";
     headline = "Preview failed";
-    detail = runtime.error || runtime.reason || "Could not start the product runtime.";
+    const exitBit =
+      typeof runtime.exitCode === "number" ? ` (exit ${runtime.exitCode})` : "";
+    detail =
+      runtime.stderrTail ||
+      runtime.error ||
+      runtime.reason ||
+      `Could not start the product runtime${exitBit}.`;
     progressLabel = "Error";
   } else if (preview?.status === "ready" || runtime?.status === "ready") {
     phase = "preview";

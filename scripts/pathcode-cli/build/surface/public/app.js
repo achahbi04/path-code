@@ -123,15 +123,38 @@ function renderDrawer(view) {
 function updatePreview(view) {
   const embed = view.preview?.embedPath || null;
   const direct = view.preview?.url || null;
-  const ready = view.preview?.status === "ready" || view.preview?.status === "stale";
+  const runtimeFailed =
+    view.runtime?.status === "failed" ||
+    view.runtime?.status === "exited" ||
+    view.runtime?.status === "unhealthy" ||
+    view.runtime?.status === "unavailable";
+  const ready =
+    !runtimeFailed &&
+    (view.preview?.status === "ready" || view.preview?.status === "stale");
 
-  if (view.runtime?.status === "failed" || view.runtime?.status === "unhealthy") {
+  if (runtimeFailed) {
     els.previewError.hidden = false;
-    els.previewError.textContent =
-      view.runtime.error || view.detail || "Preview runtime failed.";
-  } else {
-    els.previewError.hidden = true;
+    const exitBit =
+      typeof view.runtime?.exitCode === "number"
+        ? ` (exit ${view.runtime.exitCode})`
+        : "";
+    const stderr =
+      view.runtime?.stderrTail ||
+      view.runtime?.error ||
+      view.runtime?.reason ||
+      view.detail ||
+      "Preview runtime is not running.";
+    els.previewError.textContent = `Preview failed${exitBit}: ${String(stderr).slice(0, 800)}`;
+    els.previewEmpty.hidden = true;
+    els.previewFrame.hidden = true;
+    els.previewFrame.src = "";
+    previewEmbed = null;
+    previewDirectUrl = null;
+    els.previewLabel.textContent = "Preview unavailable";
+    return;
   }
+
+  els.previewError.hidden = true;
 
   if (ready && embed) {
     const nextSrc = embed.endsWith("/") ? embed : `${embed}/`;

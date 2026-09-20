@@ -17,6 +17,7 @@ describe("CLI package and entry foundation", () => {
     expect(packageJson.private).not.toBe(true);
     expect(packageJson.bin).toEqual({
       pathcode: "./scripts/pathcode.mjs",
+      "path-build": "./scripts/path-build.mjs",
     });
     expect(packageJson.dependencies ?? {}).toEqual({});
   });
