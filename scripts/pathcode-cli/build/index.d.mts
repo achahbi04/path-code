@@ -60,6 +60,7 @@ export interface BuildChild {
   intentRevision?: number;
   authoritativeSha?: string | null;
   semanticProofAccepted?: boolean;
+  provider?: string;
 }
 
 export interface ProductBrief {
@@ -137,6 +138,7 @@ export interface BuildRecord {
     at: string;
     element?: SelectedElement;
     kind?: string;
+    status?: "queued" | "incorporated" | "being_applied" | "applied";
   }>;
   productBranch?: string;
   coordinator?: { autoRun: boolean; owner: string };
@@ -168,8 +170,29 @@ export function createBuildRecordSkeleton(input: {
   buildId?: string;
 }): BuildRecord;
 export function readBuildRecord(runtimeRoot: string, buildId: string): BuildRecord | null;
-export function writeBuildRecord(runtimeRoot: string, record: BuildRecord): BuildRecord;
+export function writeBuildRecord(
+  runtimeRoot: string,
+  record: BuildRecord | Record<string, unknown>,
+): BuildRecord;
 export function listBuildRecords(runtimeRoot: string): BuildRecord[];
+export function findLatestActiveBuild(runtimeRoot: string): BuildRecord | null;
+export function appendPendingConversation(
+  runtimeRoot: string,
+  buildId: string,
+  message: Record<string, unknown>,
+): Record<string, unknown>;
+export function readPendingConversations(
+  runtimeRoot: string,
+  buildId: string,
+): Array<Record<string, unknown>>;
+export function drainPendingConversations(
+  runtimeRoot: string,
+  buildId: string,
+): Array<Record<string, unknown>>;
+export function resolveBuildConversationQueuePath(
+  runtimeRoot: string,
+  buildId: string,
+): string;
 export function resolveBuildsDir(runtimeRoot: string): string;
 export function resolveBuildRecordPath(runtimeRoot: string, buildId: string): string;
 export function makeBuildActionId(kind: string, keyMaterial: string): string;
@@ -429,22 +452,26 @@ export function projectBuildForSurface(
     | BuildRecord
     | {
         buildId: string;
-        loop: { status: BuildRecord["loop"]["status"] };
+        loop: { status: BuildRecord["loop"]["status"]; [key: string]: unknown };
         intent: {
           outcome: string;
           outcomeRevision: number;
-          explicitRequirements: ExplicitRequirement[];
+          explicitRequirements?: ExplicitRequirement[];
+          [key: string]: unknown;
         };
-        outcomeCriteria: OutcomeCriterion[];
-        projectBindings: ProjectBinding[];
-        children: BuildChild[];
-        hypotheses: BuildRecord["hypotheses"];
+        outcomeCriteria?: OutcomeCriterion[];
+        projectBindings?: ProjectBinding[];
+        children?: Array<Partial<BuildChild> & { kind?: BuildChild["kind"] }>;
+        hypotheses?: BuildRecord["hypotheses"];
         conversation?: BuildRecord["conversation"];
+        authoritativeSha?: string | null;
       }
     | null,
   state?: {
     preview?: { status: string; embedPath?: string; url?: string };
     runtime?: { status: string; url?: string };
+    events?: Array<{ id?: number; type?: string; at?: string }>;
+    checkpoint?: Record<string, unknown>;
   },
 ): {
   phase: string;
@@ -456,6 +483,12 @@ export function projectBuildForSurface(
   preview: { embedPath?: string };
   uiState?: string;
   handoff?: { projectRoot: string };
+  progressLabel?: string;
+  engineeringActivity?: {
+    engine?: string | null;
+    files?: string[];
+    [key: string]: unknown;
+  };
 };
 
 export interface BuildCoordinatorClient {

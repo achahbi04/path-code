@@ -4,6 +4,7 @@
  */
 
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -208,9 +209,76 @@ export function listBuildRecords(runtimeRoot) {
 export function findLatestActiveBuild(runtimeRoot) {
   return (
     listBuildRecords(runtimeRoot).find(
-      (b) => b.loop?.status === "running" || b.loop?.status === "blocked",
+      (b) =>
+        b.loop?.status === "running" ||
+        b.loop?.status === "blocked" ||
+        b.loop?.status === "paused",
     ) || null
   );
+}
+
+/**
+ * @param {string} runtimeRoot
+ * @param {string} buildId
+ */
+export function resolveBuildConversationQueuePath(runtimeRoot, buildId) {
+  const recordPath = resolveBuildRecordPath(runtimeRoot, buildId);
+  return recordPath.replace(/\.build\.json$/, ".conversation.jsonl");
+}
+
+/**
+ * Append-only conversation accept path. Safe while a cognitive child holds
+ * the coordinator mutation gate — the UI can persist without waiting.
+ *
+ * @param {string} runtimeRoot
+ * @param {string} buildId
+ * @param {object} message
+ */
+export function appendPendingConversation(runtimeRoot, buildId, message) {
+  const path = resolveBuildConversationQueuePath(runtimeRoot, buildId);
+  mkdirSync(dirname(path), { recursive: true });
+  appendFileSync(path, `${JSON.stringify(message)}\n`, "utf8");
+  return message;
+}
+
+/**
+ * @param {string} runtimeRoot
+ * @param {string} buildId
+ */
+export function readPendingConversations(runtimeRoot, buildId) {
+  const path = resolveBuildConversationQueuePath(runtimeRoot, buildId);
+  if (!existsSync(path)) return [];
+  try {
+    return readFileSync(path, "utf8")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * @param {string} runtimeRoot
+ * @param {string} buildId
+ */
+export function drainPendingConversations(runtimeRoot, buildId) {
+  const pending = readPendingConversations(runtimeRoot, buildId);
+  const path = resolveBuildConversationQueuePath(runtimeRoot, buildId);
+  try {
+    unlinkSync(path);
+  } catch {
+    /* already drained */
+  }
+  return pending;
 }
 
 /**

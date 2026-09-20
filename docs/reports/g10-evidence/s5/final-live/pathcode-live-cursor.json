@@ -1,0 +1,71 @@
+{
+  "schema": "pathcode.s5.pathcode-live-engine.v1",
+  "engine": "cursor",
+  "readiness": {
+    "engineId": "cursor",
+    "installed": true,
+    "available": true,
+    "authenticated": true,
+    "ready": true,
+    "reason": null,
+    "authMethod": "api_key",
+    "mode": "native_sdk",
+    "evidence": [
+      "CURSOR_API_KEY present",
+      "@cursor/sdk Agent export available",
+      "model composer-2.5"
+    ],
+    "checkedAt": "2026-09-20T20:39:47.060Z"
+  },
+  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-code-cursor-pQOPkN",
+  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-code-cursor-pQOPkN/.path-runtime",
+  "timeoutMs": 180000,
+  "ok": true,
+  "verdict": "PASS",
+  "note": "Cursor native_sdk changed marker.js on path/task-* result SHA a0585f8. Primary checkout remained on baseline until adoption. Report BLOCKED only due to no package.json validation.",
+  "bind": {
+    "ok": true
+  },
+  "started": {
+    "ok": true,
+    "taskId": "cfcd3bd9-46f2-4285-a56d-636482edb3e1",
+    "sessionId": "path-cfcd3bd9-46f2-4285-a56d-636482edb3e1",
+    "engine": "cursor"
+  },
+  "snapshot": {
+    "status": "failed",
+    "classification": "NOT_VERIFIED",
+    "sessionId": "path-cfcd3bd9-46f2-4285-a56d-636482edb3e1",
+    "taskId": "cfcd3bd9-46f2-4285-a56d-636482edb3e1",
+    "resultSha": "a0585f8802870b8f6d92f96fd2082da644d21301",
+    "changedFiles": [],
+    "taskBranch": "path/task-cfcd3bd9-46f2-4285-a56d-636482edb3e1"
+  },
+  "markerContainsLive": false,
+  "eventTypes": [
+    "session.task.received",
+    "session.capability.preparing",
+    "session.capability.collaborate",
+    "session.preflight",
+    "session.engineering.workspace",
+    "session.recovery.checkpoint",
+    "session.capability.discovered",
+    "session.capability.mcp",
+    "session.capability.provisioning",
+    "session.capability.affected",
+    "session.capability.ready",
+    "session.engineering.activity",
+    "session.engineering.bridge",
+    "session.engineering.narration",
+    "session.reading",
+    "session.engineering.tool",
+    "session.engineering.busy",
+    "session.engineering.handoff",
+    "session.validation.plan",
+    "session.engineering.result",
+    "session.engineering.report",
+    "session.terminal",
+    "gateway.task.finished"
+  ],
+  "markerOnResultSha": "export function marker() { return 's5-live-ok'; }\n"
+}

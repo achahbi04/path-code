@@ -52,6 +52,10 @@ body {
   gap: 1.5rem;
   padding: 2rem;
 }
+.landing[hidden],
+.workspace[hidden] {
+  display: none !important;
+}
 .brand-block { text-align: center; }
 .brand {
   margin: 0;
@@ -285,6 +289,32 @@ body {
 .drawer-body { overflow: auto; padding: 1rem; font-size: 0.88rem; color: var(--muted); }
 .drawer-body h3 { color: var(--ink); margin: 1rem 0 0.4rem; font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; }
 .drawer-body ul { margin: 0; padding-left: 1.1rem; }
+.activity-grid {
+  display: grid;
+  gap: 0.35rem 0.75rem;
+  grid-template-columns: auto 1fr;
+  margin: 0 0 1rem;
+}
+.activity-grid dt { color: var(--ink); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; }
+.activity-grid dd { margin: 0; color: var(--muted); word-break: break-word; }
+.activity-diff {
+  white-space: pre-wrap;
+  font-size: 0.75rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.6rem;
+  color: #d7e6dc;
+}
+.bubble .msg-status {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.preview-empty-detail { color: var(--muted); font-size: 0.9rem; }
 .path { display: block; font-size: 0.75rem; word-break: break-all; color: var(--accent); margin-bottom: 0.6rem; }
 .drawer-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 

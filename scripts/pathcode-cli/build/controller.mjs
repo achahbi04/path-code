@@ -17,6 +17,7 @@ import {
   writeBuildRecord,
   findLatestActiveBuild,
   scrubBuildTempFiles,
+  drainPendingConversations,
 } from "./record.mjs";
 import { ensureBuildOrigin, isBindableProject } from "./origin.mjs";
 import { isEmptyProductTree } from "./adopt.mjs";
@@ -165,13 +166,18 @@ export function createBuildController(opts) {
    */
   function browserEvidenceStale(record) {
     if (!record?.authoritativeSha) return false;
-    const hasConsumedEngineer = (record.children || []).some(
+    const binding = primaryBinding(record);
+    const hasAdoptedProduct = (record.children || []).some(
       (c) =>
         c.kind === "engineer" &&
         c.dispatchState === "consumed" &&
-        !c.orphanAbandoned,
+        !c.orphanAbandoned &&
+        Boolean(c.adoptedSha),
     );
-    if (!hasConsumedEngineer) return false;
+    if (!hasAdoptedProduct) return false;
+    if (binding?.projectRoot && isEmptyProductTree(binding.projectRoot)) {
+      return false;
+    }
     const fresh = Array.isArray(record.browserEvidence)
       ? record.browserEvidence.filter((e) => e && e.ok).slice(-1)[0]
       : null;
@@ -1144,6 +1150,7 @@ export function createBuildController(opts) {
               adoptedAt: adoption.adoptedAt,
             });
             record.authoritativeSha = adoption.adoptedSha;
+            record.loop.lastAdoptionError = undefined;
             record.loop.pendingRuntimeRefresh = !fakeMode;
             if (fakeMode) {
               record.runtimeHealth = "ok";
@@ -1153,6 +1160,18 @@ export function createBuildController(opts) {
             delete binding.activeWorktreePath;
             child.adoptedSha = adoption.adoptedSha;
             child.sourceSha = adoption.sourceSha;
+            if (Array.isArray(record.conversation)) {
+              for (const msg of record.conversation) {
+                if (
+                  msg.role === "user" &&
+                  (msg.status === "queued" ||
+                    msg.status === "incorporated" ||
+                    msg.status === "being_applied")
+                ) {
+                  msg.status = "applied";
+                }
+              }
+            }
 
             // Greenfield honesty: "VERIFIED" with no product files is not progress.
             if (isEmptyProductTree(binding.projectRoot)) {
@@ -1393,12 +1412,23 @@ export function createBuildController(opts) {
       record.loop.pendingRuntimeRefresh = false;
     }
     if (record.loop.lastAdoptionError) {
-      return {
-        ok: true,
-        complete: false,
-        reason: "adoption_failed",
-        build: record,
-      };
+      const recovered =
+        Boolean(record.authoritativeSha) &&
+        (record.children || []).some(
+          (c) =>
+            c.kind === "engineer" &&
+            c.dispatchState === "consumed" &&
+            c.adoptedSha &&
+            !c.orphanAbandoned,
+        );
+      if (!recovered) {
+        return {
+          ok: true,
+          complete: false,
+          reason: "adoption_failed",
+          build: record,
+        };
+      }
     }
     const requiredCriteria = (record.outcomeCriteria || []).filter((c) => c.required);
     const requiredReqs = (record.intent.explicitRequirements || []).filter(
@@ -1614,11 +1644,8 @@ export function createBuildController(opts) {
         };
       }
       if (!fakeMode) {
-        try {
-          await gateway.awaitTask(active.taskId, 120_000);
-        } catch {
-          // bounded wait — reconcile next tick / orphan rules
-        }
+        // Do not hold the coordinator mutation gate across Gateway waits.
+        // Conversation / stop / resume must persist while the child runs.
         await reconcileBuildChildren(buildId);
         const after = readBuildRecord(runtimeRoot, buildId);
         const still = after?.children?.find((c) => c.taskId === active.taskId);
@@ -1673,6 +1700,10 @@ export function createBuildController(opts) {
     // Runtime/browser evidence must follow the latest authoritative revision
     // before more engineering or COMPLETE (real mode only) — but only once a
     // product exists to capture. Never block the first engineer on empty roots.
+    const previewBindingRoot =
+      record.projectBindings?.[0]?.projectRoot ||
+      record.projectBindings?.[0]?.path ||
+      "";
     if (
       !fakeMode &&
       (record.loop.pendingRuntimeRefresh || browserEvidenceStale(record)) &&
@@ -1680,8 +1711,11 @@ export function createBuildController(opts) {
         (c) =>
           c.kind === "engineer" &&
           c.dispatchState === "consumed" &&
-          !c.orphanAbandoned,
-      )
+          !c.orphanAbandoned &&
+          Boolean(c.adoptedSha),
+      ) &&
+      previewBindingRoot &&
+      !isEmptyProductTree(previewBindingRoot)
     ) {
       record.loop.pendingRuntimeRefresh = true;
       writeBuildRecord(runtimeRoot, record);
@@ -1698,12 +1732,14 @@ export function createBuildController(opts) {
     // Clear stale refresh flags when no product exists yet so the loop can engineer.
     if (
       record.loop.pendingRuntimeRefresh &&
-      !(record.children || []).some(
+      (!(record.children || []).some(
         (c) =>
           c.kind === "engineer" &&
           c.dispatchState === "consumed" &&
-          !c.orphanAbandoned,
-      )
+          !c.orphanAbandoned &&
+          Boolean(c.adoptedSha),
+      ) ||
+        (previewBindingRoot && isEmptyProductTree(previewBindingRoot)))
     ) {
       record.loop.pendingRuntimeRefresh = false;
       writeBuildRecord(runtimeRoot, record);
@@ -1862,30 +1898,39 @@ export function createBuildController(opts) {
       }
     }
 
-    const consumed = await awaitAndConsume(buildId, dispatched.taskId);
-    record = readBuildRecord(runtimeRoot, buildId);
-
-    const after = assessCompletion(buildId);
-    if (after.complete) {
-      markComplete(buildId);
+    if (fakeMode) {
+      const consumed = await awaitAndConsume(buildId, dispatched.taskId);
+      record = readBuildRecord(runtimeRoot, buildId);
+      const after = assessCompletion(buildId);
+      if (after.complete) {
+        markComplete(buildId);
+        return {
+          ok: true,
+          done: true,
+          action: "complete",
+          kind,
+          taskId: dispatched.taskId,
+          build: readBuildRecord(runtimeRoot, buildId),
+        };
+      }
       return {
         ok: true,
-        done: true,
-        action: "complete",
+        done: false,
+        action: "child_finished",
         kind,
         taskId: dispatched.taskId,
-        build: readBuildRecord(runtimeRoot, buildId),
+        build: record,
+        completionReason: after.reason,
       };
     }
 
     return {
       ok: true,
       done: false,
-      action: "child_finished",
+      action: dispatched.deduped ? "deduped_child" : "dispatched",
       kind,
       taskId: dispatched.taskId,
-      build: record,
-      completionReason: after.reason,
+      build: readBuildRecord(runtimeRoot, buildId),
     };
   }
 
@@ -1978,14 +2023,47 @@ export function createBuildController(opts) {
       hasSelection: Boolean(selectedElement),
     });
     if (!Array.isArray(record.conversation)) record.conversation = [];
-    record.conversation.push({
-      id: `msg-${randomUUID().slice(0, 8)}`,
-      role: "user",
-      text,
-      at: new Date().toISOString(),
-      kind: classified.kind,
-      element: selectedElement || undefined,
-    });
+    const pending = drainPendingConversations(runtimeRoot, buildId);
+    const activeChild = [...(record.children || [])].reverse().find(
+      (child) =>
+        child.dispatchState === "selected" ||
+        child.dispatchState === "dispatched",
+    );
+    const known = new Set(
+      record.conversation.map((msg) => String(msg.id || "")).filter(Boolean),
+    );
+    for (const queued of pending) {
+      const id = String(queued.id || "");
+      if (id && known.has(id)) continue;
+      if (
+        queued.role === "user" &&
+        String(queued.text || "").trim() === text &&
+        record.conversation.some(
+          (msg) => msg.role === "user" && String(msg.text || "").trim() === text,
+        )
+      ) {
+        continue;
+      }
+      record.conversation.push({
+        ...queued,
+        status: queued.status || (activeChild ? "queued" : "incorporated"),
+      });
+      if (id) known.add(id);
+    }
+    const already = record.conversation.some(
+      (msg) => msg.role === "user" && String(msg.text || "").trim() === text,
+    );
+    if (!already) {
+      record.conversation.push({
+        id: `msg-${randomUUID().slice(0, 8)}`,
+        role: "user",
+        text,
+        at: new Date().toISOString(),
+        kind: classified.kind,
+        element: selectedElement || undefined,
+        status: activeChild ? "queued" : "incorporated",
+      });
+    }
     if (selectedElement) {
       record.loop.pendingSelectedElement = selectedElement;
     }
@@ -2017,6 +2095,14 @@ export function createBuildController(opts) {
     const after = readBuildRecord(runtimeRoot, buildId);
     if (after) {
       if (!Array.isArray(after.conversation)) after.conversation = [];
+      for (const msg of after.conversation) {
+        if (
+          msg.role === "user" &&
+          (msg.status === "queued" || msg.status === "incorporated")
+        ) {
+          msg.status = "being_applied";
+        }
+      }
       after.conversation.push({
         id: `msg-${randomUUID().slice(0, 8)}`,
         role: "assistant",
@@ -2028,6 +2114,7 @@ export function createBuildController(opts) {
               : "Updating the product direction…",
         at: new Date().toISOString(),
         kind: classified.kind,
+        status: "being_applied",
       });
       after.hypotheses.proposedNextAction = classified.engineerObjectiveHint;
       writeBuildRecord(runtimeRoot, after);

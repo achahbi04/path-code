@@ -1000,3 +1000,11 @@ export {
   declareCopilotEngineCapability,
   declareCursorEngineCapability,
 } from "./engine-contract.mjs";
+
+export {
+  probeEngineReadiness,
+  probeAntigravityReadiness,
+  probeCopilotReadiness,
+  probeCursorReadiness,
+  readinessToFabricLive,
+} from "./engine-readiness.mjs";

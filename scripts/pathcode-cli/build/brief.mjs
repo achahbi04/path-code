@@ -106,6 +106,15 @@ export function deriveProductBrief(outcome, opts = {}) {
     acceptanceCriteria.push("Primary hero or introduction clearly explains the product purpose");
     acceptanceCriteria.push("At least one primary call-to-action is present");
     acceptanceCriteria.push("The web surface renders successfully in a local preview");
+    acceptanceCriteria.push("Visual hierarchy supports the stated product — not a generic keyword page");
+    acceptanceCriteria.push("The rendered product has no blocking runtime or browser errors");
+    if (/polished|professional|modern|trust|urgent|emergency|ice|medical|safety/i.test(text)) {
+      acceptanceCriteria.push("Product identity is immediately clear in the first screen");
+      acceptanceCriteria.push("Hero communicates urgency, trust, and why the product matters");
+      acceptanceCriteria.push("Usage flow is understandable without reading a wall of text");
+      acceptanceCriteria.push("Primary call-to-action is meaningful for an emergency or safety product");
+      acceptanceCriteria.push("Page is responsive across desktop and mobile viewports");
+    }
   }
 
   if (productKind === "api") {

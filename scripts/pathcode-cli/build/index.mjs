@@ -12,6 +12,10 @@ export {
   makeBuildActionId,
   resolveBuildRecordPath,
   resolveBuildsDir,
+  appendPendingConversation,
+  readPendingConversations,
+  drainPendingConversations,
+  resolveBuildConversationQueuePath,
 } from "./record.mjs";
 export {
   appendBuildEvent,

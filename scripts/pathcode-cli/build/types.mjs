@@ -53,6 +53,7 @@
  * @property {string} at
  * @property {object} [element]
  * @property {string} [kind]
+ * @property {'queued'|'incorporated'|'being_applied'|'applied'} [status]
  *
  * @typedef {object} BuildArtifact
  * @property {string} bindingId

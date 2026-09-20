@@ -2,6 +2,11 @@
  * PATH Build — human product projection for the visual builder workspace.
  */
 
+import {
+  labelFromBuildEvents,
+  projectEngineeringActivity,
+} from "./engineering-activity.mjs";
+
 /**
  * @param {import('../types.mjs').BuildRecord | null | undefined} build
  * @param {{
@@ -10,6 +15,8 @@
  *   artifact?: object | null,
  *   uiState?: string | null,
  *   events?: object[],
+ *   checkpoint?: object | null,
+ *   diff?: object | null,
  * }} [extras]
  */
 export function projectBuildForSurface(build, extras = {}) {
@@ -40,6 +47,7 @@ export function projectBuildForSurface(build, extras = {}) {
       runtime: null,
       artifact: null,
       activity: [],
+      engineeringActivity: null,
       handoff: null,
     };
   }
@@ -121,41 +129,51 @@ export function projectBuildForSurface(build, extras = {}) {
       binding?.originKind === "build-created" || binding?.originGitInit
         ? "Created a fresh project. First engineering pass is establishing the product."
         : "Bound to your project. First engineering pass is about to begin.";
-    progressLabel = "Building…";
+    progressLabel = labelFromBuildEvents(extras.events) || "Preparing project";
   } else if (last) {
     const kind = String(last.kind || "");
     const ds = String(last.dispatchState || "");
-    if (kind === "engineer") {
+    if (kind === "brief") {
+      phase = "briefing";
+      uiState = "building";
+      headline = "Understanding the product";
+      detail = "PATH is turning your request into a durable product brief.";
+      progressLabel = "Understanding the product";
+    } else if (kind === "engineer") {
       phase = "engineering";
       uiState = ds === "dispatched" || ds === "selected" ? "building" : "checking";
       headline =
         ds === "dispatched" || ds === "selected"
-          ? "Building…"
-          : "Checking…";
+          ? "Engineering first version"
+          : "Adopting verified revision";
       detail = "A real engine is implementing toward your outcome.";
-      progressLabel = headline;
+      progressLabel =
+        labelFromBuildEvents(extras.events) || headline;
     } else if (kind === "evaluate") {
       phase = "evaluating";
       uiState = "checking";
-      headline = "Checking…";
+      headline = "Running project checks";
       detail = "Verifying the product against your outcome.";
-      progressLabel = "Checking…";
+      progressLabel =
+        labelFromBuildEvents(extras.events) || "Running project checks";
     } else if (kind === "challenge") {
       phase = "challenging";
       uiState = "checking";
-      headline = "Checking…";
+      headline = "Challenging completion claims";
       detail = "Challenge pass is trying to falsify completion claims.";
-      progressLabel = "Checking…";
+      progressLabel =
+        labelFromBuildEvents(extras.events) || "Challenging completion claims";
     }
   }
 
-  const conversation = Array.isArray(build.conversation)
+  const       conversation = Array.isArray(build.conversation)
     ? build.conversation.map((m) => ({
         id: m.id,
         role: m.role,
         text: m.text,
         at: m.at,
         kind: m.kind || null,
+        status: m.status || null,
       }))
     : [
         {
@@ -217,6 +235,12 @@ export function projectBuildForSurface(build, extras = {}) {
     children: activity,
     conversation,
     activity,
+    engineeringActivity: projectEngineeringActivity(build, extras),
+    previewRevision: runtime?.authoritativeSha || preview?.authoritativeSha || null,
+    previewMatchesAuthoritative:
+      !build.authoritativeSha ||
+      !runtime?.authoritativeSha ||
+      runtime.authoritativeSha === build.authoritativeSha,
     proposedNext: build.hypotheses?.proposedNextAction || null,
     blockedReason: build.loop?.blockedReason || null,
     complete,

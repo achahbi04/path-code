@@ -296,6 +296,7 @@ export function engineMeetsNeeds(cap, needs) {
  *   prefer?: EngineId | string | null,
  *   lastEngine?: EngineId | string | null,
  *   preferContinuity?: boolean,
+ *   forcePrefer?: boolean,
  *   needs?: TurnNeed[],
  *   capabilities?: EngineCapability[],
  * }} input
@@ -362,6 +363,18 @@ export function explainEngineSelection(input = {}) {
   }
 
   const prefer = normalizeEngineId(input.prefer);
+  if (prefer && input.forcePrefer === true) {
+    return {
+      engine: prefer,
+      reason: candidates.includes(prefer)
+        ? `forced preferred ${prefer}`
+        : `forced preferred ${prefer} despite unreadiness`,
+      needs,
+      candidates: candidates.includes(prefer) ? candidates : [prefer, ...candidates],
+      preferredHonored: true,
+      continuityHonored: false,
+    };
+  }
   if (prefer && candidates.includes(prefer)) {
     return {
       engine: prefer,
@@ -415,7 +428,7 @@ export function explainEngineSelection(input = {}) {
  *
  * @param {{
  *   antigravity?: boolean,
- *   copilot?: { ready?: boolean, mode?: string, evidence?: string[] },
+ *   copilot?: { ready?: boolean, mode?: string, evidence?: string[], reason?: string },
  *   cursor?: { ready?: boolean, mode?: string, evidence?: string[], reason?: string },
  *   declarations?: Partial<Record<EngineId, EngineCapability>>,
  *   traitOverrides?: Partial<Record<EngineId, EngineTrait[]>>,
@@ -445,8 +458,17 @@ export function buildEngineCapabilityList(live = {}) {
   const copilot = {
     ...base.copilot,
     traits: traitsFor("copilot", base.copilot),
-    status: copilotReady ? "available" : "unavailable",
+    status: copilotReady
+      ? "available"
+      : live.copilot?.reason === "AUTH_REQUIRED" ||
+          live.copilot?.reason === "auth_required"
+        ? "auth_required"
+        : "unavailable",
     evidence: live.copilot?.evidence || [],
+    note:
+      live.copilot?.reason && !copilotReady
+        ? String(live.copilot.reason).slice(0, 200)
+        : base.copilot.note,
     extensions: {
       mode: live.copilot?.mode || "none",
     },

@@ -37,6 +37,7 @@ import {
   resolvePreferredEngine,
 } from "../ag10/engine-contract.mjs";
 import { resolveCursorApiKey } from "../ag10/cursor-sdk.mjs";
+import { probeCopilotReadiness } from "../ag10/engine-readiness.mjs";
 import {
   findLatestResumableCheckpoint,
   markTaskInterrupted,
@@ -317,12 +318,14 @@ export function createGatewayRuntime(options = {}) {
 
   function listCapabilities() {
     const cursorProbe = probeCursorCapabilitySync();
+    const copilotProbe = probeCopilotReadiness();
     const engines = buildEngineCapabilityList({
       antigravity: true,
       copilot: {
-        ready: true,
-        mode: "available",
-        evidence: ["stable collaborator path"],
+        ready: copilotProbe.ready,
+        mode: copilotProbe.mode || "none",
+        reason: copilotProbe.reason || undefined,
+        evidence: copilotProbe.evidence,
       },
       cursor: {
         ready: cursorProbe.ready,

@@ -6,8 +6,10 @@ import { tmpdir } from "node:os";
 import {
   createBuildCoordinatorClient,
   appendBuildEvent,
+  appendPendingConversation,
   readBuildEvents,
   readBuildRecord,
+  readPendingConversations,
   startBuildCoordinatorServer,
   writeBuildRecord,
 } from "../../scripts/pathcode-cli/build/index.mjs";
@@ -62,6 +64,30 @@ describe("PATH Build durable coordinator", () => {
     expect(JSON.stringify(readBuildEvents(runtimeRoot, "b1"))).not.toContain(
       "do-not-leak",
     );
+  });
+
+  it("does not flood build.updated for no-op record writes", () => {
+    runtimeRoot = mkdtempSync(join(tmpdir(), "path-build-events-noop-"));
+    const record = {
+      schema: "pathcode.s5.build-record.v1",
+      buildId: "b-noop",
+      intent: { outcome: "noop", outcomeRevision: 1, explicitRequirements: [] },
+      loop: { status: "running" },
+      children: [],
+      conversation: [],
+    };
+    writeBuildRecord(runtimeRoot, record as never);
+    const before = readBuildEvents(runtimeRoot, "b-noop").filter(
+      (event) => event.type === "build.updated",
+    ).length;
+    writeBuildRecord(runtimeRoot, {
+      ...readBuildRecord(runtimeRoot, "b-noop")!,
+      loop: { status: "running" },
+    } as never);
+    const after = readBuildEvents(runtimeRoot, "b-noop").filter(
+      (event) => event.type === "build.updated",
+    ).length;
+    expect(after).toBe(before);
   });
 
   it("owns commands over Unix socket and single-flights autonomous loops", async () => {
@@ -207,10 +233,28 @@ describe("PATH Build durable coordinator", () => {
       }
       expect(final?.loop.status).toBe("complete");
 
+      const queued = appendPendingConversation(runtimeRoot, buildId, {
+        id: "msg-queued-1",
+        role: "user",
+        text: "Show a usage section before more engineering",
+        at: new Date().toISOString(),
+        status: "queued",
+        kind: "change",
+      });
+      expect(readPendingConversations(runtimeRoot, buildId)).toHaveLength(1);
+      expect(queued.status).toBe("queued");
+
       await coordinator.messageBuild(buildId, {
         message: "The CLI must include friendly output",
       });
       const revised = readBuildRecord(runtimeRoot, buildId)!;
+      expect(readPendingConversations(runtimeRoot, buildId)).toHaveLength(0);
+      expect(
+        revised.conversation?.some(
+          (msg: { text?: string }) =>
+            String(msg.text || "").includes("usage section"),
+        ),
+      ).toBe(true);
       expect(["running", "complete"]).toContain(revised.loop.status);
       expect(revised.intent.outcomeRevision).toBe(2);
       expect(revised.productBrief?.intentRevision).toBe(2);

@@ -124,6 +124,26 @@ export async function createBuildCoordinatorService(options) {
         syncRuntime: runtimeSync.sync,
       }),
     )
+      .then(async (result) => {
+        const last = Array.isArray(result?.steps)
+          ? result.steps[result.steps.length - 1]
+          : null;
+        const waitTaskId = last?.taskId || result?.taskId;
+        if (
+          !fakeMode &&
+          waitTaskId &&
+          (last?.action === "await_active_child" ||
+            result?.action === "await_active_child") &&
+          typeof gateway.awaitTask === "function"
+        ) {
+          try {
+            await gateway.awaitTask(waitTaskId, 120_000);
+          } catch {
+            /* bounded wait — next loop reconciles */
+          }
+        }
+        return result;
+      })
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         const failed = readBuildRecord(runtimeRoot, buildId);

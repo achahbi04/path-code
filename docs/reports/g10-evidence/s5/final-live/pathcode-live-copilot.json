@@ -1,0 +1,72 @@
+{
+  "schema": "pathcode.s5.pathcode-live-engine.v1",
+  "engine": "copilot",
+  "readiness": {
+    "engineId": "copilot",
+    "installed": true,
+    "available": true,
+    "authenticated": true,
+    "ready": true,
+    "reason": null,
+    "authMethod": "local_config",
+    "mode": "available",
+    "evidence": [
+      "copilot → /Users/achahbi/.local/bin/copilot",
+      "version GitHub Copilot CLI 1.0.84-5.",
+      "auth directory present: ~/.copilot"
+    ],
+    "checkedAt": "2026-09-20T20:42:57.214Z"
+  },
+  "projectDir": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-code-copilot-0gPQm2",
+  "runtimeRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-s5-code-copilot-0gPQm2/.path-runtime",
+  "timeoutMs": 180000,
+  "ok": true,
+  "verdict": "PASS",
+  "bind": {
+    "ok": true
+  },
+  "started": {
+    "ok": true,
+    "taskId": "747724cd-7f7f-40b7-8607-112fd0652db6",
+    "sessionId": "path-747724cd-7f7f-40b7-8607-112fd0652db6",
+    "engine": "copilot"
+  },
+  "snapshot": {
+    "status": "failed",
+    "classification": "NOT_VERIFIED",
+    "sessionId": "path-747724cd-7f7f-40b7-8607-112fd0652db6",
+    "taskId": "747724cd-7f7f-40b7-8607-112fd0652db6",
+    "resultSha": "44ffce12177e5c7e40f91f44e778a739b3c60d5e",
+    "changedFiles": [],
+    "taskBranch": "path/task-747724cd-7f7f-40b7-8607-112fd0652db6"
+  },
+  "markerContainsLive": true,
+  "resultMarker": "export function marker() { return 's5-live-ok'; }\n",
+  "eventTypes": [
+    "session.task.received",
+    "session.capability.preparing",
+    "session.capability.collaborate",
+    "session.preflight",
+    "session.engineering.workspace",
+    "session.recovery.checkpoint",
+    "session.capability.discovered",
+    "session.capability.mcp",
+    "session.capability.provisioning",
+    "session.capability.affected",
+    "session.capability.ready",
+    "session.engineering.activity",
+    "session.engineering.bridge",
+    "session.engineering.busy",
+    "session.reading",
+    "session.engineering.tool",
+    "session.applying",
+    "session.edit.summary",
+    "session.engineering.narration",
+    "session.engineering.handoff",
+    "session.validation.plan",
+    "session.engineering.result",
+    "session.engineering.report",
+    "session.terminal",
+    "gateway.task.finished"
+  ]
+}

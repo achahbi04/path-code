@@ -18,6 +18,11 @@ import {
   assertSupportedNode,
   assertSupportedPlatform,
 } from "../ag6/platform.mjs";
+import {
+  probeAntigravityReadiness,
+  probeCopilotReadiness,
+} from "../ag10/engine-readiness.mjs";
+import { resolveCursorApiKey } from "../ag10/cursor-sdk.mjs";
 
 /**
  * @param {{ cwd?: string, env?: NodeJS.ProcessEnv, packageRoot?: string }} [opts]
@@ -164,6 +169,32 @@ export function runPathcodeDoctor(opts = {}) {
       detail: "Skipped (not in a Git repository)",
     });
   }
+
+  const agReady = probeAntigravityReadiness({ env });
+  rows.push({
+    name: "Engine AG",
+    ok: agReady.ready,
+    optional: true,
+    detail: agReady.ready
+      ? `ready (${agReady.authMethod || "bridge"})`
+      : agReady.reason || "not ready",
+  });
+  const copilotReady = probeCopilotReadiness({ env });
+  rows.push({
+    name: "Engine Copilot",
+    ok: copilotReady.ready,
+    optional: true,
+    detail: copilotReady.ready
+      ? `ready (${copilotReady.authMethod || "local"})`
+      : copilotReady.reason || "not ready",
+  });
+  const cursorKey = Boolean(resolveCursorApiKey(env, { includeStored: env === process.env }));
+  rows.push({
+    name: "Engine Cursor",
+    ok: cursorKey,
+    optional: true,
+    detail: cursorKey ? "ready (api_key)" : "AUTH_REQUIRED",
+  });
 
   const mark = (ok) => (ok ? "✓" : "✗");
   const lines = ["PATH Code doctor", ""];

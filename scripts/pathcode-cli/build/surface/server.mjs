@@ -14,14 +14,18 @@ import { dirname, join, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 import {
   readBuildRecord,
   findLatestActiveBuild,
   listBuildRecords,
+  appendPendingConversation,
+  readPendingConversations,
+  appendBuildEvent,
 } from "../index.mjs";
 import { projectBuildForSurface } from "./product-view.mjs";
+import { classifyConversationMessage } from "../conversation.mjs";
 import { detectBuildArtifact } from "../runtime/artifact.mjs";
 import {
   proxyPreviewHttp,
@@ -30,6 +34,7 @@ import {
 import { launchPathCodeInTerminal } from "./handoff.mjs";
 import { ensureBuildCoordinator } from "../coordinator/ensure.mjs";
 import { sanitizeBuildEventValue } from "../events.mjs";
+import { readTaskCheckpoint } from "../../ag10/task-checkpoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(HERE, "public");
@@ -155,7 +160,25 @@ export async function startPathBuildSurface(options) {
         null;
       id = latest?.buildId || "";
     }
-    const build = id ? readBuildRecord(runtimeRoot, id) : null;
+    const stored = id ? readBuildRecord(runtimeRoot, id) : null;
+    const pending = id ? readPendingConversations(runtimeRoot, id) : [];
+    const build =
+      stored && pending.length
+        ? {
+            ...stored,
+            conversation: [
+              ...(Array.isArray(stored.conversation)
+                ? stored.conversation
+                : []),
+              ...pending.filter(
+                (msg) =>
+                  !stored.conversation?.some(
+                    (existing) => existing.id && existing.id === msg.id,
+                  ),
+              ),
+            ],
+          }
+        : stored;
     const root = build?.projectBindings?.[0]?.projectRoot || null;
     const artifact =
       root && existsSync(root)
@@ -167,11 +190,65 @@ export async function startPathBuildSurface(options) {
     const eventState = id
       ? await coordinator.getBuildEvents(id, { afterId: 0, limit: 1_000 })
       : { events: [] };
+    const lastChild = [...(build?.children || [])]
+      .reverse()
+      .find((child) => child?.taskId);
+    const checkpoint = lastChild
+      ? readTaskCheckpoint(runtimeRoot, lastChild.taskId)
+      : null;
+    /** @type {{ files?: string[], summary?: string, commands?: string[] } | null} */
+    let diff = null;
+    if (root && existsSync(join(root, ".git")) && build?.authoritativeSha) {
+      const shown = spawnSync(
+        "git",
+        ["show", "--stat", "--oneline", "-1", build.authoritativeSha],
+        {
+          cwd: root,
+          encoding: "utf8",
+          timeout: 8_000,
+          env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+        },
+      );
+      if (shown.status === 0) {
+        diff = {
+          summary: String(shown.stdout || "").slice(0, 2_000),
+          files: checkpoint?.changedFiles || [],
+        };
+      }
+    }
+    const worktreePath =
+      typeof checkpoint?.worktreePath === "string" ? checkpoint.worktreePath : "";
+    /** @type {string[]} */
+    let worktreeFiles = [];
+    if (worktreePath && existsSync(join(worktreePath, ".git"))) {
+      const porcelain = spawnSync(
+        "git",
+        ["status", "--porcelain"],
+        {
+          cwd: worktreePath,
+          encoding: "utf8",
+          timeout: 5_000,
+          env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+        },
+      );
+      if (porcelain.status === 0) {
+        worktreeFiles = String(porcelain.stdout || "")
+          .split("\n")
+          .map((line) => line.slice(3).trim())
+          .filter(Boolean)
+          .slice(0, 24);
+        if (!diff) diff = { files: worktreeFiles, summary: "" };
+        else if (!diff.files?.length) diff.files = worktreeFiles;
+      }
+    }
     const view = projectBuildForSurface(build, {
       preview: state.preview,
       runtime: state.runtime,
       artifact,
       events: eventState.events || [],
+      checkpoint,
+      diff,
+      worktreeFiles,
     });
     const coordinatorStatus = id ? await coordinator.status() : { loops: [] };
     return {
@@ -374,17 +451,51 @@ export async function startPathBuildSurface(options) {
 
         if (method === "POST" && action === "message") {
           const body = await readJsonBody(req);
-          const applied = await coordinator.messageBuild(buildId, {
-            message: String(body.message || ""),
-            element: body.element || null,
-          });
-          if (applied.ok) {
-            await ensureLoop(buildId);
+          const text = String(body.message || "").trim();
+          if (!text) {
+            sendJson(res, 400, { ok: false, code: "MESSAGE_REQUIRED" });
+            return;
           }
-          sendJson(res, applied.ok ? 200 : 400, {
-            ...applied,
+          const current = readBuildRecord(runtimeRoot, buildId);
+          if (!current) {
+            sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
+            return;
+          }
+          const classified = classifyConversationMessage(text, {
+            hasSelection: Boolean(body.element),
+          });
+          const message = {
+            id: `msg-${randomUUID().slice(0, 8)}`,
+            role: "user",
+            text,
+            at: new Date().toISOString(),
+            kind: classified.kind,
+            element: body.element || undefined,
+            status: "queued",
+          };
+          appendPendingConversation(runtimeRoot, buildId, message);
+          appendBuildEvent(runtimeRoot, buildId, "conversation.queued", {
+            messageId: message.id,
+            kind: classified.kind,
+            status: "queued",
+          });
+          sendJson(res, 200, {
+            ok: true,
+            queued: true,
+            classified,
+            message,
             view: await viewFor(buildId),
           });
+          void coordinator
+            .messageBuild(buildId, {
+              message: text,
+              element: body.element || null,
+            })
+            .then((applied) => {
+              if (applied?.ok) return ensureLoop(buildId);
+              return applied;
+            })
+            .catch(() => {});
           return;
         }
 

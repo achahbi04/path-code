@@ -212,7 +212,10 @@ export function appendBuildTransitionEvents(runtimeRoot, previous, next) {
       authoritativeSha: next.authoritativeSha || null,
     });
   }
-  if (emitted.length === 0) {
+  if (
+    emitted.length === 0 &&
+    previous?.loop?.status !== next.loop?.status
+  ) {
     emit("build.updated", {
       status: next.loop?.status,
       intentRevision: next.intent?.outcomeRevision,

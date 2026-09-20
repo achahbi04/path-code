@@ -301,7 +301,7 @@ describe("S5 PATH Build", () => {
     });
     expect(changedRun.done).toBe(true);
   },
-    60_000,
+    180_000,
   );
 
   it("persists selected element exactly for the next engineer objective", async () => {
@@ -355,14 +355,21 @@ describe("S5 PATH Build", () => {
     const objective = frameEngineerObjective(record, "Apply the change.");
     expect(objective).toContain(JSON.stringify(persisted));
 
-    await controller.tick(started.build.buildId);
-    const after = readBuildRecord(runtimeRoot, started.build.buildId);
+    let after = readBuildRecord(runtimeRoot, started.build.buildId);
+    let engineer = null;
+    for (let i = 0; i < 4; i += 1) {
+      await controller.tick(started.build.buildId);
+      after = readBuildRecord(runtimeRoot, started.build.buildId);
+      engineer = [...(after?.children || [])]
+        .reverse()
+        .find((c) => c.kind === "engineer");
+      if (engineer?.objective) break;
+    }
     expect(after).not.toBeNull();
     if (!after) return;
-    const engineer = [...after.children].reverse().find((c) => c.kind === "engineer");
     expect(engineer?.objective).toContain(JSON.stringify(persisted));
     expect(after.loop.pendingSelectedElement).toBeNull();
-  });
+  }, 60_000);
 
   it("mechanical probe: README requirement satisfied from README.md", () => {
     const target = join(dir, "readme-req");

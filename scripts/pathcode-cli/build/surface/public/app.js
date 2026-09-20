@@ -14,6 +14,8 @@ const els = {
   selectionChip: document.getElementById("selectionChip"),
   previewStage: document.getElementById("previewStage"),
   previewEmpty: document.getElementById("previewEmpty"),
+  previewEmptyTitle: document.getElementById("previewEmptyTitle"),
+  previewEmptyDetail: document.getElementById("previewEmptyDetail"),
   previewFrame: document.getElementById("previewFrame"),
   previewError: document.getElementById("previewError"),
   previewLabel: document.getElementById("previewLabel"),
@@ -77,7 +79,10 @@ function renderChat(view) {
   els.chatScroll.innerHTML = msgs
     .map((m) => {
       const role = m.role === "user" ? "user" : "assistant";
-      return `<div class="bubble ${role}">${escapeHtml(m.text || "")}</div>`;
+      const status = m.status
+        ? `<span class="msg-status">${escapeHtml(String(m.status).replaceAll("_", " "))}</span>`
+        : "";
+      return `<div class="bubble ${role}">${escapeHtml(m.text || "")}${status}</div>`;
     })
     .join("");
   els.chatScroll.scrollTop = els.chatScroll.scrollHeight;
@@ -87,7 +92,7 @@ function renderDrawer(view) {
   const criteria = (view.criteria || [])
     .map((c) => `<li>[${escapeHtml(c.status)}] ${escapeHtml(c.statement)}</li>`)
     .join("");
-  const activity = (view.activity || view.children || [])
+  const history = (view.activity || view.children || [])
     .map(
       (c) =>
         `<li>${escapeHtml(c.kind)} · ${escapeHtml(c.dispatchState || "")}${
@@ -95,28 +100,28 @@ function renderDrawer(view) {
         }</li>`,
     )
     .join("");
-  const engine = view.preferredEngine
-    ? `<p>Preferred engine: <strong>${escapeHtml(view.preferredEngine)}</strong></p>`
-    : "";
-  const artifact = view.artifact
-    ? `<p>Artifact: ${escapeHtml(view.artifact.kind)}${
-        view.artifact.framework ? ` / ${escapeHtml(view.artifact.framework)}` : ""
-      }</p>`
-    : "";
-  const runtime = view.runtime
-    ? `<p>Runtime: ${escapeHtml(view.runtime.status || "")}${
-        view.runtime.url ? ` · ${escapeHtml(view.runtime.url)}` : ""
-      }</p>`
-    : "";
-
+  const live = view.engineeringActivity || {};
+  const files = (live.files || [])
+    .map((f) => `<li>${escapeHtml(f)}</li>`)
+    .join("");
+  const engine = live.engine || view.preferredEngine;
   els.drawerBody.innerHTML = `
-    ${engine}
-    ${artifact}
-    ${runtime}
+    <h3>Engineering Activity</h3>
+    <dl class="activity-grid">
+      <dt>Action</dt><dd>${escapeHtml(live.action || "preparing")}</dd>
+      <dt>Engine</dt><dd>${escapeHtml(engine || "selecting")}</dd>
+      <dt>Task</dt><dd>${escapeHtml(live.taskId || "not dispatched")}</dd>
+      <dt>Phase</dt><dd>${escapeHtml(live.phase || view.progressLabel || "starting")}</dd>
+      <dt>Result</dt><dd>${escapeHtml(live.resultSha || "pending")}</dd>
+      <dt>Adopted</dt><dd>${escapeHtml(live.adoptedSha || view.authoritativeSha || "none")}</dd>
+    </dl>
+    ${live.diff ? `<pre class="activity-diff">${escapeHtml(live.diff)}</pre>` : ""}
+    <h3>Changed files</h3>
+    <ul>${files || "<li>None yet</li>"}</ul>
     <h3>Outcome checks</h3>
     <ul>${criteria || "<li>None yet</li>"}</ul>
-    <h3>Engineering activity</h3>
-    <ul>${activity || "<li>None yet</li>"}</ul>
+    <h3>History</h3>
+    <ul>${history || "<li>None yet</li>"}</ul>
   `;
   if (view.projectRoot) {
     els.projectPath.textContent = view.projectRoot;
@@ -161,20 +166,28 @@ function updatePreview(view) {
 
   if (ready && embed) {
     const nextSrc = embed.endsWith("/") ? embed : `${embed}/`;
+    els.previewEmpty.hidden = true;
+    els.previewFrame.hidden = false;
     if (previewEmbed !== nextSrc) {
       previewEmbed = nextSrc;
       previewDirectUrl = direct;
-      els.previewEmpty.hidden = true;
-      els.previewFrame.hidden = false;
       els.previewFrame.src = nextSrc;
     }
     els.previewLabel.textContent = view.artifact?.framework
       ? `Live · ${view.artifact.framework}`
       : "Live product";
-  } else if (!els.previewFrame.src) {
+  } else {
     els.previewEmpty.hidden = false;
-    els.previewFrame.hidden = true;
-    els.previewLabel.textContent = "Product preview";
+    if (!els.previewFrame.src) els.previewFrame.hidden = true;
+    els.previewLabel.textContent = view.progressLabel || "Preparing";
+    if (els.previewEmptyTitle) {
+      els.previewEmptyTitle.textContent = view.progressLabel || "Preparing the live product…";
+    }
+    if (els.previewEmptyDetail) {
+      els.previewEmptyDetail.textContent =
+        view.detail ||
+        "Your product will appear here as soon as the first runnable revision exists.";
+    }
   }
 }
 
@@ -183,7 +196,7 @@ function updatePreview(view) {
  */
 function render(view) {
   lastView = view;
-  if (!view || view.phase === "idle" || !view.buildId) {
+  if (!view || (view.phase === "idle" && !activeBuildId) || (!view.buildId && !activeBuildId)) {
     setWorkspaceVisible(false);
     return;
   }
@@ -249,6 +262,19 @@ async function startBuild() {
   showLandingError("");
   els.buildBtn.disabled = true;
   els.buildBtn.textContent = "Starting…";
+  render({
+    phase: "starting",
+    uiState: "building",
+    buildId: "pending",
+    headline: "Starting your build",
+    progressLabel: "Preparing project",
+    detail: "PATH is creating the Build session and project folder.",
+    conversation: [{ role: "user", text: outcome, kind: "outcome", status: "incorporated" }],
+    canStop: false,
+    canResume: false,
+    activity: [],
+    criteria: [],
+  });
   let startedOk = false;
   try {
     const res = await fetch("/api/builds", {
@@ -264,6 +290,8 @@ async function startBuild() {
       return;
     }
     if (!res.ok || !body?.ok || !body.buildId) {
+      activeBuildId = null;
+      setWorkspaceVisible(false);
       showLandingError(
         body?.message ||
           body?.code ||
@@ -282,6 +310,8 @@ async function startBuild() {
     }
     subscribe(body.buildId);
   } catch (err) {
+    activeBuildId = null;
+    setWorkspaceVisible(false);
     showLandingError(err instanceof Error ? err.message : String(err));
   } finally {
     // Only restore the landing CTA when start failed and we are still on landing.
@@ -331,6 +361,22 @@ function startTruthPoll(buildId) {
 
 async function sendMessage(text) {
   if (!activeBuildId || !text.trim()) return;
+  const trimmed = text.trim();
+  const optimistic = {
+    id: `local-${Date.now()}`,
+    role: "user",
+    text: trimmed,
+    at: new Date().toISOString(),
+    status: "queued",
+  };
+  if (lastView) {
+    lastView = {
+      ...lastView,
+      conversation: [...(lastView.conversation || []), optimistic],
+    };
+    render(lastView);
+  }
+  els.chatInput.value = "";
   els.sendBtn.disabled = true;
   try {
     const res = await fetch(
@@ -339,7 +385,7 @@ async function sendMessage(text) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: text.trim(),
+          message: trimmed,
           element: selectedElement,
         }),
       },
@@ -571,6 +617,11 @@ window.addEventListener("message", (ev) => {
   try {
     const params = new URLSearchParams(location.search);
     const fromUrl = params.get("buildId");
+    if (fromUrl) {
+      activeBuildId = fromUrl;
+      setWorkspaceVisible(true);
+      els.statusPill.textContent = "Resuming…";
+    }
     const path = fromUrl
       ? `/api/builds/${encodeURIComponent(fromUrl)}`
       : "/api/builds/latest";
@@ -579,8 +630,10 @@ window.addEventListener("message", (ev) => {
     if (view?.buildId && view.phase !== "idle") {
       render(view);
       subscribe(view.buildId);
+    } else if (fromUrl) {
+      setWorkspaceVisible(true);
     }
   } catch {
-    /* fresh landing */
+    if (activeBuildId) setWorkspaceVisible(true);
   }
 })();

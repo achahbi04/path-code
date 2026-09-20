@@ -23,6 +23,23 @@ export function readBuildRecord(
 ): BuildRecord | null;
 export function listBuildRecords(runtimeRoot: string): BuildRecord[];
 export function findLatestActiveBuild(runtimeRoot: string): BuildRecord | null;
+export function resolveBuildConversationQueuePath(
+  runtimeRoot: string,
+  buildId: string,
+): string;
+export function appendPendingConversation(
+  runtimeRoot: string,
+  buildId: string,
+  message: Record<string, unknown>,
+): Record<string, unknown>;
+export function readPendingConversations(
+  runtimeRoot: string,
+  buildId: string,
+): Array<Record<string, unknown>>;
+export function drainPendingConversations(
+  runtimeRoot: string,
+  buildId: string,
+): Array<Record<string, unknown>>;
 export function updateBuildRecord(
   runtimeRoot: string,
   buildId: string,

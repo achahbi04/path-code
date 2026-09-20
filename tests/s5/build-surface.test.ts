@@ -77,6 +77,7 @@ describe("S5 PATH Build product surface", () => {
     });
     expect(complete.phase).toBe("complete");
     expect(complete.handoff?.projectRoot).toBe("/tmp/app");
+    expect(complete.engineeringActivity).toBeTruthy();
     expect(JSON.stringify(complete)).not.toMatch(/\/build /);
   });
 
