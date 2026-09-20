@@ -212,27 +212,85 @@ async function startBuild() {
   showLandingError("");
   els.buildBtn.disabled = true;
   els.buildBtn.textContent = "Starting…";
+  let startedOk = false;
   try {
     const res = await fetch("/api/builds", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ outcome, originKind: "build-created" }),
     });
-    const body = await res.json();
-    if (!res.ok || !body.ok) {
-      showLandingError(body.message || body.code || "Could not start build");
+    let body = null;
+    try {
+      body = await res.json();
+    } catch {
+      showLandingError(`Build start failed (HTTP ${res.status}): invalid response`);
       return;
     }
+    if (!res.ok || !body?.ok || !body.buildId) {
+      showLandingError(
+        body?.message ||
+          body?.code ||
+          `Could not start build (HTTP ${res.status})`,
+      );
+      return;
+    }
+    startedOk = true;
     activeBuildId = body.buildId;
-    projectRoot = body.projectRoot;
-    render(body.view);
+    projectRoot = body.projectRoot || null;
+    if (body.view) {
+      render(body.view);
+    } else {
+      setWorkspaceVisible(true);
+      els.statusPill.textContent = "Building…";
+    }
     subscribe(body.buildId);
+    startTruthPoll(body.buildId);
   } catch (err) {
     showLandingError(err instanceof Error ? err.message : String(err));
   } finally {
-    els.buildBtn.disabled = false;
-    els.buildBtn.textContent = "Build";
+    // Only restore the landing CTA when start failed and we are still on landing.
+    if (!startedOk) {
+      els.buildBtn.disabled = false;
+      els.buildBtn.textContent = "Build";
+    }
   }
+}
+
+/** @type {ReturnType<typeof setInterval> | null} */
+let truthPoll = null;
+
+function stopTruthPoll() {
+  if (truthPoll) {
+    clearInterval(truthPoll);
+    truthPoll = null;
+  }
+}
+
+/**
+ * SSE can miss events; poll authoritative Build view as a safe fallback.
+ * @param {string} buildId
+ */
+function startTruthPoll(buildId) {
+  stopTruthPoll();
+  let failures = 0;
+  truthPoll = setInterval(() => {
+    void (async () => {
+      try {
+        const res = await fetch(`/api/builds/${encodeURIComponent(buildId)}`);
+        if (!res.ok) {
+          failures += 1;
+          return;
+        }
+        failures = 0;
+        const view = await res.json();
+        if (view?.buildId === buildId) render(view);
+        if (view?.complete || view?.status === "blocked") stopTruthPoll();
+      } catch {
+        failures += 1;
+        if (failures > 20) stopTruthPoll();
+      }
+    })();
+  }, 2500);
 }
 
 async function sendMessage(text) {
@@ -286,13 +344,20 @@ els.chatForm.addEventListener("submit", (e) => {
 els.newBuildBtn.addEventListener("click", () => {
   if (events) events.close();
   events = null;
+  stopTruthPoll();
   activeBuildId = null;
   projectRoot = null;
   previewEmbed = null;
+  previewDirectUrl = null;
   selectedElement = null;
+  lastView = null;
   els.previewFrame.src = "";
   els.previewFrame.hidden = true;
   els.previewEmpty.hidden = false;
+  els.drawerBody.innerHTML = "";
+  els.projectPath.textContent = "";
+  els.buildBtn.disabled = false;
+  els.buildBtn.textContent = "Build";
   setWorkspaceVisible(false);
   els.outcome.value = "";
   els.outcome.focus();
@@ -305,22 +370,73 @@ els.closeDrawerBtn.addEventListener("click", () => {
   els.drawer.hidden = true;
 });
 
+function showHandoffResult(whichTitle, body) {
+  const msg = body?.ok
+    ? `${whichTitle}: ${body.path || projectRoot || "ok"}`
+    : `${whichTitle} failed: ${body?.message || body?.code || "unknown error"}`;
+  if (els.previewError) {
+    els.previewError.hidden = false;
+    els.previewError.textContent = msg;
+    if (body?.ok) {
+      setTimeout(() => {
+        if (els.previewError.textContent === msg) els.previewError.hidden = true;
+      }, 4000);
+    }
+  }
+}
+
 els.openFolderBtn.addEventListener("click", async () => {
-  if (!activeBuildId && !projectRoot) return;
-  await fetch("/api/open-folder", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ buildId: activeBuildId, path: projectRoot }),
-  });
+  if (!activeBuildId && !projectRoot) {
+    showHandoffResult("Open Folder", {
+      ok: false,
+      message: "No active Build project.",
+    });
+    return;
+  }
+  try {
+    const res = await fetch("/api/open-folder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ buildId: activeBuildId, path: projectRoot }),
+    });
+    const body = await res.json().catch(() => ({
+      ok: false,
+      message: `HTTP ${res.status}`,
+    }));
+    showHandoffResult("Open Folder", body);
+  } catch (err) {
+    showHandoffResult("Open Folder", {
+      ok: false,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 });
 
 els.openCodeBtn.addEventListener("click", async () => {
-  if (!activeBuildId && !projectRoot) return;
-  await fetch("/api/open-code", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ buildId: activeBuildId, path: projectRoot }),
-  });
+  if (!activeBuildId && !projectRoot) {
+    showHandoffResult("Open in PATH Code", {
+      ok: false,
+      message: "No active Build project.",
+    });
+    return;
+  }
+  try {
+    const res = await fetch("/api/open-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ buildId: activeBuildId, path: projectRoot }),
+    });
+    const body = await res.json().catch(() => ({
+      ok: false,
+      message: `HTTP ${res.status}`,
+    }));
+    showHandoffResult("Open in PATH Code", body);
+  } catch (err) {
+    showHandoffResult("Open in PATH Code", {
+      ok: false,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 });
 
 els.refreshPreviewBtn.addEventListener("click", async () => {

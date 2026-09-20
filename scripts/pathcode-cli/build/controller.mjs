@@ -110,10 +110,19 @@ export function createBuildController(opts) {
   }
 
   /**
+   * Browser evidence is only meaningful after real product engineering exists.
+   * Fresh empty Build roots must NOT be treated as stale — that blocked first dispatch.
    * @param {import('./types.mjs').BuildRecord} record
    */
   function browserEvidenceStale(record) {
     if (!record?.authoritativeSha) return false;
+    const hasConsumedEngineer = (record.children || []).some(
+      (c) =>
+        c.kind === "engineer" &&
+        c.dispatchState === "consumed" &&
+        !c.orphanAbandoned,
+    );
+    if (!hasConsumedEngineer) return false;
     const fresh = Array.isArray(record.browserEvidence)
       ? record.browserEvidence.filter((e) => e && e.ok).slice(-1)[0]
       : null;
@@ -1161,12 +1170,22 @@ export function createBuildController(opts) {
       };
     }
     if (record.loop.pendingRuntimeRefresh) {
-      return {
-        ok: true,
-        complete: false,
-        reason: "pending_runtime_refresh",
-        build: record,
-      };
+      const hasConsumedEngineer = (record.children || []).some(
+        (c) =>
+          c.kind === "engineer" &&
+          c.dispatchState === "consumed" &&
+          !c.orphanAbandoned,
+      );
+      if (hasConsumedEngineer) {
+        return {
+          ok: true,
+          complete: false,
+          reason: "pending_runtime_refresh",
+          build: record,
+        };
+      }
+      // No product yet — do not block completion assessment / next dispatch.
+      record.loop.pendingRuntimeRefresh = false;
     }
     if (record.loop.lastAdoptionError) {
       return {
@@ -1432,10 +1451,17 @@ export function createBuildController(opts) {
     }
 
     // Runtime/browser evidence must follow the latest authoritative revision
-    // before more engineering or COMPLETE (real mode only).
+    // before more engineering or COMPLETE (real mode only) — but only once a
+    // product exists to capture. Never block the first engineer on empty roots.
     if (
       !fakeMode &&
-      (record.loop.pendingRuntimeRefresh || browserEvidenceStale(record))
+      (record.loop.pendingRuntimeRefresh || browserEvidenceStale(record)) &&
+      (record.children || []).some(
+        (c) =>
+          c.kind === "engineer" &&
+          c.dispatchState === "consumed" &&
+          !c.orphanAbandoned,
+      )
     ) {
       record.loop.pendingRuntimeRefresh = true;
       writeBuildRecord(runtimeRoot, record);
@@ -1448,6 +1474,19 @@ export function createBuildController(opts) {
           ? "pending_runtime_refresh"
           : "browser_evidence_stale",
       };
+    }
+    // Clear stale refresh flags when no product exists yet so the loop can engineer.
+    if (
+      record.loop.pendingRuntimeRefresh &&
+      !(record.children || []).some(
+        (c) =>
+          c.kind === "engineer" &&
+          c.dispatchState === "consumed" &&
+          !c.orphanAbandoned,
+      )
+    ) {
+      record.loop.pendingRuntimeRefresh = false;
+      writeBuildRecord(runtimeRoot, record);
     }
 
     const completion = assessCompletion(buildId);

@@ -32,6 +32,7 @@ import {
 } from "../runtime/proxy.mjs";
 import { captureBrowserEvidence } from "../runtime/browser-evidence.mjs";
 import { deriveProductBrief } from "../brief.mjs";
+import { launchPathCodeInTerminal } from "./handoff.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(HERE, "public");
@@ -190,6 +191,12 @@ export async function startPathBuildSurface(options) {
       return { ok: true, skipped: true, reason: "non_web" };
     }
     if ((artifact.signals || []).includes("empty_tree")) {
+      // No product yet — clear refresh so the Build loop can dispatch the first engineer.
+      controller.patchRuntimeState?.(buildId, {
+        previewUrl: null,
+        runtimeHealth: "awaiting_product",
+        clearRuntimeRefresh: true,
+      });
       return { ok: true, skipped: true, reason: "empty_tree" };
     }
 
@@ -256,12 +263,18 @@ export async function startPathBuildSurface(options) {
         if (opts.autoPreview !== false) {
           await syncRuntimeForBuild(buildId);
         }
+        if (result && result.ok === false) {
+          console.error("[path-build] runUntilDone failed", buildId, result);
+        }
         return result;
       })
-      .catch((err) => ({
-        ok: false,
-        message: err instanceof Error ? err.message : String(err),
-      }))
+      .catch((err) => {
+        console.error("[path-build] runUntilDone threw", buildId, err);
+        return {
+          ok: false,
+          message: err instanceof Error ? err.message : String(err),
+        };
+      })
       .finally(() => {
         // Allow a later conversation steer / recovery to start a new loop.
         const cur = loops.get(buildId);
@@ -617,15 +630,29 @@ export async function startPathBuildSurface(options) {
           if (gate.ok) dir = gate.projectRoot;
         }
         if (!dir || !existsSync(dir)) {
-          sendJson(res, 400, { ok: false, code: "PATH_REQUIRED" });
+          sendJson(res, 400, {
+            ok: false,
+            code: "PATH_REQUIRED",
+            message: "No Build project folder to open.",
+          });
           return;
         }
         try {
-          spawn("open", [dir], { detached: true, stdio: "ignore" }).unref();
-          sendJson(res, 200, { ok: true, path: dir });
+          const child = spawn("open", [dir], {
+            detached: true,
+            stdio: "ignore",
+          });
+          child.unref();
+          sendJson(res, 200, {
+            ok: true,
+            path: dir,
+            launched: true,
+            pid: child.pid || null,
+          });
         } catch (err) {
           sendJson(res, 500, {
             ok: false,
+            code: "OPEN_FOLDER_FAILED",
             message: err instanceof Error ? err.message : String(err),
           });
         }
@@ -644,21 +671,44 @@ export async function startPathBuildSurface(options) {
             ? resolve(body.path)
             : "";
         if (!dir || !existsSync(dir)) {
-          sendJson(res, 400, { ok: false, code: "PATH_REQUIRED" });
+          sendJson(res, 400, {
+            ok: false,
+            code: "PATH_REQUIRED",
+            message: "No Build project to open in PATH Code.",
+          });
           return;
         }
         const launcher = join(packageRoot, "scripts", "pathcode.mjs");
+        if (!existsSync(launcher)) {
+          sendJson(res, 500, {
+            ok: false,
+            code: "PATHCODE_LAUNCHER_MISSING",
+            message: `PATH Code launcher not found at ${launcher}`,
+          });
+          return;
+        }
         try {
-          spawn(process.execPath, [launcher], {
-            cwd: dir,
-            detached: true,
-            stdio: "ignore",
-            env: { ...process.env },
-          }).unref();
-          sendJson(res, 200, { ok: true, path: dir });
+          const launched = await launchPathCodeInTerminal({
+            projectRoot: dir,
+            nodePath: process.execPath,
+            launcherPath: launcher,
+            env: process.env,
+          });
+          if (!launched.ok) {
+            sendJson(res, 500, launched);
+            return;
+          }
+          sendJson(res, 200, {
+            ok: true,
+            path: dir,
+            launched: true,
+            method: launched.method,
+            pid: launched.pid || null,
+          });
         } catch (err) {
           sendJson(res, 500, {
             ok: false,
+            code: "OPEN_CODE_FAILED",
             message: err instanceof Error ? err.message : String(err),
           });
         }
@@ -729,9 +779,17 @@ export async function startPathBuildSurface(options) {
 
         // Defer loop so HTTP response returns immediately (tests + UX).
         if (autoLoop) {
-          setImmediate(() =>
-            ensureLoop(started.build.buildId, { autoPreview: true }),
-          );
+          setImmediate(() => {
+            try {
+              ensureLoop(started.build.buildId, { autoPreview: true });
+            } catch (err) {
+              console.error(
+                "[path-build] ensureLoop failed",
+                started.build.buildId,
+                err,
+              );
+            }
+          });
         }
         sendJson(res, 200, {
           ok: true,

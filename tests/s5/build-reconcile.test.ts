@@ -110,6 +110,57 @@ describe("S5 Build child reconciliation", () => {
     expect(decision.orphan).toBe(true);
   });
 
+  it("fresh empty Build tick dispatches engineer instead of await_runtime_refresh", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "path-fresh-"));
+    const runtimeRoot = join(dir, "rt");
+    mkdirSync(join(runtimeRoot, "metadata", "tasks"), { recursive: true });
+    const target = join(dir, "site");
+    mkdirSync(target);
+
+    const controller = createBuildController({
+      runtimeRoot,
+      fakeMode: true,
+      gateway: {
+        async bindProject() {
+          return { ok: true };
+        },
+        async startTask() {
+          return { ok: true, taskId: "t-eng" };
+        },
+        async awaitTask() {
+          return { status: "verified", classification: "VERIFIED" };
+        },
+        snapshotTask() {
+          return { status: "verified", classification: "VERIFIED" };
+        },
+      },
+    });
+
+    const started = await controller.startBuild("Build a friendly ICE website", {
+      targetDir: target,
+      originKind: "build-created",
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    // Simulate the prior bug: seeded auth SHA + pendingRuntimeRefresh with no product.
+    const { writeBuildRecord, readBuildRecord } = await import(
+      "../../scripts/pathcode-cli/build/record.mjs"
+    );
+    const rec = readBuildRecord(runtimeRoot, started.build.buildId);
+    rec.authoritativeSha = rec.authoritativeSha || "abc123";
+    rec.loop.pendingRuntimeRefresh = true;
+    writeBuildRecord(runtimeRoot, rec);
+
+    const step = await controller.tick(started.build.buildId);
+    expect(step.action).not.toBe("await_runtime_refresh");
+    expect(step.kind === "engineer" || step.action === "child_finished").toBe(true);
+    const after = readBuildRecord(runtimeRoot, started.build.buildId);
+    expect(after.children.some((c) => c.kind === "engineer")).toBe(true);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("conversation steer supersedes active evaluate and forces engineer next", async () => {
     const dir = mkdtempSync(join(tmpdir(), "path-steer-"));
     const runtimeRoot = join(dir, "rt");
