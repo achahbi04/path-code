@@ -19,6 +19,7 @@ const FORBIDDEN_TOOL_RE =
   /\b(write|edit|apply|create_file|delete|git|push|commit|pr|deploy|shell|terminal|bash)\b/i;
 
 /**
+ * @param {{ skipVersion?: boolean, timeoutMs?: number }} [opts]
  * @returns {{
  *   status: 'ready'|'unavailable',
  *   executable: string|null,
@@ -26,7 +27,7 @@ const FORBIDDEN_TOOL_RE =
  *   evidence: string[],
  * }}
  */
-export function detectCopilotCli() {
+export function detectCopilotCli(opts = {}) {
   /** @type {string[]} */
   const evidence = [];
   const executable = whichBinary("copilot");
@@ -35,10 +36,13 @@ export function detectCopilotCli() {
     return { status: "unavailable", executable: null, evidence };
   }
   evidence.push(`copilot → ${executable}`);
+  if (opts.skipVersion === true) {
+    return { status: "ready", executable, evidence };
+  }
 
   const ver = spawnSync(executable, ["--version"], {
     encoding: "utf8",
-    timeout: 8_000,
+    timeout: typeof opts.timeoutMs === "number" ? opts.timeoutMs : 8_000,
     env: process.env,
   });
   /** @type {string | undefined} */

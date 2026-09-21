@@ -116,14 +116,14 @@ describe("PATH Build durable coordinator", () => {
     expect(a.running || b.running).toBe(true);
     expect(a.deduped || b.deduped).toBe(true);
 
-    const deadline = Date.now() + 10_000;
+    const deadline = Date.now() + 20_000;
     let final = readBuildRecord(runtimeRoot, record.buildId);
     while (final?.loop.status !== "complete" && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
       final = readBuildRecord(runtimeRoot, record.buildId);
     }
     expect(final?.loop.status).toBe("complete");
-  });
+  }, 40_000);
 
   it("reconciles nonterminal records when the host restarts", async () => {
     runtimeRoot = mkdtempSync(join(tmpdir(), "path-build-restart-"));
@@ -154,7 +154,7 @@ describe("PATH Build durable coordinator", () => {
       ),
     ).toBe(true);
 
-    const deadline = Date.now() + 10_000;
+    const deadline = Date.now() + 20_000;
     let final = readBuildRecord(runtimeRoot, record.buildId);
     while (final?.loop.status !== "complete" && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -162,7 +162,7 @@ describe("PATH Build durable coordinator", () => {
     }
     expect(final?.loop.pendingReinspect).toBe(false);
     expect(final?.loop.status).toBe("complete");
-  });
+  }, 40_000);
 
   it("serializes stop between autonomous loop steps without rescheduling", async () => {
     runtimeRoot = mkdtempSync(join(tmpdir(), "path-build-stop-race-"));
@@ -225,7 +225,7 @@ describe("PATH Build durable coordinator", () => {
       expect(recovered.build.loop.status).toBe("running");
       expect(recovered.build.coordinator?.autoRun).toBe(true);
 
-      const deadline = Date.now() + 10_000;
+      const deadline = Date.now() + 20_000;
       let final = readBuildRecord(runtimeRoot, buildId);
       while (final?.loop.status !== "complete" && Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, 50));

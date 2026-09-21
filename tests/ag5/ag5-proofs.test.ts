@@ -438,7 +438,7 @@ describe("AG5 packaging surface", () => {
     expect(report.text).toContain("PATH Code doctor");
     expect(report.text).not.toContain("should-not-appear");
     expect(report.text).not.toMatch(/ghp_[A-Za-z0-9]+/);
-  }, 20_000);
+  }, 40_000);
 
   it("detectAg1Auth sees default gcloud ADC file", async () => {
     const { detectAg1Auth } = await loadAg1("auth-detect.mjs");

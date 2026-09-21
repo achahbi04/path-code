@@ -179,7 +179,7 @@ export function runPathcodeDoctor(opts = {}) {
       ? `ready (${agReady.authMethod || "bridge"})`
       : agReady.reason || "not ready",
   });
-  const copilotReady = probeCopilotReadiness({ env });
+  const copilotReady = probeCopilotReadiness({ env, skipVersion: true });
   rows.push({
     name: "Engine Copilot",
     ok: copilotReady.ready,

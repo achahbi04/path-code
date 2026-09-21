@@ -113,7 +113,10 @@ export function probeAntigravityReadiness(opts = {}) {
 export function probeCopilotReadiness(opts = {}) {
   const env = opts.env || process.env;
   const checkedAt = new Date().toISOString();
-  const cli = detectCopilotCli();
+  const cli = detectCopilotCli({
+    skipVersion: opts.skipVersion === true,
+    timeoutMs: opts.timeoutMs,
+  });
   const auth = detectCopilotAuthArtifacts(env, { home: opts.home });
   const evidence = [...(cli.evidence || []), ...auth.evidence];
   if (!cli.executable) {

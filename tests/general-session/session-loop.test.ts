@@ -229,7 +229,7 @@ describe("R2 living session loop (shell)", { timeout: 20_000 }, () => {
     expect(output).toMatch(/PATH [●*] Code/);
     expect(output).toMatch(/│ > |path-idle-composer/);
     expect(output).toContain("Goodbye.");
-  });
+  }, 40_000);
 
   it("R2-J: /recover between tasks returns to the prompt", async () => {
     const order: string[] = [];

@@ -635,27 +635,29 @@ export function createBuildController(opts) {
     record.loop.pendingReinspect = false;
     writeBuildRecord(runtimeRoot, record);
 
-    try {
-      const cp = childTaskId ? resolveTaskCheckpoint(childTaskId) : null;
-      const snap = childTaskId ? gatewayProbeHints(childTaskId) : null;
-      const ctx = probeContextFromChild(cp, snap, null);
-      const probe = mechanicalProbeBinding(
-        buildProbeInput(record, binding.bindingId, {
-          taskId: childTaskId,
-          changedFiles:
-            refresh.delta?.changedFiles?.length
-              ? refresh.delta.changedFiles
-              : ctx.changedFiles,
-          worktreePath: ctx.worktreePath,
-          taskBranch: ctx.taskBranch,
-          taskSha: ctx.taskSha,
-        }),
-      );
-      if (probe.ok && Array.isArray(probe.updates) && probe.updates.length) {
-        writeBuildRecord(runtimeRoot, record);
+    if (!fakeMode) {
+      try {
+        const cp = childTaskId ? resolveTaskCheckpoint(childTaskId) : null;
+        const snap = childTaskId ? gatewayProbeHints(childTaskId) : null;
+        const ctx = probeContextFromChild(cp, snap, null);
+        const probe = mechanicalProbeBinding(
+          buildProbeInput(record, binding.bindingId, {
+            taskId: childTaskId,
+            changedFiles:
+              refresh.delta?.changedFiles?.length
+                ? refresh.delta.changedFiles
+                : ctx.changedFiles,
+            worktreePath: ctx.worktreePath,
+            taskBranch: ctx.taskBranch,
+            taskSha: ctx.taskSha,
+          }),
+        );
+        if (probe.ok && Array.isArray(probe.updates) && probe.updates.length) {
+          writeBuildRecord(runtimeRoot, record);
+        }
+      } catch {
+        // best-effort mechanical refresh after Depth A
       }
-    } catch {
-      // best-effort mechanical refresh after Depth A
     }
 
     return {
@@ -1214,21 +1216,23 @@ export function createBuildController(opts) {
 
     // Mechanical FS/check probe — updates criteria from authoritative reality
     let probe = null;
-    try {
-      const rec2 = readBuildRecord(runtimeRoot, buildId);
-      if (rec2) {
-        probe = mechanicalProbeBinding(
-          buildProbeInput(rec2, child.bindingId, {
-            taskId,
-            ...probeCtx,
-          }),
-        );
-        if (probe.ok && Array.isArray(probe.updates) && probe.updates.length) {
-          writeBuildRecord(runtimeRoot, rec2);
+    if (!fakeMode) {
+      try {
+        const rec2 = readBuildRecord(runtimeRoot, buildId);
+        if (rec2) {
+          probe = mechanicalProbeBinding(
+            buildProbeInput(rec2, child.bindingId, {
+              taskId,
+              ...probeCtx,
+            }),
+          );
+          if (probe.ok && Array.isArray(probe.updates) && probe.updates.length) {
+            writeBuildRecord(runtimeRoot, rec2);
+          }
         }
+      } catch {
+        probe = null;
       }
-    } catch {
-      probe = null;
     }
 
     return {
@@ -1680,7 +1684,7 @@ export function createBuildController(opts) {
     }
 
     const bindingForProbe = primaryBinding(record);
-    if (bindingForProbe) {
+    if (bindingForProbe && !fakeMode) {
       try {
         const reality = captureBindingReality(bindingForProbe.projectRoot);
         const probe = mechanicalProbeBinding(

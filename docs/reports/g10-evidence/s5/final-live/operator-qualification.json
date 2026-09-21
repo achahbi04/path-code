@@ -1,0 +1,457 @@
+{
+  "schema": "pathcode.s5.final-live-operator-qualification.v1",
+  "capturedAt": "2026-09-20T21:50:00Z",
+  "s5Frozen": false,
+  "operatorAcceptance": "READY_FOR_OPERATOR",
+  "buildId": "11f8d55a-c20b-4d05-bb17-df5c37f6b19e",
+  "projectRoot": "/Users/achahbi/PATH Builds/build-a-polished-website-for-ice-in--4c006c",
+  "productBranch": "path-build/11f8d55a",
+  "authoritativeSha": "da87b149a76a3929b34b38f0c4198e1b7af60e0d",
+  "previewUrl": "http://127.0.0.1:4173/",
+  "runtimeHealth": "ok",
+  "loopStatus": "complete",
+  "intentRevision": 5,
+  "criteria": [
+    {
+      "id": "c-structure-landmarks",
+      "status": "PROVEN",
+      "statement": "index.html includes skip link to #main-content, header role=banner, main#main-content, footer role=contentinfo, and exactly one h1 with no heading-level skips."
+    },
+    {
+      "id": "c-nav-targets",
+      "status": "PROVEN",
+      "statement": "Every #site-nav in-page hash link resolves to an element id present in the document."
+    },
+    {
+      "id": "c-core-sections",
+      "status": "PROVEN",
+      "statement": "Page contains identifiable sections for why-it-matters, how-it-works, emergency-access, for-caregivers, trust-privacy, faq, and get-started with content aligned to ICE preparedness narrative."
+    },
+    {
+      "id": "c-emergency-flow",
+      "status": "PROVEN",
+      "statement": "Emergency access area includes a multi-step visual flow with at least three .access-step items and 911-first guidance."
+    },
+    {
+      "id": "c-disclaimer",
+      "status": "PROVEN",
+      "statement": "Visible disclaimer text states ICE is not a replacement for emergency services (matches automated test regex)."
+    },
+    {
+      "id": "c-faq-depth",
+      "status": "PROVEN",
+      "statement": "FAQ contains at least eight details/summary pairs under #faq."
+    },
+    {
+      "id": "c-meta-seo",
+      "status": "PROVEN",
+      "statement": "Document has non-empty meta description, og:title, and og:description suitable for link previews."
+    },
+    {
+      "id": "c-cta-sync",
+      "status": "PROVEN",
+      "statement": "At least two data-primary-cta elements exist; HTML fallbacks include label and href from copy-constants.js; main.js applies ICE_COPY on load."
+    },
+    {
+      "id": "c-a11y-axe",
+      "status": "PROVEN",
+      "statement": "npm test reports zero axe critical violations against served page at http://127.0.0.1:3456/."
+    },
+    {
+      "id": "c-reduced-motion",
+      "status": "PROVEN",
+      "statement": "css/styles.css includes prefers-reduced-motion rules disabling smooth scroll and minimizing motion."
+    },
+    {
+      "id": "c-mobile-nav-a11y",
+      "status": "PROVEN",
+      "statement": "Nav toggle updates aria-expanded, toggles open class, closes on Escape returning focus to toggle, and closes after in-nav link activation."
+    },
+    {
+      "id": "c-trust-tone",
+      "status": "PROVEN",
+      "statement": "Trust section and hero preview communicate minimum necessary data sharing, user control, and security practices without selling health data."
+    }
+  ],
+  "productBrief": {
+    "intentRevision": 5,
+    "revision": 9,
+    "source": "cognitive",
+    "productKind": "web",
+    "summary": "Static single-page marketing site for ICE (In Case of Emergency) that educates first-time visitors and families on medical preparedness when someone cannot speak: what ICE stores, why seconds matter, a four-step setup flow, a stress-oriented helper access path, caregiver co-management, trust and privacy commitments, FAQ, and consistent primary CTAs\u2014delivered as vanilla HTML/CSS/JS with automated s",
+    "criteriaCount": 12,
+    "acceptanceCriteria": [
+      {
+        "id": "c-structure-landmarks",
+        "statement": "index.html includes skip link to #main-content, header role=banner, main#main-content, footer role=contentinfo, and exactly one h1 with no heading-level skips."
+      },
+      {
+        "id": "c-nav-targets",
+        "statement": "Every #site-nav in-page hash link resolves to an element id present in the document."
+      },
+      {
+        "id": "c-core-sections",
+        "statement": "Page contains identifiable sections for why-it-matters, how-it-works, emergency-access, for-caregivers, trust-privacy, faq, and get-started with content aligned to ICE preparedness narrative."
+      },
+      {
+        "id": "c-emergency-flow",
+        "statement": "Emergency access area includes a multi-step visual flow with at least three .access-step items and 911-first guidance."
+      },
+      {
+        "id": "c-disclaimer",
+        "statement": "Visible disclaimer text states ICE is not a replacement for emergency services (matches automated test regex)."
+      },
+      {
+        "id": "c-faq-depth",
+        "statement": "FAQ contains at least eight details/summary pairs under #faq."
+      },
+      {
+        "id": "c-meta-seo",
+        "statement": "Document has non-empty meta description, og:title, and og:description suitable for link previews."
+      },
+      {
+        "id": "c-cta-sync",
+        "statement": "At least two data-primary-cta elements exist; HTML fallbacks include label and href from copy-constants.js; main.js applies ICE_COPY on load."
+      },
+      {
+        "id": "c-a11y-axe",
+        "statement": "npm test reports zero axe critical violations against served page at http://127.0.0.1:3456/."
+      },
+      {
+        "id": "c-reduced-motion",
+        "statement": "css/styles.css includes prefers-reduced-motion rules disabling smooth scroll and minimizing motion."
+      },
+      {
+        "id": "c-mobile-nav-a11y",
+        "statement": "Nav toggle updates aria-expanded, toggles open class, closes on Escape returning focus to toggle, and closes after in-nav link activation."
+      },
+      {
+        "id": "c-trust-tone",
+        "statement": "Trust section and hero preview communicate minimum necessary data sharing, user control, and security practices without selling health data."
+      }
+    ]
+  },
+  "timing": {
+    "T0_build_click": "2026-09-20T20:20:00Z",
+    "T1_buildId_created": "2026-09-20T20:20:30.878Z",
+    "T2_create_response": "2026-09-20T20:20:30.878Z",
+    "T3_workspace_visible": "2026-09-20T20:20:31.209Z",
+    "T4_first_coordinator_action": "2026-09-20T20:20:31.209Z",
+    "T5_first_engineer_dispatched": "2026-09-20T20:22:43.800Z",
+    "T6_first_runnable_preview": "2026-09-20T20:22:56.363Z",
+    "T7_first_complete": "2026-09-20T21:02:12.022Z",
+    "first_adoption": "2026-09-20T20:32:21.688Z",
+    "conversation_followup": "2026-09-20T20:28:07.500Z",
+    "stop": "2026-09-20T20:34:23.896Z",
+    "resume": "2026-09-20T20:34:53.522Z",
+    "post_complete_queued": "2026-09-20T21:02:22.014Z",
+    "recomplete": "2026-09-20T21:15:59.146Z"
+  },
+  "eventCount": 1087,
+  "eventTypeFirsts": {
+    "build.created": "2026-09-20T20:20:30.878Z",
+    "brief.bootstrap": "2026-09-20T20:20:30.881Z",
+    "coordinator.updated": "2026-09-20T20:20:30.885Z",
+    "build.updated": "2026-09-20T20:20:30.894Z",
+    "brief.selected": "2026-09-20T20:20:31.209Z",
+    "brief.dispatched": "2026-09-20T20:20:33.795Z",
+    "brief.accepted": "2026-09-20T20:22:06.254Z",
+    "brief.consumed": "2026-09-20T20:22:06.255Z",
+    "assessment.updated": "2026-09-20T20:22:06.255Z",
+    "intent.revised": "2026-09-20T20:22:06.991Z",
+    "engineer.selected": "2026-09-20T20:22:40.184Z",
+    "engineer.dispatched": "2026-09-20T20:22:43.800Z",
+    "engineer.consumed": "2026-09-20T20:22:54.301Z",
+    "runtime.updated": "2026-09-20T20:22:56.363Z",
+    "conversation.queued": "2026-09-20T20:28:07.500Z",
+    "engineer.terminal_seen": "2026-09-20T20:32:21.072Z",
+    "adoption.completed": "2026-09-20T20:32:21.688Z",
+    "runtime.restarted": "2026-09-20T20:33:28.518Z",
+    "build.paused": "2026-09-20T20:34:23.896Z",
+    "brief.terminal_seen": "2026-09-20T20:34:52.594Z",
+    "build.resumed": "2026-09-20T20:34:53.522Z",
+    "evaluate.selected": "2026-09-20T20:35:57.497Z",
+    "evaluate.dispatched": "2026-09-20T20:36:03.112Z",
+    "evaluate.terminal_seen": "2026-09-20T20:36:52.476Z",
+    "evaluate.consumed": "2026-09-20T20:36:52.793Z",
+    "challenge.selected": "2026-09-20T20:36:57.476Z",
+    "challenge.dispatched": "2026-09-20T20:37:07.113Z",
+    "challenge.terminal_seen": "2026-09-20T20:37:56.822Z",
+    "challenge.consumed": "2026-09-20T20:37:56.932Z",
+    "build.completed": "2026-09-20T21:02:12.022Z"
+  },
+  "children": [
+    {
+      "kind": "brief",
+      "taskId": "6b1266ed-d473-4477-ab78-71fef1f93d69",
+      "dispatchState": "consumed",
+      "classification": "NOT_VERIFIED",
+      "intentRevision": 1,
+      "authoritativeSha": "ca31eabb9d21d6ef885eacd103699d4863564fe6",
+      "provider": "preferred"
+    },
+    {
+      "kind": "brief",
+      "taskId": "a94e1e00-0e25-4a01-b8f1-1bf483b2d8fe",
+      "dispatchState": "consumed",
+      "classification": "NOT_VERIFIED",
+      "intentRevision": 2,
+      "authoritativeSha": "ca31eabb9d21d6ef885eacd103699d4863564fe6",
+      "provider": "preferred"
+    },
+    {
+      "kind": "engineer",
+      "taskId": "2f0aad41-9554-4ebd-86e3-3bf72bab5985",
+      "dispatchState": "consumed",
+      "classification": null,
+      "intentRevision": 2,
+      "authoritativeSha": "ca31eabb9d21d6ef885eacd103699d4863564fe6",
+      "provider": null
+    },
+    {
+      "kind": "engineer",
+      "taskId": "6568130a-e3eb-4ec9-97da-e01ea038139b",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 2,
+      "authoritativeSha": "ca31eabb9d21d6ef885eacd103699d4863564fe6",
+      "provider": "preferred"
+    },
+    {
+      "kind": "brief",
+      "taskId": "f4e73bd3-3ed2-44c9-bbeb-b7cb373dc9c5",
+      "dispatchState": "consumed",
+      "classification": "NOT_VERIFIED",
+      "intentRevision": 3,
+      "authoritativeSha": "fef811028be1bf6fa9cdbf4f322b98e8f7f476bf",
+      "provider": "preferred"
+    },
+    {
+      "kind": "engineer",
+      "taskId": "a6ff7aba-8249-483e-b6f9-85dbb73cb155",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 3,
+      "authoritativeSha": "fef811028be1bf6fa9cdbf4f322b98e8f7f476bf",
+      "provider": "preferred"
+    },
+    {
+      "kind": "evaluate",
+      "taskId": "a20a487d-d7cf-45d3-bcbe-7b17c086bb13",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 3,
+      "authoritativeSha": "7ae26cffd1d1aa2464ce1a7f22258b9ab75df24a",
+      "provider": "preferred"
+    },
+    {
+      "kind": "challenge",
+      "taskId": "a1a32a5e-cf23-4d12-9d0f-95cbefe3584d",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 3,
+      "authoritativeSha": "7ae26cffd1d1aa2464ce1a7f22258b9ab75df24a",
+      "provider": "preferred"
+    },
+    {
+      "kind": "engineer",
+      "taskId": "d49e4e61-fc1c-4091-9bc4-bfbbc361b564",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 3,
+      "authoritativeSha": "7ae26cffd1d1aa2464ce1a7f22258b9ab75df24a",
+      "provider": "preferred"
+    },
+    {
+      "kind": "brief",
+      "taskId": "80edf98e-2d98-4cf0-919e-6d8068183c3b",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 4,
+      "authoritativeSha": "40ddd464dbfa1223e716f64e6d8067fa8f3cdbbf",
+      "provider": "preferred"
+    },
+    {
+      "kind": "engineer",
+      "taskId": "da916ca9-d709-4b03-9080-2ed63bb3d3f3",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 4,
+      "authoritativeSha": "40ddd464dbfa1223e716f64e6d8067fa8f3cdbbf",
+      "provider": "preferred"
+    },
+    {
+      "kind": "evaluate",
+      "taskId": "c9e87005-785b-42ef-b5f4-0443409591fc",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 4,
+      "authoritativeSha": "be19a9d59b4675bde1eeacb8536856b4ff616005",
+      "provider": "preferred"
+    },
+    {
+      "kind": "challenge",
+      "taskId": "d0b52781-4b15-4674-9b16-dbf02af3a2ed",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 4,
+      "authoritativeSha": "be19a9d59b4675bde1eeacb8536856b4ff616005",
+      "provider": "preferred"
+    },
+    {
+      "kind": "engineer",
+      "taskId": "b796ab82-e774-4129-80ba-4ab7db6896f7",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 4,
+      "authoritativeSha": "be19a9d59b4675bde1eeacb8536856b4ff616005",
+      "provider": "preferred"
+    },
+    {
+      "kind": "evaluate",
+      "taskId": "9ea5a83c-ae89-4870-af5e-378d236b2c8f",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 4,
+      "authoritativeSha": "06febf4423325ceeb0416c9590458e74487bb85b",
+      "provider": "preferred"
+    },
+    {
+      "kind": "challenge",
+      "taskId": "67772705-75e9-430a-a656-5e53ca3cbb1f",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 4,
+      "authoritativeSha": "06febf4423325ceeb0416c9590458e74487bb85b",
+      "provider": "preferred"
+    },
+    {
+      "kind": "brief",
+      "taskId": "da139a55-46ee-453e-a783-5d8a4e59fce1",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 5,
+      "authoritativeSha": "06febf4423325ceeb0416c9590458e74487bb85b",
+      "provider": "preferred"
+    },
+    {
+      "kind": "engineer",
+      "taskId": "11ef6fc8-0f56-42b3-8c17-47e460497d58",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 5,
+      "authoritativeSha": "06febf4423325ceeb0416c9590458e74487bb85b",
+      "provider": "preferred"
+    },
+    {
+      "kind": "evaluate",
+      "taskId": "13f49d49-c0ea-44ec-b428-6237bd940311",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 5,
+      "authoritativeSha": "da87b149a76a3929b34b38f0c4198e1b7af60e0d",
+      "provider": "preferred"
+    },
+    {
+      "kind": "challenge",
+      "taskId": "e47ad371-557a-4921-afa7-ec04e1ce8fa6",
+      "dispatchState": "consumed",
+      "classification": "VERIFIED",
+      "intentRevision": 5,
+      "authoritativeSha": "da87b149a76a3929b34b38f0c4198e1b7af60e0d",
+      "provider": "preferred"
+    }
+  ],
+  "stopResume": {
+    "pausedAt": "2026-09-20T20:34:23.881Z",
+    "pausedTaskId": "f4e73bd3-3ed2-44c9-bbeb-b7cb373dc9c5",
+    "resumedAt": "2026-09-20T20:34:52.582Z",
+    "sameBuildId": true
+  },
+  "repo": {
+    "head": "b1d8a742a90cfa70fb9c52f90afbaeeaab85b3df",
+    "branch": "cursor/pathcode-antigravity-v1",
+    "tree": "dirty",
+    "dirtyFiles": [
+      "scripts/pathcode-cli/ag10/engine-readiness.mjs",
+      "scripts/pathcode-cli/ag5/doctor.mjs",
+      "scripts/pathcode-cli/ag8/copilot.mjs",
+      "scripts/pathcode-cli/build/controller.mjs",
+      "tests/ag5/ag5-proofs.test.ts",
+      "tests/general-session/session-loop.test.ts",
+      "tests/s5/build-coordinator.test.ts",
+      "docs/reports/g10-evidence/s5/final-live/11-recomplete-workspace.png",
+      "docs/reports/g10-evidence/s5/final-live/operator-qualification.json"
+    ],
+    "priorHardeningHead": "b894070ba6d0ff10438a7601a7aca98fe311ef2b"
+  },
+  "canonicalCheck": {
+    "command": "npm run check",
+    "result": "CHECK_EXIT:0",
+    "files": 180,
+    "tests": 1559
+  },
+  "engineReadiness": {
+    "cursor": {
+      "ready": true,
+      "authMethod": "api_key",
+      "mode": "native_sdk"
+    },
+    "copilot": {
+      "ready": true,
+      "authMethod": "local_config",
+      "mode": "available"
+    },
+    "antigravity": {
+      "ready": true,
+      "authMethod": "vertex_adc",
+      "mode": "bridge"
+    }
+  },
+  "pathCodeLive": {
+    "cursor": {
+      "verdict": "PASS",
+      "taskId": "cfcd3bd9-46f2-4285-a56d-636482edb3e1",
+      "resultSha": "a0585f8802870b8f6d92f96fd2082da644d21301",
+      "note": "marker.js on result SHA returns s5-live-ok; report BLOCKED only because the isolated repo had no package.json validation"
+    },
+    "copilot": {
+      "verdict": "PASS",
+      "taskId": "747724cd-7f7f-40b7-8607-112fd0652db6",
+      "resultSha": "44ffce12177e5c7e40f91f44e778a739b3c60d5e",
+      "authMethod": "local_config",
+      "markerContainsLive": true
+    }
+  },
+  "gates": {
+    "PATH BUILD LIVE WORKSPACE": "PASS",
+    "REAL ENGINEERING ACTIVITY VISIBLE": "PASS",
+    "FIRST RUNNABLE PRODUCT BEFORE COMPLETE": "PASS",
+    "LIVE PREVIEW UPDATES DURING BUILD": "PASS",
+    "CONVERSATION DURING ACTIVE BUILD": "PASS",
+    "ELEMENT TARGETING REAL UI": "PASS",
+    "STOP / RESUME REAL UI": "PASS",
+    "REAL BUILD COMPLETE": "PASS",
+    "POST-COMPLETE ITERATION": "PASS",
+    "BUILD / S4 RECOVERY": "PASS",
+    "PATH CODE LIVE CURSOR ENGINEERING": "PASS",
+    "PATH CODE LIVE COPILOT ENGINEERING": "PASS",
+    "ENGINE READINESS": "PASS",
+    "PATH CODE MECHANICAL REGRESSION": "PASS",
+    "CURRENT PACK PARITY": "PASS",
+    "npm run check": "CHECK_EXIT:0",
+    "S5 FROZEN": false
+  },
+  "supersededPreCandidatePack": {
+    "version": "1.0.1",
+    "tarball": "/tmp/pathcode-s5-pack-final-live/path-code-1.0.1.tgz",
+    "packedBytes": 927604,
+    "unpackedBytes": 4271761,
+    "fileCount": 1126,
+    "sha256": "be8f952ad6b7741d991b828c03ec5883476be589f83f640af34d2c3fefbdc9f8",
+    "audit": "PASS",
+    "published": false,
+    "publicNpm101": "stale subset \u2014 do not reuse 1.0.1 for a future publication",
+    "note": "Packed from the dirty tree before the operator-acceptance candidate commit. Not the candidate artifact."
+  }
+}
