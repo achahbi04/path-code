@@ -10,15 +10,13 @@ import { defineConfig } from "vitest/config";
  * The lock itself stays unchanged as the correctness guarantee for any other
  * execution order.
  *
- * A separate serial project was not enough. With two projects, Vitest still
- * kept a second fork. The first cold check of 8e4fd1f finished every
- * assertion (1575 passed) and then died on that RPC timeout after the H2
- * file, so three files never reported. One project and one fork removes
- * that second waiter. Assertions and the discovery set stay the same.
+ * One file at a time (`maxWorkers: 1`, `fileParallelism: false`) means the
+ * contended mutex branch is never taken. Isolation stays on.
  *
- * Many suites also build disposable Git worktrees. The default of one worker
- * per CPU can keep several of those files in flight at once and starve the
- * same RPC. One root worker and fileParallelism: false keep the suite serial.
+ * `singleFork: true` is not used. It disables isolation. The cold check of
+ * 4b0d18d then leaked fake timers and 26 tests hung on their own deadlines.
+ * A second project fork is not used either. The cold check of 8e4fd1f
+ * finished every assertion and then lost worker RPC after the H2 file.
  */
 const ROOT_MAX_WORKERS = 1;
 
@@ -28,18 +26,7 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 20_000,
     pool: "forks",
-    poolOptions: { forks: { singleFork: true } },
-    projects: [
-      {
-        test: {
-          name: "default",
-          include: ["tests/**/*.test.ts"],
-          exclude: ["**/node_modules/**"],
-          pool: "forks",
-          poolOptions: { forks: { singleFork: true } },
-          testTimeout: 20_000,
-        },
-      },
-    ],
+    include: ["tests/**/*.test.ts"],
+    exclude: ["**/node_modules/**"],
   },
 });
