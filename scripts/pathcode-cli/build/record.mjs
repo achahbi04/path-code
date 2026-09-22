@@ -207,13 +207,20 @@ export function listBuildRecords(runtimeRoot) {
  * @returns {import('./types.mjs').BuildRecord | null}
  */
 export function findLatestActiveBuild(runtimeRoot) {
+  const rank = (build) =>
+    build?.loop?.status === "running"
+      ? 2
+      : build?.loop?.status === "paused" || build?.loop?.status === "blocked"
+        ? 1
+        : 0;
   return (
-    listBuildRecords(runtimeRoot).find(
-      (b) =>
-        b.loop?.status === "running" ||
-        b.loop?.status === "blocked" ||
-        b.loop?.status === "paused",
-    ) || null
+    listBuildRecords(runtimeRoot)
+      .filter((build) => rank(build) > 0)
+      .sort(
+        (a, b) =>
+          rank(b) - rank(a) ||
+          String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")),
+      )[0] || null
   );
 }
 

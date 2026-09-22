@@ -321,6 +321,9 @@ export interface BuildController {
     input: { message: string; element?: SelectedElement },
   ): Promise<{ ok: boolean; build: BuildRecord }>;
   tick(buildId: string): Promise<{
+    ok?: boolean;
+    code?: string;
+    message?: string;
     action?: string;
     kind?: BuildChild["kind"];
     taskId?: string;
@@ -496,6 +499,17 @@ export function projectBuildForSurface(
     engine?: string | null;
     files?: string[];
     [key: string]: unknown;
+  };
+  engineeringTimeline?: {
+    phases: Array<{ id: string; label: string; status: string; count: number }>;
+    entries: Array<{
+      sequence: number;
+      kind: string;
+      summary: string;
+      taskId?: string | null;
+      engine?: string | null;
+    }>;
+    current: { summary?: string; kind?: string } | null;
   };
 };
 

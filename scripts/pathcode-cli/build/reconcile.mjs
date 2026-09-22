@@ -298,12 +298,12 @@ export function decideChildReconciliation(input) {
  * @param {string} taskId
  * @param {{ snapshotTask?: (id: string) => any }} [gateway]
  */
-export function loadChildTruth(runtimeRoot, taskId, gateway = {}) {
+export async function loadChildTruth(runtimeRoot, taskId, gateway = {}) {
   const cp = readTaskCheckpoint(runtimeRoot, taskId);
   let snap = null;
   if (typeof gateway.snapshotTask === "function") {
     try {
-      snap = gateway.snapshotTask(taskId);
+      snap = await gateway.snapshotTask(taskId);
     } catch {
       snap = null;
     }

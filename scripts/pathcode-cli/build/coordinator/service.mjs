@@ -17,7 +17,11 @@ import { createBuildRuntimeSync } from "../runtime/sync.mjs";
 import { detectBuildArtifact } from "../runtime/artifact.mjs";
 import { appendBuildEvent, readBuildEvents } from "../events.mjs";
 import { ensureGateway } from "../../gateway/ensure.mjs";
-import { BuildCoordinatorMethods } from "./protocol.mjs";
+import { readPathPackageVersion } from "../../paths.mjs";
+import {
+  BUILD_COORDINATOR_PROTOCOL_VERSION,
+  BuildCoordinatorMethods,
+} from "./protocol.mjs";
 
 export async function createBuildCoordinatorService(options) {
   const {
@@ -202,31 +206,44 @@ export async function createBuildCoordinatorService(options) {
   async function reconcileStartup() {
     const recovered = [];
     for (const build of listBuildRecords(runtimeRoot)) {
-      const binding = build.projectBindings?.[0];
-      const runtime = binding?.projectRoot
-        ? await runtimeManager.reconcile(build.buildId, binding.projectRoot, {
-            bindingId: binding.bindingId,
-            outcomeHint: build.intent?.outcome,
-            authoritativeSha: build.authoritativeSha || null,
-            descriptor: {
-              buildId: build.buildId,
+      try {
+        const binding = build.projectBindings?.[0];
+        const runtime = binding?.projectRoot
+          ? await runtimeManager.reconcile(build.buildId, binding.projectRoot, {
               bindingId: binding.bindingId,
-              projectRoot: binding.projectRoot,
-            },
-            restartAllowed: true,
-          })
-        : null;
-      const result = await exclusive(build.buildId, () =>
-        controller.recover(build.buildId),
-      );
-      recovered.push({
-        buildId: build.buildId,
-        ok: result?.ok !== false,
-        decisions: result?.decisions || [],
-        runtime: runtime?.runtime || null,
-      });
-      if (shouldAutoRun(readBuildRecord(runtimeRoot, build.buildId))) {
-        ensureLoop(build.buildId);
+              outcomeHint: build.intent?.outcome,
+              authoritativeSha: build.authoritativeSha || null,
+              descriptor: {
+                buildId: build.buildId,
+                bindingId: binding.bindingId,
+                projectRoot: binding.projectRoot,
+              },
+              restartAllowed: true,
+            })
+          : null;
+        const result = await exclusive(build.buildId, () =>
+          controller.recover(build.buildId),
+        );
+        recovered.push({
+          buildId: build.buildId,
+          ok: result?.ok !== false,
+          decisions: result?.decisions || [],
+          runtime: runtime?.runtime || null,
+        });
+        const previousUpdatedAt = Date.parse(build?.updatedAt || "");
+        const recentlyActive =
+          Number.isFinite(previousUpdatedAt) &&
+          Date.now() - previousUpdatedAt < 10 * 60_000;
+        const current = readBuildRecord(runtimeRoot, build.buildId);
+        if (shouldAutoRun(current) && (fakeMode || recentlyActive)) {
+          ensureLoop(build.buildId);
+        }
+      } catch (error) {
+        recovered.push({
+          buildId: build.buildId,
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
     return recovered;
@@ -255,7 +272,8 @@ export async function createBuildCoordinatorService(options) {
       case BuildCoordinatorMethods.HELLO:
         return {
           ok: true,
-          protocolVersion: 1,
+          protocolVersion: BUILD_COORDINATOR_PROTOCOL_VERSION,
+          packageVersion: readPathPackageVersion(packageRoot),
           pid: process.pid,
           role: "path-build-coordinator",
           fakeMode,
@@ -420,7 +438,11 @@ export async function createBuildCoordinatorService(options) {
     }
   }
 
-  const recovered = await reconcileStartup();
+  let recovered = [];
+  const whenReady = reconcileStartup().then((rows) => {
+    recovered = rows;
+    return rows;
+  });
 
   return {
     controller,
@@ -428,7 +450,10 @@ export async function createBuildCoordinatorService(options) {
     runtimeSync,
     dispatch,
     ensureLoop,
-    recovered,
+    whenReady,
+    get recovered() {
+      return recovered;
+    },
     isShuttingDown: () => shuttingDown,
     close: async () => {
       shuttingDown = true;

@@ -35,6 +35,11 @@ const els = {
   newBuildBtn: document.getElementById("newBuildBtn"),
   openFolderBtn: document.getElementById("openFolderBtn"),
   openCodeBtn: document.getElementById("openCodeBtn"),
+  worklog: document.getElementById("worklog"),
+  worklogCurrent: document.getElementById("worklogCurrent"),
+  worklogPhases: document.getElementById("worklogPhases"),
+  worklogScroll: document.getElementById("worklogScroll"),
+  worklogToggle: document.getElementById("worklogToggle"),
 };
 
 /** @type {string | null} */
@@ -90,6 +95,43 @@ function renderChat(view) {
     })
     .join("");
   els.chatScroll.scrollTop = els.chatScroll.scrollHeight;
+}
+
+function clock(timestamp) {
+  if (!timestamp) return "--:--:--";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "--:--:--";
+  return date.toLocaleTimeString("en-GB", { hour12: false });
+}
+
+function renderWorklog(view) {
+  const timeline = view.engineeringTimeline || { phases: [], entries: [], current: null };
+  const active = view.status === "running";
+  if (active) els.worklog.classList.remove("collapsed");
+  els.worklogToggle.hidden = active;
+  els.worklogToggle.textContent = els.worklog.classList.contains("collapsed") ? "Show" : "Hide";
+  const current = timeline.current;
+  els.worklogCurrent.textContent = current?.summary || "Engineering has not begun.";
+  els.worklogPhases.innerHTML = (timeline.phases || [])
+    .map(
+      (phase) =>
+        `<span class="phase-chip" data-status="${escapeHtml(phase.status)}">${escapeHtml(phase.label)}${
+          phase.count ? ` · ${phase.count}` : ""
+        }</span>`,
+    )
+    .join("");
+  const nearBottom =
+    els.worklogScroll.scrollHeight - els.worklogScroll.scrollTop - els.worklogScroll.clientHeight < 48;
+  els.worklogScroll.innerHTML = (timeline.entries || [])
+    .map(
+      (entry) =>
+        `<div class="worklog-entry" data-kind="${escapeHtml(entry.kind)}" data-sequence="${entry.sequence}">
+          <time>${escapeHtml(clock(entry.timestamp))}</time>
+          <span>${escapeHtml(entry.summary || "")}</span>
+        </div>`,
+    )
+    .join("");
+  if (nearBottom) els.worklogScroll.scrollTop = els.worklogScroll.scrollHeight;
 }
 
 function renderDrawer(view) {
@@ -226,6 +268,7 @@ function render(view) {
 
   renderChat(view);
   renderDrawer(view);
+  renderWorklog(view);
   updatePreview(view);
   els.stopBuildBtn.hidden = !view.canStop;
   els.resumeBuildBtn.hidden = !view.canResume;
@@ -515,6 +558,12 @@ els.newBuildBtn.addEventListener("click", () => {
 
 els.detailsBtn.addEventListener("click", () => {
   els.drawer.hidden = false;
+  els.worklog.classList.remove("collapsed");
+});
+els.worklogToggle.addEventListener("click", () => {
+  if (lastView?.status === "running") return;
+  els.worklog.classList.toggle("collapsed");
+  els.worklogToggle.textContent = els.worklog.classList.contains("collapsed") ? "Show" : "Hide";
 });
 els.closeDrawerBtn.addEventListener("click", () => {
   els.drawer.hidden = true;

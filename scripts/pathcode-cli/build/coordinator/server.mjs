@@ -153,6 +153,29 @@ export async function startBuildCoordinatorServer(options) {
     throw error;
   }
   chmodSync(socketPath, 0o600);
+  if (service.whenReady) {
+    try {
+      await service.whenReady;
+    } catch (error) {
+      server.close();
+      try {
+        await service.close();
+      } catch {
+        // close is best-effort after a failed recovery
+      }
+      try {
+        unlinkSync(socketPath);
+      } catch {
+        // ignore
+      }
+      try {
+        unlinkSync(pidPath);
+      } catch {
+        // ignore
+      }
+      throw error;
+    }
+  }
 
   let stopped = false;
   async function stop() {

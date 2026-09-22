@@ -47,6 +47,8 @@ import {
   completenessClaim,
 } from "./objectives.mjs";
 import { formatBuildStatus } from "./format.mjs";
+import { detectBuildArtifact } from "./runtime/artifact.mjs";
+import { appendBuildEvent } from "./events.mjs";
 import { mechanicalProbeBinding } from "./mechanical-probe.mjs";
 import {
   briefToOutcomeCriteria,
@@ -224,6 +226,12 @@ export function createBuildController(opts) {
     if (!hasAdoptedProduct) return false;
     if (binding?.projectRoot && isEmptyProductTree(binding.projectRoot)) {
       return false;
+    }
+    if (binding?.projectRoot) {
+      const artifact = detectBuildArtifact(binding.projectRoot, {
+        outcomeHint: record.intent?.outcome,
+      });
+      if (artifact?.preview?.capability !== "web") return false;
     }
     const fresh = Array.isArray(record.browserEvidence)
       ? record.browserEvidence.filter((e) => e && e.ok).slice(-1)[0]
@@ -513,7 +521,7 @@ export function createBuildController(opts) {
     const decisions = [];
     for (const child of record.children) {
       if (child.dispatchState === "consumed") continue;
-      const truth = loadChildTruth(runtimeRoot, child.taskId, gateway);
+      const truth = await loadChildTruth(runtimeRoot, child.taskId, gateway);
       const decision = decideChildReconciliation({
         child,
         cp: truth.cp,
@@ -741,8 +749,12 @@ export function createBuildController(opts) {
     ) {
       try {
         const snap = gateway.snapshotTask(child.taskId);
-        const fromSnap = snap && snap.classification ? String(snap.classification) : "";
-        if (/VERIFIED/i.test(fromSnap)) return fromSnap;
+        if (snap && typeof snap.then === "function") {
+          void snap.catch(() => {});
+        } else {
+          const fromSnap = snap && snap.classification ? String(snap.classification) : "";
+          if (/VERIFIED/i.test(fromSnap)) return fromSnap;
+        }
       } catch {
         // best-effort
       }
@@ -871,6 +883,35 @@ export function createBuildController(opts) {
 
     record = readBuildRecord(runtimeRoot, buildId) || record;
     const child = record.children.find((c) => c.actionId === actionId);
+    if (!fakeMode && (!started || started.ok === false)) {
+      const message =
+        (started && (started.message || started.code)) || "Engine failed to start";
+      if (child) {
+        child.dispatchState = "consumed";
+        child.consumedAt = new Date().toISOString();
+        child.terminalAt = child.consumedAt;
+        child.classification = "FAILED";
+        child.taskId = started?.taskId || taskId;
+      }
+      record.loop.status = "blocked";
+      record.loop.blockedReason = String(message).slice(0, 500);
+      syncConversationLifecycle(record);
+      writeBuildRecord(runtimeRoot, record);
+      appendBuildEvent(runtimeRoot, buildId, `${kind}.failed`, {
+        taskId: child?.taskId || taskId,
+        actionId,
+        message: String(message).slice(0, 500),
+        code: started?.code || "ENGINE_START_FAILED",
+      });
+      return {
+        ok: false,
+        code: started?.code || "ENGINE_START_FAILED",
+        message: String(message),
+        taskId: child?.taskId || taskId,
+        actionId,
+        build: record,
+      };
+    }
     if (child) {
       child.dispatchState = "dispatched";
       child.dispatchedAt = new Date().toISOString();

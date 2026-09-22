@@ -168,7 +168,10 @@ export function createGatewayClient(options = {}) {
 
   async function snapshotTask(taskId) {
     const res = await request(GatewayMethods.TASK_SNAPSHOT, { taskId });
-    if (res.error) throw new Error(res.error.message);
+    if (res.error) {
+      if (res.error.code === "TASK_NOT_FOUND") return null;
+      throw new Error(res.error.message);
+    }
     return res.result;
   }
 

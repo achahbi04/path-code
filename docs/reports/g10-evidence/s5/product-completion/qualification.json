@@ -1,0 +1,21 @@
+{
+  "baseSha": "2ff12cd125c31ac0175043ac97f42b5ce14e609f",
+  "buildId": "c6a14d2e-c912-4cb8-836c-61f1f8610c4a",
+  "projectRoot": "/Users/achahbi/PATH Builds/build-a-polished-public-website-for--13497b",
+  "productBranch": "path-build/c6a14d2e",
+  "originSha": "e8f62ae89fd309cb622a4cabb942d181cd4c6334",
+  "websiteSha": "4e8efdfcb161aecd1b72052623f92d86f2732743",
+  "redSha": "020f0d8a07fa377c624a01acc66d369bd4771e2f",
+  "surface": "http://127.0.0.1:7788/",
+  "previewRevisionHeader": "020f0d8a07fa377c624a01acc66d369bd4771e2f",
+  "startup": {
+    "cold": "PATH Build ready: http://127.0.0.1:7788/",
+    "warmAttach": { "started": false, "protocolVersion": 1, "packageVersion": "1.0.1" },
+    "rootCause": "Coordinator child died on an unhandled Gateway snapshot of an unknown historical task before its socket was listening, and the parent reported only the socket path."
+  },
+  "engines": {
+    "cursor": "LIVE on the ProductBrief result and later checking reads",
+    "copilot": "LIVE on the mutating engineer turns (checkpoint copilotMode cli_fallback, cursorMode unavailable)",
+    "antigravity": "CAPTURED-TRACE FIXTURE only"
+  }
+}

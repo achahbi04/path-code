@@ -47,7 +47,7 @@ function printHelp() {
       "  PATHCODE_BUILD_NO_OPEN=1",
       "  PATHCODE_RUNTIME_ROOT=…",
       "",
-      "Do not set PATHCODE_BUILD_FAKE / PATHCODE_GATEWAY_FAKE_ENGINE for real builds.",
+      "Fake/simulated Build mode is not available through the operator entrypoint.",
       "",
     ].join("\n"),
   );
@@ -66,6 +66,16 @@ export async function runPathBuildMain(argv = process.argv.slice(2)) {
     return 0;
   }
 
+  if (
+    process.env.PATHCODE_BUILD_FAKE === "1" ||
+    process.env.PATHCODE_GATEWAY_FAKE_ENGINE === "1"
+  ) {
+    process.stderr.write(
+      "Fake/simulated Build mode is not available through the operator entrypoint.\n",
+    );
+    return 2;
+  }
+
   const packageRoot = resolvePathPackageRoot();
   const runtimeRoot = resolvePathRuntimeRoot({ packageRoot });
 
@@ -76,16 +86,12 @@ export async function runPathBuildMain(argv = process.argv.slice(2)) {
     runtimeRoot,
     openBrowser: process.env.PATHCODE_BUILD_NO_OPEN !== "1",
     preferredEngine: process.env.PATHCODE_PREFERRED_ENGINE || null,
-    fakeMode:
-      process.env.PATHCODE_BUILD_FAKE === "1" ||
-      process.env.PATHCODE_GATEWAY_FAKE_ENGINE === "1",
+    fakeMode: false,
   });
 
-  process.stdout.write(`PATH Build is ready at ${surface.url}\n`);
+  process.stdout.write(`PATH Build ready: ${surface.url}\n`);
   process.stdout.write(
-    surface.fakeMode
-      ? "Note: running with fake fabric (PATHCODE_BUILD_FAKE / GATEWAY_FAKE_ENGINE).\n"
-      : "Real Gateway fabric — engines: Cursor / Copilot / Antigravity as available.\n",
+    "Real Gateway fabric — engines: Cursor / Copilot / Antigravity as available.\n",
   );
   process.stdout.write("Press Ctrl-C to stop.\n");
 

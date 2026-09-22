@@ -6,6 +6,7 @@ import {
   labelFromBuildEvents,
   projectEngineeringActivity,
 } from "./engineering-activity.mjs";
+import { projectEngineeringTimeline } from "./engineering-timeline.mjs";
 
 /**
  * @param {import('../types.mjs').BuildRecord | null | undefined} build
@@ -271,13 +272,24 @@ export function projectBuildForSurface(build, extras = {}) {
       ...extras,
       projectRoot,
     }),
+    engineeringTimeline: projectEngineeringTimeline(build, {
+      ...extras,
+      projectRoot,
+    }),
     viewRevision:
       (Array.isArray(extras.events) ? extras.events : []).reduce(
         (max, event) => Math.max(max, Number(event?.id) || 0),
         0,
       ) *
         1_000_000 +
-      (Array.isArray(extras.traceLines) ? extras.traceLines.length : 0),
+      (Array.isArray(extras.traces)
+        ? extras.traces.reduce(
+            (total, bundle) => total + (Array.isArray(bundle?.lines) ? bundle.lines.length : 0),
+            0,
+          )
+        : Array.isArray(extras.traceLines)
+          ? extras.traceLines.length
+          : 0),
     previewRevision: runtime?.authoritativeSha || preview?.authoritativeSha || null,
     previewMatchesAuthoritative:
       !build.authoritativeSha ||

@@ -159,9 +159,17 @@ export function createGatewayRuntime(options = {}) {
                   : typeof fields.message === "string"
                     ? fields.message
                     : undefined,
+          exitCode: typeof fields.exitCode === "number" ? fields.exitCode : undefined,
+          durationMs: typeof fields.durationMs === "number" ? fields.durationMs : undefined,
           meta: {
             status: task.status,
             classification: fields.classification ?? task.classification,
+            ...(typeof fields.kind === "string" ? { kind: fields.kind } : {}),
+            ...(typeof fields.query === "string" ? { query: fields.query.slice(0, 200) } : {}),
+            ...(typeof fields.added === "number" ? { added: fields.added } : {}),
+            ...(typeof fields.removed === "number" ? { removed: fields.removed } : {}),
+            ...(typeof fields.ok === "boolean" ? { ok: fields.ok } : {}),
+            ...(typeof fields.exitCode === "number" ? { exitCode: fields.exitCode } : {}),
           },
         });
       }

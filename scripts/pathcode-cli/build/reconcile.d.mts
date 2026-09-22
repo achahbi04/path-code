@@ -50,4 +50,4 @@ export function loadChildTruth(
   runtimeRoot: string,
   taskId: string,
   gateway?: { snapshotTask?: (id: string) => unknown },
-): { cp: unknown; snap: unknown; reportText: string; traceLines: object[] };
+): Promise<{ cp: unknown; snap: unknown; reportText: string; traceLines: object[] }>;

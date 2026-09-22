@@ -2,13 +2,16 @@ import { spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
+  openSync,
   readFileSync,
   unlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isPidAlive } from "../../ag10/task-continuity.mjs";
 import { createBuildCoordinatorClient } from "./client.mjs";
+import { BUILD_COORDINATOR_PROTOCOL_VERSION } from "./protocol.mjs";
 import {
   resolveBuildCoordinatorPidPath,
   resolveBuildCoordinatorSocketPath,
@@ -16,6 +19,24 @@ import {
 
 const SERVER_MAIN = join(dirname(fileURLToPath(import.meta.url)), "server-main.mjs");
 
+function coordinatorLogPath(runtimeRoot) {
+  return join(runtimeRoot, "build-coordinator", "coordinator.log");
+}
+
+function tailLog(path, max = 900) {
+  try {
+    const text = readFileSync(path, "utf8").trim();
+    return text ? text.slice(-max) : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * @param {string} runtimeRoot
+ * @param {string} socketPath
+ * @param {number} timeoutMs
+ */
 async function connectIfReady(runtimeRoot, socketPath, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -27,10 +48,19 @@ async function connectIfReady(runtimeRoot, socketPath, timeoutMs) {
       });
       try {
         await client.connect();
-        await client.hello("ensure");
+        const hello = await client.hello("ensure");
+        if (hello?.protocolVersion !== BUILD_COORDINATOR_PROTOCOL_VERSION) {
+          client.close();
+          const error = new Error(
+            `PATH Build coordinator protocol mismatch: owner pid ${hello?.pid ?? "unknown"} speaks version ${hello?.protocolVersion ?? "unknown"} (${hello?.packageVersion || "unknown package"}); this build expects ${BUILD_COORDINATOR_PROTOCOL_VERSION}`,
+          );
+          error.code = "COORDINATOR_PROTOCOL_MISMATCH";
+          throw error;
+        }
         return client;
-      } catch {
+      } catch (error) {
         client.close();
+        if (error?.code === "COORDINATOR_PROTOCOL_MISMATCH") throw error;
       }
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -38,32 +68,37 @@ async function connectIfReady(runtimeRoot, socketPath, timeoutMs) {
   return null;
 }
 
-export async function ensureBuildCoordinator(options) {
-  const { runtimeRoot, packageRoot } = options;
-  const socketPath = resolveBuildCoordinatorSocketPath(runtimeRoot);
-  const pidPath = resolveBuildCoordinatorPidPath(runtimeRoot);
-  mkdirSync(dirname(pidPath), { recursive: true });
-
-  const existing = await connectIfReady(runtimeRoot, socketPath, 1_000);
-  if (existing) {
-    return { client: existing, socketPath, started: false };
-  }
-
-  let recordedPid = null;
+function readRecordedPid(pidPath) {
   try {
-    recordedPid = Number(readFileSync(pidPath, "utf8").split("\n")[0]);
+    return Number(readFileSync(pidPath, "utf8").split("\n")[0]);
   } catch {
-    recordedPid = null;
+    return null;
   }
-  if (Number.isFinite(recordedPid) && isPidAlive(recordedPid)) {
-    const warming = await connectIfReady(runtimeRoot, socketPath, 10_000);
-    if (warming) {
-      return { client: warming, socketPath, started: false };
-    }
-    throw new Error(
-      `PATH Build coordinator pid ${recordedPid} is alive but its socket is unavailable`,
-    );
+}
+
+function startingLockPath(runtimeRoot) {
+  return join(runtimeRoot, "build-coordinator", "coordinator.starting");
+}
+
+function claimStartLock(lockPath) {
+  try {
+    writeFileSync(lockPath, `${process.pid}\n`, { mode: 0o600, flag: "wx" });
+    return true;
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    return false;
   }
+}
+
+function releaseStartLock(lockPath) {
+  try {
+    if (existsSync(lockPath)) unlinkSync(lockPath);
+  } catch {
+    // the next launch treats a dead lock owner as stale
+  }
+}
+
+function reclaimDeadOwnership(pidPath, socketPath) {
   try {
     if (existsSync(pidPath)) unlinkSync(pidPath);
   } catch {
@@ -74,29 +109,107 @@ export async function ensureBuildCoordinator(options) {
   } catch {
     // ignore stale socket
   }
+}
 
-  const child = spawn(process.execPath, [SERVER_MAIN], {
-    detached: true,
-    stdio: "ignore",
-    env: {
-      ...process.env,
-      PATHCODE_RUNTIME_ROOT: runtimeRoot,
-      PATHCODE_PACKAGE_ROOT: packageRoot,
-      PATHCODE_BUILD_COORDINATOR_FAKE: options.fakeMode ? "1" : "0",
-      PATHCODE_PREFERRED_ENGINE: options.preferredEngine || "",
-    },
-  });
-  child.unref();
-  const client = await connectIfReady(runtimeRoot, socketPath, 25_000);
-  if (!client) {
+export async function ensureBuildCoordinator(options) {
+  const { runtimeRoot, packageRoot } = options;
+  const socketPath = resolveBuildCoordinatorSocketPath(runtimeRoot);
+  const pidPath = resolveBuildCoordinatorPidPath(runtimeRoot);
+  const logPath = coordinatorLogPath(runtimeRoot);
+  mkdirSync(dirname(pidPath), { recursive: true });
+
+  const existing = await connectIfReady(runtimeRoot, socketPath, 1_000);
+  if (existing) {
+    return { client: existing, socketPath, started: false };
+  }
+
+  const recordedPid = readRecordedPid(pidPath);
+  if (Number.isFinite(recordedPid) && isPidAlive(recordedPid)) {
+    const warming = await connectIfReady(runtimeRoot, socketPath, 45_000);
+    if (warming) {
+      return { client: warming, socketPath, started: false };
+    }
+    const detail = tailLog(logPath);
     throw new Error(
-      `PATH Build coordinator failed to start: ${socketPath}`,
+      `PATH Build coordinator pid ${recordedPid} is alive but its socket is unavailable${detail ? `\n${detail}` : ""}`,
     );
   }
-  return {
-    client,
-    socketPath,
-    started: true,
-    pid: child.pid || null,
-  };
+
+  const lockPath = startingLockPath(runtimeRoot);
+  if (!claimStartLock(lockPath)) {
+    const lockPid = readRecordedPid(lockPath);
+    if (Number.isFinite(lockPid) && isPidAlive(lockPid)) {
+      const warming = await connectIfReady(runtimeRoot, socketPath, 45_000);
+      if (warming) return { client: warming, socketPath, started: false };
+      throw new Error(
+        `PATH Build coordinator start is owned by pid ${lockPid}, but it did not become ready`,
+      );
+    }
+    releaseStartLock(lockPath);
+    if (!claimStartLock(lockPath)) {
+      const warming = await connectIfReady(runtimeRoot, socketPath, 45_000);
+      if (warming) return { client: warming, socketPath, started: false };
+      throw new Error(`PATH Build coordinator start lock is busy: ${lockPath}`);
+    }
+  }
+
+  const latestPid = readRecordedPid(pidPath);
+  if (Number.isFinite(latestPid) && isPidAlive(latestPid)) {
+    releaseStartLock(lockPath);
+    const warming = await connectIfReady(runtimeRoot, socketPath, 45_000);
+    if (warming) return { client: warming, socketPath, started: false };
+    throw new Error(
+      `PATH Build coordinator pid ${latestPid} is alive but its socket is unavailable`,
+    );
+  }
+  try {
+    reclaimDeadOwnership(pidPath, socketPath);
+
+    const logFd = openSync(logPath, "a");
+    const child = spawn(process.execPath, [SERVER_MAIN], {
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
+      env: {
+        ...process.env,
+        PATHCODE_RUNTIME_ROOT: runtimeRoot,
+        PATHCODE_PACKAGE_ROOT: packageRoot,
+        PATHCODE_BUILD_COORDINATOR_FAKE: options.fakeMode ? "1" : "0",
+        PATHCODE_PREFERRED_ENGINE: options.preferredEngine || "",
+      },
+    });
+    let childExit = null;
+    child.on("exit", (code) => {
+      childExit = code;
+    });
+
+    const deadline = Date.now() + 45_000;
+    while (Date.now() < deadline) {
+      if (childExit === 1) break;
+      const client = await connectIfReady(runtimeRoot, socketPath, 400);
+      if (client) {
+        child.unref();
+        return {
+          client,
+          socketPath,
+          started: true,
+          pid: child.pid || null,
+        };
+      }
+    }
+
+    if (child.pid && childExit == null && child.pid === readRecordedPid(pidPath)) {
+      try {
+        process.kill(child.pid, "SIGTERM");
+      } catch {
+        // the child may already have exited
+      }
+    }
+    child.unref();
+    const detail = tailLog(logPath);
+    throw new Error(
+      `PATH Build coordinator failed to start: ${socketPath}${detail ? `\n${detail}` : ""}`,
+    );
+  } finally {
+    releaseStartLock(lockPath);
+  }
 }

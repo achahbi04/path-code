@@ -40,6 +40,16 @@ import { readTaskTrace } from "../../task-trace.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(HERE, "public");
 
+function engineFromCheckpoint(checkpoint) {
+  const cursor = String(checkpoint?.cursorMode || "");
+  const copilot = String(checkpoint?.copilotMode || "");
+  const antigravity = String(checkpoint?.agSessionMode || "");
+  if (cursor && !/^(unavailable|none|auth_required)$/.test(cursor)) return "cursor";
+  if (copilot && !/^(unavailable|none|auth_required)$/.test(copilot)) return "copilot";
+  if (/antigravity|\bag1\b/.test(antigravity)) return "antigravity";
+  return null;
+}
+
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -133,10 +143,7 @@ export async function startPathBuildSurface(options) {
     typeof options.preferredEngine === "string" && options.preferredEngine.trim()
       ? options.preferredEngine.trim()
       : process.env.PATHCODE_PREFERRED_ENGINE || null;
-  const fakeMode =
-    options.fakeMode === true ||
-    process.env.PATHCODE_BUILD_FAKE === "1" ||
-    process.env.PATHCODE_GATEWAY_FAKE_ENGINE === "1";
+  const fakeMode = options.fakeMode === true;
   const autoLoop = options.autoLoop !== false;
 
   const coordinatorHandle = await ensureBuildCoordinator({
@@ -197,9 +204,14 @@ export async function startPathBuildSurface(options) {
     const checkpoint = lastChild
       ? readTaskCheckpoint(runtimeRoot, lastChild.taskId)
       : null;
-    const traceLines = lastChild
-      ? readTaskTrace(lastChild.taskId, runtimeRoot, 80).lines || []
-      : [];
+    const traces = (build?.children || [])
+      .filter((child) => child?.taskId)
+      .map((child) => ({
+        taskId: child.taskId,
+        lines: readTaskTrace(child.taskId, runtimeRoot, 4000).lines || [],
+        engine: engineFromCheckpoint(readTaskCheckpoint(runtimeRoot, child.taskId)),
+      }));
+    const traceLines = traces.length ? traces[traces.length - 1].lines : [];
     /** @type {{ files?: string[], summary?: string, commands?: string[] } | null} */
     let diff = null;
     if (root && existsSync(join(root, ".git")) && build?.authoritativeSha) {
@@ -254,6 +266,7 @@ export async function startPathBuildSurface(options) {
       diff,
       worktreeFiles,
       traceLines,
+      traces,
     });
     const coordinatorStatus = id ? await coordinator.status() : { loops: [] };
     return {
