@@ -144,6 +144,7 @@ export function createGatewayRuntime(options = {}) {
           taskId: task.taskId,
           runtimeRoot,
           type,
+          engine: typeof fields.engine === "string" ? fields.engine : undefined,
           phase: typeof fields.label === "string" ? fields.label : undefined,
           tool: typeof fields.tool === "string" ? fields.tool : undefined,
           path: typeof fields.path === "string" ? fields.path : undefined,

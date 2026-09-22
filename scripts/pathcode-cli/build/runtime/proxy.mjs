@@ -150,6 +150,10 @@ export function proxyPreviewHttp(req, res, opts) {
       }
       const outHeaders = { ...proxyRes.headers };
       delete outHeaders["x-frame-options"];
+      outHeaders["cache-control"] = "no-store";
+      if (opts.authoritativeSha) {
+        outHeaders["x-path-build-revision"] = String(opts.authoritativeSha);
+      }
       res.writeHead(proxyRes.statusCode || 200, outHeaders);
       proxyRes.pipe(res);
     },

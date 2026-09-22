@@ -138,7 +138,15 @@ export interface BuildRecord {
     at: string;
     element?: SelectedElement;
     kind?: string;
-    status?: "queued" | "incorporated" | "being_applied" | "applied";
+    status?:
+      | "queued"
+      | "preparing"
+      | "applying"
+      | "being_applied"
+      | "incorporated"
+      | "applied"
+      | "failed";
+    intentRevision?: number;
   }>;
   productBranch?: string;
   coordinator?: { autoRun: boolean; owner: string };
@@ -469,7 +477,7 @@ export function projectBuildForSurface(
     | null,
   state?: {
     preview?: { status: string; embedPath?: string; url?: string };
-    runtime?: { status: string; url?: string };
+    runtime?: { status: string; url?: string; reason?: string; exitCode?: number };
     events?: Array<{ id?: number; type?: string; at?: string }>;
     checkpoint?: Record<string, unknown>;
   },

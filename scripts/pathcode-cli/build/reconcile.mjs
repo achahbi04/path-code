@@ -3,13 +3,23 @@
  * Build cached "dispatched" must never override a terminal checkpoint/report.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { readTaskCheckpoint } from "../ag10/task-checkpoint.mjs";
 import {
   engineeringReportExists,
   resolveEngineeringReportPath,
 } from "../engineering-report.mjs";
+import { readTaskTrace } from "../task-trace.mjs";
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function engineNameFromTurn(value) {
+  const raw = String(value || "");
+  const match = raw.match(/(?:^|:)(cursor|copilot|antigravity)$/i);
+  return match ? match[1].toLowerCase() : null;
+}
 
 const TERMINAL_FINAL = new Set([
   "completed",
@@ -76,9 +86,11 @@ export function readTaskReportText(runtimeRoot, taskId) {
  * @param {string} [reportText]
  */
 export function extractProviderProvenance(cp, snap = null, reportText = "") {
+  const turnEngine = engineNameFromTurn(cp?.latestEngineTurn || cp?.inFlightEngine);
   const provider =
     (typeof cp?.selectedEngine === "string" && cp.selectedEngine) ||
     (typeof cp?.provider === "string" && cp.provider) ||
+    turnEngine ||
     (typeof snap?.engine === "string" && snap.engine) ||
     (typeof snap?.provider === "string" && snap.provider) ||
     null;
@@ -130,6 +142,92 @@ export function isOrphanDispatchedChild(input) {
   return now - dispatchedAt >= orphanAfter && !cp;
 }
 
+const TRACE_FAILURE_STATUS = new Set([
+  "failed",
+  "cancelled",
+  "canceled",
+  "not_verified",
+  "error",
+  "interrupted",
+  "abandoned",
+]);
+
+const TRACE_SUCCESS_STATUS = new Set([
+  "completed",
+  "verified",
+  "success",
+  "partially_verified",
+]);
+
+/**
+ * Durable task-trace reading for terminal FAILURE or CANCELLATION only.
+ *
+ * Checkpoint, gateway snapshot, and engineering report stay the authority for
+ * success and adoption. A trace line that says the task finished successfully
+ * is not enough to consume or adopt, because the report may still be in flight.
+ * A trace that says the Gateway task failed or was cancelled, with no later
+ * live work and no contradictory running snapshot, is enough to stop treating
+ * the child as dispatched.
+ *
+ * @param {object[] | null | undefined} lines
+ * @returns {{ kind: "none" | "failure" | "success_unconfirmed", classification?: string }}
+ */
+export function classifyTraceTerminal(lines) {
+  if (!Array.isArray(lines) || lines.length === 0) return { kind: "none" };
+  /** @type {{ kind: "failure", classification: string } | null} */
+  let failure = null;
+  let sawSuccessFinish = false;
+  for (const line of lines) {
+    const type = String(line?.type || "");
+    const status = String(line?.meta?.status || "").toLowerCase();
+    const classification = String(line?.meta?.classification || "");
+    const isFinish = type === "gateway.task.finished";
+    const isCancel =
+      type === "session.cancelled" ||
+      (type === "task.stop" && /cancel/i.test(String(line?.detail || "")));
+    if (isFinish && TRACE_SUCCESS_STATUS.has(status)) {
+      sawSuccessFinish = true;
+      failure = null;
+      continue;
+    }
+    if (
+      isCancel ||
+      (isFinish &&
+        (TRACE_FAILURE_STATUS.has(status) ||
+          /FAIL|CANCEL|NOT_VERIFIED/i.test(classification)))
+    ) {
+      if (sawSuccessFinish) continue;
+      const cancelled =
+        isCancel || status === "cancelled" || status === "canceled";
+      failure = {
+        kind: "failure",
+        classification: cancelled ? "CANCELLED" : "FAILED",
+      };
+      continue;
+    }
+    if (
+      failure &&
+      (type === "session.engineering.tool" ||
+        type === "session.task.received" ||
+        status === "running" ||
+        status === "starting")
+    ) {
+      failure = null;
+    }
+  }
+  if (sawSuccessFinish && !failure) return { kind: "success_unconfirmed" };
+  if (failure) return failure;
+  return { kind: "none" };
+}
+
+/**
+ * @param {any} snap
+ */
+function snapshotLooksLive(snap) {
+  const status = String(snap?.status || "").toLowerCase();
+  return status === "running" || status === "starting" || status === "pending";
+}
+
 /**
  * Pure reconciliation decisions for one child (no I/O side effects).
  * @param {{
@@ -137,11 +235,12 @@ export function isOrphanDispatchedChild(input) {
  *   cp: any,
  *   snap: any,
  *   reportText?: string,
+ *   traceLines?: object[],
  *   nowMs?: number,
  * }} input
  */
 export function decideChildReconciliation(input) {
-  const { child, cp, snap, reportText = "" } = input;
+  const { child, cp, snap, reportText = "", traceLines = [] } = input;
   if (!child) return { action: "noop" };
   if (child.dispatchState === "consumed") return { action: "noop", reason: "already_consumed" };
 
@@ -164,6 +263,21 @@ export function decideChildReconciliation(input) {
       provider: provenance.provider,
       engineMode: provenance.engineMode,
     };
+  }
+
+  // Failure/cancellation only. Success stays on the checkpoint/report path above.
+  if (!snapshotLooksLive(snap)) {
+    const traced = classifyTraceTerminal(traceLines);
+    if (traced.kind === "failure") {
+      const provenance = extractProviderProvenance(cp, snap, reportText);
+      return {
+        action: "mark_terminal_and_consume",
+        classification: traced.classification || "NOT_VERIFIED",
+        provider: provenance.provider,
+        engineMode: provenance.engineMode,
+        traceFailure: true,
+      };
+    }
   }
 
   if (isOrphanDispatchedChild(input)) {
@@ -195,5 +309,6 @@ export function loadChildTruth(runtimeRoot, taskId, gateway = {}) {
     }
   }
   const reportText = readTaskReportText(runtimeRoot, taskId);
-  return { cp, snap, reportText };
+  const trace = readTaskTrace(taskId, runtimeRoot, 400);
+  return { cp, snap, reportText, traceLines: trace.lines || [] };
 }

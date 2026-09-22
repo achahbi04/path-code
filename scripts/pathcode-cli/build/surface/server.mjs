@@ -35,6 +35,7 @@ import { launchPathCodeInTerminal } from "./handoff.mjs";
 import { ensureBuildCoordinator } from "../coordinator/ensure.mjs";
 import { sanitizeBuildEventValue } from "../events.mjs";
 import { readTaskCheckpoint } from "../../ag10/task-checkpoint.mjs";
+import { readTaskTrace } from "../../task-trace.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(HERE, "public");
@@ -196,6 +197,9 @@ export async function startPathBuildSurface(options) {
     const checkpoint = lastChild
       ? readTaskCheckpoint(runtimeRoot, lastChild.taskId)
       : null;
+    const traceLines = lastChild
+      ? readTaskTrace(lastChild.taskId, runtimeRoot, 80).lines || []
+      : [];
     /** @type {{ files?: string[], summary?: string, commands?: string[] } | null} */
     let diff = null;
     if (root && existsSync(join(root, ".git")) && build?.authoritativeSha) {
@@ -249,6 +253,7 @@ export async function startPathBuildSurface(options) {
       checkpoint,
       diff,
       worktreeFiles,
+      traceLines,
     });
     const coordinatorStatus = id ? await coordinator.status() : { loops: [] };
     return {
@@ -379,6 +384,7 @@ export async function startPathBuildSurface(options) {
             "X-Accel-Buffering": "no",
           });
           let pushing = false;
+          let lastSentRevision = -1;
           const push = async () => {
             if (pushing) return;
             pushing = true;
@@ -388,23 +394,34 @@ export async function startPathBuildSurface(options) {
                 limit: 250,
               });
               for (const event of replay.events || []) {
+                const view = sanitizeBuildEventValue(await viewFor(buildId));
                 const payload = JSON.stringify({
                   event,
-                  view: sanitizeBuildEventValue(await viewFor(buildId)),
+                  view,
+                  viewRevision: view?.viewRevision ?? null,
                 });
                 res.write(`id: ${event.id}\n`);
                 res.write(`event: build\n`);
                 res.write(`data: ${payload}\n\n`);
                 cursor = event.id;
+                if (Number.isFinite(view?.viewRevision)) {
+                  lastSentRevision = view.viewRevision;
+                }
               }
-              // Snapshot is bootstrap/fallback only when no durable event exists.
-              if (cursor === 0 && (replay.events || []).length === 0) {
+              // Always converge on the current view. A reconnect that is
+              // already at the latest Build event id would otherwise wait
+              // forever for the next event, and task-trace progress does not
+              // itself append a Build event.
+              const view = sanitizeBuildEventValue(await viewFor(buildId));
+              const revision = Number(view?.viewRevision);
+              if (!Number.isFinite(revision) || revision !== lastSentRevision) {
                 res.write(
                   `event: snapshot\ndata: ${JSON.stringify({
-                    view: sanitizeBuildEventValue(await viewFor(buildId)),
-                    fallback: true,
+                    view,
+                    viewRevision: Number.isFinite(revision) ? revision : 0,
                   })}\n\n`,
                 );
+                if (Number.isFinite(revision)) lastSentRevision = revision;
               }
             } finally {
               pushing = false;

@@ -1,0 +1,74 @@
+{
+  "schema": "path.s5.truth-correction.v1",
+  "baseSha": "e6fb1df001a92d1f294fc117eac148a538ab977b",
+  "mode": "real-cursor-engine",
+  "fakeMode": false,
+  "surface": "http://127.0.0.1:7822/",
+  "runtimeRoot": "/tmp/path-s5-truth-correction-2",
+  "buildId": "b2e6fe31-74e7-4421-8fcb-042928bc97f4",
+  "projectRoot": "/Users/achahbi/PATH Builds/build-a-polished-website-for-ice-in--eb0134",
+  "productBranch": "path-build/b2e6fe31",
+  "preferredEngine": "cursor",
+  "firstRequest": {
+    "messageId": "msg-1f041fd4",
+    "productKind": "web",
+    "briefTaskId": "107da8b4-ccbc-411f-a0dd-03c9d52c9f06",
+    "engineerTaskId": "4efd1dcf-a2f8-4114-bac4-8a93da830c39",
+    "adoptedSha": "1e411a7827fbf911f3d4d88482b5593957ab4b23",
+    "visiblePhase": "Understanding request… then Engineering, then Checking result…",
+    "messageStatusAfterAdoption": "applied"
+  },
+  "followUp": {
+    "messageId": "msg-a76c316c",
+    "text": "Make the visual design clearly emergency red while preserving the information and structure.",
+    "intentRevision": 2,
+    "briefTaskId": "9447693c-573f-4348-9caf-123e75c59667",
+    "engineerTaskId": "5b9e4361-407f-44f6-aaae-05618afec06e",
+    "engine": "cursor",
+    "priorSha": "1e411a7827fbf911f3d4d88482b5593957ab4b23",
+    "newSha": "c0970b17652c190cd13ee3bf26d8a19dbd22be7b",
+    "commitSubject": "Apply emergency-red dominant visual theme across ICE site.",
+    "diff": "css/styles.css 103 insertions, 37 deletions",
+    "accent": "#c41e3a",
+    "runtimeSha": "c0970b17652c190cd13ee3bf26d8a19dbd22be7b",
+    "runtimeMode": "static",
+    "priorPreviewSha256": "2660a655413bcd093db86670ccbd24f06018c820ba7adf06d8e71c4f306fb999",
+    "servedPreviewSha256": "2a1224d00b607bcb5aee48e518756a7ffe49fecfc38559fbdf65a435f1727492",
+    "servedCssContains": "--emergency-red: #c41e3a",
+    "messageStatusWhileEngineerLive": "applying",
+    "messageStatusAfterAdoption": "applied",
+    "headlineWhileBrief": "Understanding request…",
+    "headlineWhileEngineer": "Applying changes…"
+  },
+  "viewports": {
+    "desktopComputedWidth": "522px (100% of the 546px stage)",
+    "tabletComputedWidth": "834px",
+    "mobileComputedWidth": "390px"
+  },
+  "select": {
+    "activeState": true,
+    "targetingBadge": "Click an element",
+    "iframeCursor": "crosshair",
+    "firstChip": "Selected: a “Why ICE”",
+    "replacedChip": "Selected: a “What information”",
+    "exited": true
+  },
+  "reload": {
+    "reconstructedHeadline": "Ready",
+    "iframeSrc": "http://127.0.0.1:7822/preview/b2e6fe31-74e7-4421-8fcb-042928bc97f4/?rev=c0970b17652c190cd13ee3bf26d8a19dbd22be7b",
+    "heroBackground": "linear-gradient including rgb(196, 30, 58)"
+  },
+  "recover": {
+    "result": "completed build stayed Ready; no new child; not still_active"
+  },
+  "screenshots": [
+    "s5-viewport-desktop.png",
+    "s5-viewport-tablet.png",
+    "s5-viewport-mobile.png",
+    "s5-select-targeting.png",
+    "s5-select-chip.png",
+    "s5-red-preparing.png",
+    "s5-red-preview.png",
+    "s5-red-hero.png"
+  ]
+}

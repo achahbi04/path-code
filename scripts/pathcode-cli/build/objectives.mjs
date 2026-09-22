@@ -23,7 +23,12 @@ function intentBlock(record) {
     "",
     "Outcome criteria:",
     criteria || "- (none yet — propose an initial set if evaluating)",
-  ].join("\n");
+    "",
+    `Product kind: ${record.productBrief?.productKind || "unknown"}`,
+    record.productBrief?.revisionContext
+      ? `Latest operator request: ${record.productBrief.revisionContext}`
+      : "",
+  ].filter((line) => line !== undefined).join("\n");
 }
 
 /**

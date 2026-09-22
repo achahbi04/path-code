@@ -1,5 +1,6 @@
 export interface ReconciliationInput {
   child: {
+    kind?: string;
     dispatchState?: string;
     dispatchedAt?: string;
     selectedAt?: string;
@@ -8,6 +9,7 @@ export interface ReconciliationInput {
   cp: unknown;
   snap: unknown;
   reportText?: string;
+  traceLines?: object[];
   nowMs?: number;
   orphanAfterMs?: number;
 }
@@ -21,6 +23,7 @@ export type ReconciliationDecision =
       provider: string | null;
       engineMode: string | null;
       orphan?: boolean;
+      traceFailure?: boolean;
     }
   | { action: "wait"; reason: string };
 
@@ -35,6 +38,10 @@ export function extractProviderProvenance(
   snapshot?: unknown,
   reportText?: string,
 ): { provider: string | null; engineMode: string | null };
+export function classifyTraceTerminal(lines: object[] | null | undefined): {
+  kind: "none" | "failure" | "success_unconfirmed";
+  classification?: string;
+};
 export function isOrphanDispatchedChild(input: ReconciliationInput): boolean;
 export function decideChildReconciliation(
   input: ReconciliationInput,
@@ -43,4 +50,4 @@ export function loadChildTruth(
   runtimeRoot: string,
   taskId: string,
   gateway?: { snapshotTask?: (id: string) => unknown },
-): { cp: unknown; snap: unknown; reportText: string };
+): { cp: unknown; snap: unknown; reportText: string; traceLines: object[] };

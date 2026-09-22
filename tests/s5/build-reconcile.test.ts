@@ -7,9 +7,11 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import {
+  classifyTraceTerminal,
   decideChildReconciliation,
   isTaskTerminal,
 } from "../../scripts/pathcode-cli/build/reconcile.mjs";
+import { appendTaskTrace } from "../../scripts/pathcode-cli/task-trace.mjs";
 import {
   parseBuildCognitiveResult,
   cognitiveResultToDirectives,
@@ -94,6 +96,166 @@ describe("S5 Build child reconciliation", () => {
     const child = recon.build.children.find((c) => c.taskId === taskId);
     expect(child?.dispatchState).toBe("consumed");
 
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("failed terminal trace without a report is consumed as failed", () => {
+    const decision = decideChildReconciliation({
+      child: {
+        dispatchState: "dispatched",
+        dispatchedAt: new Date().toISOString(),
+        kind: "brief",
+      },
+      cp: null,
+      snap: null,
+      reportText: "",
+      traceLines: [
+        {
+          type: "gateway.task.finished",
+          meta: { status: "failed", classification: "NOT_VERIFIED" },
+        },
+      ],
+    });
+    expect(decision.action).toBe("mark_terminal_and_consume");
+    if (decision.action !== "mark_terminal_and_consume") return;
+    expect(decision.classification).toBe("FAILED");
+    expect(decision.traceFailure).toBe(true);
+  });
+
+  it("cancelled terminal trace is terminal and a running trace stays active", () => {
+    const cancelled = classifyTraceTerminal([
+      { type: "task.stop", detail: "cancelled; processes=0", meta: { status: "failed" } },
+    ]);
+    expect(cancelled.kind).toBe("failure");
+    expect(cancelled.classification).toBe("CANCELLED");
+
+    const running = decideChildReconciliation({
+      child: { dispatchState: "dispatched", dispatchedAt: new Date().toISOString() },
+      cp: null,
+      snap: null,
+      reportText: "",
+      traceLines: [
+        { type: "session.task.received", meta: { status: "running" } },
+        { type: "session.engineering.tool", tool: "edit_file", meta: { status: "running" } },
+      ],
+    });
+    expect(running).toMatchObject({ action: "wait", reason: "still_active" });
+  });
+
+  it("successful trace without a report is not consumed or adopted", () => {
+    const decision = decideChildReconciliation({
+      child: { dispatchState: "dispatched", dispatchedAt: new Date().toISOString() },
+      cp: null,
+      snap: null,
+      reportText: "",
+      traceLines: [
+        { type: "gateway.task.finished", meta: { status: "completed", classification: "VERIFIED" } },
+      ],
+    });
+    expect(decision).toMatchObject({ action: "wait", reason: "still_active" });
+  });
+
+  it("a live gateway snapshot overrides a failed trace", () => {
+    const decision = decideChildReconciliation({
+      child: { dispatchState: "dispatched", dispatchedAt: new Date().toISOString() },
+      cp: null,
+      snap: { status: "running" },
+      reportText: "",
+      traceLines: [
+        { type: "gateway.task.finished", meta: { status: "failed", classification: "NOT_VERIFIED" } },
+      ],
+    });
+    expect(decision).toMatchObject({ action: "wait", reason: "still_active" });
+  });
+
+  it("reconciles a failed trace file into a consumed child and a failed message", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "path-trace-fail-"));
+    const runtimeRoot = join(dir, "rt");
+    mkdirSync(join(runtimeRoot, "metadata", "tasks"), { recursive: true });
+    const target = join(dir, "site");
+    mkdirSync(target);
+    const controller = createBuildController({
+      runtimeRoot,
+      gateway: {
+        async bindProject() {
+          return { ok: true };
+        },
+        async startTask() {
+          return { ok: true, taskId: "t-brief" };
+        },
+        async awaitTask() {
+          return {};
+        },
+        snapshotTask() {
+          return null;
+        },
+      },
+    });
+    const started = await controller.startBuild("A small status page", {
+      targetDir: target,
+      originKind: "build-created",
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    const { writeBuildRecord, readBuildRecord } = await import(
+      "../../scripts/pathcode-cli/build/record.mjs"
+    );
+    const build = readBuildRecord(runtimeRoot, started.build.buildId);
+    expect(build).not.toBeNull();
+    if (!build) return;
+    const taskId = "25274ffa-d334-44af-b219-845571a0e189";
+    build.children.push({
+      kind: "brief",
+      taskId,
+      actionId: "brief:trace-fail",
+      bindingId: build.projectBindings[0]!.bindingId,
+      dispatchState: "dispatched",
+      dispatchedAt: new Date().toISOString(),
+      selectedAt: new Date().toISOString(),
+      intentRevision: 2,
+    });
+    if (!build.conversation) build.conversation = [];
+    build.conversation.push({
+      id: "msg-red",
+      role: "user",
+      text: "make the app emergency red",
+      at: new Date().toISOString(),
+      kind: "change",
+      status: "preparing",
+      intentRevision: 2,
+    });
+    build.conversation.push({
+      id: "msg-red-assistant",
+      role: "assistant",
+      text: "Understanding that request before engineering…",
+      at: new Date().toISOString(),
+      kind: "change",
+      status: "preparing",
+      intentRevision: 2,
+    });
+    build.loop.status = "running";
+    writeBuildRecord(runtimeRoot, build);
+    appendTaskTrace({
+      taskId,
+      runtimeRoot,
+      type: "gateway.task.finished",
+      meta: { status: "failed", classification: "NOT_VERIFIED" },
+    });
+    const recon = await controller.reconcileBuildChildren(build.buildId);
+    expect(recon.ok).toBe(true);
+    const after = readBuildRecord(runtimeRoot, build.buildId);
+    const child = after?.children.find((c) => c.taskId === taskId);
+    expect(child?.dispatchState).toBe("consumed");
+    expect(child?.classification).toBe("FAILED");
+    expect(after?.authoritativeSha || null).toBe(build.authoritativeSha || null);
+    const red = after?.conversation?.find((m) => m.id === "msg-red");
+    const assistant = after?.conversation?.find((m) => m.id === "msg-red-assistant");
+    expect(red?.status).toBe("failed");
+    expect(assistant?.status).toBe("failed");
+    const view = (
+      await import("../../scripts/pathcode-cli/build/surface/product-view.mjs")
+    ).projectBuildForSurface(after, { events: [{ id: 4, type: "brief.consumed" }] });
+    expect(view.progressLabel).not.toMatch(/Applying changes/i);
     rmSync(dir, { recursive: true, force: true });
   });
 

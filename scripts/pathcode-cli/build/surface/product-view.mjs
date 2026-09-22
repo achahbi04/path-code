@@ -75,6 +75,20 @@ export function projectBuildForSurface(build, extras = {}) {
   /** @type {string | null} */
   let progressLabel = "Building…";
 
+  const kind = String(last?.kind || "");
+  const ds = String(last?.dispatchState || "");
+  const childLive = ds === "dispatched" || ds === "selected" || ds === "terminal_seen";
+  const previewReady = preview?.status === "ready" || runtime?.status === "ready";
+  const runtimeFailed =
+    runtime?.status === "failed" ||
+    runtime?.status === "unhealthy" ||
+    runtime?.status === "exited" ||
+    runtime?.status === "unavailable";
+  const emptyTreePreview =
+    runtime?.reason === "no_preview_capability" ||
+    runtime?.reason === "no_start_plan";
+  const updatingPreview = Boolean(build.loop?.pendingRuntimeRefresh) && !childLive;
+
   if (paused) {
     phase = "paused";
     uiState = "paused";
@@ -94,16 +108,55 @@ export function projectBuildForSurface(build, extras = {}) {
     detail =
       build.loop?.blockedReason ||
       "PATH could not advance honestly. Adjust the request and continue.";
-    progressLabel = "Blocked";
-  } else if (
-    runtime?.status === "failed" ||
-    runtime?.status === "unhealthy" ||
-    runtime?.status === "exited" ||
-    runtime?.status === "unavailable"
-  ) {
+    progressLabel = "Needs attention";
+  } else if (childLive && kind === "brief") {
+    phase = "briefing";
+    uiState = "building";
+    headline = "Understanding request…";
+    detail = "PATH is preparing the build from your request. You do not need to send another message.";
+    progressLabel = "Understanding request…";
+  } else if (childLive && kind === "engineer") {
+    phase = "engineering";
+    uiState = "building";
+    const followUp =
+      (build.intent?.outcomeRevision || 1) > 1 ||
+      kids.some(
+        (child) =>
+          child.kind === "engineer" &&
+          child.dispatchState === "consumed" &&
+          child.adoptedSha &&
+          child.taskId !== last?.taskId,
+      );
+    headline = followUp ? "Applying changes…" : "Engineering…";
+    detail = followUp
+      ? "A mutating engineer is applying this request to the product."
+      : "A mutating engineer is building the first version.";
+    progressLabel = headline;
+  } else if (childLive && (kind === "evaluate" || kind === "challenge")) {
+    phase = kind === "challenge" ? "challenging" : "evaluating";
+    uiState = "checking";
+    headline = kind === "challenge" ? "Reviewing outcome…" : "Checking result…";
+    detail =
+      kind === "challenge"
+        ? "Challenge is reviewing the current outcome."
+        : "PATH is validating the current result.";
+    progressLabel = headline;
+  } else if (updatingPreview) {
+    phase = "runtime";
+    uiState = "building";
+    headline = "Updating preview…";
+    detail = "An adopted revision is being moved into the preview runtime.";
+    progressLabel = "Updating preview…";
+  } else if (runtimeFailed && emptyTreePreview && status === "running") {
+    phase = "starting";
+    uiState = "building";
+    headline = "Building first version…";
+    detail = "Preview will appear when the first runnable revision is ready.";
+    progressLabel = "Building first version…";
+  } else if (runtimeFailed) {
     phase = "runtime_error";
     uiState = "error";
-    headline = "Preview failed";
+    headline = "Preview unavailable";
     const exitBit =
       typeof runtime.exitCode === "number" ? ` (exit ${runtime.exitCode})` : "";
     detail =
@@ -111,59 +164,38 @@ export function projectBuildForSurface(build, extras = {}) {
       runtime.error ||
       runtime.reason ||
       `Could not start the product runtime${exitBit}.`;
-    progressLabel = "Error";
-  } else if (preview?.status === "ready" || runtime?.status === "ready") {
+    progressLabel = "Preview unavailable";
+  } else if (
+    (build.conversation || []).some(
+      (msg) =>
+        msg?.intentRevision === build.intent?.outcomeRevision &&
+        msg?.status === "failed",
+    )
+  ) {
+    phase = "failed";
+    uiState = "error";
+    headline = "Needs attention";
+    detail = "That request ended without an adopted product revision.";
+    progressLabel = "Needs attention";
+  } else if (previewReady) {
     phase = "preview";
-    uiState = last?.dispatchState === "dispatched" ? "applying" : "ready";
-    headline = uiState === "applying" ? "Applying changes…" : "Live preview";
-    detail =
-      uiState === "applying"
-        ? "Engineering is updating the product. Preview will refresh when ready."
-        : "Interact with the live product. Chat to request changes.";
-    progressLabel = uiState === "applying" ? "Applying changes…" : "Ready";
+    uiState = "ready";
+    headline = "Ready";
+    detail = "Interact with the live product. Chat to request changes.";
+    progressLabel = "Ready";
   } else if (!kids.length) {
     phase = "starting";
     uiState = "building";
-    headline = "Starting your build";
+    headline = "Preparing the build…";
     detail =
-      binding?.originKind === "build-created" || binding?.originGitInit
-        ? "Created a fresh project. First engineering pass is establishing the product."
-        : "Bound to your project. First engineering pass is about to begin.";
-    progressLabel = labelFromBuildEvents(extras.events) || "Preparing project";
-  } else if (last) {
-    const kind = String(last.kind || "");
-    const ds = String(last.dispatchState || "");
-    if (kind === "brief") {
-      phase = "briefing";
-      uiState = "building";
-      headline = "Understanding the product";
-      detail = "PATH is turning your request into a durable product brief.";
-      progressLabel = "Understanding the product";
-    } else if (kind === "engineer") {
-      phase = "engineering";
-      uiState = ds === "dispatched" || ds === "selected" ? "building" : "checking";
-      headline =
-        ds === "dispatched" || ds === "selected"
-          ? "Engineering first version"
-          : "Adopting verified revision";
-      detail = "A real engine is implementing toward your outcome.";
-      progressLabel =
-        labelFromBuildEvents(extras.events) || headline;
-    } else if (kind === "evaluate") {
-      phase = "evaluating";
-      uiState = "checking";
-      headline = "Running project checks";
-      detail = "Verifying the product against your outcome.";
-      progressLabel =
-        labelFromBuildEvents(extras.events) || "Running project checks";
-    } else if (kind === "challenge") {
-      phase = "challenging";
-      uiState = "checking";
-      headline = "Challenging completion claims";
-      detail = "Challenge pass is trying to falsify completion claims.";
-      progressLabel =
-        labelFromBuildEvents(extras.events) || "Challenging completion claims";
-    }
+      "PATH is preparing the build from your request. You do not need to send another message.";
+    progressLabel = labelFromBuildEvents(extras.events) || "Preparing the build…";
+  } else if (last && ds === "consumed" && /FAIL|CANCEL|NOT_VERIFIED|BLOCKED/i.test(String(last.classification || "")) && !build.authoritativeSha) {
+    phase = "failed";
+    uiState = "error";
+    headline = "Needs attention";
+    detail = "The current task ended before a product revision was adopted.";
+    progressLabel = "Needs attention";
   }
 
   const       conversation = Array.isArray(build.conversation)
@@ -235,7 +267,17 @@ export function projectBuildForSurface(build, extras = {}) {
     children: activity,
     conversation,
     activity,
-    engineeringActivity: projectEngineeringActivity(build, extras),
+    engineeringActivity: projectEngineeringActivity(build, {
+      ...extras,
+      projectRoot,
+    }),
+    viewRevision:
+      (Array.isArray(extras.events) ? extras.events : []).reduce(
+        (max, event) => Math.max(max, Number(event?.id) || 0),
+        0,
+      ) *
+        1_000_000 +
+      (Array.isArray(extras.traceLines) ? extras.traceLines.length : 0),
     previewRevision: runtime?.authoritativeSha || preview?.authoritativeSha || null,
     previewMatchesAuthoritative:
       !build.authoritativeSha ||

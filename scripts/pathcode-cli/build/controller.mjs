@@ -51,9 +51,56 @@ import { mechanicalProbeBinding } from "./mechanical-probe.mjs";
 import {
   briefToOutcomeCriteria,
   deriveProductBrief,
+  inferProductKind,
   parseProductBriefResult,
   productBriefObjective,
 } from "./brief.mjs";
+
+/**
+ * Bind conversation rows to the intent revision and the child that is actually
+ * carrying that revision. Applied only after an engineer adoption for that
+ * revision. Failed when that revision's children have ended without adoption
+ * and nothing is still running.
+ *
+ * @param {import('./types.mjs').BuildRecord} record
+ */
+function syncConversationLifecycle(record) {
+  if (!Array.isArray(record?.conversation)) return;
+  const kids = Array.isArray(record.children) ? record.children : [];
+  /** @type {Set<number>} */
+  const revisions = new Set();
+  for (const msg of record.conversation) {
+    if (msg && Number.isFinite(msg.intentRevision)) revisions.add(msg.intentRevision);
+  }
+  for (const rev of revisions) {
+    const revKids = kids.filter(
+      (child) => child.intentRevision === rev && !child.orphanAbandoned,
+    );
+    const adopted = revKids.some(
+      (child) => child.kind === "engineer" && child.adoptedSha,
+    );
+    const live = (kind) =>
+      revKids.some(
+        (child) =>
+          child.kind === kind &&
+          (child.dispatchState === "dispatched" ||
+            child.dispatchState === "selected" ||
+            child.dispatchState === "terminal_seen"),
+      );
+    let status = "queued";
+    if (adopted) status = "applied";
+    else if (live("engineer")) status = "applying";
+    else if (live("brief") || live("evaluate") || live("challenge")) status = "preparing";
+    else if (revKids.some((child) => child.dispatchState === "consumed")) {
+      status = "failed";
+    }
+    for (const msg of record.conversation) {
+      if (!msg || msg.intentRevision !== rev) continue;
+      if (msg.status === "applied" && status !== "applied") continue;
+      msg.status = status;
+    }
+  }
+}
 
 function normalizeSelectedElement(value) {
   if (!value || typeof value !== "object") return null;
@@ -348,6 +395,9 @@ export function createBuildController(opts) {
         role: "user",
         text: String(outcome || "").trim(),
         at: new Date().toISOString(),
+        kind: "outcome",
+        status: "queued",
+        intentRevision: record.intent.outcomeRevision,
       },
     ];
 
@@ -469,6 +519,7 @@ export function createBuildController(opts) {
         cp: truth.cp,
         snap: truth.snap,
         reportText: truth.reportText,
+        traceLines: truth.traceLines,
       });
       decisions.push({ taskId: child.taskId, ...decision });
 
@@ -827,6 +878,7 @@ export function createBuildController(opts) {
     }
     if (kind === "evaluate") record.loop.lastEvaluateTaskId = child?.taskId || taskId;
     if (kind === "challenge") record.loop.lastChallengeTaskId = child?.taskId || taskId;
+    syncConversationLifecycle(record);
     writeBuildRecord(runtimeRoot, record);
 
     return {
@@ -1008,6 +1060,19 @@ export function createBuildController(opts) {
         revision: (Number(record.productBrief?.revision) || 0) + 1,
       });
       if (parsedBrief.ok) {
+        const hint = inferProductKind(
+          [
+            record.intent?.outcome,
+            record.productBrief?.revisionContext,
+            record.productBrief?.outcome,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        );
+        if (parsedBrief.brief.productKind === "unknown" && hint !== "unknown") {
+          parsedBrief.brief.productKind = hint;
+        }
+        parsedBrief.brief.stale = false;
         record.productBrief = parsedBrief.brief;
         record.productBriefError = undefined;
         if (record.criteriaAuthority !== "caller") {
@@ -1162,18 +1227,6 @@ export function createBuildController(opts) {
             delete binding.activeWorktreePath;
             child.adoptedSha = adoption.adoptedSha;
             child.sourceSha = adoption.sourceSha;
-            if (Array.isArray(record.conversation)) {
-              for (const msg of record.conversation) {
-                if (
-                  msg.role === "user" &&
-                  (msg.status === "queued" ||
-                    msg.status === "incorporated" ||
-                    msg.status === "being_applied")
-                ) {
-                  msg.status = "applied";
-                }
-              }
-            }
 
             // Greenfield honesty: "VERIFIED" with no product files is not progress.
             if (isEmptyProductTree(binding.projectRoot)) {
@@ -1209,6 +1262,7 @@ export function createBuildController(opts) {
       }
     }
 
+    syncConversationLifecycle(record);
     writeBuildRecord(runtimeRoot, record);
 
     // Depth A immediately after consume
@@ -2099,27 +2153,30 @@ export function createBuildController(opts) {
     const after = readBuildRecord(runtimeRoot, buildId);
     if (after) {
       if (!Array.isArray(after.conversation)) after.conversation = [];
+      const rev = after.intent.outcomeRevision;
       for (const msg of after.conversation) {
         if (
           msg.role === "user" &&
-          (msg.status === "queued" || msg.status === "incorporated")
+          !msg.intentRevision &&
+          msg.kind &&
+          msg.kind !== "outcome"
         ) {
-          msg.status = "being_applied";
+          msg.intentRevision = rev;
         }
       }
+      const preparing = !fakeMode;
       after.conversation.push({
         id: `msg-${randomUUID().slice(0, 8)}`,
         role: "assistant",
-        text:
-          classified.kind === "change" || classified.kind === "correction"
-            ? "Applying that change to the live product…"
-            : classified.kind === "requirement"
-              ? "Recorded as a hard requirement and continuing engineering…"
-              : "Updating the product direction…",
+        text: preparing
+          ? "Understanding that request before engineering…"
+          : "Engineering that change…",
         at: new Date().toISOString(),
         kind: classified.kind,
-        status: "being_applied",
+        status: "queued",
+        intentRevision: rev,
       });
+      syncConversationLifecycle(after);
       after.hypotheses.proposedNextAction = classified.engineerObjectiveHint;
       writeBuildRecord(runtimeRoot, after);
     }
@@ -2164,17 +2221,52 @@ export function createBuildController(opts) {
       }
     }
     const priorBrief = record.productBrief || {};
-    record.productBrief = {
-      ...priorBrief,
-      buildId: record.buildId,
-      intentRevision: record.intent.outcomeRevision,
-      revision: (Number(priorBrief.revision) || 0) + 1,
-      source: "mechanical-revision",
-      outcome: record.intent.outcome,
-      stale: true,
-      revisionContext: String(revision.note || "").slice(0, 2_000),
-      derivedAt: now,
-    };
+    const steerBlob = [
+      record.intent.outcome,
+      revision.note || "",
+      typeof revision.outcome === "string" ? revision.outcome : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const inferredKind = inferProductKind(steerBlob);
+    const priorKind =
+      priorBrief.productKind && priorBrief.productKind !== "unknown"
+        ? priorBrief.productKind
+        : null;
+    const productKind =
+      inferredKind !== "unknown" ? inferredKind : priorKind || "unknown";
+    const nextBriefRevision = (Number(priorBrief.revision) || 0) + 1;
+    if (inferredKind === "web" && record.criteriaAuthority !== "caller") {
+      const derived = deriveProductBrief(steerBlob, {
+        buildId: record.buildId,
+        intentRevision: record.intent.outcomeRevision,
+        revision: nextBriefRevision,
+        productKind: "web",
+      });
+      record.productBrief = {
+        ...derived,
+        source: "mechanical-revision",
+        stale: true,
+        productKind: "web",
+        intentRevision: record.intent.outcomeRevision,
+        revision: nextBriefRevision,
+        revisionContext: String(revision.note || "").slice(0, 2_000),
+      };
+      record.outcomeCriteria = briefToOutcomeCriteria(record.productBrief);
+    } else {
+      record.productBrief = {
+        ...priorBrief,
+        buildId: record.buildId,
+        intentRevision: record.intent.outcomeRevision,
+        revision: nextBriefRevision,
+        source: "mechanical-revision",
+        outcome: record.intent.outcome,
+        productKind,
+        stale: true,
+        revisionContext: String(revision.note || "").slice(0, 2_000),
+        derivedAt: now,
+      };
+    }
     // Hypotheses are disposable; force next engineering toward new requirements.
     const newReqGap = (revision.addRequirements || [])
       .map((r) => String(r.statement || "").trim())

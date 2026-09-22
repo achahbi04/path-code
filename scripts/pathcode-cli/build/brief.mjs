@@ -356,6 +356,10 @@ export function productBriefObjective(record) {
     `Intent revision: ${record.intent?.outcomeRevision}`,
     `Outcome: ${record.intent?.outcome || ""}`,
     `Mechanical bootstrap hint: ${bootstrap.productKind || "unknown"} — ${bootstrap.summary || ""}`,
+    bootstrap.revisionContext
+      ? `Latest operator request: ${bootstrap.revisionContext}`
+      : "",
+    "If the outcome or the latest operator request asks for a website, web app, or page, productKind MUST be \"web\". Do not leave productKind unknown when the request is explicitly a website.",
     "",
     "Emit exactly one validated envelope:",
     "```path-build-product-brief",

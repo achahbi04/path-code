@@ -145,7 +145,7 @@ export function appendBuildTransitionEvents(runtimeRoot, previous, next) {
     JSON.stringify(next.productBrief || null)
   ) {
     emit(
-      next.productBrief?.source === "cognitive"
+      next.productBrief?.source === "cognitive" && next.productBrief?.stale !== true
         ? "brief.accepted"
         : "brief.bootstrap",
       {

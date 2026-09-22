@@ -1,5 +1,7 @@
 /** PATH Build — visual builder client */
 
+import { previewFrameSrc, shouldAcceptViewRevision } from "./view-revision.js";
+
 const els = {
   landing: document.getElementById("landing"),
   workspace: document.getElementById("workspace"),
@@ -48,6 +50,8 @@ let previewDirectUrl = null;
 /** @type {object | null} */
 let selectedElement = null;
 let selectMode = false;
+/** @type {number} */
+let renderedRevision = -1;
 /** @type {any} */
 let lastView = null;
 
@@ -104,17 +108,23 @@ function renderDrawer(view) {
   const files = (live.files || [])
     .map((f) => `<li>${escapeHtml(f)}</li>`)
     .join("");
-  const engine = live.engine || view.preferredEngine;
+  const steps = (live.steps || [])
+    .map((step) => `<li>${escapeHtml(step.label || "")}</li>`)
+    .join("");
+  const engine = live.engine || null;
+  const engineLabel = engine || (live.taskId ? "waiting for engine" : "not started");
   els.drawerBody.innerHTML = `
     <h3>Engineering Activity</h3>
     <dl class="activity-grid">
       <dt>Action</dt><dd>${escapeHtml(live.action || "preparing")}</dd>
-      <dt>Engine</dt><dd>${escapeHtml(engine || "selecting")}</dd>
+      <dt>Engine</dt><dd>${escapeHtml(engineLabel)}</dd>
       <dt>Task</dt><dd>${escapeHtml(live.taskId || "not dispatched")}</dd>
-      <dt>Phase</dt><dd>${escapeHtml(live.phase || view.progressLabel || "starting")}</dd>
-      <dt>Result</dt><dd>${escapeHtml(live.resultSha || "pending")}</dd>
+      <dt>Phase</dt><dd>${escapeHtml(live.label || live.phase || view.progressLabel || "starting")}</dd>
+      <dt>Result</dt><dd>${escapeHtml(live.resultSha || (live.dispatchState === "consumed" ? "none" : "pending"))}</dd>
       <dt>Adopted</dt><dd>${escapeHtml(live.adoptedSha || view.authoritativeSha || "none")}</dd>
     </dl>
+    <h3>Live trace</h3>
+    <ul>${steps || "<li>None yet</li>"}</ul>
     ${live.diff ? `<pre class="activity-diff">${escapeHtml(live.diff)}</pre>` : ""}
     <h3>Changed files</h3>
     <ul>${files || "<li>None yet</li>"}</ul>
@@ -132,10 +142,15 @@ function updatePreview(view) {
   const embed = view.preview?.embedPath || null;
   const direct = view.preview?.url || null;
   const runtimeFailed =
-    view.runtime?.status === "failed" ||
-    view.runtime?.status === "exited" ||
-    view.runtime?.status === "unhealthy" ||
-    view.runtime?.status === "unavailable";
+    (view.runtime?.status === "failed" ||
+      view.runtime?.status === "exited" ||
+      view.runtime?.status === "unhealthy" ||
+      view.runtime?.status === "unavailable") &&
+    !(
+      view.runtime?.reason === "no_preview_capability" &&
+      view.uiState !== "error" &&
+      view.status === "running"
+    );
   const ready =
     !runtimeFailed &&
     (view.preview?.status === "ready" || view.preview?.status === "stale");
@@ -165,7 +180,7 @@ function updatePreview(view) {
   els.previewError.hidden = true;
 
   if (ready && embed) {
-    const nextSrc = embed.endsWith("/") ? embed : `${embed}/`;
+    const nextSrc = previewFrameSrc(embed, view.authoritativeSha);
     els.previewEmpty.hidden = true;
     els.previewFrame.hidden = false;
     if (previewEmbed !== nextSrc) {
@@ -230,6 +245,16 @@ function render(view) {
   }
 }
 
+function acceptView(view) {
+  if (!view) return;
+  const revision = Number(view.viewRevision);
+  if (!shouldAcceptViewRevision(renderedRevision, revision)) return;
+  if (Number.isFinite(revision)) {
+    renderedRevision = Math.max(renderedRevision, revision);
+  }
+  render(view);
+}
+
 function subscribe(buildId) {
   if (events) {
     events.close();
@@ -239,7 +264,7 @@ function subscribe(buildId) {
   const receive = (ev) => {
     try {
       const payload = JSON.parse(ev.data);
-      render(payload?.view || payload);
+      acceptView(payload?.view || payload);
     } catch {
       /* ignore */
     }
@@ -303,7 +328,7 @@ async function startBuild() {
     activeBuildId = body.buildId;
     projectRoot = body.projectRoot || null;
     if (body.view) {
-      render(body.view);
+      acceptView(body.view);
     } else {
       setWorkspaceVisible(true);
       els.statusPill.textContent = "Building…";
@@ -349,7 +374,7 @@ function startTruthPoll(buildId) {
         }
         failures = 0;
         const view = await res.json();
-        if (view?.buildId === buildId) render(view);
+        if (view?.buildId === buildId) acceptView(view);
         if (view?.complete || view?.status === "blocked") stopTruthPoll();
       } catch {
         failures += 1;
@@ -398,7 +423,7 @@ async function sendMessage(text) {
       });
       return;
     }
-    if (body.view) render(body.view);
+    if (body.view) acceptView(body.view);
     selectedElement = null;
     els.selectionChip.hidden = true;
     els.chatInput.value = "";
@@ -439,7 +464,7 @@ async function controlBuild(action) {
       });
       return;
     }
-    if (body.view) render(body.view);
+    if (body.view) acceptView(body.view);
   } catch (error) {
     showHandoffResult(action, {
       ok: false,
@@ -580,13 +605,25 @@ els.openExternalBtn.addEventListener("click", () => {
   if (url) window.open(url, "_blank", "noopener");
 });
 
-els.selectModeBtn.addEventListener("click", () => {
-  selectMode = !selectMode;
-  els.selectModeBtn.classList.toggle("active", selectMode);
-  els.previewFrame.contentWindow?.postMessage(
+function postSelectMode() {
+  const frameWindow = els.previewFrame.contentWindow;
+  if (!frameWindow) return;
+  frameWindow.postMessage(
     { source: "path-build", type: "path-build:select-mode", enabled: selectMode },
     "*",
   );
+}
+
+els.selectModeBtn.addEventListener("click", () => {
+  selectMode = !selectMode;
+  els.selectModeBtn.classList.toggle("active", selectMode);
+  els.selectModeBtn.setAttribute("aria-pressed", selectMode ? "true" : "false");
+  els.previewStage.classList.toggle("selecting", selectMode);
+  postSelectMode();
+});
+
+els.previewFrame.addEventListener("load", () => {
+  if (selectMode) postSelectMode();
 });
 
 document.querySelectorAll("[data-viewport]").forEach((btn) => {
@@ -599,11 +636,15 @@ document.querySelectorAll("[data-viewport]").forEach((btn) => {
 
 window.addEventListener("message", (ev) => {
   const data = ev.data || {};
+  if (ev.source !== els.previewFrame.contentWindow) return;
   if (data.source !== "path-build-preview") return;
   if (data.type === "path-build:element-selected" && data.element) {
     selectedElement = data.element;
     selectMode = false;
     els.selectModeBtn.classList.remove("active");
+    els.selectModeBtn.setAttribute("aria-pressed", "false");
+    els.previewStage.classList.remove("selecting");
+    postSelectMode();
     els.selectionChip.hidden = false;
     els.selectionChip.textContent = `Selected: ${selectedElement.tag}${
       selectedElement.text ? ` “${String(selectedElement.text).slice(0, 40)}”` : ""
@@ -628,7 +669,7 @@ window.addEventListener("message", (ev) => {
     const res = await fetch(path);
     const view = await res.json();
     if (view?.buildId && view.phase !== "idle") {
-      render(view);
+      acceptView(view);
       subscribe(view.buildId);
     } else if (fromUrl) {
       setWorkspaceVisible(true);
