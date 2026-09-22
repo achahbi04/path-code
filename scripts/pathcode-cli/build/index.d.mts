@@ -61,6 +61,9 @@ export interface BuildChild {
   authoritativeSha?: string | null;
   semanticProofAccepted?: boolean;
   provider?: string;
+  adoptedSha?: string | null;
+  sourceSha?: string | null;
+  failureReason?: string;
 }
 
 export interface ProductBrief {
@@ -402,6 +405,7 @@ export function parseProductBriefResult(
 export interface BuildArtifact {
   kind: "web" | "api" | "cli" | "desktop" | "mobile" | "service" | "multi_service" | "unknown";
   preview: { capability: string; mode: string; status: string };
+  signals?: string[];
 }
 export function detectBuildArtifact(projectRoot: string): BuildArtifact;
 

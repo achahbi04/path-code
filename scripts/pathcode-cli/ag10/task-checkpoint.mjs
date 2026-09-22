@@ -43,6 +43,7 @@ import { ensureAg9RuntimeDirs } from "../ag9/layout.mjs";
  * @property {string} [sha] Result commit SHA
  * @property {string} [baseline] Baseline commit SHA
  * @property {string[]} [changedFiles] Authoritative result file list
+ * @property {object} [productEvidence] Sealed product capability captured before worktree disposal
  * @property {string} [preferredEngine]
  * @property {string} [continuityDisposition] interrupted | resumable | …
  * @property {string} [interruptedAt] ISO timestamp when Gateway/process loss was recorded
@@ -69,6 +70,46 @@ export function resolveCheckpointPath(runtimeRoot, taskId) {
 export function resolveCheckpointIndexPath(runtimeRoot) {
   const dirs = ensureAg9RuntimeDirs(runtimeRoot);
   return join(dirs.metadata, "tasks", "index.json");
+}
+
+/**
+ * Keep only the sealed product facts. Unknown fields are dropped so a
+ * checkpoint cannot smuggle credentials or a second project store.
+ * @param {unknown} value
+ */
+function sealProductEvidence(value) {
+  if (!value || typeof value !== "object") return undefined;
+  const evidence = /** @type {Record<string, unknown>} */ (value);
+  /** @type {Record<string, unknown>} */
+  const sealed = {};
+  if (typeof evidence.capability === "string" && evidence.capability.trim()) {
+    sealed.capability = evidence.capability.trim().slice(0, 32);
+  }
+  if (typeof evidence.source === "string" && evidence.source.trim()) {
+    sealed.source = evidence.source.trim().slice(0, 64);
+  }
+  if (typeof evidence.sealedAt === "string") {
+    sealed.sealedAt = evidence.sealedAt.slice(0, 40);
+  }
+  if (typeof evidence.resultingSha === "string" && evidence.resultingSha.trim()) {
+    sealed.resultingSha = evidence.resultingSha.trim().slice(0, 64);
+  }
+  if (typeof evidence.buildId === "string" && evidence.buildId.trim()) {
+    sealed.buildId = evidence.buildId.trim().slice(0, 80);
+  }
+  if (typeof evidence.actionId === "string" && evidence.actionId.trim()) {
+    sealed.actionId = evidence.actionId.trim().slice(0, 120);
+  }
+  if (typeof evidence.fingerprint === "string" && evidence.fingerprint.trim()) {
+    sealed.fingerprint = evidence.fingerprint.trim().slice(0, 80);
+  }
+  if (Array.isArray(evidence.changedFiles)) {
+    sealed.changedFiles = evidence.changedFiles
+      .filter((file) => typeof file === "string" && file.trim())
+      .map((file) => String(file).trim())
+      .slice(0, 200);
+  }
+  return Object.keys(sealed).length > 0 ? sealed : undefined;
 }
 
 /**
@@ -157,6 +198,7 @@ export function createCheckpointSkeleton(partial) {
           .map((f) => String(f).trim())
           .slice(0, 200)
       : undefined,
+    productEvidence: sealProductEvidence(partial.productEvidence),
     preferredEngine:
       typeof partial.preferredEngine === "string"
         ? partial.preferredEngine

@@ -46,7 +46,7 @@ export function frameEngineerObjective(record, gap) {
         "Greenfield context: this binding began as git-init-only — the Build folder IS already a git repository.",
         "CRITICAL: Do NOT run `git init`. Do NOT create a nested .git. Commit on the existing repo / task branch only.",
         wantsWeb
-          ? "This intent is a website. The product of this turn must be a previewable website in this worktree (index.html or an equivalent web entry the outcome names). A CLI, library, or unrelated sample program does not satisfy the intent."
+          ? "This intent is a website. The product of this turn must be a previewable website in this worktree (index.html or an equivalent web entry the outcome names). A CLI, library, or unrelated sample program does not satisfy the intent. Commit that website on the existing task branch. If you add package.json, include a `test` script that runs a local node check of the site with no install and no npx; PATH admits test, typecheck, lint, check, and build as validation."
           : "Establish the software the outcome names in this worktree, with a project-native check when the stack has one.",
         "git add + git commit on the existing repository (never re-init).",
         "Do not stop at a marker file alone.",

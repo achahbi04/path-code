@@ -45,9 +45,8 @@ import {
   frameEvaluateObjective,
   frameChallengeObjective,
   completenessClaim,
-  adoptionAllowedForIntent,
-  capabilityFromChangedFiles,
 } from "./objectives.mjs";
+import { decideEngineerProductAdoption } from "./result-evidence.mjs";
 import { resolveMutatingEngineAttempt } from "../ag10/engine-contract.mjs";
 import { formatBuildStatus } from "./format.mjs";
 import { detectBuildArtifact } from "./runtime/artifact.mjs";
@@ -1230,31 +1229,16 @@ export function createBuildController(opts) {
     /** @type {object | null} */
     let adoption = null;
     if (child.kind === "engineer") {
-      const changed =
-        Array.isArray(cp?.changedFiles) && cp.changedFiles.length > 0;
-      const acceptable =
-        /VERIFIED|SUCCESS/i.test(classification) ||
-        (/completed/i.test(String(cp?.finalState || "")) && changed);
-      const inspectRoot =
-        (typeof cp?.worktreePath === "string" && cp.worktreePath) ||
-        binding?.projectRoot ||
-        null;
-      const artifactNow = inspectRoot
-        ? detectBuildArtifact(inspectRoot, {
-            outcomeHint: record.intent?.outcome,
-          })
-        : null;
-      const liveCapability = artifactNow?.preview?.capability || "none";
-      const fileCapability = capabilityFromChangedFiles(cp?.changedFiles);
-      const intentGuard = adoptionAllowedForIntent(
+      const decision = decideEngineerProductAdoption({
         record,
-        liveCapability !== "none" ? liveCapability : fileCapability || liveCapability,
-      );
-      const adoptionCandidate =
-        acceptable || (changed && !/BLOCKED/i.test(classification));
-      if (adoptionCandidate && !intentGuard.ok) {
+        child,
+        checkpoint: cp,
+        projectRoot: binding?.projectRoot || "",
+        classification,
+      });
+      if (!decision.adopt && decision.code === "NON_WEB") {
         child.classification = "NOT_VERIFIED";
-        child.failureReason = intentGuard.reason;
+        child.failureReason = decision.reason;
         record.loop.forceNextKind = "engineer";
         record.loop.pendingRuntimeRefresh = false;
         record.hypotheses.proposedNextAction =
@@ -1263,9 +1247,21 @@ export function createBuildController(opts) {
           taskId,
           actionId: child.actionId,
           intentRevision: child.intentRevision || record.intent.outcomeRevision,
-          capability: artifactNow?.preview?.capability || "none",
+          capability: decision.capability,
+          capabilitySource: decision.capabilitySource,
         });
-      } else if (adoptionCandidate) {
+      } else if (!decision.adopt) {
+        child.failureReason = decision.reason;
+        record.loop.pendingRuntimeRefresh = false;
+        appendBuildEvent(runtimeRoot, buildId, "engineer.adoption_rejected", {
+          taskId,
+          actionId: child.actionId,
+          intentRevision: child.intentRevision || record.intent.outcomeRevision,
+          code: decision.code,
+          capability: decision.capability,
+          capabilitySource: decision.capabilitySource,
+        });
+      } else if (decision.adopt) {
         const { adoptEngineerResultIntoBuild, ensureBuildProductBranch } =
           await import("./adopt.mjs");
         const productBranch =
@@ -1276,24 +1272,21 @@ export function createBuildController(opts) {
           productBranch,
         });
         if (binding?.projectRoot) {
+          const liveWorktree =
+            typeof cp?.worktreePath === "string" &&
+            cp.worktreePath &&
+            existsSync(cp.worktreePath)
+              ? cp.worktreePath
+              : null;
           adoption = adoptEngineerResultIntoBuild({
             runtimeRoot,
             buildId,
             projectRoot: binding.projectRoot,
             productBranch,
             taskId,
-            taskBranch:
-              (typeof cp?.branch === "string" && cp.branch) ||
-              binding.activeTaskBranch ||
-              null,
-            sourceSha:
-              (typeof cp?.sha === "string" && cp.sha) ||
-              (typeof snap?.sha === "string" && snap.sha) ||
-              null,
-            worktreePath:
-              (typeof cp?.worktreePath === "string" && cp.worktreePath) ||
-              binding.activeWorktreePath ||
-              null,
+            taskBranch: decision.taskBranch || binding.activeTaskBranch || null,
+            sourceSha: decision.sourceSha,
+            worktreePath: liveWorktree,
           });
           if (adoption?.ok) {
             if (!Array.isArray(record.adoptionHistory)) {
@@ -1314,6 +1307,9 @@ export function createBuildController(opts) {
               files: Array.isArray(cp?.changedFiles) ? cp.changedFiles.slice(0, 40) : [],
               mode: adoption.mode,
               adoptedAt: adoption.adoptedAt,
+              capability: decision.capability,
+              capabilitySource: decision.capabilitySource,
+              resultFingerprint: decision.fingerprint,
             });
             record.authoritativeSha = adoption.adoptedSha;
             record.loop.lastAdoptionError = undefined;

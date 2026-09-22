@@ -4,6 +4,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { resolve, basename } from "node:path";
 
 import { createAntigravityEngineeringAgent } from "./bridge-client.mjs";
@@ -34,6 +35,7 @@ import {
   setFinalValidationProgressHook,
 } from "./final-validation.mjs";
 import { resolveEngineeringCwd, resolvePathRuntimeRoot } from "../paths.mjs";
+import { detectBuildArtifact } from "../build/runtime/artifact.mjs";
 import { normalizeObjectiveText } from "../normalize-text.mjs";
 import { markTaskInterrupted } from "../ag10/task-checkpoint.mjs";
 import {
@@ -2176,13 +2178,20 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     if (
       head.status === 0 &&
       /^[0-9a-f]{7,40}$/i.test(tip) &&
-      classification === "VERIFIED" &&
       String(tip).toLowerCase() !== String(baselineSha).toLowerCase()
     ) {
-      commitSha = tip;
-      if (!commitStatus || commitStatus === "NO_CHANGES") {
+      // The engineer may already have committed. Record that SHA for every
+      // terminal classification. Adoption still requires a verified result;
+      // this only keeps the commit addressable after the checkout is removed.
+      if (!commitSha) commitSha = tip;
+      if (
+        classification === "VERIFIED" &&
+        (!commitStatus || commitStatus === "NO_CHANGES")
+      ) {
         commitStatus = "VERIFIED";
         advancesSession = true;
+      } else if (!commitStatus) {
+        commitStatus = "SEALED";
       }
     }
   } catch {
@@ -2198,6 +2207,32 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       : [];
   const resultChangedFiles =
     committedFiles.length > 0 ? committedFiles : gitResult.changedFiles;
+
+  // Seal product evidence while the checkout still exists. Disposal below
+  // must not be the first moment the result becomes unreadable.
+  /** @type {object | undefined} */
+  let productEvidence;
+  if (existsSync(worktree.worktreePath)) {
+    const sealedArtifact = detectBuildArtifact(worktree.worktreePath);
+    productEvidence = {
+      capability: sealedArtifact?.preview?.capability || "none",
+      source: "task-worktree",
+      sealedAt: new Date().toISOString(),
+      resultingSha: commitSha || undefined,
+      changedFiles: resultChangedFiles,
+    };
+    try {
+      g10Fabric?.persist?.({
+        branch: worktree.taskBranch || undefined,
+        sha: commitSha || undefined,
+        baseline: baselineSha || undefined,
+        changedFiles: resultChangedFiles,
+        productEvidence,
+      });
+    } catch {
+      /* The terminal markFinal writes the same evidence again. */
+    }
+  }
 
   /** @type {{ ok: boolean, code?: string } | null} */
   let cleanup = null;
@@ -2421,6 +2456,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       sha: commitSha || undefined,
       baseline: baselineSha || undefined,
       changedFiles: resultChangedFiles,
+      productEvidence,
     });
     }
     await g10Fabric?.shutdown?.();
