@@ -332,17 +332,21 @@ function operationTarget(entry) {
   return entry.file?.relativePath || entry.command?.safeDisplay || entry.summary || "";
 }
 
-function sameLifecycle(prev, entry) {
-  if (!prev || prev.taskId !== entry.taskId || prev.kind !== entry.kind) return false;
-  const target = entry.file?.relativePath || entry.command?.safeDisplay || "";
-  if (!target || target !== (prev.file?.relativePath || prev.command?.safeDisplay || "")) return false;
-  const left = String(prev.timestamp || "").slice(0, 19);
-  const right = String(entry.timestamp || "").slice(0, 19);
-  if (!left || left !== right) return false;
-  const prevExit = prev.command?.exitCode;
-  const nextExit = entry.command?.exitCode;
-  if (prevExit != null && nextExit != null && prevExit !== nextExit) return false;
-  return true;
+function lifecycleTarget(entry) {
+  return entry?.file?.relativePath || entry?.command?.safeDisplay || "";
+}
+
+function lifecycleKey(entry) {
+  const target = lifecycleTarget(entry);
+  const second = String(entry?.timestamp || "").slice(0, 19);
+  if (!entry?.taskId || !target || !second) return null;
+  return `${entry.taskId}\n${entry.kind}\n${target}\n${second}`;
+}
+
+function exitsDisagree(prev, entry) {
+  const prevExit = prev?.command?.exitCode;
+  const nextExit = entry?.command?.exitCode;
+  return prevExit != null && nextExit != null && prevExit !== nextExit;
 }
 
 function richerEntry(prev, entry) {
@@ -353,23 +357,35 @@ function richerEntry(prev, entry) {
     (item.status === "completed" || item.status === "failed" ? 1 : 0);
   const kept = score(entry) >= score(prev) ? entry : prev;
   const other = kept === entry ? prev : entry;
+  const collapsedSources = [
+    ...(kept.diagnostics?.collapsedSources || []),
+    ...(other.diagnostics?.collapsedSources || []),
+  ];
+  if (other.source) collapsedSources.push(other.source);
   return {
     ...kept,
     diagnostics: {
       ...(kept.diagnostics || {}),
-      collapsedSource: other.source || null,
+      collapsedSource: other.source || kept.diagnostics?.collapsedSource || null,
+      collapsedSources,
     },
   };
 }
 
 function collapseCreatorEntries(ordered) {
   const lifecycle = [];
+  const seen = new Map();
   for (const entry of ordered) {
-    const prev = lifecycle[lifecycle.length - 1];
-    if (sameLifecycle(prev, entry)) {
-      lifecycle[lifecycle.length - 1] = richerEntry(prev, entry);
-      continue;
+    const key = lifecycleKey(entry);
+    if (key && seen.has(key)) {
+      const index = seen.get(key);
+      const prev = lifecycle[index];
+      if (!exitsDisagree(prev, entry)) {
+        lifecycle[index] = richerEntry(prev, entry);
+        continue;
+      }
     }
+    if (key) seen.set(key, lifecycle.length);
     lifecycle.push(entry);
   }
   const grouped = [];

@@ -151,6 +151,13 @@ describe("PATH Builder creator shell", () => {
                 engine: "cursor",
               },
               {
+                t: "2026-09-22T10:00:01.100Z",
+                type: "session.engineering.tool",
+                tool: "edit",
+                path: "/proj/styles.css",
+                engine: "cursor",
+              },
+              {
                 t: "2026-09-22T10:00:01.200Z",
                 type: "session.engineering.tool",
                 tool: "edit",
@@ -209,6 +216,7 @@ describe("PATH Builder creator shell", () => {
     expect(summaries.some((line) => line.startsWith("CURSOR"))).toBe(false);
     expect(summaries).toContain("INSPECT project ×3");
     expect(summaries.filter((line) => line.startsWith("EDIT package.json"))).toHaveLength(1);
+    expect(summaries.filter((line) => line.startsWith("EDIT styles.css"))).toHaveLength(1);
     expect(summaries.filter((line) => line.includes("PASS test"))).toHaveLength(2);
     expect(summaries).toContain("PATH switched engineering route and continued.");
     const adoptAt = summaries.findIndex((line) => line.includes("ADOPT abc123def456"));
