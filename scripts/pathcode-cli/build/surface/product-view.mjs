@@ -240,7 +240,10 @@ export function projectBuildForSurface(build, extras = {}) {
         text: m.text,
         at: m.at,
         kind: m.kind || null,
-        status: m.status || null,
+        status:
+          paused && (m.status === "applying" || m.status === "preparing")
+            ? "paused"
+            : m.status || null,
       }))
     : [
         {

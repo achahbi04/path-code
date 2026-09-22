@@ -168,6 +168,22 @@ export function wantsWebProduct(record) {
  * @param {import('./types.mjs').BuildRecord | null | undefined} record
  * @param {string | null | undefined} capability
  */
+/**
+ * A removed task worktree cannot be detected on disk. HTML paths in the
+ * checkpoint are still evidence of a website result.
+ * @param {unknown} files
+ * @returns {"web" | null}
+ */
+export function capabilityFromChangedFiles(files) {
+  const names = (Array.isArray(files) ? files : []).map((file) =>
+    String(file || "").replace(/\\/g, "/"),
+  );
+  if (names.some((file) => /(^|\/)index\.html$/i.test(file) || /\.html$/i.test(file))) {
+    return "web";
+  }
+  return null;
+}
+
 export function adoptionAllowedForIntent(record, capability) {
   if (!wantsWebProduct(record)) return { ok: true, reason: null };
   if (capability === "web") return { ok: true, reason: null };

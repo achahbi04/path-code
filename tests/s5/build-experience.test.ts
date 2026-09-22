@@ -21,6 +21,7 @@ import { projectEngineeringTimeline } from "../../scripts/pathcode-cli/build/sur
 import { projectEngineeringActivity } from "../../scripts/pathcode-cli/build/surface/engineering-activity.mjs";
 import {
   adoptionAllowedForIntent,
+  capabilityFromChangedFiles,
   frameEngineerObjective,
 } from "../../scripts/pathcode-cli/build/objectives.mjs";
 import { resolveMutatingEngineAttempt } from "../../scripts/pathcode-cli/ag10/engine-contract.mjs";
@@ -698,6 +699,14 @@ describe("PATH Build experience", () => {
     };
     expect(adoptionAllowedForIntent(record, "cli").ok).toBe(false);
     expect(adoptionAllowedForIntent(record, "web").ok).toBe(true);
+    expect(adoptionAllowedForIntent(record, "none").ok).toBe(false);
+    expect(capabilityFromChangedFiles(["index.html", "css/styles.css", "js/main.js"])).toBe("web");
+    expect(
+      adoptionAllowedForIntent(
+        record,
+        capabilityFromChangedFiles(["index.html", "css/styles.css"]) || "none",
+      ).ok,
+    ).toBe(true);
     const objective = frameEngineerObjective(record, "establish the product");
     expect(objective).toContain("previewable website");
     expect(objective).toContain("PATH Build outcome");

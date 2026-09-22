@@ -33,7 +33,7 @@ import {
 } from "./guards.mjs";
 import { SteeringQueue } from "./steering.mjs";
 import { createCopilotEngine } from "./copilot-sdk.mjs";
-import { createCursorEngine } from "./cursor-sdk.mjs";
+import { createCursorEngine, resolveCursorApiKey } from "./cursor-sdk.mjs";
 import {
   selectEngineForTurn,
   resolvePreferredEngine,
@@ -319,9 +319,10 @@ export async function createG10Fabric(options) {
       resumeSessionId: checkpoint.cursorSessionId || undefined,
     });
     const apiKeyPresent = Boolean(
-      (typeof options.toolEnv?.CURSOR_API_KEY === "string" &&
-        options.toolEnv.CURSOR_API_KEY.trim()) ||
-        (typeof process.env.CURSOR_API_KEY === "string" && process.env.CURSOR_API_KEY.trim()),
+      resolveCursorApiKey(
+        { ...process.env, ...(options.toolEnv || {}) },
+        { includeStored: true },
+      ),
     );
     persist({
       cursorMode: cursor.getMode(),

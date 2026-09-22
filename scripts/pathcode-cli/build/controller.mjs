@@ -46,6 +46,7 @@ import {
   frameChallengeObjective,
   completenessClaim,
   adoptionAllowedForIntent,
+  capabilityFromChangedFiles,
 } from "./objectives.mjs";
 import { resolveMutatingEngineAttempt } from "../ag10/engine-contract.mjs";
 import { formatBuildStatus } from "./format.mjs";
@@ -1243,9 +1244,11 @@ export function createBuildController(opts) {
             outcomeHint: record.intent?.outcome,
           })
         : null;
+      const liveCapability = artifactNow?.preview?.capability || "none";
+      const fileCapability = capabilityFromChangedFiles(cp?.changedFiles);
       const intentGuard = adoptionAllowedForIntent(
         record,
-        artifactNow?.preview?.capability || "none",
+        liveCapability !== "none" ? liveCapability : fileCapability || liveCapability,
       );
       const adoptionCandidate =
         acceptable || (changed && !/BLOCKED/i.test(classification));
