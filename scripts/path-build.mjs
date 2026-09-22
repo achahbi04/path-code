@@ -126,10 +126,14 @@ export function isDirectEntry(argv1 = process.argv[1]) {
 }
 
 if (isDirectEntry()) {
-  runPathBuildMain(process.argv.slice(2)).catch((err) => {
-    process.stderr.write(
-      `path-build failed: ${err instanceof Error ? err.message : String(err)}\n`,
-    );
-    process.exitCode = 1;
-  });
+  runPathBuildMain(process.argv.slice(2))
+    .then((code) => {
+      process.exitCode = typeof code === "number" ? code : 0;
+    })
+    .catch((err) => {
+      process.stderr.write(
+        `path-build failed: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      process.exitCode = 1;
+    });
 }

@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { createServer, type Server } from "node:net";
 import { mkdtempSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -203,6 +204,24 @@ describe("PATH Build experience", () => {
       expect(errors.join("")).toContain(
         "Fake/simulated Build mode is not available through the operator entrypoint.",
       );
+      const processResult = spawnSync(
+        process.execPath,
+        [join(packageRoot, "scripts/path-build.mjs")],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            PATHCODE_BUILD_FAKE: "1",
+            PATHCODE_BUILD_NO_OPEN: "1",
+          },
+          timeout: 10_000,
+        },
+      );
+      expect(processResult.status).toBe(2);
+      expect(processResult.stderr).toContain(
+        "Fake/simulated Build mode is not available through the operator entrypoint.",
+      );
+      expect(processResult.stdout).not.toContain("PATH Build ready:");
     } finally {
       process.stderr.write = write;
       if (previous.fake == null) delete process.env.PATHCODE_BUILD_FAKE;
