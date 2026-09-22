@@ -27,8 +27,7 @@ import {
   appendBuildEvent,
 } from "../index.mjs";
 import { projectBuildForSurface } from "./product-view.mjs";
-import { libraryRow } from "./project-library.mjs";
-import { displayTitleFor } from "./project-library.mjs";
+import { displayTitleFor, isCreatorProject, libraryRow } from "./project-library.mjs";
 import {
   exportAuthoritativeProject,
   readExportBytes,
@@ -383,6 +382,7 @@ export async function startPathBuildSurface(options) {
 
       if (method === "GET" && path === "/api/builds") {
         const rows = listBuildRecords(runtimeRoot)
+          .filter((build) => isCreatorProject(build))
           .slice()
           .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))
           .slice(0, 200);

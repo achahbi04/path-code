@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -13,8 +13,11 @@ import { projectEngineeringTimeline } from "../../scripts/pathcode-cli/build/sur
 import { projectBuildForSurface } from "../../scripts/pathcode-cli/build/surface/product-view.mjs";
 import {
   creatorConversation,
+  criteriaSummary,
   deriveDisplayTitle,
   hasActiveEngineering,
+  isCreatorProject,
+  isCreatorProjectRoot,
 } from "../../scripts/pathcode-cli/build/surface/project-library.mjs";
 import { exportAuthoritativeProject } from "../../scripts/pathcode-cli/build/surface/project-export.mjs";
 import {
@@ -45,7 +48,10 @@ describe("PATH Builder creator shell", () => {
       deriveDisplayTitle(
         "Build an ICE  in case of emergency website that define the app ICE when you cannot speak",
       ),
-    ).toBe("ICE — In Case of Emergency");
+    ).toBe("ICE in case of emergency website");
+    expect(
+      deriveDisplayTitle("Build a polished public website for ICE — In Case of Emergency. Explain what ICE is"),
+    ).not.toBe("ICE — In Case of Emergency");
     const dir = mkdtempSync(join(tmpdir(), "path-library-"));
     const runtimeRoot = join(dir, "rt");
     const projectRoot = join(dir, "ice");
@@ -66,6 +72,21 @@ describe("PATH Builder creator shell", () => {
     expect(stored?.productBranch).toBe("path-build/dcca5ffb");
     expect(stored?.buildId).toBe(record.buildId);
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("shows PATH Builds projects and hides temp and home roots", () => {
+    expect(isCreatorProjectRoot(join(homedir(), "PATH Builds", "ice"))).toBe(true);
+    expect(isCreatorProjectRoot(join(tmpdir(), "path-build-accept"))).toBe(false);
+    expect(isCreatorProjectRoot("/private/tmp/path-s5-empty")).toBe(false);
+    expect(isCreatorProjectRoot(homedir())).toBe(false);
+    const visible = { projectBindings: [{ projectRoot: join(homedir(), "PATH Builds", "site") }] };
+    const hidden = { projectBindings: [{ projectRoot: join(tmpdir(), "scratch") }] };
+    expect(isCreatorProject(visible)).toBe(true);
+    expect(isCreatorProject(hidden)).toBe(false);
+    expect(criteriaSummary([
+      { status: "PROVEN", required: true },
+      { status: "UNKNOWN", required: true },
+    ])).toEqual({ met: 1, failed: 0, pending: 1, total: 2 });
   });
 
   it("keeps every project when another is created and restores each after a new reader", () => {
@@ -217,7 +238,7 @@ describe("PATH Builder creator shell", () => {
     expect(summaries).toContain("INSPECT project ×3");
     expect(summaries.filter((line) => line.startsWith("EDIT package.json"))).toHaveLength(1);
     expect(summaries.filter((line) => line.startsWith("EDIT styles.css"))).toHaveLength(1);
-    expect(summaries.filter((line) => line.includes("PASS test"))).toHaveLength(2);
+    expect(summaries.filter((line) => line.includes("TEST passed"))).toHaveLength(2);
     expect(summaries).toContain("PATH switched engineering route and continued.");
     const adoptAt = summaries.findIndex((line) => line.includes("ADOPT abc123def456"));
     const laterRead = summaries.findIndex((line) => line.includes("READ index.html"));

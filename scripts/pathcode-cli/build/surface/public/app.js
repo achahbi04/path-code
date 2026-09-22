@@ -9,6 +9,7 @@ const els = {
   buildBtn: document.getElementById("buildBtn"),
   landingError: document.getElementById("landingError"),
   statusPill: document.getElementById("statusPill"),
+  criteriaLine: document.getElementById("criteriaLine"),
   buildIdentity: document.getElementById("buildIdentity"),
   chatScroll: document.getElementById("chatScroll"),
   chatForm: document.getElementById("chatForm"),
@@ -47,6 +48,7 @@ const els = {
   titleEditor: document.getElementById("titleEditor"),
   libraryCollapse: document.getElementById("libraryCollapse"),
   libraryOpen: document.getElementById("libraryOpen"),
+  jumpLatest: document.getElementById("jumpLatest"),
   worklog: document.getElementById("worklog"),
   worklogCurrent: document.getElementById("worklogCurrent"),
   worklogPhases: document.getElementById("worklogPhases"),
@@ -69,6 +71,8 @@ let selectedElement = null;
 let selectMode = false;
 /** @type {number} */
 let renderedRevision = -1;
+let worklogFollow = true;
+let chatStick = true;
 /** @type {any} */
 let lastView = null;
 
@@ -96,6 +100,7 @@ function setWorkspaceVisible(on) {
 }
 
 function renderChat(view) {
+  const saved = els.chatScroll.scrollTop;
   const msgs = view.conversation || [];
   els.chatScroll.innerHTML = msgs
     .map((m) => {
@@ -106,7 +111,8 @@ function renderChat(view) {
       return `<div class="bubble ${role}" data-status="${escapeHtml(m.status || "")}">${status}${escapeHtml(m.text || "")}</div>`;
     })
     .join("");
-  els.chatScroll.scrollTop = els.chatScroll.scrollHeight;
+  if (chatStick) els.chatScroll.scrollTop = els.chatScroll.scrollHeight;
+  else els.chatScroll.scrollTop = saved;
 }
 
 function clock(timestamp) {
@@ -148,15 +154,16 @@ function renderWorklog(view) {
         }</span>`,
     )
     .join("");
-  const nearBottom =
-    els.worklogScroll.scrollHeight - els.worklogScroll.scrollTop - els.worklogScroll.clientHeight < 48;
+  const savedScroll = els.worklogScroll.scrollTop;
   const turns = timeline.turns?.length
     ? timeline.turns
     : [{ entries: timeline.entries || [], phase: null, engine: null, taskId: null, status: null }];
   let previousDay = "";
   els.worklogScroll.innerHTML = turns
     .map((turn) => {
-      const firstStamp = (turn.entries || []).map((entry) => entry.timestamp).find(Boolean);
+      const visible = (turn.entries || []).filter((entry) => entry.presentation !== "diagnostic");
+      const hidden = (turn.entries || []).filter((entry) => entry.presentation === "diagnostic");
+      const firstStamp = (visible[0] || turn.entries?.[0])?.timestamp;
       const day = dayLabel(firstStamp);
       const boundary = day && day !== previousDay ? `<div class="worklog-day">${escapeHtml(day)}</div>` : "";
       if (day) previousDay = day;
@@ -165,32 +172,50 @@ function renderWorklog(view) {
         engineer: "Building",
         evaluate: "Verifying",
         challenge: "Reviewing",
+        revision: "Revision",
       }[turn.phase] || "PATH Engineering";
       const title = turn.taskId ? phaseName : turn.phase || "PATH Engineering";
+      const diagLines = [
+        turn.taskId ? `Task ${shortId(turn.taskId)}` : "",
+        turn.actionId ? `Action ${shortId(turn.actionId)}` : "",
+        turn.engine ? `Executor ${turn.engine}` : "",
+        turn.intentRevision ? `Intent ${turn.intentRevision}` : "",
+        ...hidden.map((entry) => entry.summary || ""),
+        ...visible
+          .filter(
+            (entry) =>
+              entry.command?.safeDisplay &&
+              (entry.summary === "RUN command" || entry.summary === "FAILURE command"),
+          )
+          .map((entry) => entry.command.safeDisplay),
+      ].filter(Boolean);
       const header = turn.taskId
         ? `<div class="worklog-turn" data-status="${escapeHtml(turn.status || "")}">
             <strong>${escapeHtml(title)}</strong>
             <details class="worklog-diagnostics">
               <summary>Diagnostics</summary>
-              <div>Task ${escapeHtml(shortId(turn.taskId))}${
-                turn.engine ? ` · ${escapeHtml(String(turn.engine))}` : ""
-              }${turn.intentRevision ? ` · intent ${escapeHtml(turn.intentRevision)}` : ""}</div>
+              <div>${diagLines.map((line) => escapeHtml(line)).join("<br>")}</div>
             </details>
           </div>`
         : "";
-      const rows = (turn.entries || [])
-        .map(
-          (entry) =>
-            `<div class="worklog-entry" data-kind="${escapeHtml(entry.kind)}" data-sequence="${entry.sequence}" data-source="${escapeHtml(entry.source?.trace || entry.orderKey || "")}">
+      let sawRevision = false;
+      const rows = visible
+        .map((entry) => {
+          const revision = entry.kind === "adopt" || entry.kind === "runtime";
+          const banner = revision && !sawRevision ? `<div class="worklog-turn"><strong>Revision</strong></div>` : "";
+          if (revision) sawRevision = true;
+          return `${banner}<div class="worklog-entry" data-kind="${escapeHtml(entry.kind)}" data-sequence="${entry.sequence}">
               <time>${escapeHtml(clock(entry.timestamp))}</time>
               <span>${escapeHtml(entry.summary || "")}</span>
-            </div>`,
-        )
+            </div>`;
+        })
         .join("");
       return `${boundary}${header}${rows}`;
     })
     .join("");
-  if (nearBottom) els.worklogScroll.scrollTop = els.worklogScroll.scrollHeight;
+  if (worklogFollow) els.worklogScroll.scrollTop = els.worklogScroll.scrollHeight;
+  else els.worklogScroll.scrollTop = savedScroll;
+  if (els.jumpLatest) els.jumpLatest.hidden = worklogFollow;
 }
 
 function renderDrawer(view) {
@@ -220,6 +245,7 @@ function renderDrawer(view) {
       <dt>Path</dt><dd>${escapeHtml(view.projectRoot || "")}</dd>
       <dt>Branch</dt><dd>${escapeHtml(view.productBranch || view.identity?.productBranch || "")}</dd>
       <dt>SHA</dt><dd>${escapeHtml(view.authoritativeSha || "")}</dd>
+      <dt>Preview SHA</dt><dd>${escapeHtml(view.identity?.previewSha || view.previewRevision || "")}</dd>
     </dl>
     <h3>Current engineering task</h3>
     <dl class="activity-grid">
@@ -270,6 +296,10 @@ function updatePreview(view) {
   const ready =
     !runtimeFailed &&
     (view.preview?.status === "ready" || view.preview?.status === "stale");
+
+  const controls = Boolean(ready && (embed || direct));
+  document.querySelector(".preview-actions")?.toggleAttribute("hidden", !controls);
+  document.querySelector(".viewport-toggles")?.toggleAttribute("hidden", !controls);
 
   if (runtimeFailed) {
     els.previewError.hidden = false;
@@ -347,8 +377,35 @@ function render(view) {
   }
 
   const state = view.uiState || "building";
-  els.statusPill.textContent = view.creatorStatus || view.progressLabel || view.headline || state;
+  const phaseText = {
+    understanding: "Understanding",
+    engineering: "Engineering",
+    verifying: "Verifying",
+    reviewing: "Reviewing",
+    ready: "Ready",
+    paused: "Paused",
+    attention: "Needs attention",
+  }[view.creatorPhase] || view.creatorStatus || view.progressLabel || state;
+  els.statusPill.textContent = phaseText;
   els.statusPill.dataset.state = state;
+  if (els.criteriaLine) {
+    const summary = view.criteriaSummary;
+    els.criteriaLine.textContent = summary && summary.total
+      ? `${summary.met} / ${summary.total} criteria met`
+      : "";
+  }
+  if (els.chatInput) {
+    const editable = view.canSteer !== false && Boolean(view.projectRoot);
+    els.chatInput.disabled = !editable;
+    els.sendBtn.disabled = !editable;
+    if (!editable) {
+      els.chatInput.placeholder = view.projectRoot
+        ? "This project needs attention before it can take a new message."
+        : "This record has no product folder.";
+    } else {
+      els.chatInput.placeholder = "Ask for a change… e.g. Make the hero darker";
+    }
+  }
   const phaseLabels = {
     understanding: "Understanding your request",
     engineering: "Engineering",
@@ -690,6 +747,7 @@ els.newBuildBtn.addEventListener("click", () => {
 });
 
 els.detailsBtn.addEventListener("click", () => {
+  closeProjectMenu();
   els.drawer.hidden = false;
   els.worklog.classList.remove("collapsed");
 });
@@ -718,6 +776,7 @@ function showHandoffResult(whichTitle, body) {
 }
 
 els.openFolderBtn.addEventListener("click", async () => {
+  closeProjectMenu();
   if (!activeBuildId && !projectRoot) {
     showHandoffResult("Open Folder", {
       ok: false,
@@ -745,6 +804,7 @@ els.openFolderBtn.addEventListener("click", async () => {
 });
 
 els.openCodeBtn.addEventListener("click", async () => {
+  closeProjectMenu();
   if (!activeBuildId && !projectRoot) {
     showHandoffResult("Open in PATH Code", {
       ok: false,
@@ -839,12 +899,15 @@ function relativeTime(timestamp) {
   if (!timestamp) return "";
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const minutes = Math.round((Date.now() - date.getTime()) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d`;
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 async function loadProjects() {
@@ -868,6 +931,12 @@ async function loadProjects() {
   });
 }
 
+function closeProjectMenu() {
+  if (!els.sourceMenuPanel) return;
+  els.sourceMenuPanel.hidden = true;
+  els.sourceMenuBtn?.setAttribute("aria-expanded", "false");
+}
+
 async function openProject(buildId, mode) {
   if (!buildId) return;
   const url = new URL(location.href);
@@ -875,6 +944,15 @@ async function openProject(buildId, mode) {
   if (mode === "push") history.pushState({ buildId }, "", url);
   else if (mode === "replace") history.replaceState({ buildId }, "", url);
   activeBuildId = buildId;
+  worklogFollow = true;
+  chatStick = true;
+  if (els.chatScroll) els.chatScroll.innerHTML = "";
+  if (els.worklogScroll) els.worklogScroll.innerHTML = "";
+  if (els.previewFrame) {
+    els.previewFrame.hidden = true;
+    els.previewFrame.removeAttribute("src");
+  }
+  if (els.previewStage) els.previewStage.scrollTop = 0;
   setWorkspaceVisible(true);
   const res = await fetch(`/api/builds/${encodeURIComponent(buildId)}`);
   const view = await res.json();
@@ -886,10 +964,33 @@ async function openProject(buildId, mode) {
   document.querySelector(".app-shell")?.classList.remove("library-open");
 }
 
-els.sourceMenuBtn?.addEventListener("click", () => {
+els.sourceMenuBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
   const open = els.sourceMenuPanel.hidden;
   els.sourceMenuPanel.hidden = !open;
   els.sourceMenuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+});
+document.addEventListener("click", (event) => {
+  if (!els.sourceMenuPanel || els.sourceMenuPanel.hidden) return;
+  const menu = document.getElementById("sourceMenu");
+  if (menu && !menu.contains(event.target)) closeProjectMenu();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeProjectMenu();
+});
+els.chatScroll?.addEventListener("scroll", () => {
+  const gap = els.chatScroll.scrollHeight - els.chatScroll.scrollTop - els.chatScroll.clientHeight;
+  chatStick = gap < 48;
+});
+els.worklogScroll?.addEventListener("scroll", () => {
+  const gap = els.worklogScroll.scrollHeight - els.worklogScroll.scrollTop - els.worklogScroll.clientHeight;
+  worklogFollow = gap < 48;
+  if (els.jumpLatest) els.jumpLatest.hidden = worklogFollow;
+});
+els.jumpLatest?.addEventListener("click", () => {
+  worklogFollow = true;
+  els.worklogScroll.scrollTop = els.worklogScroll.scrollHeight;
+  els.jumpLatest.hidden = true;
 });
 
 els.copyPathBtn?.addEventListener("click", async () => {

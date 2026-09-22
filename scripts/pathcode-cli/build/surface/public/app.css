@@ -20,6 +20,7 @@ body {
   color: var(--ink);
   font-family: var(--font-body);
   background: var(--bg0);
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -166,12 +167,28 @@ body {
 }
 .topbar-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 
+.criteria-line {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.workspace {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
 .workspace-grid {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(280px, 32%) minmax(0, 1fr) minmax(280px, 340px);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  grid-template-rows: minmax(0, 1.35fr) minmax(168px, 0.75fr);
   height: 100%;
+  overflow: hidden;
 }
+.preview-pane { grid-column: 1; grid-row: 1; }
+.chat-pane { grid-column: 1; grid-row: 2; border-right: 0; border-top: 1px solid var(--line); }
+.worklog { grid-column: 2; grid-row: 1 / span 2; }
 .worklog {
   min-height: 0;
   display: grid;
@@ -187,6 +204,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.4rem;
+  position: sticky;
+  top: 0;
 }
 .worklog-head h2 { margin: 0; font-size: 0.85rem; letter-spacing: 0.04em; }
 .worklog-current {
@@ -207,7 +227,8 @@ body {
 .phase-chip[data-status="active"] { color: var(--accent); border-color: var(--accent); }
 .phase-chip[data-status="done"] { color: #d7e6dc; }
 .worklog-scroll {
-  overflow: auto;
+  overflow-y: auto;
+  min-height: 0;
   padding: 0.4rem 0.75rem 0.8rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.74rem;
@@ -235,6 +256,7 @@ body {
   background: rgba(8, 16, 13, 0.55);
 }
 .chat-scroll {
+  min-height: 0;
   overflow: auto;
   padding: 1rem;
   display: flex;
@@ -298,7 +320,7 @@ body {
   min-height: 0;
   display: grid;
   place-items: center;
-  overflow: hidden;
+  overflow: auto;
   padding: 0.75rem;
 }
 .preview-stage.selecting {
@@ -393,28 +415,22 @@ body {
 
 @media (max-width: 1100px) {
   .workspace-grid {
-    grid-template-columns: minmax(240px, 40%) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) minmax(160px, 30vh);
-  }
-  .worklog { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
-}
-@media (max-width: 900px) {
-  body { overflow: auto; }
-  .workspace-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: 34vh minmax(180px, 32vh) minmax(160px, 28vh);
+    grid-template-rows: minmax(0, 1.1fr) minmax(140px, 0.7fr) minmax(160px, 0.8fr);
   }
-  .chat-pane { border-right: 0; border-bottom: 1px solid var(--line); }
-  .worklog { grid-column: auto; }
+  .preview-pane { grid-column: 1; grid-row: 1; }
+  .chat-pane { grid-column: 1; grid-row: 2; }
+  .worklog { grid-column: 1; grid-row: 3; border-left: 0; border-top: 1px solid var(--line); }
 }
 
 .app-shell {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
-  height: 100%;
+  height: 100dvh;
   width: 100%;
+  overflow: hidden;
 }
-.shell-main { min-width: 0; height: 100%; position: relative; }
+.shell-main { min-width: 0; min-height: 0; height: 100%; position: relative; overflow: hidden; }
 .library {
   min-height: 0;
   display: flex;
@@ -453,7 +469,7 @@ body {
   text-transform: uppercase;
   color: var(--muted);
 }
-.project-list { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 0.35rem; }
+.project-list { min-height: 0; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
 .project-entry {
   text-align: left;
   color: var(--ink);

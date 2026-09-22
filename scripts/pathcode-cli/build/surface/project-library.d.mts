@@ -1,4 +1,12 @@
 export function deriveDisplayTitle(outcome?: string | null, brief?: { summary?: string } | null): string;
+export function isCreatorProjectRoot(projectRoot?: string | null): boolean;
+export function isCreatorProject(build?: object | null): boolean;
+export function criteriaSummary(criteria?: Array<{ status?: string; required?: boolean }> | null): {
+  met: number;
+  failed: number;
+  pending: number;
+  total: number;
+};
 export function displayTitleFor(build?: object | null): string;
 export function creatorStatusLabel(build?: object | null): string;
 export function creatorPhase(build?: object | null): string;

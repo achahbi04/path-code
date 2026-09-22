@@ -57,6 +57,7 @@
           <span class="build-identity" id="buildIdentity"></span>
           <input id="titleEditor" class="title-editor" hidden autocomplete="off" />
           <span class="status-pill" id="statusPill">Building…</span>
+          <span class="criteria-line" id="criteriaLine"></span>
         </div>
         <div class="topbar-actions">
           <div class="menu" id="sourceMenu">
@@ -126,11 +127,12 @@
         <aside class="worklog" id="worklog">
           <div class="worklog-head">
             <h2>PATH Engineering</h2>
+            <button type="button" class="ghost tiny" id="jumpLatest" hidden>Jump to latest</button>
             <button type="button" class="ghost tiny" id="worklogToggle">Hide</button>
           </div>
           <div class="worklog-current" id="worklogCurrent">Engineering has not begun.</div>
           <div class="worklog-phases" id="worklogPhases"></div>
-          <div class="worklog-scroll" id="worklogScroll"></div>
+          <div class="worklog-scroll" id="worklogScroll" tabindex="0" aria-label="PATH Engineering history"></div>
         </aside>
       </div>
 

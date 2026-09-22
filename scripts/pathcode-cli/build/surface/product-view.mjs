@@ -10,6 +10,7 @@ import { projectEngineeringTimeline } from "./engineering-timeline.mjs";
 import {
   creatorConversation,
   creatorPhase,
+  criteriaSummary,
   creatorStatusLabel,
   displayTitleFor,
   hasActiveEngineering,
@@ -329,6 +330,7 @@ export function projectBuildForSurface(build, extras = {}) {
       required: c.required,
       source: c.source || null,
     })),
+    criteriaSummary: criteriaSummary(build.outcomeCriteria),
     children: activity,
     conversation,
     activity,

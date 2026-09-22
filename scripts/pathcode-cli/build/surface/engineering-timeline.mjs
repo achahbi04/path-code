@@ -137,6 +137,7 @@ function fromTraceLine(line, roots, ctx) {
       ...base,
       kind: "task_started",
       status: "started",
+      presentation: "diagnostic",
       summary: "Engineering started",
     };
   }
@@ -156,7 +157,7 @@ function fromTraceLine(line, roots, ctx) {
       kind: failed ? "task_failed" : "result",
       status: failed ? "failed" : "completed",
       summary: failed
-        ? "Engineering failed"
+        ? "FAILURE engineering failed"
         : "RESULT engineering result ready",
     };
   }
@@ -217,15 +218,12 @@ function fromTraceLine(line, roots, ctx) {
   const validationType = ["typecheck", "test", "build", "lint"].includes(kind)
     ? kind
     : null;
-  const verb = done ? "PASS" : failed ? "FAIL" : "RUN";
-  const shown = commandText || kind;
+  const shown = creatorCommandSummary(commandText, validationType || kind, done, failed);
   return {
     ...base,
     kind: validationType || "command",
     status: failed ? "failed" : done ? "completed" : "started",
-    summary: validationType && (done || failed)
-      ? `PATH ${verb} ${validationType}${line?.durationMs ? ` · ${line.durationMs}ms` : ""}`
-      : `${verb} ${shown}`,
+    summary: shown,
     command: {
       safeDisplay: commandText || shown,
       ...(exitCode != null ? { exitCode } : {}),
@@ -270,7 +268,7 @@ function fromBuildEvent(event, buildId) {
     },
   };
   if (type === "adoption.completed" && sha) {
-    return { ...base, kind: "adopt", status: "completed", summary: `PATH ADOPT ${sha.slice(0, 12)}` };
+    return { ...base, kind: "adopt", status: "completed", phase: "revision", summary: `ADOPT ${sha.slice(0, 12)}` };
   }
   if (type === "runtime.updated" || type === "runtime.started" || type === "runtime.restarted") {
     return {
@@ -278,8 +276,8 @@ function fromBuildEvent(event, buildId) {
       kind: "runtime",
       status: String(data.status || data.runtimeHealth || "ready"),
       summary: sha
-        ? `PATH PREVIEW ${sha.slice(0, 12)}`
-        : `PATH RUNTIME ${String(data.status || "updated")}`,
+        ? `PREVIEW ${sha.slice(0, 12)}`
+        : `PREVIEW ${String(data.status || "updated")}`,
     };
   }
   if (type.endsWith(".failed")) {
@@ -287,7 +285,7 @@ function fromBuildEvent(event, buildId) {
       ...base,
       kind: "task_failed",
       status: "failed",
-      summary: `PATH FAIL ${String(data.message || data.code || "engineering failed").slice(0, 160)}`,
+      summary: `FAILURE ${String(data.message || data.code || "engineering failed").slice(0, 160)}`,
     };
   }
   if (type === "engine.decision") {
@@ -300,6 +298,7 @@ function fromBuildEvent(event, buildId) {
       engine: selected,
       phase: typeof data.phase === "string" ? data.phase : null,
       status: "completed",
+      presentation: switched ? "normal" : "diagnostic",
       summary: switched
         ? "PATH switched engineering route and continued."
         : "PATH selected an engineering route.",
@@ -318,10 +317,30 @@ function fromBuildEvent(event, buildId) {
       kind: "task_started",
       phase,
       status: "started",
-      summary: `PATH ${PHASE_LABEL[phase] || phase} started`,
+      presentation: "diagnostic",
+      summary: `${PHASE_LABEL[phase] || phase} started`,
     };
   }
   return null;
+}
+
+function creatorCommandSummary(commandText, kind, done, failed) {
+  const raw = String(commandText || "").trim();
+  const first = raw.split("\n")[0];
+  const long = first.length > 72 || raw.includes("\n") || /\bnode\s+-e\b/.test(raw);
+  if (kind === "test") return done ? "TEST passed" : failed ? "TEST failed" : "RUN npm test";
+  if (kind === "typecheck") return done ? "TYPECHECK passed" : failed ? "TYPECHECK failed" : "RUN typecheck";
+  if (kind === "build") return done ? "BUILD passed" : failed ? "BUILD failed" : "RUN build";
+  if (kind === "lint") return done ? "LINT passed" : failed ? "LINT failed" : "RUN lint";
+  if (/\bgit\s+commit\b/.test(raw)) {
+    const sha = raw.match(/\b([0-9a-f]{7,40})\b/i);
+    return sha ? `COMMIT ${sha[1].slice(0, 12)}` : "COMMIT";
+  }
+  if (long) return failed ? "FAILURE command" : "RUN command";
+  const clipped = first.slice(0, 80);
+  if (failed) return `FAILURE ${clipped || "command"}`;
+  if (done) return `RUN ${clipped || kind}`;
+  return `RUN ${clipped || kind}`;
 }
 
 function numberOrNull(value) {

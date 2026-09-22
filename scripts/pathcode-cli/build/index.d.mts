@@ -555,6 +555,7 @@ export function projectBuildForSurface(
   displayTitle?: string;
   creatorStatus?: string;
   creatorPhase?: string;
+  criteriaSummary?: { met: number; failed: number; pending: number; total: number };
   activeEngineering?: boolean;
   needsRecovery?: boolean;
   engineeringActivity?: {
