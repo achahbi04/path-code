@@ -28,7 +28,7 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 20_000,
     pool: "forks",
-    poolOptions: { forks: { singleFork: true, maxForks: 1, minForks: 1 } },
+    poolOptions: { forks: { singleFork: true } },
     projects: [
       {
         test: {
@@ -36,8 +36,7 @@ export default defineConfig({
           include: ["tests/**/*.test.ts"],
           exclude: ["**/node_modules/**"],
           pool: "forks",
-          poolOptions: { forks: { singleFork: true, maxForks: 1, minForks: 1 } },
-          fileParallelism: false,
+          poolOptions: { forks: { singleFork: true } },
           testTimeout: 20_000,
         },
       },
