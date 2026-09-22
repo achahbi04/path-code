@@ -115,10 +115,38 @@ describe("durable website result after worktree disposal", () => {
     expect(decision.capabilitySource).toBe("git-tree");
     expect(decision.sourceSha).toBe(fixture.resultingSha);
 
+    const sealedAsOrigin = decideEngineerProductAdoption({
+      record: webRecord,
+      child: {
+        taskId: fixture.taskId,
+        actionId: "engineer:465ffffc212413587468",
+        intentRevision: 1,
+        kind: "engineer",
+      },
+      checkpoint: verifiedCheckpoint(fixture, {
+        sha: fixture.originSha,
+        productEvidence: {
+          capability: "web",
+          source: "task-worktree",
+          resultingSha: fixture.originSha,
+        },
+      }),
+      projectRoot: fixture.root,
+      classification: "VERIFIED",
+    });
+    expect(sealedAsOrigin.adopt).toBe(true);
+    expect(sealedAsOrigin.sourceSha).toBe(fixture.resultingSha);
+    expect(sealedAsOrigin.capability).toBe("web");
+    expect(sealedAsOrigin.capabilitySource).toBe("git-tree");
+
     const filesOnly = decideEngineerProductAdoption({
       record: webRecord,
       child: { taskId: fixture.taskId, actionId: "engineer:files", intentRevision: 1 },
-      checkpoint: verifiedCheckpoint(fixture, { sha: undefined, productEvidence: undefined }),
+      checkpoint: verifiedCheckpoint(fixture, {
+        sha: undefined,
+        branch: "path/task-00000000-0000-0000-0000-000000000000",
+        productEvidence: undefined,
+      }),
       projectRoot: fixture.root,
       classification: "VERIFIED",
     });

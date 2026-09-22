@@ -167,9 +167,19 @@ export function decideEngineerProductAdoption(input) {
     });
   }
 
-  const sourceSha = shaOf(cp.sha) || shaOf(evidence.resultingSha);
   const taskBranch =
     typeof cp.branch === "string" && cp.branch.trim() ? cp.branch.trim() : null;
+  const recordedSha = shaOf(cp.sha) || shaOf(evidence.resultingSha);
+  const originSha = shaOf(cp.baseline) || shaOf(input.originSha);
+  let sourceSha = recordedSha;
+  if (taskBranch && projectRoot && gitCommitExists(projectRoot, taskBranch)) {
+    const tipOut = git(projectRoot, ["rev-parse", `${taskBranch}^{commit}`]);
+    const tip = tipOut.status === 0 ? shaOf(tipOut.stdout) : null;
+    const recordedIsOrigin = Boolean(originSha && recordedSha === originSha);
+    if (tip && tip !== originSha && (!sourceSha || recordedIsOrigin)) {
+      sourceSha = tip;
+    }
+  }
   const worktreePath =
     typeof cp.worktreePath === "string" ? cp.worktreePath : "";
   const worktreeExists =

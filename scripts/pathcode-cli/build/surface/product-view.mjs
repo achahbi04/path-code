@@ -301,8 +301,12 @@ export function projectBuildForSurface(build, extras = {}) {
       productBranch: build.productBranch || null,
       currentIntentRevision: build.intent?.outcomeRevision || 1,
       authoritativeProductSha: build.authoritativeSha || null,
-      runtimeSha: runtime?.revision || runtime?.sha || null,
-      previewSha: preview?.revision || null,
+      runtimeSha:
+        runtime?.revision ||
+        runtime?.sha ||
+        runtime?.authoritativeSha ||
+        null,
+      previewSha: preview?.revision || preview?.authoritativeSha || null,
       loopStatus: status,
     },
     criteria: (build.outcomeCriteria || []).map((c) => ({

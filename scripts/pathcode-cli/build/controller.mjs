@@ -1313,6 +1313,7 @@ export function createBuildController(opts) {
             });
             record.authoritativeSha = adoption.adoptedSha;
             record.loop.lastAdoptionError = undefined;
+            record.loop.forceNextKind = undefined;
             record.loop.pendingRuntimeRefresh = !fakeMode;
             if (fakeMode) {
               record.runtimeHealth = "ok";

@@ -2180,10 +2180,10 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       /^[0-9a-f]{7,40}$/i.test(tip) &&
       String(tip).toLowerCase() !== String(baselineSha).toLowerCase()
     ) {
-      // The engineer may already have committed. Record that SHA for every
-      // terminal classification. Adoption still requires a verified result;
-      // this only keeps the commit addressable after the checkout is removed.
-      if (!commitSha) commitSha = tip;
+      // The no-changes path records the baseline as a placeholder. An advanced
+      // HEAD replaces it. Cursor often commits before PATH's own commit step,
+      // which then sees a clean tree and would otherwise keep the origin SHA.
+      commitSha = tip;
       if (
         classification === "VERIFIED" &&
         (!commitStatus || commitStatus === "NO_CHANGES")
@@ -2196,6 +2196,40 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     }
   } catch {
     /* ignore */
+  }
+
+  // The branch ref in the product repo is authoritative even when this
+  // checkout's HEAD was still the baseline at the moment PATH inspected it.
+  if (
+    (!commitSha ||
+      String(commitSha).toLowerCase() === String(baselineSha || "").toLowerCase()) &&
+    worktree.taskBranch &&
+    projectRoot
+  ) {
+    try {
+      const { spawnSync } = await import("node:child_process");
+      const branchTip = spawnSync(
+        "git",
+        ["rev-parse", `${worktree.taskBranch}^{commit}`],
+        {
+          cwd: projectRoot,
+          encoding: "utf8",
+          env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+          timeout: 15_000,
+        },
+      );
+      const tip = (branchTip.stdout || "").trim();
+      if (
+        branchTip.status === 0 &&
+        /^[0-9a-f]{7,40}$/i.test(tip) &&
+        String(tip).toLowerCase() !== String(baselineSha || "").toLowerCase()
+      ) {
+        commitSha = tip;
+        if (!commitStatus) commitStatus = "SEALED";
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   // Authoritative file list while the worktree still exists.
