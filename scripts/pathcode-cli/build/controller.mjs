@@ -21,6 +21,7 @@ import {
 } from "./record.mjs";
 import { ensureBuildOrigin, isBindableProject } from "./origin.mjs";
 import { isEmptyProductTree } from "./adopt.mjs";
+import { syncAdoptedRevisionIfEnabled } from "./surface/repository.mjs";
 import {
   captureBindingReality,
   makeEvidenceRef,
@@ -1312,6 +1313,14 @@ export function createBuildController(opts) {
               resultFingerprint: decision.fingerprint,
             });
             record.authoritativeSha = adoption.adoptedSha;
+            try {
+              syncAdoptedRevisionIfEnabled(record, binding.projectRoot);
+            } catch (err) {
+              record.repository = {
+                ...(record.repository || {}),
+                lastSyncError: err instanceof Error ? err.message : String(err),
+              };
+            }
             record.loop.lastAdoptionError = undefined;
             record.loop.forceNextKind = undefined;
             record.loop.pendingRuntimeRefresh = !fakeMode;
@@ -1384,6 +1393,7 @@ export function createBuildController(opts) {
         reason: decision.fallback
           ? `${decision.reason} ${reason}`
           : reason,
+        fallback: decision.fallback === true,
         phase: "engineer",
         newTask: decision.newTask,
       });
@@ -2308,18 +2318,6 @@ export function createBuildController(opts) {
           msg.intentRevision = rev;
         }
       }
-      const preparing = !fakeMode;
-      after.conversation.push({
-        id: `msg-${randomUUID().slice(0, 8)}`,
-        role: "assistant",
-        text: preparing
-          ? "Understanding that request before engineering…"
-          : "Engineering that change…",
-        at: new Date().toISOString(),
-        kind: classified.kind,
-        status: "queued",
-        intentRevision: rev,
-      });
       syncConversationLifecycle(after);
       after.hypotheses.proposedNextAction = classified.engineerObjectiveHint;
       writeBuildRecord(runtimeRoot, after);

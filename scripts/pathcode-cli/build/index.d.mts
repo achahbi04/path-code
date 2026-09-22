@@ -152,6 +152,16 @@ export interface BuildRecord {
     intentRevision?: number;
   }>;
   productBranch?: string;
+  displayTitle?: string;
+  repository?: {
+    syncAdopted?: boolean;
+    lastSyncedSha?: string | null;
+    lastSyncError?: string | null;
+    lastSyncedAt?: string | null;
+    remoteUrl?: string | null;
+    kind?: string;
+    validated?: boolean;
+  };
   coordinator?: { autoRun: boolean; owner: string };
   authoritativeSha?: string;
   previewUrl?: string;
@@ -498,11 +508,12 @@ export function projectBuildForSurface(
         children?: unknown[];
         hypotheses?: BuildRecord["hypotheses"];
         conversation?: Array<{
-          id: string;
+          id?: string;
           role: string;
           text: string;
           at?: string;
           status?: string;
+          kind?: string;
           intentRevision?: number;
         }>;
         authoritativeSha?: string | null;
@@ -541,6 +552,11 @@ export function projectBuildForSurface(
   uiState?: string;
   handoff?: { projectRoot: string };
   progressLabel?: string;
+  displayTitle?: string;
+  creatorStatus?: string;
+  creatorPhase?: string;
+  activeEngineering?: boolean;
+  needsRecovery?: boolean;
   engineeringActivity?: {
     engine?: string | null;
     files?: string[];

@@ -7,6 +7,13 @@ import {
   projectEngineeringActivity,
 } from "./engineering-activity.mjs";
 import { projectEngineeringTimeline } from "./engineering-timeline.mjs";
+import {
+  creatorConversation,
+  creatorPhase,
+  creatorStatusLabel,
+  displayTitleFor,
+  hasActiveEngineering,
+} from "./project-library.mjs";
 
 /**
  * Creator-facing criterion lifecycle. UNKNOWN stays the stored value.
@@ -244,7 +251,7 @@ export function projectBuildForSurface(build, extras = {}) {
           paused && (m.status === "applying" || m.status === "preparing")
             ? "paused"
             : m.status || null,
-      }))
+      })).filter((message) => creatorConversation([message]).length)
     : [
         {
           id: "outcome",
@@ -283,6 +290,11 @@ export function projectBuildForSurface(build, extras = {}) {
     buildId: build.buildId,
     status,
     outcome: build.intent?.outcome || "",
+    displayTitle: displayTitleFor(build),
+    creatorStatus: creatorStatusLabel(build),
+    creatorPhase: creatorPhase(build),
+    activeEngineering: hasActiveEngineering(build),
+    needsRecovery: status === "blocked" || Boolean(build.loop?.blockedReason),
     outcomeRevision: build.intent?.outcomeRevision || 1,
     authoritativeSha: build.authoritativeSha || null,
     projectRoot,

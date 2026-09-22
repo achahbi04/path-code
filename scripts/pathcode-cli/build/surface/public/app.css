@@ -407,3 +407,136 @@ body {
   .chat-pane { border-right: 0; border-bottom: 1px solid var(--line); }
   .worklog { grid-column: auto; }
 }
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  height: 100%;
+  width: 100%;
+}
+.shell-main { min-width: 0; height: 100%; position: relative; }
+.library {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 0.75rem;
+  border-right: 1px solid var(--line);
+  background: rgba(6, 14, 11, 0.88);
+}
+.library-head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+.lockup {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-size: 1.05rem;
+}
+.lockup-large { font-size: clamp(2.4rem, 5vw, 3.6rem); justify-content: center; }
+.lockup-mini { font-size: 0.95rem; }
+.lockup-dot {
+  width: 0.38em;
+  height: 0.38em;
+  border-radius: 50%;
+  background: #e4c15a;
+  align-self: center;
+  flex: 0 0 auto;
+}
+.library-new { width: 100%; }
+.library-label {
+  margin: 0.4rem 0 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.project-list { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 0.35rem; }
+.project-entry {
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0.55rem 0.6rem;
+  cursor: pointer;
+  font: inherit;
+}
+.project-entry[aria-current="true"] { border-color: var(--line); background: rgba(182, 242, 109, 0.08); }
+.project-entry strong { display: block; font-size: 0.92rem; }
+.project-meta { display: flex; gap: 0.45rem; color: var(--muted); font-size: 0.72rem; margin-top: 0.15rem; }
+.repo-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--muted); display: inline-block; }
+.repo-dot[data-state="github"],
+.repo-dot[data-state="connected"] { background: #7ddea0; }
+.library-open { position: absolute; z-index: 3; margin: 0.5rem; }
+.app-shell.library-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+.app-shell.library-collapsed .library { display: none; }
+.app-shell.library-collapsed .library-open { display: inline-flex; }
+.preview-toolbar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.preview-actions, .viewport-toggles { display: flex; gap: 0.25rem; }
+.menu { position: relative; }
+.menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem;
+  background: #102019;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  z-index: 5;
+}
+.menu-item { text-align: left; }
+.creator-status {
+  margin: 0 0.75rem 0.35rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.ellipsis::after {
+  content: "";
+  animation: path-ellipsis 1.2s steps(4, end) infinite;
+}
+@keyframes path-ellipsis {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+.chat-composer { align-items: flex-end; }
+.choice-dialog {
+  color: var(--ink);
+  background: #102019;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  max-width: 420px;
+}
+.choice-dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+.dialog-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: flex-end; }
+.repo-field, .repo-sync { display: flex; flex-direction: column; gap: 0.25rem; margin: 0.5rem 0; font-size: 0.85rem; }
+.repo-field input, .repo-field select {
+  font: inherit;
+  color: var(--ink);
+  background: #0b1612;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+}
+.worklog-diagnostics { color: var(--muted); font-size: 0.72rem; margin: 0 0.75rem 0.35rem; }
+@media (max-width: 900px) {
+  .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .library {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(280px, 86vw);
+    z-index: 6;
+    transform: translateX(-105%);
+  }
+  .app-shell.library-open .library { transform: none; }
+  .library-open { display: inline-flex; }
+}

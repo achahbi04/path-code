@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PATH Build</title>
+    <title>PATH • Builder</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -14,11 +14,23 @@
   </head>
   <body>
     <div class="atmosphere" aria-hidden="true"></div>
+    <div class="app-shell">
+      <aside class="library" id="library">
+        <div class="library-head">
+          <p class="lockup"><span>PATH</span><span class="lockup-dot" aria-hidden="true"></span><span>Builder</span></p>
+          <button type="button" class="ghost tiny library-collapse" id="libraryCollapse" aria-label="Collapse projects">Hide</button>
+        </div>
+        <button type="button" class="cta library-new" id="newBuildBtn">+ New project</button>
+        <h2 class="library-label">Projects</h2>
+        <div class="project-list" id="projectList"></div>
+      </aside>
+      <button type="button" class="ghost tiny library-open" id="libraryOpen" hidden>Projects</button>
+      <div class="shell-main">
 
     <!-- Landing / create -->
     <section class="landing" id="landing">
       <header class="brand-block">
-        <p class="brand">PATH Build</p>
+        <p class="brand lockup lockup-large"><span>PATH</span><span class="lockup-dot" aria-hidden="true"></span><span>Builder</span></p>
         <p class="tagline">Turn an outcome into working software.</p>
       </header>
       <div class="composer-card">
@@ -41,21 +53,25 @@
     <section class="workspace" id="workspace" hidden>
       <header class="topbar">
         <div class="topbar-brand">
-          <span class="brand-mini">PATH Build</span>
+          <span class="lockup lockup-mini"><span>PATH</span><span class="lockup-dot" aria-hidden="true"></span><span>Builder</span></span>
           <span class="build-identity" id="buildIdentity"></span>
+          <input id="titleEditor" class="title-editor" hidden autocomplete="off" />
           <span class="status-pill" id="statusPill">Building…</span>
         </div>
         <div class="topbar-actions">
-          <button type="button" class="ghost" id="stopBuildBtn">Stop</button>
-          <button type="button" class="ghost" id="resumeBuildBtn" hidden>Resume</button>
-          <button type="button" class="ghost" id="recoverBuildBtn">Recover</button>
-          <button type="button" class="ghost" id="selectModeBtn" title="Select element in preview">
-            Select
-          </button>
-          <button type="button" class="ghost" id="refreshPreviewBtn">Refresh</button>
-          <button type="button" class="ghost" id="openExternalBtn">Open preview</button>
-          <button type="button" class="ghost" id="detailsBtn">Activity</button>
-          <button type="button" class="ghost" id="newBuildBtn">New</button>
+          <div class="menu" id="sourceMenu">
+            <button type="button" class="ghost" id="sourceMenuBtn" aria-expanded="false">Project</button>
+            <div class="menu-panel" id="sourceMenuPanel" hidden>
+              <button type="button" class="ghost menu-item" id="openFolderBtn">Open Folder</button>
+              <button type="button" class="ghost menu-item" id="copyPathBtn">Copy Project Path</button>
+              <button type="button" class="ghost menu-item" id="downloadZipBtn">Download Project ZIP</button>
+              <button type="button" class="ghost menu-item" id="repositoryBtn">Repository</button>
+              <button type="button" class="ghost menu-item" id="renameTitleBtn">Rename</button>
+              <button type="button" class="ghost menu-item" id="detailsBtn">Details</button>
+              <button type="button" class="ghost menu-item" id="recoverBuildBtn" hidden>Recover</button>
+              <button type="button" class="ghost menu-item" id="openCodeBtn">Open in PATH Code</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -63,12 +79,15 @@
         <aside class="chat-pane">
           <div class="chat-scroll" id="chatScroll"></div>
           <div class="selection-chip" id="selectionChip" hidden></div>
+          <p class="creator-status" id="creatorStatus" hidden>Understanding your request<span class="ellipsis" aria-hidden="true"></span></p>
           <form class="chat-composer" id="chatForm">
             <textarea
               id="chatInput"
               rows="2"
               placeholder="Ask for a change… e.g. Make the hero darker"
             ></textarea>
+            <button type="button" class="ghost composer-stop" id="stopBuildBtn" hidden>Stop</button>
+            <button type="button" class="ghost composer-stop" id="resumeBuildBtn" hidden>Resume</button>
             <button type="submit" class="cta compact" id="sendBtn">Send</button>
           </form>
         </aside>
@@ -76,6 +95,11 @@
         <main class="preview-pane">
           <div class="preview-toolbar">
             <span class="preview-label" id="previewLabel">Product preview</span>
+            <div class="preview-actions">
+              <button type="button" class="ghost tiny" id="selectModeBtn" title="Select element in preview">Select</button>
+              <button type="button" class="ghost tiny" id="refreshPreviewBtn">Refresh</button>
+              <button type="button" class="ghost tiny" id="openExternalBtn">Open preview</button>
+            </div>
             <div class="viewport-toggles" role="group" aria-label="Viewport">
               <button type="button" class="ghost tiny active" data-viewport="desktop">Desktop</button>
               <button type="button" class="ghost tiny" data-viewport="tablet">Tablet</button>
@@ -101,7 +125,7 @@
 
         <aside class="worklog" id="worklog">
           <div class="worklog-head">
-            <h2>Engineering</h2>
+            <h2>PATH Engineering</h2>
             <button type="button" class="ghost tiny" id="worklogToggle">Hide</button>
           </div>
           <div class="worklog-current" id="worklogCurrent">Engineering has not begun.</div>
@@ -112,19 +136,58 @@
 
       <aside class="drawer" id="drawer" hidden>
         <div class="drawer-head">
-          <h2>Activity</h2>
+          <h2>Details</h2>
           <button type="button" class="ghost" id="closeDrawerBtn">Close</button>
         </div>
         <div class="drawer-body" id="drawerBody"></div>
         <div class="drawer-foot">
           <code class="path" id="projectPath"></code>
-          <div class="drawer-actions">
-            <button type="button" class="cta secondary" id="openFolderBtn">Open folder</button>
-            <button type="button" class="ghost" id="openCodeBtn">Open in PATH Code</button>
-          </div>
         </div>
       </aside>
     </section>
+      </div>
+    </div>
+
+    <dialog class="choice-dialog" id="newProjectDialog">
+      <form method="dialog">
+        <h2>This project is still building.</h2>
+        <p>Stop engineering before starting another project. The current project stays in Projects.</p>
+        <div class="dialog-actions">
+          <button type="submit" class="ghost" value="stay">Stay here</button>
+          <button type="submit" class="cta" id="stopAndNewBtn" value="stop">Stop engineering and start new project</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="choice-dialog" id="repositoryDialog">
+      <form method="dialog" id="repositoryForm">
+        <h2>Repository</h2>
+        <p id="repositoryState">Local</p>
+        <p class="hint" id="repositoryHint"></p>
+        <label class="repo-field" id="repositoryNameField">
+          Repository name
+          <input id="repositoryName" name="name" autocomplete="off" />
+        </label>
+        <label class="repo-field">
+          Visibility
+          <select id="repositoryVisibility">
+            <option value="private" selected>Private</option>
+            <option value="public">Public</option>
+          </select>
+        </label>
+        <label class="repo-sync">
+          <input type="checkbox" id="repositorySync" />
+          Sync adopted revisions
+        </label>
+        <p id="repositorySyncMeta"></p>
+        <div class="dialog-actions">
+          <button type="button" class="ghost" id="repositoryCloseBtn">Close</button>
+          <button type="button" class="ghost" id="repositoryDisconnectBtn" hidden>Disconnect</button>
+          <button type="button" class="ghost" id="repositoryPushBtn" hidden>Sync now</button>
+          <button type="button" class="cta" id="repositoryConnectBtn">Connect GitHub</button>
+        </div>
+      </form>
+    </dialog>
 
     <script src="/assets/app.js" type="module"></script>
   </body>

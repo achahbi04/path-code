@@ -9,6 +9,7 @@ import {
   existsSync,
   mkdirSync,
   statSync,
+  rmSync,
 } from "node:fs";
 import { dirname, join, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +19,7 @@ import { spawn, spawnSync } from "node:child_process";
 
 import {
   readBuildRecord,
+  writeBuildRecord,
   listBuildRecords,
   selectSurfaceBuildId,
   appendPendingConversation,
@@ -25,6 +27,20 @@ import {
   appendBuildEvent,
 } from "../index.mjs";
 import { projectBuildForSurface } from "./product-view.mjs";
+import { libraryRow } from "./project-library.mjs";
+import { displayTitleFor } from "./project-library.mjs";
+import {
+  exportAuthoritativeProject,
+  readExportBytes,
+} from "./project-export.mjs";
+import {
+  connectGitHubRepository,
+  connectLocalRemote,
+  disconnectRepository,
+  inspectRepository,
+  pushAdoptedRevision,
+  setAdoptedSync,
+} from "./repository.mjs";
 import { classifyConversationMessage } from "../conversation.mjs";
 import { detectBuildArtifact } from "../runtime/artifact.mjs";
 import {
@@ -366,17 +382,24 @@ export async function startPathBuildSurface(options) {
       }
 
       if (method === "GET" && path === "/api/builds") {
-        const rows = listBuildRecords(runtimeRoot).slice(0, 20);
+        const rows = listBuildRecords(runtimeRoot)
+          .slice()
+          .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))
+          .slice(0, 200);
         sendJson(res, 200, {
           ok: true,
-          builds: rows.map((b) => ({
-            buildId: b.buildId,
+          builds: rows.map((b) => {
+            const row = libraryRow(b);
+            return {
+            ...row,
             status: b.loop?.status,
+            creatorStatus: row.status,
             outcome: b.intent?.outcome,
             projectRoot: b.projectBindings?.[0]?.projectRoot || null,
             originKind: b.originKind || b.projectBindings?.[0]?.originKind || null,
             updatedAt: b.updatedAt,
-          })),
+          };
+          }),
         });
         return;
       }
@@ -394,6 +417,88 @@ export async function startPathBuildSurface(options) {
             return;
           }
           sendJson(res, 200, await viewFor(buildId));
+          return;
+        }
+
+        if (method === "POST" && action === "title") {
+          const build = readBuildRecord(runtimeRoot, buildId);
+          if (!build) {
+            sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
+            return;
+          }
+          const body = await readJsonBody(req);
+          const title = String(body.displayTitle || "").trim().slice(0, 80);
+          if (!title) {
+            sendJson(res, 400, { ok: false, code: "TITLE_REQUIRED" });
+            return;
+          }
+          build.displayTitle = title;
+          writeBuildRecord(runtimeRoot, build);
+          sendJson(res, 200, { ok: true, displayTitle: title, view: await viewFor(buildId) });
+          return;
+        }
+
+        if (method === "GET" && action === "export") {
+          const build = readBuildRecord(runtimeRoot, buildId);
+          const root = build?.projectBindings?.[0]?.projectRoot;
+          if (!build || !root) {
+            sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
+            return;
+          }
+          const exported = exportAuthoritativeProject({
+            projectRoot: root,
+            sha: build.authoritativeSha,
+            title: displayTitleFor(build),
+          });
+          if (!exported.ok) {
+            sendJson(res, 400, exported);
+            return;
+          }
+          const bytes = readExportBytes(exported.zipPath);
+          rmSync(exported.directory, { recursive: true, force: true });
+          res.writeHead(200, {
+            "Content-Type": "application/zip",
+            "Content-Disposition": `attachment; filename="${exported.filename}"`,
+            "Content-Length": bytes.length,
+            "Cache-Control": "no-store",
+          });
+          res.end(bytes);
+          return;
+        }
+
+        if (method === "GET" && action === "repository") {
+          const build = readBuildRecord(runtimeRoot, buildId);
+          const root = build?.projectBindings?.[0]?.projectRoot;
+          if (!build || !root) {
+            sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
+            return;
+          }
+          sendJson(res, 200, { ok: true, repository: inspectRepository(root, build) });
+          return;
+        }
+
+        if (method === "POST" && action === "repository") {
+          const build = readBuildRecord(runtimeRoot, buildId);
+          const root = build?.projectBindings?.[0]?.projectRoot;
+          if (!build || !root) {
+            sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
+            return;
+          }
+          const body = await readJsonBody(req);
+          const op = String(body.action || "");
+          let result;
+          if (op === "connect-local") result = connectLocalRemote(build, root, body.remoteUrl);
+          else if (op === "connect-github") {
+            result = connectGitHubRepository(build, root, {
+              name: body.name,
+              visibility: body.visibility,
+            });
+          } else if (op === "sync-mode") result = setAdoptedSync(build, root, body.enabled === true);
+          else if (op === "sync") result = pushAdoptedRevision(build, root, build.authoritativeSha);
+          else if (op === "disconnect") result = disconnectRepository(build, root, body.confirm === true);
+          else result = { ok: false, code: "REPOSITORY_ACTION_REQUIRED" };
+          if (result.ok) writeBuildRecord(runtimeRoot, build);
+          sendJson(res, result.ok ? 200 : 400, { ...result, view: await viewFor(buildId) });
           return;
         }
 

@@ -34,6 +34,7 @@ function relativeProjectPath(filePath, roots) {
   }
   const taskWorktree = text.match(/\/ag1-tasks\/[0-9a-f-]{36}\/(.+)$/i);
   if (taskWorktree?.[1]) text = taskWorktree[1];
+  else if (/ag1-tasks\/[0-9a-f-]{36}/i.test(text)) return "task context";
   if (text.startsWith("/") || /^[A-Za-z]:\//.test(text)) {
     const parts = text.split("/").filter(Boolean);
     text = parts.slice(-2).join("/");
@@ -136,7 +137,7 @@ function fromTraceLine(line, roots, ctx) {
       ...base,
       kind: "task_started",
       status: "started",
-      summary: `${engineLabel(engine)} task started`,
+      summary: "Engineering started",
     };
   }
   if (type === "session.cancelled" || type === "task.stop") {
@@ -144,7 +145,7 @@ function fromTraceLine(line, roots, ctx) {
       ...base,
       kind: "task_cancelled",
       status: "cancelled",
-      summary: `${engineLabel(engine)} task cancelled`,
+      summary: "Engineering stopped",
     };
   }
   if (type === "gateway.task.finished") {
@@ -155,7 +156,7 @@ function fromTraceLine(line, roots, ctx) {
       kind: failed ? "task_failed" : "result",
       status: failed ? "failed" : "completed",
       summary: failed
-        ? `${engineLabel(engine)} task failed`
+        ? "Engineering failed"
         : "RESULT engineering result ready",
     };
   }
@@ -172,7 +173,7 @@ function fromTraceLine(line, roots, ctx) {
       ...base,
       kind: "project_inspection",
       status: "completed",
-      summary: `${engineLabel(engine)} INSPECT project`,
+      summary: "INSPECT project",
     };
   }
   if (type !== "session.engineering.tool" && !tool) return null;
@@ -199,7 +200,7 @@ function fromTraceLine(line, roots, ctx) {
       ...base,
       kind,
       status: "completed",
-      summary: `${engineLabel(engine)} ${verb} ${target}${counts}`,
+      summary: `${verb} ${target}${counts}`,
       file: {
         relativePath: path,
         operation: verb,
@@ -224,7 +225,7 @@ function fromTraceLine(line, roots, ctx) {
     status: failed ? "failed" : done ? "completed" : "started",
     summary: validationType && (done || failed)
       ? `PATH ${verb} ${validationType}${line?.durationMs ? ` · ${line.durationMs}ms` : ""}`
-      : `${engineLabel(engine)} ${verb} ${shown}`,
+      : `${verb} ${shown}`,
     command: {
       safeDisplay: commandText || shown,
       ...(exitCode != null ? { exitCode } : {}),
@@ -292,13 +293,22 @@ function fromBuildEvent(event, buildId) {
   if (type === "engine.decision") {
     const selected = typeof data.selected === "string" ? data.selected : null;
     const reason = String(data.reason || data.summary || "engine decision").slice(0, 160);
+    const switched = data.fallback === true && selected;
     return {
       ...base,
       kind: "fabric",
       engine: selected,
       phase: typeof data.phase === "string" ? data.phase : null,
       status: "completed",
-      summary: `PATH ENGINE FABRIC ${reason}`,
+      summary: switched
+        ? "PATH switched engineering route and continued."
+        : "PATH selected an engineering route.",
+      diagnostics: {
+        preferred: data.preferred || null,
+        selected,
+        reason,
+        fallback: data.fallback === true,
+      },
     };
   }
   if (type.endsWith(".dispatched")) {
@@ -314,16 +324,85 @@ function fromBuildEvent(event, buildId) {
   return null;
 }
 
-function engineLabel(engine) {
-  const name = String(engine || "").trim().toLowerCase();
-  if (name === "cursor" || name === "copilot" || name === "antigravity") {
-    return name.toUpperCase();
-  }
-  return "PATH";
-}
-
 function numberOrNull(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function operationTarget(entry) {
+  return entry.file?.relativePath || entry.command?.safeDisplay || entry.summary || "";
+}
+
+function sameLifecycle(prev, entry) {
+  if (!prev || prev.taskId !== entry.taskId || prev.kind !== entry.kind) return false;
+  const target = entry.file?.relativePath || entry.command?.safeDisplay || "";
+  if (!target || target !== (prev.file?.relativePath || prev.command?.safeDisplay || "")) return false;
+  const left = String(prev.timestamp || "").slice(0, 19);
+  const right = String(entry.timestamp || "").slice(0, 19);
+  if (!left || left !== right) return false;
+  const prevExit = prev.command?.exitCode;
+  const nextExit = entry.command?.exitCode;
+  if (prevExit != null && nextExit != null && prevExit !== nextExit) return false;
+  return true;
+}
+
+function richerEntry(prev, entry) {
+  const score = (item) =>
+    (item.command?.exitCode != null ? 2 : 0) +
+    (item.file?.additions != null ? 2 : 0) +
+    (item.command?.durationMs != null ? 1 : 0) +
+    (item.status === "completed" || item.status === "failed" ? 1 : 0);
+  const kept = score(entry) >= score(prev) ? entry : prev;
+  const other = kept === entry ? prev : entry;
+  return {
+    ...kept,
+    diagnostics: {
+      ...(kept.diagnostics || {}),
+      collapsedSource: other.source || null,
+    },
+  };
+}
+
+function collapseCreatorEntries(ordered) {
+  const lifecycle = [];
+  for (const entry of ordered) {
+    const prev = lifecycle[lifecycle.length - 1];
+    if (sameLifecycle(prev, entry)) {
+      lifecycle[lifecycle.length - 1] = richerEntry(prev, entry);
+      continue;
+    }
+    lifecycle.push(entry);
+  }
+  const grouped = [];
+  for (const entry of lifecycle) {
+    const prev = grouped[grouped.length - 1];
+    const noisy =
+      entry.kind === "project_inspection" ||
+      (entry.kind === "search" && operationTarget(entry) === "task context");
+    const stableTarget = (item) =>
+      item.baseSummary ||
+      item.file?.relativePath ||
+      item.command?.safeDisplay ||
+      String(item.summary || "").replace(/ ×\d+$/, "");
+    if (
+      prev &&
+      noisy &&
+      prev.kind === entry.kind &&
+      prev.taskId === entry.taskId &&
+      stableTarget(prev) === stableTarget(entry)
+    ) {
+      const repeat = (prev.repeat || 1) + 1;
+      const base = prev.baseSummary || String(prev.summary || "").replace(/ ×\d+$/, "");
+      grouped[grouped.length - 1] = {
+        ...prev,
+        repeat,
+        baseSummary: base,
+        summary: `${base} ×${repeat}`,
+      };
+      continue;
+    }
+    grouped.push(entry);
+  }
+  return grouped;
 }
 
 /**
@@ -366,8 +445,15 @@ export function projectEngineeringTimeline(build, extras = {}) {
     if (!entry) return;
     const taskId = entry.taskId || event?.data?.taskId || null;
     const bundleIndex = taskId ? traces.findIndex((bundle) => bundle.taskId === taskId) : -1;
-    const order =
+    let order =
       bundleIndex >= 0 ? bundleIndex * 1_000_000 + 900_000 + index : 50_000_000 + index;
+    if (bundleIndex < 0 && entry.timestamp) {
+      const earlier = raw.filter(
+        (item) => item.entry.timestamp && item.entry.timestamp <= entry.timestamp,
+      );
+      const anchor = earlier.length ? earlier[earlier.length - 1] : null;
+      order = anchor ? anchor.order + 0.5 + index / 1000 : index / 1000;
+    }
     raw.push({ entry, order });
   });
   raw.sort((a, b) => a.order - b.order);
@@ -407,7 +493,10 @@ export function projectEngineeringTimeline(build, extras = {}) {
     seen.add(identity);
     ordered.push({ ...entry, orderKey: item.order });
   }
-  const entries = ordered.map((entry, index) => ({ ...entry, sequence: index + 1 }));
+  const entries = collapseCreatorEntries(ordered).map((entry, index) => ({
+    ...entry,
+    sequence: index + 1,
+  }));
   const phases = ["brief", "engineer", "evaluate", "challenge"].map((kind) => {
     const related = children.filter((child) => child.kind === kind);
     const ids = new Set(related.map((child) => child.taskId));

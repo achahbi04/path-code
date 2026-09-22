@@ -128,6 +128,8 @@
  * @property {ConversationMessage[]} [conversation]
  * @property {string} [productBranch]
  * @property {{ autoRun: boolean, owner: string }} [coordinator]
+ * @property {string} [displayTitle]
+ * @property {{ syncAdopted?: boolean, lastSyncedSha?: string | null, lastSyncError?: string | null, lastSyncedAt?: string | null, remoteUrl?: string | null, kind?: string, validated?: boolean }} [repository]
  * @property {string} createdAt
  * @property {string} updatedAt
  */

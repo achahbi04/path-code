@@ -36,6 +36,17 @@ const els = {
   newBuildBtn: document.getElementById("newBuildBtn"),
   openFolderBtn: document.getElementById("openFolderBtn"),
   openCodeBtn: document.getElementById("openCodeBtn"),
+  projectList: document.getElementById("projectList"),
+  creatorStatus: document.getElementById("creatorStatus"),
+  sourceMenuBtn: document.getElementById("sourceMenuBtn"),
+  sourceMenuPanel: document.getElementById("sourceMenuPanel"),
+  copyPathBtn: document.getElementById("copyPathBtn"),
+  downloadZipBtn: document.getElementById("downloadZipBtn"),
+  repositoryBtn: document.getElementById("repositoryBtn"),
+  renameTitleBtn: document.getElementById("renameTitleBtn"),
+  titleEditor: document.getElementById("titleEditor"),
+  libraryCollapse: document.getElementById("libraryCollapse"),
+  libraryOpen: document.getElementById("libraryOpen"),
   worklog: document.getElementById("worklog"),
   worklogCurrent: document.getElementById("worklogCurrent"),
   worklogPhases: document.getElementById("worklogPhases"),
@@ -149,16 +160,22 @@ function renderWorklog(view) {
       const day = dayLabel(firstStamp);
       const boundary = day && day !== previousDay ? `<div class="worklog-day">${escapeHtml(day)}</div>` : "";
       if (day) previousDay = day;
-      const engine = turn.engine ? String(turn.engine) : "";
-      const title = turn.taskId
-        ? `Engineering turn${engine ? ` — ${engine}` : ""}`
-        : turn.phase || "Engineering";
+      const phaseName = {
+        brief: "Understanding",
+        engineer: "Building",
+        evaluate: "Verifying",
+        challenge: "Reviewing",
+      }[turn.phase] || "PATH Engineering";
+      const title = turn.taskId ? phaseName : turn.phase || "PATH Engineering";
       const header = turn.taskId
         ? `<div class="worklog-turn" data-status="${escapeHtml(turn.status || "")}">
             <strong>${escapeHtml(title)}</strong>
-            <span>Task ${escapeHtml(shortId(turn.taskId))}${
-              turn.intentRevision ? ` · intent ${escapeHtml(turn.intentRevision)}` : ""
-            }${turn.clockReversed ? " · clock boundary" : ""}</span>
+            <details class="worklog-diagnostics">
+              <summary>Diagnostics</summary>
+              <div>Task ${escapeHtml(shortId(turn.taskId))}${
+                turn.engine ? ` · ${escapeHtml(String(turn.engine))}` : ""
+              }${turn.intentRevision ? ` · intent ${escapeHtml(turn.intentRevision)}` : ""}</div>
+            </details>
           </div>`
         : "";
       const rows = (turn.entries || [])
@@ -196,6 +213,14 @@ function renderDrawer(view) {
     .map((step) => `<li>${escapeHtml(step.label || "")}</li>`)
     .join("");
   els.drawerBody.innerHTML = `
+    <h3>Project</h3>
+    <dl class="activity-grid">
+      <dt>Title</dt><dd>${escapeHtml(view.displayTitle || "")}</dd>
+      <dt>Build</dt><dd>${escapeHtml(view.buildId || "")}</dd>
+      <dt>Path</dt><dd>${escapeHtml(view.projectRoot || "")}</dd>
+      <dt>Branch</dt><dd>${escapeHtml(view.productBranch || view.identity?.productBranch || "")}</dd>
+      <dt>SHA</dt><dd>${escapeHtml(view.authoritativeSha || "")}</dd>
+    </dl>
     <h3>Current engineering task</h3>
     <dl class="activity-grid">
       <dt>Engine</dt><dd>${escapeHtml(current.engine || "not started")}</dd>
@@ -310,12 +335,8 @@ function render(view) {
   setWorkspaceVisible(true);
   activeBuildId = view.buildId;
   projectRoot = view.projectRoot || null;
-  const identity = view.identity || {};
-  const branch = identity.productBranch || view.productBranch || "";
   if (els.buildIdentity) {
-    els.buildIdentity.textContent = view.buildId
-      ? `Build ${shortId(view.buildId)}${branch ? ` · ${branch}` : ""}`
-      : "";
+    els.buildIdentity.textContent = view.displayTitle || "Project";
   }
   if (view.buildId) {
     const url = new URL(location.href);
@@ -326,8 +347,21 @@ function render(view) {
   }
 
   const state = view.uiState || "building";
-  els.statusPill.textContent = view.progressLabel || view.headline || state;
+  els.statusPill.textContent = view.creatorStatus || view.progressLabel || view.headline || state;
   els.statusPill.dataset.state = state;
+  const phaseLabels = {
+    understanding: "Understanding your request",
+    engineering: "Engineering",
+    verifying: "Verifying",
+    reviewing: "Reviewing",
+  };
+  if (els.creatorStatus) {
+    const label = phaseLabels[view.creatorPhase];
+    els.creatorStatus.hidden = !label;
+    if (label) {
+      els.creatorStatus.innerHTML = `${escapeHtml(label)}<span class="ellipsis" aria-hidden="true"></span>`;
+    }
+  }
 
   renderChat(view);
   renderDrawer(view);
@@ -335,7 +369,8 @@ function render(view) {
   updatePreview(view);
   els.stopBuildBtn.hidden = !view.canStop;
   els.resumeBuildBtn.hidden = !view.canResume;
-  els.recoverBuildBtn.hidden = view.status === "running";
+  els.recoverBuildBtn.hidden = !view.needsRecovery;
+  void loadProjects();
 
   if (!selectedElement && view.selectedElement) {
     selectedElement = view.selectedElement;
@@ -440,6 +475,10 @@ async function startBuild() {
       els.statusPill.textContent = "Building…";
     }
     subscribe(body.buildId);
+    const url = new URL(location.href);
+    url.searchParams.set("buildId", body.buildId);
+    history.pushState({ buildId: body.buildId }, "", url);
+    void loadProjects();
   } catch (err) {
     activeBuildId = null;
     setWorkspaceVisible(false);
@@ -593,11 +632,21 @@ els.chatForm.addEventListener("submit", (e) => {
   e.preventDefault();
   void sendMessage(els.chatInput.value);
 });
+els.chatInput.addEventListener("keydown", (event) => {
+  if (event.isComposing || event.keyCode === 229) return;
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const send =
+    (event.key === "Enter" && !event.shiftKey && !coarse) ||
+    (event.key === "Enter" && (event.metaKey || event.ctrlKey));
+  if (!send) return;
+  event.preventDefault();
+  els.chatForm.requestSubmit();
+});
 els.stopBuildBtn.addEventListener("click", () => void controlBuild("stop"));
 els.resumeBuildBtn.addEventListener("click", () => void controlBuild("resume"));
 els.recoverBuildBtn.addEventListener("click", () => void controlBuild("recover"));
 
-els.newBuildBtn.addEventListener("click", () => {
+function showComposer(pushHistory) {
   if (events) events.close();
   events = null;
   stopTruthPoll();
@@ -617,6 +666,27 @@ els.newBuildBtn.addEventListener("click", () => {
   setWorkspaceVisible(false);
   els.outcome.value = "";
   els.outcome.focus();
+  if (pushHistory !== false) {
+    history.pushState({ buildId: null }, "", location.pathname);
+  }
+  void loadProjects();
+}
+
+els.newBuildBtn.addEventListener("click", () => {
+  if (lastView?.activeEngineering) {
+    const dialog = document.getElementById("newProjectDialog");
+    dialog.showModal();
+    dialog.addEventListener(
+      "close",
+      () => {
+        if (dialog.returnValue !== "stop") return;
+        void controlBuild("stop").then(() => showComposer(true));
+      },
+      { once: true },
+    );
+    return;
+  }
+  showComposer(true);
 });
 
 els.detailsBtn.addEventListener("click", () => {
@@ -765,27 +835,219 @@ window.addEventListener("message", (ev) => {
   }
 });
 
-// Resume explicit buildId from URL, else latest active build
+function relativeTime(timestamp) {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+async function loadProjects() {
+  if (!els.projectList) return;
+  const res = await fetch("/api/builds");
+  const body = await res.json().catch(() => null);
+  const rows = Array.isArray(body?.builds) ? body.builds : [];
+  els.projectList.innerHTML = rows
+    .map((row) => {
+      const current = row.buildId === activeBuildId ? ' aria-current="true"' : "";
+      return `<button type="button" class="project-entry" data-build-id="${escapeHtml(row.buildId)}"${current}>
+        <strong>${escapeHtml(row.displayTitle || "Project")}</strong>
+        <span class="project-meta"><span>${escapeHtml(row.creatorStatus || row.status || "")}</span><span>${escapeHtml(relativeTime(row.updatedAt))}</span><span class="repo-dot" data-state="${escapeHtml(row.repository || "local")}" title="${escapeHtml(row.repository || "local")}"></span></span>
+      </button>`;
+    })
+    .join("");
+  els.projectList.querySelectorAll("[data-build-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void openProject(button.getAttribute("data-build-id"), "push");
+    });
+  });
+}
+
+async function openProject(buildId, mode) {
+  if (!buildId) return;
+  const url = new URL(location.href);
+  url.searchParams.set("buildId", buildId);
+  if (mode === "push") history.pushState({ buildId }, "", url);
+  else if (mode === "replace") history.replaceState({ buildId }, "", url);
+  activeBuildId = buildId;
+  setWorkspaceVisible(true);
+  const res = await fetch(`/api/builds/${encodeURIComponent(buildId)}`);
+  const view = await res.json();
+  if (view?.buildId) {
+    renderedRevision = -1;
+    acceptView(view);
+    subscribe(view.buildId);
+  }
+  document.querySelector(".app-shell")?.classList.remove("library-open");
+}
+
+els.sourceMenuBtn?.addEventListener("click", () => {
+  const open = els.sourceMenuPanel.hidden;
+  els.sourceMenuPanel.hidden = !open;
+  els.sourceMenuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+});
+
+els.copyPathBtn?.addEventListener("click", async () => {
+  if (!projectRoot) return;
+  await navigator.clipboard.writeText(projectRoot);
+  showHandoffResult("Copy Project Path", { ok: true, path: projectRoot });
+  els.sourceMenuPanel.hidden = true;
+});
+
+els.downloadZipBtn?.addEventListener("click", () => {
+  if (!activeBuildId) return;
+  window.location.assign(`/api/builds/${encodeURIComponent(activeBuildId)}/export`);
+  els.sourceMenuPanel.hidden = true;
+});
+
+els.renameTitleBtn?.addEventListener("click", () => {
+  if (!els.titleEditor || !activeBuildId) return;
+  els.titleEditor.hidden = false;
+  els.titleEditor.value = els.buildIdentity.textContent || "";
+  els.buildIdentity.hidden = true;
+  els.titleEditor.focus();
+  els.sourceMenuPanel.hidden = true;
+});
+
+async function commitTitle() {
+  if (!els.titleEditor || els.titleEditor.hidden) return;
+  const title = els.titleEditor.value.trim();
+  els.titleEditor.hidden = true;
+  els.buildIdentity.hidden = false;
+  if (!title || !activeBuildId) return;
+  const res = await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/title`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ displayTitle: title }),
+  });
+  const body = await res.json().catch(() => null);
+  if (body?.view) acceptView(body.view);
+  else els.buildIdentity.textContent = title;
+  void loadProjects();
+}
+
+els.titleEditor?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void commitTitle();
+  }
+});
+els.titleEditor?.addEventListener("blur", () => {
+  void commitTitle();
+});
+
+async function refreshRepositoryDialog() {
+  if (!activeBuildId) return;
+  const res = await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/repository`);
+  const body = await res.json().catch(() => null);
+  const repo = body?.repository || {};
+  const state = document.getElementById("repositoryState");
+  const hint = document.getElementById("repositoryHint");
+  const meta = document.getElementById("repositorySyncMeta");
+  const sync = document.getElementById("repositorySync");
+  const connect = document.getElementById("repositoryConnectBtn");
+  const disconnect = document.getElementById("repositoryDisconnectBtn");
+  const push = document.getElementById("repositoryPushBtn");
+  const nameField = document.getElementById("repositoryNameField");
+  if (state) {
+    state.textContent = repo.state === "github"
+      ? "GitHub connected"
+      : repo.state === "connected"
+        ? "Connected"
+        : "Local";
+  }
+  if (hint) {
+    hint.textContent = repo.github?.authenticated
+      ? "GitHub CLI is available. Creating a repository happens only when you choose Connect."
+      : "GitHub CLI is not authenticated. PATH does not store credentials.";
+  }
+  if (sync) sync.checked = repo.syncAdopted === true;
+  if (meta) {
+    meta.textContent = repo.lastSyncedSha
+      ? `Last synced ${String(repo.lastSyncedSha).slice(0, 8)}`
+      : repo.lastSyncError || "";
+  }
+  const connected = repo.validated === true;
+  if (connect) connect.hidden = connected || !repo.github?.authenticated;
+  if (nameField) nameField.hidden = connected || !repo.github?.authenticated;
+  if (disconnect) disconnect.hidden = !connected;
+  if (push) push.hidden = !connected;
+}
+
+els.repositoryBtn?.addEventListener("click", () => {
+  els.sourceMenuPanel.hidden = true;
+  void refreshRepositoryDialog().then(() => {
+    document.getElementById("repositoryDialog")?.showModal();
+  });
+});
+document.getElementById("repositoryCloseBtn")?.addEventListener("click", () => {
+  document.getElementById("repositoryDialog")?.close();
+});
+document.getElementById("repositorySync")?.addEventListener("change", async (event) => {
+  if (!activeBuildId) return;
+  await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/repository`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "sync-mode", enabled: event.target.checked === true }),
+  });
+  await refreshRepositoryDialog();
+});
+document.getElementById("repositoryConnectBtn")?.addEventListener("click", async () => {
+  if (!activeBuildId) return;
+  const name = document.getElementById("repositoryName")?.value || "";
+  const visibility = document.getElementById("repositoryVisibility")?.value || "private";
+  const res = await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/repository`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "connect-github", name, visibility }),
+  });
+  const body = await res.json().catch(() => null);
+  if (!body?.ok) showHandoffResult("Repository", body || { ok: false, message: "GitHub was not connected." });
+  await refreshRepositoryDialog();
+});
+document.getElementById("repositoryPushBtn")?.addEventListener("click", async () => {
+  if (!activeBuildId) return;
+  await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/repository`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "sync" }),
+  });
+  await refreshRepositoryDialog();
+});
+document.getElementById("repositoryDisconnectBtn")?.addEventListener("click", async () => {
+  if (!activeBuildId) return;
+  if (!window.confirm("Disconnect removes PATH's local remote. It does not delete the GitHub repository.")) return;
+  await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/repository`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "disconnect", confirm: true }),
+  });
+  await refreshRepositoryDialog();
+});
+
+els.libraryCollapse?.addEventListener("click", () => {
+  document.querySelector(".app-shell")?.classList.toggle("library-collapsed");
+});
+els.libraryOpen?.addEventListener("click", () => {
+  document.querySelector(".app-shell")?.classList.add("library-open");
+});
+
+window.addEventListener("popstate", () => {
+  const id = new URLSearchParams(location.search).get("buildId");
+  if (id) void openProject(id, "none");
+  else showComposer(false);
+});
+
 (async () => {
   try {
-    const params = new URLSearchParams(location.search);
-    const fromUrl = params.get("buildId");
-    if (fromUrl) {
-      activeBuildId = fromUrl;
-      setWorkspaceVisible(true);
-      els.statusPill.textContent = "Resuming…";
-    }
-    const path = fromUrl
-      ? `/api/builds/${encodeURIComponent(fromUrl)}`
-      : "/api/builds/latest";
-    const res = await fetch(path);
-    const view = await res.json();
-    if (view?.buildId && view.phase !== "idle") {
-      acceptView(view);
-      subscribe(view.buildId);
-    } else if (fromUrl) {
-      setWorkspaceVisible(true);
-    }
+    await loadProjects();
+    const fromUrl = new URLSearchParams(location.search).get("buildId");
+    if (fromUrl) await openProject(fromUrl, "replace");
   } catch {
     if (activeBuildId) setWorkspaceVisible(true);
   }

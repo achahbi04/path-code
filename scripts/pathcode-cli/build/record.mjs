@@ -17,6 +17,7 @@ import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { ensureAg9RuntimeDirs } from "../ag9/layout.mjs";
 import { appendBuildTransitionEvents } from "./events.mjs";
+import { deriveDisplayTitle } from "./surface/project-library.mjs";
 
 export const BUILD_RECORD_SCHEMA = "pathcode.s5.build-record.v1";
 
@@ -98,6 +99,7 @@ export function createBuildRecordSkeleton(input) {
       lastEvaluateTaskId: null,
       lastChallengeTaskId: null,
     },
+    displayTitle: deriveDisplayTitle(outcome),
     createdAt: now,
     updatedAt: now,
   };

@@ -230,11 +230,13 @@ describe("S5 truthful Build projection", () => {
     const rows = (after?.conversation || []).filter((msg) => msg.intentRevision === rev && msg.kind !== "outcome");
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((msg) => msg.status !== "being_applied" && msg.status !== "applying" && msg.status !== "applied")).toBe(true);
-    expect(rows.some((msg) => /Understanding that request/i.test(msg.text || ""))).toBe(true);
+    expect(rows.some((msg) => msg.role === "user" && /website/i.test(msg.text || ""))).toBe(true);
+    expect(rows.some((msg) => /Understanding that request/i.test(msg.text || ""))).toBe(false);
     const objective = frameEngineerObjective(after, after?.hypotheses?.proposedNextAction || "");
     expect(objective).toMatch(/Product kind: web/);
     expect(objective).toMatch(/website/i);
     const view = projectBuildForSurface(after, { events: [] });
+    expect(view.creatorPhase).toBe("understanding");
     expect(view.progressLabel).not.toMatch(/Applying changes/i);
     rmSync(dir, { recursive: true, force: true });
   });
