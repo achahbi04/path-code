@@ -18,6 +18,15 @@ import {
 } from "../../scripts/pathcode-cli/build/index.mjs";
 import { ensureBuildCoordinator } from "../../scripts/pathcode-cli/build/coordinator/ensure.mjs";
 import { projectEngineeringTimeline } from "../../scripts/pathcode-cli/build/surface/engineering-timeline.mjs";
+import { projectEngineeringActivity } from "../../scripts/pathcode-cli/build/surface/engineering-activity.mjs";
+import {
+  adoptionAllowedForIntent,
+  frameEngineerObjective,
+} from "../../scripts/pathcode-cli/build/objectives.mjs";
+import { resolveMutatingEngineAttempt } from "../../scripts/pathcode-cli/ag10/engine-contract.mjs";
+import { probeCursorDispatchReadiness } from "../../scripts/pathcode-cli/ag10/cursor-sdk.mjs";
+import { mapCursorSdkEvent } from "../../scripts/pathcode-cli/ag10/events.mjs";
+import { selectSurfaceBuildId } from "../../scripts/pathcode-cli/build/index.mjs";
 import { appendTaskTrace } from "../../scripts/pathcode-cli/task-trace.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
 
@@ -476,5 +485,283 @@ describe("PATH Build experience", () => {
     incompatible.close();
     incompatible = null;
     rmSync(runtimeRoot, { recursive: true, force: true });
+  });
+
+  it("keeps two builds from sharing conversation, preview, worklog, or adoption", () => {
+    const buildA = {
+      buildId: "build-a",
+      productBranch: "path-build/build-a",
+      authoritativeSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      intent: { outcome: "website A", outcomeRevision: 1 },
+      loop: { status: "running" },
+      conversation: [{ id: "a", role: "user", text: "conversation A" }],
+      children: [{ kind: "engineer", taskId: "task-a", provider: "cursor", dispatchState: "consumed" }],
+      adoptionHistory: [{ adoptedSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", taskId: "task-a", engine: "cursor" }],
+      projectBindings: [{ projectRoot: "/proj-a" }],
+    };
+    const buildB = {
+      buildId: "build-b",
+      productBranch: "path-build/build-b",
+      authoritativeSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      intent: { outcome: "website B", outcomeRevision: 2 },
+      loop: { status: "complete" },
+      conversation: [{ id: "b", role: "user", text: "conversation B" }],
+      children: [{ kind: "engineer", taskId: "task-b", provider: "copilot", dispatchState: "consumed" }],
+      adoptionHistory: [{ adoptedSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", taskId: "task-b", engine: "copilot" }],
+      projectBindings: [{ projectRoot: "/proj-b" }],
+    };
+    const viewA = projectBuildForSurface(buildA, {
+      traces: [{ taskId: "task-a", lines: [{ t: "2026-09-22T16:03:33.000Z", type: "session.task.received", engine: "cursor" }] }],
+      preview: { revision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    });
+    const viewB = projectBuildForSurface(buildB, {
+      traces: [{ taskId: "task-b", lines: [{ t: "2026-09-22T10:26:08.000Z", type: "session.task.received", engine: "copilot" }] }],
+      preview: { revision: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+    });
+    expect(viewA.buildId).toBe("build-a");
+    const talkA = (viewA.conversation || []).map((row) => row.text).join(" ");
+    expect(talkA).toContain("conversation A");
+    expect(talkA).not.toContain("conversation B");
+    expect(viewA.identity?.previewSha).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect((viewA.engineeringTimeline?.entries || []).every((entry) => entry.taskId === "task-a")).toBe(true);
+    expect(viewA.engineeringActivity?.latestRevision?.taskId).toBe("task-a");
+    expect(viewB.engineeringActivity?.latestRevision?.sha?.startsWith("bbbb")).toBe(true);
+    expect(selectSurfaceBuildId([buildA, buildB])).toBe("build-a");
+    expect(selectSurfaceBuildId([buildB])).toBeNull();
+    expect(selectSurfaceBuildId([buildA, { ...buildA, buildId: "build-c", loop: { status: "running" } }])).toBeNull();
+  });
+
+  it("scopes a failed current task apart from an older adopted revision", () => {
+    const activity = projectEngineeringActivity(
+      {
+        buildId: "build-mix",
+        authoritativeSha: "1a57490e6e60ef7fd84810bb9b1fe201776e7db6",
+        children: [
+          {
+            kind: "engineer",
+            taskId: "e87c7556-84aa-4743-b6dd-aa5d43152897",
+            provider: "cursor",
+            dispatchState: "consumed",
+            classification: "VERIFIED",
+            adoptedSha: "1a57490e6e60ef7fd84810bb9b1fe201776e7db6",
+          },
+          {
+            kind: "engineer",
+            taskId: "ceddd7fb-39fa-4d42-bb9b-5abea2cb6cb6",
+            provider: "cursor",
+            dispatchState: "consumed",
+            classification: "FAILED",
+            intentRevision: 4,
+          },
+        ],
+        adoptionHistory: [
+          {
+            adoptedSha: "1a57490e6e60ef7fd84810bb9b1fe201776e7db6",
+            taskId: "e87c7556-84aa-4743-b6dd-aa5d43152897",
+            engine: "cursor",
+            intentRevision: 3,
+            files: ["index.html", "package.json", "style.css"],
+          },
+        ],
+      },
+      {
+        checkpoint: { taskId: "ceddd7fb-39fa-4d42-bb9b-5abea2cb6cb6", changedFiles: [] },
+        revisionDiff: {
+          sha: "1a57490e6e60ef7fd84810bb9b1fe201776e7db6",
+          summary: "191 insertions",
+          files: ["index.html", "package.json", "style.css"],
+        },
+      },
+    );
+    expect(activity.currentTask.taskId).toBe("ceddd7fb-39fa-4d42-bb9b-5abea2cb6cb6");
+    expect(activity.currentTask.files).toEqual([]);
+    expect(activity.currentTask.adoptedSha).toBeNull();
+    expect(activity.latestRevision?.taskId).toBe("e87c7556-84aa-4743-b6dd-aa5d43152897");
+    expect(activity.latestRevision?.files).toEqual(["index.html", "package.json", "style.css"]);
+    expect(activity.adoptedSha).toBeNull();
+  });
+
+  it("orders the worklog by source sequence and keeps distinct same-time events", () => {
+    const timeline = projectEngineeringTimeline(
+      {
+        buildId: "build-order",
+        children: [
+          { kind: "engineer", taskId: "task-late", provider: "cursor", dispatchState: "consumed" },
+          { kind: "engineer", taskId: "task-early", provider: "copilot", dispatchState: "consumed" },
+        ],
+      },
+      {
+        traces: [
+          {
+            taskId: "task-late",
+            lines: [
+              { t: "2026-09-22T16:07:24.000Z", type: "session.engineering.tool", tool: "read_file", path: "a.html", engine: "cursor" },
+              {
+                t: "2026-09-22T16:07:24.000Z",
+                type: "gateway.task.finished",
+                meta: { status: "completed" },
+                engine: "cursor",
+              },
+              {
+                t: "2026-09-22T16:07:24.000Z",
+                type: "session.engineering.result",
+                engine: "cursor",
+              },
+            ],
+          },
+          {
+            taskId: "task-early",
+            lines: [
+              { t: "2026-09-23T10:26:08.000Z", type: "session.engineering.tool", tool: "read_file", path: "b.html", engine: "copilot" },
+              { t: "2026-09-23T10:26:08.000Z", type: "session.engineering.tool", tool: "read_file", path: "c.html", engine: "copilot" },
+            ],
+          },
+        ],
+      },
+    );
+    expect(timeline.entries.map((entry) => entry.taskId)).toEqual([
+      "task-late",
+      "task-late",
+      "task-early",
+      "task-early",
+    ]);
+    expect(timeline.entries.filter((entry) => entry.kind === "result")).toHaveLength(1);
+    const sameTimeReads = timeline.entries.filter((entry) => entry.taskId === "task-early");
+    expect(sameTimeReads).toHaveLength(2);
+    expect(timeline.turns.map((turn) => turn.taskId)).toEqual(["task-late", "task-early"]);
+    expect(timeline.turns[0]?.clockReversed).toBe(false);
+  });
+
+  it("shows a date boundary when a later source turn has an earlier clock", () => {
+    const timeline = projectEngineeringTimeline(
+      {
+        buildId: "build-clock",
+        children: [
+          { kind: "engineer", taskId: "afternoon", provider: "cursor", dispatchState: "consumed", intentRevision: 1 },
+          { kind: "engineer", taskId: "morning", provider: "cursor", dispatchState: "consumed", intentRevision: 2 },
+        ],
+      },
+      {
+        traces: [
+          {
+            taskId: "afternoon",
+            lines: [{ t: "2026-09-22T16:07:24.000Z", type: "session.task.received", engine: "cursor" }],
+          },
+          {
+            taskId: "morning",
+            lines: [{ t: "2026-09-22T10:26:08.000Z", type: "session.task.received", engine: "cursor" }],
+          },
+        ],
+      },
+    );
+    const first = timeline.entries[0];
+    const second = timeline.entries[1];
+    expect(first && second && first.timestamp && second.timestamp && first.timestamp > second.timestamp).toBe(true);
+    expect(timeline.turns).toHaveLength(2);
+    expect(timeline.turns[0]?.taskId).toBe("afternoon");
+    expect(timeline.turns[1]?.taskId).toBe("morning");
+  });
+
+  it("distinguishes Cursor auth, runtime, and SDK readiness without printing a key", () => {
+    const missing = probeCursorDispatchReadiness({ env: {} });
+    expect(missing.apiKeyPresent).toBe(false);
+    expect(missing.ready).toBe(false);
+    expect(missing.reason === "auth_unavailable" || missing.reason?.startsWith("unsupported_runtime")).toBe(true);
+    expect(JSON.stringify(missing)).not.toMatch(/sk-|CURSOR_API_KEY=/);
+    const mapped = mapCursorSdkEvent({
+      type: "tool_call",
+      call_id: "call-1",
+      name: "edit",
+      status: "completed",
+      path: "index.html",
+    });
+    expect(JSON.stringify(mapped || {})).toContain("call-1");
+  });
+
+  it("selects ready Cursor and refuses a silent Copilot fallback", () => {
+    expect(
+      resolveMutatingEngineAttempt({ preferred: "cursor", cursorMode: "native_sdk", fallback: "copilot" }),
+    ).toMatchObject({ selected: "cursor", fallback: false, blocked: false });
+    expect(
+      resolveMutatingEngineAttempt({ preferred: "cursor", cursorMode: "unavailable", fallback: "" }),
+    ).toMatchObject({ selected: null, blocked: true, newTask: false });
+    expect(
+      resolveMutatingEngineAttempt({ preferred: "cursor", cursorMode: "unavailable", fallback: "copilot" }),
+    ).toMatchObject({ selected: "copilot", fallback: true, newTask: true });
+  });
+
+  it("refuses to adopt a non-web result for a website intent", () => {
+    const record = {
+      intent: { outcome: "Build a polished public website for ICE", outcomeRevision: 1 },
+      productBrief: { productKind: "web" },
+      projectBindings: [{ originGitInit: true }],
+    };
+    expect(adoptionAllowedForIntent(record, "cli").ok).toBe(false);
+    expect(adoptionAllowedForIntent(record, "web").ok).toBe(true);
+    const objective = frameEngineerObjective(record, "establish the product");
+    expect(objective).toContain("previewable website");
+    expect(objective).toContain("PATH Build outcome");
+    expect(objective).not.toContain("package.json OR a static index.html");
+  });
+
+  it("composes failed and paused as one truth and maps outcome lifecycle", () => {
+    const paused = projectBuildForSurface(
+      {
+        buildId: "build-fail",
+        loop: { status: "paused" },
+        intent: { outcome: "website", outcomeRevision: 2 },
+        children: [
+          {
+            kind: "engineer",
+            taskId: "task-fail",
+            provider: "cursor",
+            dispatchState: "consumed",
+            classification: "FAILED",
+          },
+        ],
+        conversation: [
+          { id: "u", role: "user", text: "make it red", status: "failed", intentRevision: 2 },
+          { id: "a", role: "assistant", text: "Engineering that change…", status: "failed" },
+        ],
+        outcomeCriteria: [{ id: "c1", statement: "Explains the service", status: "UNKNOWN", required: true }],
+      },
+      {},
+    );
+    expect(paused.progressLabel).toBe("Failed — paused");
+    expect((paused.conversation || []).find((row) => row.role === "assistant")?.status).toBe("failed");
+    expect(paused.criteria?.[0]?.creatorStatus).toBe("pending");
+    const evaluating = projectBuildForSurface(
+      {
+        buildId: "build-eval",
+        loop: { status: "running" },
+        intent: { outcome: "website", outcomeRevision: 1 },
+        children: [{ kind: "evaluate", taskId: "task-eval", dispatchState: "dispatched" }],
+        outcomeCriteria: [{ id: "c1", statement: "Explains the service", status: "UNKNOWN", required: true }],
+      },
+      {},
+    );
+    expect(evaluating.criteria?.[0]?.creatorStatus).toBe("evaluating");
+    const inconclusive = projectBuildForSurface(
+      {
+        buildId: "build-unknown",
+        loop: { status: "running" },
+        intent: { outcome: "website", outcomeRevision: 1 },
+        children: [{ kind: "evaluate", taskId: "task-eval", dispatchState: "consumed" }],
+        outcomeCriteria: [{ id: "c1", statement: "Explains the service", status: "UNKNOWN", required: true }],
+      },
+      {},
+    );
+    expect(inconclusive.criteria?.[0]?.creatorStatus).toBe("inconclusive");
+    const proven = projectBuildForSurface(
+      {
+        buildId: "build-proven",
+        loop: { status: "complete" },
+        intent: { outcome: "website", outcomeRevision: 1 },
+        children: [{ kind: "evaluate", taskId: "task-eval", dispatchState: "consumed" }],
+        outcomeCriteria: [{ id: "c1", statement: "Explains the service", status: "PROVEN", required: true }],
+      },
+      {},
+    );
+    expect(proven.criteria?.[0]?.creatorStatus).toBe("proven");
   });
 });

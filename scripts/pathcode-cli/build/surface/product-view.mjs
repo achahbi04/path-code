@@ -9,6 +9,29 @@ import {
 import { projectEngineeringTimeline } from "./engineering-timeline.mjs";
 
 /**
+ * Creator-facing criterion lifecycle. UNKNOWN stays the stored value.
+ * @param {{ status?: string }} criterion
+ * @param {Array<{ kind?: string, dispatchState?: string }>} children
+ */
+function creatorCriterionStatus(criterion, children) {
+  const raw = String(criterion?.status || "UNKNOWN").toUpperCase();
+  if (raw === "PROVEN" || raw === "MET" || raw === "PASS") return "proven";
+  if (raw === "UNMET" || raw === "FAILED" || raw === "FAIL") return "failed";
+  if (raw === "INCONCLUSIVE") return "inconclusive";
+  const evaluateLive = children.some(
+    (child) =>
+      child?.kind === "evaluate" &&
+      ["selected", "dispatched", "terminal_seen"].includes(String(child.dispatchState || "")),
+  );
+  if (evaluateLive) return "evaluating";
+  const evaluated = children.some(
+    (child) => child?.kind === "evaluate" && child.dispatchState === "consumed",
+  );
+  if (evaluated && (raw === "UNKNOWN" || raw === "")) return "inconclusive";
+  return "pending";
+}
+
+/**
  * @param {import('../types.mjs').BuildRecord | null | undefined} build
  * @param {{
  *   preview?: object | null,
@@ -90,7 +113,18 @@ export function projectBuildForSurface(build, extras = {}) {
     runtime?.reason === "no_start_plan";
   const updatingPreview = Boolean(build.loop?.pendingRuntimeRefresh) && !childLive;
 
-  if (paused) {
+  const lastFailed =
+    Boolean(last) &&
+    !last.adoptedSha &&
+    /FAIL|CANCEL|NOT_VERIFIED|BLOCKED/i.test(String(last.classification || ""));
+  const replacementLive = childLive && kind === "engineer";
+  if (paused && lastFailed && !replacementLive) {
+    phase = "paused";
+    uiState = "error";
+    headline = "Failed — paused";
+    detail = "The current engineering task failed. Engineering is paused.";
+    progressLabel = "Failed — paused";
+  } else if (paused) {
     phase = "paused";
     uiState = "paused";
     headline = "Paused";
@@ -258,10 +292,21 @@ export function projectBuildForSurface(build, extras = {}) {
       status: r.status,
       required: r.required,
     })),
+    identity: {
+      buildId: build.buildId,
+      projectRoot,
+      productBranch: build.productBranch || null,
+      currentIntentRevision: build.intent?.outcomeRevision || 1,
+      authoritativeProductSha: build.authoritativeSha || null,
+      runtimeSha: runtime?.revision || runtime?.sha || null,
+      previewSha: preview?.revision || null,
+      loopStatus: status,
+    },
     criteria: (build.outcomeCriteria || []).map((c) => ({
       id: c.id,
       statement: c.statement,
       status: c.status,
+      creatorStatus: creatorCriterionStatus(c, kids),
       required: c.required,
       source: c.source || null,
     })),

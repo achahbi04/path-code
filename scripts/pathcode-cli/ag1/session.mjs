@@ -1065,6 +1065,44 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   const cursorReadyAtStart =
     g10Fabric?.getCursor?.()?.getMode?.() === "native_sdk";
 
+  async function endCursorAttempt(outcome, detail) {
+    const reason = String(detail || outcome || "Cursor was not ready").slice(0, 300);
+    try {
+      g10Fabric?.persist?.({
+        cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || "unavailable",
+        cursorUnavailableReason: reason,
+        finalState: "NOT_VERIFIED",
+      });
+    } catch {
+      /* ignore */
+    }
+    emit("session.terminal", {
+      disposition: outcome,
+      summary: reason,
+    });
+    clearTimeout(wallTimer);
+    clearInterval(pollCancel);
+    try {
+      await agent.close();
+    } catch {
+      /* ignore */
+    }
+    return {
+      exitCode: 2,
+      outcome,
+      classification: "NOT_VERIFIED",
+      engineActivityCount,
+    };
+  }
+
+  if (preferredEngine === "cursor" && !cursorReadyAtStart) {
+    const cursor = g10Fabric?.getCursor?.();
+    const reason =
+      cursor?.getDegradeReason?.() ||
+      `Cursor mode ${cursor?.getMode?.() || "unavailable"}`;
+    return endCursorAttempt("CURSOR_NOT_READY", reason);
+  }
+
   if (
     preferredEngine === "cursor" &&
     cursorReadyAtStart &&
@@ -1114,33 +1152,21 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
           mode: turn.mode || undefined,
         });
       } else if (turn?.code === "AUTH_REQUIRED") {
-        emit("session.terminal", {
-          disposition: "AUTH_REQUIRED",
-          summary: "Cursor authentication required; falling back to PATH engine",
-        });
-        try {
-          g10Fabric?.persist?.({
-            cursorMode: "auth_required",
-            finalState: undefined,
-          });
-        } catch {
-          /* ignore */
-        }
+        return endCursorAttempt(
+          "AUTH_REQUIRED",
+          turn?.detail || "Cursor authentication required",
+        );
       } else {
-        emit("session.capability.collaborate", {
-          engine: "cursor",
-          phase: "fallback",
-          label: "Continuing",
-          detail: turn?.detail || "Cursor primary unavailable; starting PATH engine",
-        });
+        return endCursorAttempt(
+          turn?.code || "CURSOR_NOT_READY",
+          turn?.detail || "Cursor primary turn failed",
+        );
       }
-    } catch {
-      emit("session.capability.collaborate", {
-        engine: "cursor",
-        phase: "error",
-        label: "Continuing",
-        detail: "Cursor primary error; starting PATH engine",
-      });
+    } catch (error) {
+      return endCursorAttempt(
+        "CURSOR_NOT_READY",
+        error instanceof Error ? error.message : "Cursor primary error",
+      );
     }
   }
 

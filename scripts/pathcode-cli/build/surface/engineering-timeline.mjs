@@ -125,7 +125,8 @@ function fromTraceLine(line, roots, ctx) {
     revision: null,
     source: {
       authoritativeTrace: "task-trace",
-      sourceOffsetOrEventId: line?.t || type,
+      sourceOffsetOrEventId:
+        ctx.sourceIndex ?? line?.sourceOffset ?? line?.seq ?? line?.t ?? type,
     },
   };
 
@@ -288,6 +289,18 @@ function fromBuildEvent(event, buildId) {
       summary: `PATH FAIL ${String(data.message || data.code || "engineering failed").slice(0, 160)}`,
     };
   }
+  if (type === "engine.decision") {
+    const selected = typeof data.selected === "string" ? data.selected : null;
+    const reason = String(data.reason || data.summary || "engine decision").slice(0, 160);
+    return {
+      ...base,
+      kind: "fabric",
+      engine: selected,
+      phase: typeof data.phase === "string" ? data.phase : null,
+      status: "completed",
+      summary: `PATH ENGINE FABRIC ${reason}`,
+    };
+  }
   if (type.endsWith(".dispatched")) {
     const phase = type.split(".")[0];
     return {
@@ -343,7 +356,7 @@ export function projectEngineeringTimeline(build, extras = {}) {
       phase: child?.kind || null,
     };
     (bundle.lines || []).forEach((line, index) => {
-      const entry = fromTraceLine(line, roots, ctx);
+      const entry = fromTraceLine(line, roots, { ...ctx, sourceIndex: index });
       if (!entry) return;
       raw.push({ entry, order: bundleIndex * 1_000_000 + index });
     });
@@ -351,15 +364,50 @@ export function projectEngineeringTimeline(build, extras = {}) {
   (Array.isArray(extras.events) ? extras.events : []).forEach((event, index) => {
     const entry = fromBuildEvent(event, build?.buildId);
     if (!entry) return;
-    raw.push({ entry, order: 5_000_000 + index });
+    const taskId = entry.taskId || event?.data?.taskId || null;
+    const bundleIndex = taskId ? traces.findIndex((bundle) => bundle.taskId === taskId) : -1;
+    const order =
+      bundleIndex >= 0 ? bundleIndex * 1_000_000 + 900_000 + index : 50_000_000 + index;
+    raw.push({ entry, order });
   });
-  raw.sort((a, b) => {
-    const at = String(a.entry.timestamp || "");
-    const bt = String(b.entry.timestamp || "");
-    if (at && bt && at !== bt) return at < bt ? -1 : 1;
-    return a.order - b.order;
-  });
-  const entries = raw.map((item, index) => ({ ...item.entry, sequence: index + 1 }));
+  raw.sort((a, b) => a.order - b.order);
+  const seen = new Set();
+  const traceStarts = new Set(
+    raw
+      .filter(
+        (item) =>
+          item.entry.kind === "task_started" &&
+          item.entry.source?.authoritativeTrace === "task-trace" &&
+          item.entry.taskId,
+      )
+      .map((item) => item.entry.taskId),
+  );
+  const ordered = [];
+  for (const item of raw) {
+    const entry = item.entry;
+    if (
+      entry.kind === "task_started" &&
+      entry.source?.authoritativeTrace === "build-event" &&
+      entry.taskId &&
+      traceStarts.has(entry.taskId)
+    ) {
+      continue;
+    }
+    const identity =
+      entry.kind === "result"
+        ? `result:${entry.taskId || entry.source?.sourceOffsetOrEventId}`
+        : [
+            entry.source?.authoritativeTrace,
+            entry.taskId || "",
+            entry.source?.sourceOffsetOrEventId,
+            entry.kind,
+            entry.summary,
+          ].join("|");
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    ordered.push({ ...entry, orderKey: item.order });
+  }
+  const entries = ordered.map((entry, index) => ({ ...entry, sequence: index + 1 }));
   const phases = ["brief", "engineer", "evaluate", "challenge"].map((kind) => {
     const related = children.filter((child) => child.kind === kind);
     const ids = new Set(related.map((child) => child.taskId));
@@ -375,9 +423,40 @@ export function projectEngineeringTimeline(build, extras = {}) {
       count,
     };
   });
+  const turns = [];
+  for (const entry of entries) {
+    const child = entry.taskId ? childByTask.get(entry.taskId) : null;
+    const previous = turns[turns.length - 1];
+    const sameTask = previous && entry.taskId && previous.taskId === entry.taskId;
+    const revision = entry.kind === "adopt" || entry.kind === "runtime" || entry.kind === "fabric";
+    if (sameTask && !revision) {
+      previous.entries.push(entry);
+      continue;
+    }
+    if (revision && previous && (!entry.taskId || previous.taskId === entry.taskId)) {
+      previous.entries.push(entry);
+      continue;
+    }
+    turns.push({
+      taskId: entry.taskId || null,
+      actionId: child?.actionId || entry.actionId || null,
+      intentRevision: child?.intentRevision || null,
+      engine: entry.engine || child?.provider || null,
+      phase: child?.kind || entry.phase || null,
+      entries: [entry],
+    });
+  }
+  for (const turn of turns) {
+    const failed = turn.entries.some((entry) => entry.kind === "task_failed" || entry.status === "failed");
+    const ready = turn.entries.some((entry) => entry.kind === "result" || entry.kind === "adopt");
+    turn.status = failed ? "failed" : ready ? "ready" : "running";
+    const stamps = turn.entries.map((entry) => entry.timestamp).filter(Boolean);
+    turn.clockReversed = stamps.some((stamp, index) => index > 0 && stamp < stamps[index - 1]);
+  }
   return {
     phases,
     entries,
+    turns,
     current: entries.length ? entries[entries.length - 1] : null,
   };
 }

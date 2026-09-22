@@ -22,7 +22,7 @@ import {
   probeAntigravityReadiness,
   probeCopilotReadiness,
 } from "../ag10/engine-readiness.mjs";
-import { resolveCursorApiKey } from "../ag10/cursor-sdk.mjs";
+import { probeCursorDispatchReadiness } from "../ag10/cursor-sdk.mjs";
 
 /**
  * @param {{ cwd?: string, env?: NodeJS.ProcessEnv, packageRoot?: string }} [opts]
@@ -188,12 +188,14 @@ export function runPathcodeDoctor(opts = {}) {
       ? `ready (${copilotReady.authMethod || "local"})`
       : copilotReady.reason || "not ready",
   });
-  const cursorKey = Boolean(resolveCursorApiKey(env, { includeStored: env === process.env }));
+  const cursorReady = probeCursorDispatchReadiness({ env });
   rows.push({
     name: "Engine Cursor",
-    ok: cursorKey,
+    ok: cursorReady.ready,
     optional: true,
-    detail: cursorKey ? "ready (api_key)" : "AUTH_REQUIRED",
+    detail: cursorReady.ready
+      ? "ready (native_sdk)"
+      : cursorReady.reason || "unavailable",
   });
 
   const mark = (ok) => (ok ? "✓" : "✗");

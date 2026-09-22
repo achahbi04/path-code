@@ -18,8 +18,8 @@ import { spawn, spawnSync } from "node:child_process";
 
 import {
   readBuildRecord,
-  findLatestActiveBuild,
   listBuildRecords,
+  selectSurfaceBuildId,
   appendPendingConversation,
   readPendingConversations,
   appendBuildEvent,
@@ -162,11 +162,7 @@ export async function startPathBuildSurface(options) {
   async function viewFor(buildId) {
     let id = buildId || "";
     if (!id) {
-      const latest =
-        findLatestActiveBuild(runtimeRoot) ||
-        listBuildRecords(runtimeRoot)[0] ||
-        null;
-      id = latest?.buildId || "";
+      id = selectSurfaceBuildId(listBuildRecords(runtimeRoot)) || "";
     }
     const stored = id ? readBuildRecord(runtimeRoot, id) : null;
     const pending = id ? readPendingConversations(runtimeRoot, id) : [];
@@ -214,6 +210,8 @@ export async function startPathBuildSurface(options) {
     const traceLines = traces.length ? traces[traces.length - 1].lines : [];
     /** @type {{ files?: string[], summary?: string, commands?: string[] } | null} */
     let diff = null;
+    /** @type {{ sha?: string, files?: string[], summary?: string } | null} */
+    let revisionDiff = null;
     if (root && existsSync(join(root, ".git")) && build?.authoritativeSha) {
       const shown = spawnSync(
         "git",
@@ -226,9 +224,27 @@ export async function startPathBuildSurface(options) {
         },
       );
       if (shown.status === 0) {
-        diff = {
+        const names = spawnSync(
+          "git",
+          ["show", "--name-only", "--pretty=format:", build.authoritativeSha],
+          {
+            cwd: root,
+            encoding: "utf8",
+            timeout: 8_000,
+            env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+          },
+        );
+        revisionDiff = {
+          sha: build.authoritativeSha,
           summary: String(shown.stdout || "").slice(0, 2_000),
-          files: checkpoint?.changedFiles || [],
+          files:
+            names.status === 0
+              ? String(names.stdout || "")
+                  .split("\n")
+                  .map((line) => line.trim())
+                  .filter(Boolean)
+                  .slice(0, 40)
+              : [],
         };
       }
     }
@@ -253,8 +269,6 @@ export async function startPathBuildSurface(options) {
           .map((line) => line.slice(3).trim())
           .filter(Boolean)
           .slice(0, 24);
-        if (!diff) diff = { files: worktreeFiles, summary: "" };
-        else if (!diff.files?.length) diff.files = worktreeFiles;
       }
     }
     const view = projectBuildForSurface(build, {
@@ -264,6 +278,7 @@ export async function startPathBuildSurface(options) {
       events: eventState.events || [],
       checkpoint,
       diff,
+      revisionDiff,
       worktreeFiles,
       traceLines,
       traces,

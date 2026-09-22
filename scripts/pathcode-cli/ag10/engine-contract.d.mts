@@ -24,4 +24,15 @@ export function selectEngineForTurn(input?: object): EngineId;
 export function buildEngineCapabilityList(live?: object): unknown[];
 export function buildFabricHandoff(input: object): unknown;
 export function formatFabricHandoff(packet: unknown): string;
+export function resolveMutatingEngineAttempt(input?: {
+  preferred?: string | null;
+  cursorMode?: string | null;
+  fallback?: string | null;
+}): {
+  selected: string | null;
+  fallback: boolean;
+  blocked: boolean;
+  newTask: boolean;
+  reason: string;
+};
 export function withEngineProvenance(turn: object, engine: unknown): object;

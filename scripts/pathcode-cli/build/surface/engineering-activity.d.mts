@@ -12,6 +12,7 @@ export function projectEngineeringActivity(
     checkpoint?: unknown;
     traceLines?: object[];
     events?: object[];
+    revisionDiff?: { sha?: string; summary?: string; files?: string[] };
   },
 ): {
   engine: string | null;
@@ -19,4 +20,7 @@ export function projectEngineeringActivity(
   action: string | null;
   phase: string;
   label: string | null;
+  adoptedSha: string | null;
+  currentTask: { taskId: string | null; files: string[]; adoptedSha: string | null };
+  latestRevision: { taskId: string | null; sha: string | null; files: string[] } | null;
 };

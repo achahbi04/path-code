@@ -206,6 +206,19 @@ export function listBuildRecords(runtimeRoot) {
  * @param {string} runtimeRoot
  * @returns {import('./types.mjs').BuildRecord | null}
  */
+/**
+ * Root surface identity. Auto-open only when exactly one Build is running.
+ * A stale completed or paused Build must not become the current Build.
+ * @param {Array<{ buildId?: string, loop?: { status?: string } }>} records
+ * @returns {string | null}
+ */
+export function selectSurfaceBuildId(records) {
+  const running = (Array.isArray(records) ? records : []).filter(
+    (build) => build?.loop?.status === "running" && build.buildId,
+  );
+  return running.length === 1 ? running[0].buildId : null;
+}
+
 export function findLatestActiveBuild(runtimeRoot) {
   const rank = (build) =>
     build?.loop?.status === "running"

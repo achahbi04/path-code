@@ -215,6 +215,15 @@ body {
 }
 .worklog-entry { display: grid; grid-template-columns: 4.6rem 1fr; gap: 0.4rem; padding: 0.12rem 0; }
 .worklog-entry time { color: var(--muted); }
+.worklog-day { margin: 0.7rem 0 0.25rem; color: var(--muted); font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.worklog-turn { display: flex; flex-direction: column; gap: 0.1rem; margin: 0.55rem 0 0.2rem; padding-top: 0.35rem; border-top: 1px solid var(--line); }
+.worklog-turn strong { font-size: 0.72rem; letter-spacing: 0.03em; text-transform: uppercase; }
+.worklog-turn span { color: var(--muted); }
+.build-identity { color: var(--muted); font-size: 0.75rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.bubble[data-status="failed"] .msg-status,
+.bubble[data-status="applied"] .msg-status { font-weight: 650; }
+.bubble[data-status="failed"] { color: var(--muted); }
+.bubble[data-status="failed"] .msg-status { color: inherit; filter: none; }
 .worklog.collapsed .worklog-scroll,
 .worklog.collapsed .worklog-phases { display: none; }
 

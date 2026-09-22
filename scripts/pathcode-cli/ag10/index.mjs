@@ -318,9 +318,23 @@ export async function createG10Fabric(options) {
     const connected = await cursor.ensureConnected({
       resumeSessionId: checkpoint.cursorSessionId || undefined,
     });
+    const apiKeyPresent = Boolean(
+      (typeof options.toolEnv?.CURSOR_API_KEY === "string" &&
+        options.toolEnv.CURSOR_API_KEY.trim()) ||
+        (typeof process.env.CURSOR_API_KEY === "string" && process.env.CURSOR_API_KEY.trim()),
+    );
     persist({
       cursorMode: cursor.getMode(),
       cursorSessionId: cursor.getSessionId() || undefined,
+      cursorUnavailableReason: connected?.ok
+        ? undefined
+        : String(connected?.detail || connected?.code || cursor.getDegradeReason?.() || "unavailable").slice(0, 300),
+      cursorRuntime: {
+        node: process.version,
+        execPath: process.execPath,
+        apiKeyPresent,
+        sdkResolved: cursor.getMode() === "native_sdk" || connected?.code !== "SDK_FAILURE",
+      },
     });
     if (connected?.ok) {
       const wasInterrupted =

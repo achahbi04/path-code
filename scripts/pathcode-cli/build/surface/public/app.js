@@ -9,6 +9,7 @@ const els = {
   buildBtn: document.getElementById("buildBtn"),
   landingError: document.getElementById("landingError"),
   statusPill: document.getElementById("statusPill"),
+  buildIdentity: document.getElementById("buildIdentity"),
   chatScroll: document.getElementById("chatScroll"),
   chatForm: document.getElementById("chatForm"),
   chatInput: document.getElementById("chatInput"),
@@ -91,7 +92,7 @@ function renderChat(view) {
       const status = m.status
         ? `<span class="msg-status">${escapeHtml(String(m.status).replaceAll("_", " "))}</span>`
         : "";
-      return `<div class="bubble ${role}">${escapeHtml(m.text || "")}${status}</div>`;
+      return `<div class="bubble ${role}" data-status="${escapeHtml(m.status || "")}">${status}${escapeHtml(m.text || "")}</div>`;
     })
     .join("");
   els.chatScroll.scrollTop = els.chatScroll.scrollHeight;
@@ -104,8 +105,24 @@ function clock(timestamp) {
   return date.toLocaleTimeString("en-GB", { hour12: false });
 }
 
+function shortId(value) {
+  const text = String(value || "");
+  return text ? text.slice(0, 8) : "";
+}
+
+function dayLabel(timestamp) {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
 function renderWorklog(view) {
-  const timeline = view.engineeringTimeline || { phases: [], entries: [], current: null };
+  const timeline = view.engineeringTimeline || { phases: [], entries: [], turns: [], current: null };
   const active = view.status === "running";
   if (active) els.worklog.classList.remove("collapsed");
   els.worklogToggle.hidden = active;
@@ -122,58 +139,90 @@ function renderWorklog(view) {
     .join("");
   const nearBottom =
     els.worklogScroll.scrollHeight - els.worklogScroll.scrollTop - els.worklogScroll.clientHeight < 48;
-  els.worklogScroll.innerHTML = (timeline.entries || [])
-    .map(
-      (entry) =>
-        `<div class="worklog-entry" data-kind="${escapeHtml(entry.kind)}" data-sequence="${entry.sequence}">
-          <time>${escapeHtml(clock(entry.timestamp))}</time>
-          <span>${escapeHtml(entry.summary || "")}</span>
-        </div>`,
-    )
+  const turns = timeline.turns?.length
+    ? timeline.turns
+    : [{ entries: timeline.entries || [], phase: null, engine: null, taskId: null, status: null }];
+  let previousDay = "";
+  els.worklogScroll.innerHTML = turns
+    .map((turn) => {
+      const firstStamp = (turn.entries || []).map((entry) => entry.timestamp).find(Boolean);
+      const day = dayLabel(firstStamp);
+      const boundary = day && day !== previousDay ? `<div class="worklog-day">${escapeHtml(day)}</div>` : "";
+      if (day) previousDay = day;
+      const engine = turn.engine ? String(turn.engine) : "";
+      const title = turn.taskId
+        ? `Engineering turn${engine ? ` — ${engine}` : ""}`
+        : turn.phase || "Engineering";
+      const header = turn.taskId
+        ? `<div class="worklog-turn" data-status="${escapeHtml(turn.status || "")}">
+            <strong>${escapeHtml(title)}</strong>
+            <span>Task ${escapeHtml(shortId(turn.taskId))}${
+              turn.intentRevision ? ` · intent ${escapeHtml(turn.intentRevision)}` : ""
+            }${turn.clockReversed ? " · clock boundary" : ""}</span>
+          </div>`
+        : "";
+      const rows = (turn.entries || [])
+        .map(
+          (entry) =>
+            `<div class="worklog-entry" data-kind="${escapeHtml(entry.kind)}" data-sequence="${entry.sequence}" data-source="${escapeHtml(entry.source?.trace || entry.orderKey || "")}">
+              <time>${escapeHtml(clock(entry.timestamp))}</time>
+              <span>${escapeHtml(entry.summary || "")}</span>
+            </div>`,
+        )
+        .join("");
+      return `${boundary}${header}${rows}`;
+    })
     .join("");
   if (nearBottom) els.worklogScroll.scrollTop = els.worklogScroll.scrollHeight;
 }
 
 function renderDrawer(view) {
   const criteria = (view.criteria || [])
-    .map((c) => `<li>[${escapeHtml(c.status)}] ${escapeHtml(c.statement)}</li>`)
-    .join("");
-  const history = (view.activity || view.children || [])
     .map(
       (c) =>
-        `<li>${escapeHtml(c.kind)} · ${escapeHtml(c.dispatchState || "")}${
-          c.classification ? ` · ${escapeHtml(c.classification)}` : ""
-        }</li>`,
+        `<li>[${escapeHtml(c.creatorStatus || "pending")}] ${escapeHtml(c.statement)}</li>`,
     )
     .join("");
   const live = view.engineeringActivity || {};
-  const files = (live.files || [])
+  const current = live.currentTask || live;
+  const revision = live.latestRevision || null;
+  const currentFiles = (current.files || [])
+    .map((f) => `<li>${escapeHtml(f)}</li>`)
+    .join("");
+  const revisionFiles = (revision?.files || [])
     .map((f) => `<li>${escapeHtml(f)}</li>`)
     .join("");
   const steps = (live.steps || [])
     .map((step) => `<li>${escapeHtml(step.label || "")}</li>`)
     .join("");
-  const engine = live.engine || null;
-  const engineLabel = engine || (live.taskId ? "waiting for engine" : "not started");
   els.drawerBody.innerHTML = `
-    <h3>Engineering Activity</h3>
+    <h3>Current engineering task</h3>
     <dl class="activity-grid">
-      <dt>Action</dt><dd>${escapeHtml(live.action || "preparing")}</dd>
-      <dt>Engine</dt><dd>${escapeHtml(engineLabel)}</dd>
-      <dt>Task</dt><dd>${escapeHtml(live.taskId || "not dispatched")}</dd>
-      <dt>Phase</dt><dd>${escapeHtml(live.label || live.phase || view.progressLabel || "starting")}</dd>
-      <dt>Result</dt><dd>${escapeHtml(live.resultSha || (live.dispatchState === "consumed" ? "none" : "pending"))}</dd>
-      <dt>Adopted</dt><dd>${escapeHtml(live.adoptedSha || view.authoritativeSha || "none")}</dd>
+      <dt>Engine</dt><dd>${escapeHtml(current.engine || "not started")}</dd>
+      <dt>Task</dt><dd>${escapeHtml(current.taskId || "not dispatched")}</dd>
+      <dt>Phase</dt><dd>${escapeHtml(current.phase || live.phase || view.progressLabel || "starting")}</dd>
+      <dt>Result</dt><dd>${escapeHtml(current.classification || current.resultSha || "pending")}</dd>
+      <dt>Failure</dt><dd>${escapeHtml(current.failure || "none")}</dd>
     </dl>
+    <h3>Files changed by this task</h3>
+    <ul>${currentFiles || "<li>None</li>"}</ul>
+    <h3>Latest adopted revision</h3>
+    ${
+      revision
+        ? `<dl class="activity-grid">
+            <dt>SHA</dt><dd>${escapeHtml(shortId(revision.sha) || "none")}</dd>
+            <dt>Task</dt><dd>${escapeHtml(shortId(revision.taskId) || "unknown")}</dd>
+            <dt>Engine</dt><dd>${escapeHtml(revision.engine || "unknown")}</dd>
+            <dt>Intent</dt><dd>${escapeHtml(revision.intentRevision || "unknown")}</dd>
+          </dl>
+          <ul>${revisionFiles || "<li>None recorded</li>"}</ul>
+          ${revision.diff ? `<pre class="activity-diff">${escapeHtml(revision.diff)}</pre>` : ""}`
+        : "<p>No adopted revision yet.</p>"
+    }
     <h3>Live trace</h3>
     <ul>${steps || "<li>None yet</li>"}</ul>
-    ${live.diff ? `<pre class="activity-diff">${escapeHtml(live.diff)}</pre>` : ""}
-    <h3>Changed files</h3>
-    <ul>${files || "<li>None yet</li>"}</ul>
-    <h3>Outcome checks</h3>
-    <ul>${criteria || "<li>None yet</li>"}</ul>
-    <h3>History</h3>
-    <ul>${history || "<li>None yet</li>"}</ul>
+    <h3>Outcome verification</h3>
+    <ul>${criteria || "<li>Pending</li>"}</ul>
   `;
   if (view.projectRoot) {
     els.projectPath.textContent = view.projectRoot;
@@ -261,6 +310,20 @@ function render(view) {
   setWorkspaceVisible(true);
   activeBuildId = view.buildId;
   projectRoot = view.projectRoot || null;
+  const identity = view.identity || {};
+  const branch = identity.productBranch || view.productBranch || "";
+  if (els.buildIdentity) {
+    els.buildIdentity.textContent = view.buildId
+      ? `Build ${shortId(view.buildId)}${branch ? ` · ${branch}` : ""}`
+      : "";
+  }
+  if (view.buildId) {
+    const url = new URL(location.href);
+    if (url.searchParams.get("buildId") !== view.buildId) {
+      url.searchParams.set("buildId", view.buildId);
+      history.replaceState(null, "", url);
+    }
+  }
 
   const state = view.uiState || "building";
   els.statusPill.textContent = view.progressLabel || view.headline || state;

@@ -9,6 +9,7 @@ export {
   writeBuildRecord,
   listBuildRecords,
   findLatestActiveBuild,
+  selectSurfaceBuildId,
   makeBuildActionId,
   resolveBuildRecordPath,
   resolveBuildsDir,

@@ -37,15 +37,18 @@ function intentBlock(record) {
  */
 export function frameEngineerObjective(record, gap) {
   const binding = (record.projectBindings || [])[0];
+  const productKind = record.productBrief?.productKind || "unknown";
+  const wantsWeb =
+    productKind === "web" ||
+    /website|web\s*app|landing/i.test(String(record.intent?.outcome || ""));
   const greenfieldHint = binding?.originGitInit
     ? [
         "Greenfield context: this binding began as git-init-only — the Build folder IS already a git repository.",
         "CRITICAL: Do NOT run `git init`. Do NOT create a nested .git. Commit on the existing repo / task branch only.",
-        "You MUST establish a real software project in this turn:",
-        "- package.json (or equivalent manifests for the chosen stack) OR a static index.html",
-        "- source entrypoints in THIS worktree (the Build project root)",
-        "- at least one project-native check/test script that exits 0 (for Node) OR a static index.html that renders",
-        "- git add + git commit on the existing repository (never re-init)",
+        wantsWeb
+          ? "This intent is a website. The product of this turn must be a previewable website in this worktree (index.html or an equivalent web entry the outcome names). A CLI, library, or unrelated sample program does not satisfy the intent."
+          : "Establish the software the outcome names in this worktree, with a project-native check when the stack has one.",
+        "git add + git commit on the existing repository (never re-init).",
         "Do not stop at a marker file alone.",
       ].join("\n")
     : "Continue engineering toward the outcome with project-native validation.";
@@ -149,6 +152,32 @@ export function frameChallengeObjective(record, claim, opts = {}) {
  * Completeness challenge claim.
  * @param {import('./types.mjs').BuildRecord} record
  */
+/**
+ * @param {import('./types.mjs').BuildRecord | null | undefined} record
+ */
+export function wantsWebProduct(record) {
+  const kind = record?.productBrief?.productKind || "";
+  return (
+    kind === "web" ||
+    /website|web\s*app|landing/i.test(String(record?.intent?.outcome || ""))
+  );
+}
+
+/**
+ * Deterministic provenance guard. A web intent may only adopt a web artifact.
+ * @param {import('./types.mjs').BuildRecord | null | undefined} record
+ * @param {string | null | undefined} capability
+ */
+export function adoptionAllowedForIntent(record, capability) {
+  if (!wantsWebProduct(record)) return { ok: true, reason: null };
+  if (capability === "web") return { ok: true, reason: null };
+  return {
+    ok: false,
+    reason:
+      "Result does not belong to the current web intent. It was kept on the task branch and was not adopted.",
+  };
+}
+
 export function completenessClaim(record) {
   return `BUILD COMPLETE: the outcome is satisfied and all required explicit requirements remain respected (intent revision ${record.intent.outcomeRevision}).`;
 }

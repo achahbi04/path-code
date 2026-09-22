@@ -106,6 +106,22 @@ export function createCheckpointSkeleton(partial) {
         ? partial.cursorSessionId
         : undefined,
     cursorMode: partial.cursorMode || "none",
+    cursorUnavailableReason:
+      typeof partial.cursorUnavailableReason === "string"
+        ? partial.cursorUnavailableReason.slice(0, 300)
+        : undefined,
+    cursorRuntime:
+      partial.cursorRuntime && typeof partial.cursorRuntime === "object"
+        ? {
+            node: typeof partial.cursorRuntime.node === "string" ? partial.cursorRuntime.node : undefined,
+            execPath:
+              typeof partial.cursorRuntime.execPath === "string"
+                ? partial.cursorRuntime.execPath
+                : undefined,
+            apiKeyPresent: partial.cursorRuntime.apiKeyPresent === true,
+            sdkResolved: partial.cursorRuntime.sdkResolved === true,
+          }
+        : undefined,
     latestEngineTurn:
       typeof partial.latestEngineTurn === "string"
         ? partial.latestEngineTurn

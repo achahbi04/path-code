@@ -216,15 +216,13 @@ export function projectEngineeringActivity(build, extras = {}) {
     checkpoint?.worktreePath,
     checkpoint?.repoRoot,
   ].filter((value) => typeof value === "string");
-  const files = [
-    ...(Array.isArray(checkpoint?.changedFiles) ? checkpoint.changedFiles : []),
-    ...(Array.isArray(extras.diff?.files) ? extras.diff.files : []),
-    ...(Array.isArray(extras.worktreeFiles) ? extras.worktreeFiles : []),
-  ]
-    .map((file) => relativeProjectPath(String(file), roots) || "")
-    .filter(Boolean)
-    .slice(0, 24);
-  const uniqueFiles = [...new Set(files)];
+  const normalizeFiles = (values) =>
+    [...new Set(
+      (Array.isArray(values) ? values : [])
+        .map((file) => relativeProjectPath(String(file), roots) || "")
+        .filter(Boolean),
+    )].slice(0, 24);
+  const checkpointFiles = normalizeFiles(checkpoint?.changedFiles);
   const traceEngine = [...(Array.isArray(extras.traceLines) ? extras.traceLines : [])]
     .reverse()
     .map((line) =>
@@ -254,24 +252,71 @@ export function projectEngineeringActivity(build, extras = {}) {
                 ? "editing"
                 : "inspecting";
 
-  return {
-    action: last?.kind || null,
-    engine,
-    taskId: last?.taskId || checkpoint?.taskId || null,
+  const currentTaskId = last?.taskId || null;
+  const currentOwnsCheckpoint = !checkpoint?.taskId || checkpoint.taskId === currentTaskId;
+  const currentFiles = currentOwnsCheckpoint ? checkpointFiles : [];
+  const currentFailed = /FAIL|CANCEL|NOT_VERIFIED|BLOCKED/i.test(String(last?.classification || ""));
+  const adoptionTaskId = adoption?.taskId || null;
+  const adoptionMatchesCurrent = Boolean(currentTaskId && adoptionTaskId && adoptionTaskId === currentTaskId);
+  const revisionFiles = normalizeFiles(
+    Array.isArray(adoption?.files) && adoption.files.length
+      ? adoption.files
+      : extras.revisionDiff?.sha && extras.revisionDiff.sha === adoption?.adoptedSha
+        ? extras.revisionDiff.files
+        : [],
+  );
+  const currentTask = {
+    engine: currentOwnsCheckpoint ? engine : engineName(last?.provider),
+    taskId: currentTaskId,
     phase,
     label: latestStep?.label || labelFromBuildEvents(events),
-    files: uniqueFiles,
+    files: currentFailed && !adoptionMatchesCurrent ? [] : currentFiles,
+    diff: null,
+    classification: last?.classification || null,
+    dispatchState: last?.dispatchState || null,
+    intentRevision: last?.intentRevision || null,
+    resultSha: currentOwnsCheckpoint ? last?.resultFingerprint || checkpoint?.sha || null : last?.resultFingerprint || null,
+    adoptedSha: adoptionMatchesCurrent ? adoption?.adoptedSha || null : null,
+    failure: currentFailed
+      ? String(last?.failureReason || last?.classification || "failed").slice(0, 300)
+      : null,
+  };
+  const latestRevision = adoption
+    ? {
+        sha: adoption.adoptedSha || null,
+        taskId: adoptionTaskId,
+        engine: adoption.engine || null,
+        actionId: adoption.actionId || null,
+        intentRevision: adoption.intentRevision || null,
+        resultId: adoption.resultId || adoption.sourceSha || null,
+        files: revisionFiles,
+        diff:
+          extras.revisionDiff?.sha && extras.revisionDiff.sha === adoption.adoptedSha
+            ? extras.revisionDiff.summary || null
+            : adoption.diff || null,
+        adoptedAt: adoption.adoptedAt || null,
+      }
+    : null;
+  return {
+    action: last?.kind || null,
+    engine: currentTask.engine,
+    taskId: currentTask.taskId,
+    phase,
+    label: currentTask.label,
+    files: currentFailed && !adoptionMatchesCurrent ? [] : currentTask.files,
     steps,
-    diff: extras.diff?.summary || null,
+    diff: currentTask.diff,
     commands: (extras.diff?.commands || [])
       .map((command) => sanitizeCommand(command))
       .filter(Boolean),
-    checks: checkpoint?.validation || last?.classification || null,
-    resultSha: last?.resultFingerprint || checkpoint?.sha || null,
-    adoptedSha: adoption?.adoptedSha || build?.authoritativeSha || null,
+    checks: currentOwnsCheckpoint ? checkpoint?.validation || last?.classification || null : last?.classification || null,
+    resultSha: currentTask.resultSha,
+    adoptedSha: currentTask.adoptedSha,
     authoritativeSha: build?.authoritativeSha || null,
     dispatchState: last?.dispatchState || null,
     classification: last?.classification || null,
     intentRevision: last?.intentRevision || build?.intent?.outcomeRevision || null,
+    currentTask,
+    latestRevision,
   };
 }

@@ -224,6 +224,48 @@ export function classifyCursorFailure(err) {
  *
  * @param {{ cwd?: string, env?: Record<string, string | undefined> }} [opts]
  */
+/**
+ * Dispatch-compatible Cursor readiness. Same prerequisites as agent init,
+ * without spending an engineering generation.
+ * @param {{ env?: Record<string, string | undefined> }} [opts]
+ */
+export function probeCursorDispatchReadiness(opts = {}) {
+  const env = opts.env || process.env;
+  const [major, minor] = String(process.versions.node || "0")
+    .split(".")
+    .map((part) => Number(part) || 0);
+  const nodeOk = major > 22 || (major === 22 && minor >= 13);
+  const apiKeyPresent = Boolean(
+    resolveCursorApiKey(env, { includeStored: env === process.env }),
+  );
+  let sdkResolved = false;
+  /** @type {string | null} */
+  let sdkReason = null;
+  try {
+    const require = createRequire(pathToFileURL(join(PACKAGE_ROOT, "package.json")).href);
+    const sdk = require("@cursor/sdk");
+    const Agent = sdk?.Agent || sdk?.default?.Agent;
+    sdkResolved = typeof Agent?.create === "function";
+  } catch (error) {
+    sdkReason = error instanceof Error ? error.message : String(error);
+  }
+  /** @type {string | null} */
+  let reason = null;
+  if (!nodeOk) reason = `unsupported_runtime ${process.version}`;
+  else if (!apiKeyPresent) reason = "auth_unavailable";
+  else if (!sdkResolved) {
+    reason = sdkReason ? `sdk_unavailable ${sdkReason}`.slice(0, 180) : "sdk_unavailable";
+  }
+  return {
+    ready: nodeOk && apiKeyPresent && sdkResolved,
+    node: process.version,
+    execPath: process.execPath,
+    apiKeyPresent,
+    sdkResolved,
+    reason,
+  };
+}
+
 export async function detectCursorEngine(opts = {}) {
   /** @type {string[]} */
   const evidence = [];

@@ -184,6 +184,9 @@ export function writeBuildRecord(
 ): BuildRecord;
 export function listBuildRecords(runtimeRoot: string): BuildRecord[];
 export function findLatestActiveBuild(runtimeRoot: string): BuildRecord | null;
+export function selectSurfaceBuildId(
+  records: Array<{ buildId?: string; loop?: { status?: string } }>,
+): string | null;
 export function appendPendingConversation(
   runtimeRoot: string,
   buildId: string,
@@ -473,34 +476,63 @@ export function projectBuildForSurface(
     | BuildRecord
     | {
         buildId: string;
-        loop: { status: BuildRecord["loop"]["status"]; [key: string]: unknown };
+        loop: { status: string; [key: string]: unknown };
         intent: {
           outcome: string;
           outcomeRevision: number;
           explicitRequirements?: ExplicitRequirement[];
           [key: string]: unknown;
         };
-        outcomeCriteria?: OutcomeCriterion[];
-        projectBindings?: ProjectBinding[];
-        children?: Array<Partial<BuildChild> & { kind?: BuildChild["kind"] }>;
+        outcomeCriteria?: Array<{
+          id: string;
+          statement: string;
+          status: string;
+          required?: boolean;
+          evidence?: unknown;
+        }>;
+        projectBindings?: Array<Partial<ProjectBinding>>;
+        children?: unknown[];
         hypotheses?: BuildRecord["hypotheses"];
-        conversation?: BuildRecord["conversation"];
+        conversation?: Array<{
+          id: string;
+          role: string;
+          text: string;
+          at?: string;
+          status?: string;
+          intentRevision?: number;
+        }>;
         authoritativeSha?: string | null;
+        productBranch?: string | null;
+        adoptionHistory?: unknown[];
       }
     | null,
   state?: {
-    preview?: { status: string; embedPath?: string; url?: string };
+    preview?: { status?: string; embedPath?: string; url?: string; revision?: string };
     runtime?: { status: string; url?: string; reason?: string; exitCode?: number };
     events?: Array<{ id?: number; type?: string; at?: string }>;
     checkpoint?: Record<string, unknown>;
+    traces?: Array<{ taskId?: string; lines?: object[] }>;
   },
 ): {
   phase: string;
   headline: string;
   buildId?: string;
   projectRoot?: string;
-  criteria?: OutcomeCriterion[];
-  conversation?: BuildRecord["conversation"];
+  criteria?: Array<OutcomeCriterion & { creatorStatus?: string }>;
+  conversation?: Array<{
+    id?: string;
+    role?: string;
+    text?: string;
+    status?: string;
+    at?: string;
+  }>;
+  identity?: {
+    buildId?: string;
+    productBranch?: string | null;
+    previewSha?: string | null;
+    currentIntentRevision?: number;
+    loopStatus?: string;
+  };
   preview: { embedPath?: string };
   uiState?: string;
   handoff?: { projectRoot: string };
@@ -508,6 +540,9 @@ export function projectBuildForSurface(
   engineeringActivity?: {
     engine?: string | null;
     files?: string[];
+    adoptedSha?: string | null;
+    currentTask?: { taskId?: string | null; files?: string[]; adoptedSha?: string | null };
+    latestRevision?: { taskId?: string | null; sha?: string | null; files?: string[] } | null;
     [key: string]: unknown;
   };
   engineeringTimeline?: {
@@ -516,9 +551,11 @@ export function projectBuildForSurface(
       sequence: number;
       kind: string;
       summary: string;
+      timestamp?: string | null;
       taskId?: string | null;
       engine?: string | null;
     }>;
+    turns?: Array<{ taskId?: string | null; clockReversed?: boolean }>;
     current: { summary?: string; kind?: string } | null;
   };
 };

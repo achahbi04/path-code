@@ -600,6 +600,59 @@ export function formatFabricHandoff(packet) {
  * @param {EngineId} engine
  * @returns {EngineTurnResult}
  */
+/**
+ * One mutating engine per attempt. A replacement engine requires an explicit
+ * fallback policy and a new task; this record does not start that task.
+ *
+ * @param {{
+ *   preferred?: string | null,
+ *   cursorMode?: string | null,
+ *   fallback?: string | null,
+ * }} input
+ */
+export function resolveMutatingEngineAttempt(input) {
+  const preferred = String(input?.preferred || "").trim().toLowerCase();
+  const cursorMode = String(input?.cursorMode || "").trim().toLowerCase();
+  const fallback = String(input?.fallback || "").trim().toLowerCase();
+  const explicit = fallback === "copilot" || fallback === "antigravity" ? fallback : null;
+  if (preferred === "cursor" && cursorMode === "native_sdk") {
+    return {
+      selected: "cursor",
+      fallback: false,
+      blocked: false,
+      newTask: false,
+      reason: "Preferred cursor is ready.",
+    };
+  }
+  if (preferred === "cursor" && cursorMode && cursorMode !== "native_sdk") {
+    if (explicit) {
+      return {
+        selected: explicit,
+        fallback: true,
+        blocked: false,
+        newTask: true,
+        reason: `Cursor attempt ended (${cursorMode}). Continued with ${explicit}.`,
+      };
+    }
+    return {
+      selected: null,
+      fallback: false,
+      blocked: true,
+      newTask: false,
+      reason: `Cursor attempt ended (${cursorMode}). No fallback is configured.`,
+    };
+  }
+  return {
+    selected: preferred || null,
+    fallback: false,
+    blocked: false,
+    newTask: false,
+    reason: preferred
+      ? `Preferred ${preferred} selected for this attempt.`
+      : "No preferred engine; Engine Fabric default for this attempt.",
+  };
+}
+
 export function withEngineProvenance(turn, engine) {
   const base =
     turn && typeof turn === "object" ? /** @type {any} */ (turn) : { ok: false };

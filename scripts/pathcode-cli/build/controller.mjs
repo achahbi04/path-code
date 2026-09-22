@@ -45,7 +45,9 @@ import {
   frameEvaluateObjective,
   frameChallengeObjective,
   completenessClaim,
+  adoptionAllowedForIntent,
 } from "./objectives.mjs";
+import { resolveMutatingEngineAttempt } from "../ag10/engine-contract.mjs";
 import { formatBuildStatus } from "./format.mjs";
 import { detectBuildArtifact } from "./runtime/artifact.mjs";
 import { appendBuildEvent } from "./events.mjs";
@@ -78,9 +80,9 @@ function syncConversationLifecycle(record) {
     const revKids = kids.filter(
       (child) => child.intentRevision === rev && !child.orphanAbandoned,
     );
-    const adopted = revKids.some(
-      (child) => child.kind === "engineer" && child.adoptedSha,
-    );
+    const engineers = revKids.filter((child) => child.kind === "engineer");
+    const latestEngineer = engineers.length ? engineers[engineers.length - 1] : null;
+    const latestAdopted = Boolean(latestEngineer?.adoptedSha);
     const live = (kind) =>
       revKids.some(
         (child) =>
@@ -89,9 +91,15 @@ function syncConversationLifecycle(record) {
             child.dispatchState === "selected" ||
             child.dispatchState === "terminal_seen"),
       );
+    const latestFailed =
+      latestEngineer &&
+      latestEngineer.dispatchState === "consumed" &&
+      !latestEngineer.adoptedSha &&
+      /FAIL|CANCEL|NOT_VERIFIED|BLOCKED/i.test(String(latestEngineer.classification || ""));
     let status = "queued";
-    if (adopted) status = "applied";
-    else if (live("engineer")) status = "applying";
+    if (live("engineer")) status = "applying";
+    else if (latestAdopted) status = "applied";
+    else if (latestFailed) status = "failed";
     else if (live("brief") || live("evaluate") || live("challenge")) status = "preparing";
     else if (revKids.some((child) => child.dispatchState === "consumed")) {
       status = "failed";
@@ -917,6 +925,19 @@ export function createBuildController(opts) {
       child.dispatchedAt = new Date().toISOString();
       child.taskId = started?.taskId || taskId;
     }
+    if (kind === "engineer") {
+      appendBuildEvent(runtimeRoot, buildId, "engine.decision", {
+        actionId,
+        taskId: child?.taskId || taskId,
+        intentRevision: record.intent?.outcomeRevision || null,
+        preferred: preferredEngine || null,
+        selected: preferredEngine || null,
+        reason: preferredEngine
+          ? `Preferred ${preferredEngine} selected for this attempt.`
+          : "No preferred engine; Engine Fabric default for this attempt.",
+        phase: "engineer",
+      });
+    }
     if (kind === "evaluate") record.loop.lastEvaluateTaskId = child?.taskId || taskId;
     if (kind === "challenge") record.loop.lastChallengeTaskId = child?.taskId || taskId;
     syncConversationLifecycle(record);
@@ -1213,7 +1234,35 @@ export function createBuildController(opts) {
       const acceptable =
         /VERIFIED|SUCCESS/i.test(classification) ||
         (/completed/i.test(String(cp?.finalState || "")) && changed);
-      if (acceptable || (changed && !/BLOCKED/i.test(classification))) {
+      const inspectRoot =
+        (typeof cp?.worktreePath === "string" && cp.worktreePath) ||
+        binding?.projectRoot ||
+        null;
+      const artifactNow = inspectRoot
+        ? detectBuildArtifact(inspectRoot, {
+            outcomeHint: record.intent?.outcome,
+          })
+        : null;
+      const intentGuard = adoptionAllowedForIntent(
+        record,
+        artifactNow?.preview?.capability || "none",
+      );
+      const adoptionCandidate =
+        acceptable || (changed && !/BLOCKED/i.test(classification));
+      if (adoptionCandidate && !intentGuard.ok) {
+        child.classification = "NOT_VERIFIED";
+        child.failureReason = intentGuard.reason;
+        record.loop.forceNextKind = "engineer";
+        record.loop.pendingRuntimeRefresh = false;
+        record.hypotheses.proposedNextAction =
+          "The previous result was not a previewable website for the current intent. Build that website in this project. Do not replace it with a CLI or sample program.";
+        appendBuildEvent(runtimeRoot, buildId, "engineer.intent_rejected", {
+          taskId,
+          actionId: child.actionId,
+          intentRevision: child.intentRevision || record.intent.outcomeRevision,
+          capability: artifactNow?.preview?.capability || "none",
+        });
+      } else if (adoptionCandidate) {
         const { adoptEngineerResultIntoBuild, ensureBuildProductBranch } =
           await import("./adopt.mjs");
         const productBranch =
@@ -1250,10 +1299,16 @@ export function createBuildController(opts) {
             record.adoptionHistory.push({
               buildId,
               taskId,
+              actionId: child.actionId,
+              intentRevision: child.intentRevision || record.intent.outcomeRevision,
+              engine: child.provider || null,
+              resultId: child.resultFingerprint || adoption.sourceSha,
+              parentSha: record.authoritativeSha || null,
               sourceSha: adoption.sourceSha,
               adoptedSha: adoption.adoptedSha,
               projectRoot: adoption.projectRoot,
               productBranch: adoption.productBranch,
+              files: Array.isArray(cp?.changedFiles) ? cp.changedFiles.slice(0, 40) : [],
               mode: adoption.mode,
               adoptedAt: adoption.adoptedAt,
             });
@@ -1300,6 +1355,47 @@ export function createBuildController(opts) {
             }
           }
         }
+      }
+    }
+
+    if (
+      child.kind === "engineer" &&
+      !child.adoptedSha &&
+      cp?.preferredEngine === "cursor" &&
+      cp?.cursorMode &&
+      cp.cursorMode !== "none" &&
+      cp.cursorMode !== "native_sdk"
+    ) {
+      const decision = resolveMutatingEngineAttempt({
+        preferred: "cursor",
+        cursorMode: cp.cursorMode,
+        fallback: process.env.PATHCODE_ENGINE_FALLBACK,
+      });
+      const reason = String(
+        cp.cursorUnavailableReason || child.failureReason || decision.reason,
+      ).slice(0, 300);
+      child.failureReason = reason;
+      appendBuildEvent(runtimeRoot, buildId, "engine.decision", {
+        actionId: child.actionId,
+        taskId,
+        intentRevision: child.intentRevision || record.intent.outcomeRevision,
+        preferred: "cursor",
+        selected: decision.selected,
+        reason: decision.fallback
+          ? `${decision.reason} ${reason}`
+          : reason,
+        phase: "engineer",
+        newTask: decision.newTask,
+      });
+      if (decision.fallback && decision.selected) {
+        record.loop.preferredEngineOverride = decision.selected;
+        record.loop.forceNextKind = "engineer";
+        record.loop.status = "running";
+        record.loop.blockedReason = undefined;
+      } else if (decision.blocked) {
+        record.loop.forceNextKind = undefined;
+        record.loop.status = "blocked";
+        record.loop.blockedReason = reason;
       }
     }
 
@@ -1897,7 +1993,7 @@ export function createBuildController(opts) {
         record,
         productStillEmpty
           ? record.hypotheses.proposedNextAction ||
-              "Establish a real runnable web product in this Build folder (index.html or package.json + start). Do not run git init — the repository already exists."
+              "Establish the previewable website named by the current intent in this Build folder. A CLI or unrelated sample is not the product. Do not run git init — the repository already exists."
           : record.hypotheses.proposedNextAction || "",
       );
       record.loop.forceNextKind = undefined;
@@ -1983,10 +2079,17 @@ export function createBuildController(opts) {
       objective = frameEvaluateObjective(record);
     }
 
+    const engineOverride = record.loop.preferredEngineOverride || null;
+    if (engineOverride) {
+      record.loop.preferredEngineOverride = undefined;
+      writeBuildRecord(runtimeRoot, record);
+    }
     const dispatched = await dispatchChild(buildId, kind, objective, {
       ...(kind === "challenge"
         ? { preferEngine: null, preferredEngine: null }
-        : {}),
+        : engineOverride
+          ? { preferredEngine: engineOverride }
+          : {}),
     });
     if (!dispatched.ok) return dispatched;
     if (kind === "engineer" && record.loop.pendingSelectedElement) {

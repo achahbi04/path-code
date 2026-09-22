@@ -16,6 +16,8 @@ export function projectEngineeringTimeline(
     kind: string;
     status: string;
     summary: string;
+    timestamp: string | null;
   }>;
-  current: { summary?: string; kind?: string } | null;
+    current: { summary?: string; kind?: string } | null;
+    turns: Array<{ taskId: string | null; clockReversed?: boolean; status?: string }>;
 };
