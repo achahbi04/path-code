@@ -22,6 +22,7 @@ export {
   readBuildEvents,
   resolveBuildEventPath,
   sanitizeBuildEventValue,
+  surfaceViewSanitizeLimits,
 } from "./events.mjs";
 
 export { ensureBuildOrigin, isBindableProject, hasGitDir } from "./origin.mjs";

@@ -7,6 +7,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { runPathBuildMain } from "../../scripts/path-build.mjs";
 import {
+  sanitizeBuildEventValue,
+  surfaceViewSanitizeLimits,
+} from "../../scripts/pathcode-cli/build/index.mjs";
+import {
   createBuildController,
   projectBuildForSurface,
   readBuildEvents,
@@ -229,6 +233,30 @@ describe("PATH Build experience", () => {
       if (previous.gateway == null) delete process.env.PATHCODE_GATEWAY_FAKE_ENGINE;
       else process.env.PATHCODE_GATEWAY_FAKE_ENGINE = previous.gateway;
     }
+  });
+
+  it("does not drop engineering timeline entries on the surface projection", () => {
+    const entries = Array.from({ length: 80 }, (_, index) => ({
+      sequence: index + 1,
+      summary: `CURSOR READ src/file-${index}.ts`,
+      kind: "file_read",
+    }));
+    const view = {
+      engineeringTimeline: {
+        entries,
+        current: entries[entries.length - 1],
+        phases: [{ id: "engineer", label: "Building", status: "done", count: 80 }],
+      },
+    };
+    const durable = sanitizeBuildEventValue(view) as {
+      engineeringTimeline: { entries: unknown[] };
+    };
+    expect(durable.engineeringTimeline.entries).toHaveLength(50);
+    const surface = sanitizeBuildEventValue(view, 0, surfaceViewSanitizeLimits()) as {
+      engineeringTimeline: { entries: Array<{ summary: string }> };
+    };
+    expect(surface.engineeringTimeline.entries).toHaveLength(80);
+    expect(surface.engineeringTimeline.entries[79]?.summary).toBe("CURSOR READ src/file-79.ts");
   });
 
   it("shows an engine start failure without synthetic engineering", async () => {

@@ -33,7 +33,7 @@ import {
 } from "../runtime/proxy.mjs";
 import { launchPathCodeInTerminal } from "./handoff.mjs";
 import { ensureBuildCoordinator } from "../coordinator/ensure.mjs";
-import { sanitizeBuildEventValue } from "../events.mjs";
+import { sanitizeBuildEventValue, surfaceViewSanitizeLimits } from "../events.mjs";
 import { readTaskCheckpoint } from "../../ag10/task-checkpoint.mjs";
 import { readTaskTrace } from "../../task-trace.mjs";
 
@@ -407,7 +407,7 @@ export async function startPathBuildSurface(options) {
                 limit: 250,
               });
               for (const event of replay.events || []) {
-                const view = sanitizeBuildEventValue(await viewFor(buildId));
+                const view = sanitizeBuildEventValue(await viewFor(buildId), 0, surfaceViewSanitizeLimits());
                 const payload = JSON.stringify({
                   event,
                   view,
@@ -425,7 +425,7 @@ export async function startPathBuildSurface(options) {
               // already at the latest Build event id would otherwise wait
               // forever for the next event, and task-trace progress does not
               // itself append a Build event.
-              const view = sanitizeBuildEventValue(await viewFor(buildId));
+              const view = sanitizeBuildEventValue(await viewFor(buildId), 0, surfaceViewSanitizeLimits());
               const revision = Number(view?.viewRevision);
               if (!Number.isFinite(revision) || revision !== lastSentRevision) {
                 res.write(

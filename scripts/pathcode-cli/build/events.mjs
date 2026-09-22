@@ -28,8 +28,19 @@ export function resolveBuildEventPath(runtimeRoot, buildId) {
   return join(dirs.metadata, "build-events", `${safeBuildId(buildId)}.events.ndjson`);
 }
 
-export function sanitizeBuildEventValue(value, depth = 0) {
-  if (depth > 6) return "[truncated]";
+/**
+ * Durable event records stay bounded. The live Build surface passes
+ * surfaceViewSanitizeLimits() so the engineering timeline is not cut to 50.
+ *
+ * @param {unknown} value
+ * @param {number} [depth]
+ * @param {{ maxItems?: number, maxKeys?: number, maxDepth?: number }} [limits]
+ */
+export function sanitizeBuildEventValue(value, depth = 0, limits = undefined) {
+  const maxItems = limits?.maxItems ?? 50;
+  const maxKeys = limits?.maxKeys ?? 80;
+  const maxDepth = limits?.maxDepth ?? 6;
+  if (depth > maxDepth) return "[truncated]";
   if (value === null || typeof value === "boolean" || typeof value === "number") {
     return value;
   }
@@ -44,18 +55,26 @@ export function sanitizeBuildEventValue(value, depth = 0) {
       .slice(0, MAX_STRING);
   }
   if (Array.isArray(value)) {
-    return value.slice(0, 50).map((item) => sanitizeBuildEventValue(item, depth + 1));
+    const items = value.length > maxItems ? value.slice(0, maxItems) : value;
+    return items.map((item) => sanitizeBuildEventValue(item, depth + 1, limits));
   }
   if (value && typeof value === "object") {
     const out = {};
-    for (const [key, item] of Object.entries(value).slice(0, 80)) {
+    const keys = Object.entries(value);
+    const limited = keys.length > maxKeys ? keys.slice(0, maxKeys) : keys;
+    for (const [key, item] of limited) {
       out[key] = SENSITIVE_KEY.test(key)
         ? "[redacted]"
-        : sanitizeBuildEventValue(item, depth + 1);
+        : sanitizeBuildEventValue(item, depth + 1, limits);
     }
     return out;
   }
   return String(value).slice(0, MAX_STRING);
+}
+
+/** Limits for the operator surface projection. Not a second event store. */
+export function surfaceViewSanitizeLimits() {
+  return { maxItems: 1_000_000, maxKeys: 500, maxDepth: 16 };
 }
 
 function parseEvents(raw) {

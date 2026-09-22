@@ -211,6 +211,16 @@ export function appendBuildEvent(
   type: string,
   data?: JsonValue,
 ): BuildEvent;
+export function sanitizeBuildEventValue(
+  value: unknown,
+  depth?: number,
+  limits?: { maxItems?: number; maxKeys?: number; maxDepth?: number },
+): unknown;
+export function surfaceViewSanitizeLimits(): {
+  maxItems: number;
+  maxKeys: number;
+  maxDepth: number;
+};
 export function readBuildEvents(
   runtimeRoot: string,
   buildId: string,
