@@ -4,58 +4,40 @@ import { defineConfig } from "vitest/config";
  * The public-authority suites temporarily corrupt src/editing/types.ts and
  * coordinate through a cross-process file mutex. Waiting on that mutex is
  * synchronous, so a worker that waits cannot service Vitest RPC — which
- * surfaced as `[vitest-worker]: Timeout calling "onTaskUpdate"`.
+ * surfaces as `[vitest-worker]: Timeout calling "onTaskUpdate"`.
  *
- * These files are therefore confined to a single fork, where Vitest runs test
- * files one after another. No two lock owners can be in flight at once, so the
- * contended branch of the mutex is never reached and no worker ever blocks on
- * it. The lock itself is retained unchanged as the correctness guarantee for
- * any other execution order.
- */
-const SRC_LOCK_OWNING_SUITES = [
-  "tests/architecture/public-authority-surface.test.ts",
-  "tests/architecture/public-authority-surface-h1.test.ts",
-  "tests/architecture/public-authority-surface-h2.test.ts",
-  "tests/architecture/public-authority-surface-derived.test.ts",
-];
-
-/**
- * Root worker bound (Vitest forbids `maxWorkers` inside project configs).
+ * The owning files are public-authority-surface, -h1, -h2, and -derived.
+ * The lock itself stays unchanged as the correctness guarantee for any other
+ * execution order.
  *
- * Many suites build disposable Git worktrees (`initCommitWorktree` alone
- * spawns six sequential `git` subprocesses per fixture). With the Vitest
- * default of one worker per CPU, an 8-core host can keep eight of those
- * files in flight at once while `src-lock-serial` still holds its own fork —
- * enough concurrent Git/FS fan-out to inflate wall-clock past the default
- * 5 s test budget and starve worker RPC / the serial project (observed as
- * mass timeouts plus a 65-file report that omitted the four lock-owning
- * suites). Two workers still dropped the worker RPC (`Timeout calling
- * "onTaskUpdate"`) after the public-authority H2 file ran about 65s, with
- * every reported test passed. One root worker keeps that RPC alive. It does
- * not change assertions or the discovery set.
+ * A separate serial project was not enough. With two projects, Vitest still
+ * kept a second fork. The first cold check of 8e4fd1f finished every
+ * assertion (1575 passed) and then died on that RPC timeout after the H2
+ * file, so three files never reported. One project and one fork removes
+ * that second waiter. Assertions and the discovery set stay the same.
+ *
+ * Many suites also build disposable Git worktrees. The default of one worker
+ * per CPU can keep several of those files in flight at once and starve the
+ * same RPC. One root worker and fileParallelism: false keep the suite serial.
  */
 const ROOT_MAX_WORKERS = 1;
 
 export default defineConfig({
   test: {
     maxWorkers: ROOT_MAX_WORKERS,
+    fileParallelism: false,
     testTimeout: 20_000,
+    pool: "forks",
+    poolOptions: { forks: { singleFork: true, maxForks: 1, minForks: 1 } },
     projects: [
-      {
-        test: {
-          name: "src-lock-serial",
-          include: SRC_LOCK_OWNING_SUITES,
-          // One fork, files run sequentially: no cross-worker lock contention.
-          pool: "forks",
-          poolOptions: { forks: { singleFork: true } },
-          testTimeout: 20_000,
-        },
-      },
       {
         test: {
           name: "default",
           include: ["tests/**/*.test.ts"],
-          exclude: ["**/node_modules/**", ...SRC_LOCK_OWNING_SUITES],
+          exclude: ["**/node_modules/**"],
+          pool: "forks",
+          poolOptions: { forks: { singleFork: true, maxForks: 1, minForks: 1 } },
+          fileParallelism: false,
           testTimeout: 20_000,
         },
       },
