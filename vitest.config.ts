@@ -29,11 +29,12 @@ const SRC_LOCK_OWNING_SUITES = [
  * enough concurrent Git/FS fan-out to inflate wall-clock past the default
  * 5 s test budget and starve worker RPC / the serial project (observed as
  * mass timeouts plus a 65-file report that omitted the four lock-owning
- * suites). Bounding the root run to two workers preserves every assertion
- * and discovery set; it only limits scheduling concurrency so fixture cost
- * tracks a shared developer machine instead of saturating it.
+ * suites). Two workers still dropped the worker RPC (`Timeout calling
+ * "onTaskUpdate"`) after the public-authority H2 file ran about 65s, with
+ * every reported test passed. One root worker keeps that RPC alive. It does
+ * not change assertions or the discovery set.
  */
-const ROOT_MAX_WORKERS = 2;
+const ROOT_MAX_WORKERS = 1;
 
 export default defineConfig({
   test: {
