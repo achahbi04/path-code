@@ -358,6 +358,10 @@ export async function startPathBuildSurface(options) {
         sendFile(res, join(PUBLIC_DIR, "index.html"));
         return;
       }
+      if (method === "GET" && (path === "/live" || path === "/live.html")) {
+        sendFile(res, join(PUBLIC_DIR, "live.html"));
+        return;
+      }
       if (method === "GET" && path.startsWith("/assets/")) {
         const rel = path.slice("/assets/".length).replace(/\.\./g, "");
         sendFile(res, join(PUBLIC_DIR, rel));
@@ -435,6 +439,19 @@ export async function startPathBuildSurface(options) {
           build.displayTitle = title;
           writeBuildRecord(runtimeRoot, build);
           sendJson(res, 200, { ok: true, displayTitle: title, view: await viewFor(buildId) });
+          return;
+        }
+
+        if (method === "POST" && (action === "archive" || action === "restore")) {
+          const build = readBuildRecord(runtimeRoot, buildId);
+          if (!build) {
+            sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
+            return;
+          }
+          if (action === "archive") build.archivedAt = new Date().toISOString();
+          else delete build.archivedAt;
+          writeBuildRecord(runtimeRoot, build);
+          sendJson(res, 200, { ok: true, archived: action === "archive", view: await viewFor(buildId) });
           return;
         }
 

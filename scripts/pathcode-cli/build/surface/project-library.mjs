@@ -9,29 +9,71 @@ import { resolve, sep } from "node:path";
 const UNDERSTANDING_CARD =
   /^Understanding that request before engineering/i;
 
+const GENERIC_NOUN =
+  /^(website|site|webpage|page|app|application|homepage|product)$/i;
+
+/**
+ * A product name already written in the text, such as "ICE (In Case of Emergency)"
+ * or "ICE — In Case of Emergency". This is not a title hammer: lowercase phrasing
+ * stays an outcome phrase.
+ * @param {string} text
+ */
+function namedProduct(text) {
+  const source = String(text || "");
+  const paren = source.match(/\b([A-Z][A-Z0-9]{1,8})\s*\(([^)]{3,48})\)/);
+  if (paren) return clipTitle(`${paren[1]} — ${paren[2].replace(/\s+/g, " ").trim()}`);
+  const dash = source.match(/\b([A-Z][A-Z0-9]{1,8})\s*[—–-]\s*(In Case of Emergency)\b/);
+  if (dash) return `${dash[1]} — ${dash[2]}`;
+  return "";
+}
+
+/**
+ * @param {string} title
+ */
+function clipTitle(title) {
+  const clean = String(title || "").replace(/\s+/g, " ").trim();
+  if (!clean) return "Untitled project";
+  const words = clean.split(/\s+/).slice(0, 8).join(" ");
+  const clipped = words.length > 56 ? `${words.slice(0, 53).trim()}…` : words;
+  return clipped.charAt(0).toUpperCase() + clipped.slice(1);
+}
+
 /**
  * @param {string | null | undefined} outcome
  * @param {{ summary?: string } | null | undefined} [brief]
  */
 export function deriveDisplayTitle(outcome, brief) {
+  const named = namedProduct(brief?.summary) || namedProduct(outcome);
+  if (named) return named;
   const source = String(outcome || brief?.summary || "").replace(/\s+/g, " ").trim();
   if (!source) return "Untitled project";
-  const fromBrief = String(brief?.summary || "").replace(/\s+/g, " ").trim();
-  if (fromBrief && fromBrief.length <= 56 && !/^build\b/i.test(fromBrief)) {
-    return fromBrief;
-  }
   let title = source
     .replace(
       /^(please\s+)?(can you\s+)?(build|create|make|design)\s+(me\s+)?(an|the|a)?\s*/i,
       "",
     )
-    .replace(/\s+that\b[\s\S]*$/i, "")
     .replace(/[.?!].*$/, "")
     .trim();
-  if (!title) title = source;
-  const words = title.split(/\s+/).slice(0, 8).join(" ");
-  const clipped = words.length > 56 ? `${words.slice(0, 53).trim()}…` : words;
-  return clipped.charAt(0).toUpperCase() + clipped.slice(1);
+  const homepage = title.match(/^homepage\s+for\s+(.+)$/i);
+  if (homepage) {
+    const subject = homepage[1].replace(/\s+that\b[\s\S]*$/i, "").trim();
+    return clipTitle(subject ? `${subject} homepage` : "Homepage");
+  }
+  const genericThat = title.match(
+    /^(website|site|page|app|application|homepage|product)\s+that\s+(.+)$/i,
+  );
+  if (genericThat) {
+    const rest = genericThat[2]
+      .replace(/^(?:tells|explains|describes|shows)\s+(?:me\s+)?(?:about\s+)?/i, "")
+      .replace(/\s+and how to use\b[\s\S]*$/i, "")
+      .trim();
+    title = rest || title;
+  } else {
+    const head = title.split(/\s+that\b/i)[0].trim();
+    const headWords = head.split(/\s+/).filter(Boolean);
+    if (head && !(headWords.length === 1 && GENERIC_NOUN.test(headWords[0]))) title = head;
+  }
+  return clipTitle(title);
 }
 
 /**
@@ -76,6 +118,38 @@ export function criteriaSummary(criteria) {
     else pending += 1;
   }
   return { met, failed, pending, total: pool.length };
+}
+
+/**
+ * Proven criteria stay the project outcome. While a request is live, open
+ * criteria are the current request. Same outcomeCriteria array; no second store.
+ *
+ * @param {Array<{ status?: string, required?: boolean, statement?: string }> | null | undefined} criteria
+ * @param {{ live?: boolean }} [options]
+ */
+export function criteriaProjection(criteria, options = {}) {
+  const list = Array.isArray(criteria) ? criteria : [];
+  const project = criteriaSummary(list);
+  const proven = list.filter((item) => {
+    const status = String(item?.status || "").toUpperCase();
+    return status === "PROVEN" || status === "SATISFIED" || status === "MET" || status === "PASS";
+  });
+  const open = list.filter((item) => !proven.includes(item));
+  if (options.live && proven.length && open.length) {
+    return {
+      split: true,
+      project: { met: proven.length, failed: 0, pending: 0, total: proven.length },
+      request: criteriaSummary(open),
+    };
+  }
+  return { split: false, project, request: null };
+}
+
+/**
+ * @param {object | null | undefined} build
+ */
+export function isArchived(build) {
+  return typeof build?.archivedAt === "string" && build.archivedAt.length > 0;
 }
 
 export function displayTitleFor(build) {
@@ -159,6 +233,7 @@ export function libraryRow(build) {
           ? "connected"
           : "local",
     authoritativeSha: build?.authoritativeSha || null,
+    archived: isArchived(build),
   };
 }
 

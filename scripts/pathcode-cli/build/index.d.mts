@@ -153,6 +153,7 @@ export interface BuildRecord {
   }>;
   productBranch?: string;
   displayTitle?: string;
+  archivedAt?: string;
   repository?: {
     syncAdopted?: boolean;
     lastSyncedSha?: string | null;
@@ -556,6 +557,13 @@ export function projectBuildForSurface(
   creatorStatus?: string;
   creatorPhase?: string;
   criteriaSummary?: { met: number; failed: number; pending: number; total: number };
+  criteriaProjection?: {
+    split: boolean;
+    project: { met: number; failed: number; pending: number; total: number };
+    request: { met: number; failed: number; pending: number; total: number } | null;
+  };
+  requestLabel?: string | null;
+  archived?: boolean;
   activeEngineering?: boolean;
   needsRecovery?: boolean;
   engineeringActivity?: {

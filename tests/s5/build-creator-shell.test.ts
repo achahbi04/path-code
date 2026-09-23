@@ -13,9 +13,12 @@ import { projectEngineeringTimeline } from "../../scripts/pathcode-cli/build/sur
 import { projectBuildForSurface } from "../../scripts/pathcode-cli/build/surface/product-view.mjs";
 import {
   creatorConversation,
+  criteriaProjection,
   criteriaSummary,
   deriveDisplayTitle,
+  displayTitleFor,
   hasActiveEngineering,
+  isArchived,
   isCreatorProject,
   isCreatorProjectRoot,
 } from "../../scripts/pathcode-cli/build/surface/project-library.mjs";
@@ -50,8 +53,30 @@ describe("PATH Builder creator shell", () => {
       ),
     ).toBe("ICE in case of emergency website");
     expect(
-      deriveDisplayTitle("Build a polished public website for ICE — In Case of Emergency. Explain what ICE is"),
+      deriveDisplayTitle("Build an ICE  in case of emergency website that define the app"),
     ).not.toBe("ICE — In Case of Emergency");
+    expect(
+      deriveDisplayTitle("Build a polished public website for ICE — In Case of Emergency. Explain what ICE is"),
+    ).toBe("ICE — In Case of Emergency");
+    expect(
+      deriveDisplayTitle("Build a website that tells about ICE in case of emergency app and how to use it"),
+    ).not.toBe("Website");
+    expect(deriveDisplayTitle("homepage for medical")).toBe("Medical homepage");
+    expect(
+      displayTitleFor({
+        displayTitle: null,
+        intent: { outcome: "Build an ICE in case of emergency website that explains the product" },
+        productBrief: { summary: "Static ICE (In Case of Emergency) marketing website" },
+      }),
+    ).toBe("ICE — In Case of Emergency");
+    expect(criteriaProjection([
+      { status: "PROVEN", required: true },
+      { status: "UNKNOWN", required: true, statement: "CTA" },
+    ], { live: true }).split).toBe(true);
+    expect(criteriaProjection([
+      { status: "PROVEN", required: true },
+      { status: "PROVEN", required: true },
+    ], { live: false }).split).toBe(false);
     const dir = mkdtempSync(join(tmpdir(), "path-library-"));
     const runtimeRoot = join(dir, "rt");
     const projectRoot = join(dir, "ice");
@@ -68,6 +93,10 @@ describe("PATH Builder creator shell", () => {
     writeBuildRecord(runtimeRoot, record);
     const stored = readBuildRecord(runtimeRoot, record.buildId);
     expect(stored?.displayTitle).toBe("ICE meeting");
+    expect(isArchived(stored)).toBe(false);
+    stored.archivedAt = "2026-09-23T00:00:00.000Z";
+    writeBuildRecord(runtimeRoot, stored);
+    expect(isArchived(readBuildRecord(runtimeRoot, record.buildId))).toBe(true);
     expect(stored?.projectBindings?.[0]?.projectRoot).toBe(projectRoot);
     expect(stored?.productBranch).toBe("path-build/dcca5ffb");
     expect(stored?.buildId).toBe(record.buildId);

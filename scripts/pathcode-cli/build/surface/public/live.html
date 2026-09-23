@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PATH • Live Product</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      body { height: 100dvh; overflow: hidden; }
+      .live-shell { height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+      .live-bar { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line); }
+      .live-title { font-family: var(--font-display); }
+      .live-stage { min-height: 0; display: grid; place-items: center; overflow: auto; }
+      .live-stage[data-viewport="desktop"] #liveFrame { width: 100%; height: 100%; }
+      .live-stage[data-viewport="tablet"] #liveFrame { width: 834px; height: 100%; }
+      .live-stage[data-viewport="mobile"] #liveFrame { width: 390px; height: 100%; }
+      #liveFrame { border: 0; background: #fff; }
+      .live-empty { color: var(--muted); padding: 2rem; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div class="live-shell">
+      <header class="live-bar">
+        <p class="lockup lockup-mini"><span>PATH</span><span class="lockup-dot" aria-hidden="true"></span><span>Live Product</span></p>
+        <strong class="live-title" id="liveTitle">Project</strong>
+        <div class="viewport-toggles" role="group" aria-label="Viewport">
+          <button type="button" class="ghost tiny active" data-live-viewport="desktop">Desktop</button>
+          <button type="button" class="ghost tiny" data-live-viewport="tablet">Tablet</button>
+          <button type="button" class="ghost tiny" data-live-viewport="mobile">Mobile</button>
+        </div>
+        <button type="button" class="ghost tiny" id="redockBtn">Re-dock</button>
+      </header>
+      <div class="live-stage" id="liveStage" data-viewport="desktop">
+        <p class="live-empty" id="liveEmpty">The live product will appear when this project has a preview.</p>
+        <iframe id="liveFrame" title="Live product" hidden></iframe>
+      </div>
+    </div>
+    <script src="/assets/live.js" type="module"></script>
+  </body>
+</html>

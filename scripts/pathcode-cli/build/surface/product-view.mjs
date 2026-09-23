@@ -10,10 +10,12 @@ import { projectEngineeringTimeline } from "./engineering-timeline.mjs";
 import {
   creatorConversation,
   creatorPhase,
+  criteriaProjection,
   criteriaSummary,
   creatorStatusLabel,
   displayTitleFor,
   hasActiveEngineering,
+  isArchived,
 } from "./project-library.mjs";
 
 /**
@@ -331,6 +333,17 @@ export function projectBuildForSurface(build, extras = {}) {
       source: c.source || null,
     })),
     criteriaSummary: criteriaSummary(build.outcomeCriteria),
+    criteriaProjection: criteriaProjection(build.outcomeCriteria, {
+      live: ["understanding", "engineering", "verifying", "reviewing"].includes(
+        creatorPhase(build),
+      ),
+    }),
+    requestLabel: (() => {
+      const lastUser = [...conversation].reverse().find((message) => message?.role === "user");
+      const text = String(lastUser?.text || "").replace(/\s+/g, " ").trim();
+      return text ? text.slice(0, 72) : null;
+    })(),
+    archived: isArchived(build),
     children: activity,
     conversation,
     activity,

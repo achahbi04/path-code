@@ -7,6 +7,15 @@ export function criteriaSummary(criteria?: Array<{ status?: string; required?: b
   pending: number;
   total: number;
 };
+export function criteriaProjection(
+  criteria?: Array<{ status?: string; required?: boolean; statement?: string }> | null,
+  options?: { live?: boolean },
+): {
+  split: boolean;
+  project: { met: number; failed: number; pending: number; total: number };
+  request: { met: number; failed: number; pending: number; total: number } | null;
+};
+export function isArchived(build?: object | null): boolean;
 export function displayTitleFor(build?: object | null): string;
 export function creatorStatusLabel(build?: object | null): string;
 export function creatorPhase(build?: object | null): string;
@@ -19,6 +28,7 @@ export function libraryRow(build?: object | null): {
   updatedAt: string | null;
   repository: string;
   authoritativeSha: string | null;
+  archived: boolean;
 };
 export function creatorConversation<T extends { role?: string; text?: string }>(
   conversation?: T[] | null,

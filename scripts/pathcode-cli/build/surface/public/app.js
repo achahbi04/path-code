@@ -31,16 +31,27 @@ const els = {
   recoverBuildBtn: document.getElementById("recoverBuildBtn"),
   selectModeBtn: document.getElementById("selectModeBtn"),
   refreshPreviewBtn: document.getElementById("refreshPreviewBtn"),
-  openExternalBtn: document.getElementById("openExternalBtn"),
-  detailsBtn: document.getElementById("detailsBtn"),
+  undockBtn: document.getElementById("undockBtn"),
+  projectModeBtn: document.getElementById("projectModeBtn"),
+  backToProjects: document.getElementById("backToProjects"),
+  projectsMode: document.getElementById("projectsMode"),
+  projectMode: document.getElementById("projectMode"),
+  projectModeTitle: document.getElementById("projectModeTitle"),
+  projectRepoState: document.getElementById("projectRepoState"),
+  projectDetails: document.getElementById("projectDetails"),
+  archiveBtn: document.getElementById("archiveBtn"),
+  restoreBtn: document.getElementById("restoreBtn"),
+  archivedToggle: document.getElementById("archivedToggle"),
+  archivedList: document.getElementById("archivedList"),
+  archivedCount: document.getElementById("archivedCount"),
+  requestLine: document.getElementById("requestLine"),
+  interaction: document.getElementById("interaction"),
   closeDrawerBtn: document.getElementById("closeDrawerBtn"),
   newBuildBtn: document.getElementById("newBuildBtn"),
   openFolderBtn: document.getElementById("openFolderBtn"),
   openCodeBtn: document.getElementById("openCodeBtn"),
   projectList: document.getElementById("projectList"),
   creatorStatus: document.getElementById("creatorStatus"),
-  sourceMenuBtn: document.getElementById("sourceMenuBtn"),
-  sourceMenuPanel: document.getElementById("sourceMenuPanel"),
   copyPathBtn: document.getElementById("copyPathBtn"),
   downloadZipBtn: document.getElementById("downloadZipBtn"),
   repositoryBtn: document.getElementById("repositoryBtn"),
@@ -138,12 +149,37 @@ function dayLabel(timestamp) {
   });
 }
 
+function splitEngineering(summary) {
+  const text = String(summary || "");
+  const match = text.match(
+    /^(READ|SEARCH|CREATE|EDIT|DELETE|RENAME|RUN|TEST|TYPECHECK|BUILD|LINT|RESULT|COMMIT|ADOPT|PREVIEW|FAILURE|INSPECT)\s+([\s\S]*)$/,
+  );
+  if (!match) return { verb: "", target: text };
+  return { verb: match[1], target: match[2] };
+}
+
+function engineeringDetail(entry) {
+  const lines = [
+    entry.engine ? `Executor: ${entry.engine}` : "",
+    entry.diagnostics?.mode || entry.engineMode ? `Mode: ${entry.diagnostics?.mode || entry.engineMode}` : "",
+    entry.taskId ? `Task: ${shortId(entry.taskId)}` : "",
+    entry.actionId ? `Action: ${shortId(entry.actionId)}` : "",
+    entry.source?.sourceOffsetOrEventId != null ? `Trace: ${entry.source.sourceOffsetOrEventId}` : "",
+    entry.file?.relativePath ? `File: ${entry.file.relativePath}` : "",
+    entry.command?.safeDisplay && entry.command.safeDisplay !== entry.summary
+      ? entry.command.safeDisplay
+      : "",
+    entry.command?.exitCode != null ? `Exit: ${entry.command.exitCode}` : "",
+    entry.command?.durationMs != null ? `Duration: ${entry.command.durationMs}ms` : "",
+  ].filter(Boolean);
+  return lines.map((line) => escapeHtml(line)).join("<br>");
+}
+
 function renderWorklog(view) {
   const timeline = view.engineeringTimeline || { phases: [], entries: [], turns: [], current: null };
-  const active = view.status === "running";
-  if (active) els.worklog.classList.remove("collapsed");
-  els.worklogToggle.hidden = active;
-  els.worklogToggle.textContent = els.worklog.classList.contains("collapsed") ? "Show" : "Hide";
+  const expanded = els.interaction?.classList.contains("engineering-expanded");
+  els.worklogToggle.hidden = false;
+  els.worklogToggle.textContent = expanded ? "Collapse to compact" : "Expand";
   const current = timeline.current;
   els.worklogCurrent.textContent = current?.summary || "Engineering has not begun.";
   els.worklogPhases.innerHTML = (timeline.phases || [])
@@ -204,9 +240,17 @@ function renderWorklog(view) {
           const revision = entry.kind === "adopt" || entry.kind === "runtime";
           const banner = revision && !sawRevision ? `<div class="worklog-turn"><strong>Revision</strong></div>` : "";
           if (revision) sawRevision = true;
+          const parts = splitEngineering(entry.summary);
+          const detail = engineeringDetail(entry);
           return `${banner}<div class="worklog-entry" data-kind="${escapeHtml(entry.kind)}" data-sequence="${entry.sequence}">
               <time>${escapeHtml(clock(entry.timestamp))}</time>
-              <span>${escapeHtml(entry.summary || "")}</span>
+              <span class="worklog-verb">${escapeHtml(parts.verb)}</span>
+              <span>${escapeHtml(parts.target)}</span>
+              ${
+                detail
+                  ? `<details class="entry-details"><summary>Details</summary>${detail}</details>`
+                  : ""
+              }
             </div>`;
         })
         .join("");
@@ -389,11 +433,36 @@ function render(view) {
   els.statusPill.textContent = phaseText;
   els.statusPill.dataset.state = state;
   if (els.criteriaLine) {
-    const summary = view.criteriaSummary;
-    els.criteriaLine.textContent = summary && summary.total
-      ? `${summary.met} / ${summary.total} criteria met`
-      : "";
+    const projection = view.criteriaProjection;
+    const summary = projection?.project || view.criteriaSummary;
+    if (projection?.split && summary?.total) {
+      els.criteriaLine.textContent = `project ${summary.met}/${summary.total} proven`;
+    } else if (summary?.total) {
+      els.criteriaLine.textContent = `${summary.met} / ${summary.total}`;
+    } else {
+      els.criteriaLine.textContent = "";
+    }
   }
+  if (els.requestLine) {
+    const projection = view.criteriaProjection;
+    const live = ["understanding", "engineering", "verifying", "reviewing"].includes(view.creatorPhase);
+    if (projection?.split && live) {
+      const requestPhase = {
+        understanding: "Understanding",
+        engineering: "Engineering",
+        verifying: "Verifying",
+        reviewing: "Reviewing",
+      }[view.creatorPhase] || "Current request";
+      els.requestLine.hidden = false;
+      els.requestLine.textContent = `Current request · ${requestPhase}${
+        view.requestLabel ? ` · ${view.requestLabel}` : ""
+      }`;
+    } else {
+      els.requestLine.hidden = true;
+      els.requestLine.textContent = "";
+    }
+  }
+  renderProjectMode(view);
   if (els.chatInput) {
     const editable = view.canSteer !== false && Boolean(view.projectRoot);
     els.chatInput.disabled = !editable;
@@ -403,7 +472,7 @@ function render(view) {
         ? "This project needs attention before it can take a new message."
         : "This record has no product folder.";
     } else {
-      els.chatInput.placeholder = "Ask for a change… e.g. Make the hero darker";
+      els.chatInput.placeholder = "Ask PATH…";
     }
   }
   const phaseLabels = {
@@ -721,6 +790,7 @@ function showComposer(pushHistory) {
   els.buildBtn.disabled = false;
   els.buildBtn.textContent = "Build";
   setWorkspaceVisible(false);
+  setRailMode("projects");
   els.outcome.value = "";
   els.outcome.focus();
   if (pushHistory !== false) {
@@ -746,15 +816,10 @@ els.newBuildBtn.addEventListener("click", () => {
   showComposer(true);
 });
 
-els.detailsBtn.addEventListener("click", () => {
-  closeProjectMenu();
-  els.drawer.hidden = false;
-  els.worklog.classList.remove("collapsed");
-});
 els.worklogToggle.addEventListener("click", () => {
-  if (lastView?.status === "running") return;
-  els.worklog.classList.toggle("collapsed");
-  els.worklogToggle.textContent = els.worklog.classList.contains("collapsed") ? "Show" : "Hide";
+  els.interaction?.classList.toggle("engineering-expanded");
+  const expanded = els.interaction?.classList.contains("engineering-expanded");
+  els.worklogToggle.textContent = expanded ? "Collapse to compact" : "Expand";
 });
 els.closeDrawerBtn.addEventListener("click", () => {
   els.drawer.hidden = true;
@@ -776,7 +841,6 @@ function showHandoffResult(whichTitle, body) {
 }
 
 els.openFolderBtn.addEventListener("click", async () => {
-  closeProjectMenu();
   if (!activeBuildId && !projectRoot) {
     showHandoffResult("Open Folder", {
       ok: false,
@@ -804,7 +868,6 @@ els.openFolderBtn.addEventListener("click", async () => {
 });
 
 els.openCodeBtn.addEventListener("click", async () => {
-  closeProjectMenu();
   if (!activeBuildId && !projectRoot) {
     showHandoffResult("Open in PATH Code", {
       ok: false,
@@ -842,9 +905,9 @@ els.refreshPreviewBtn.addEventListener("click", async () => {
   }
 });
 
-els.openExternalBtn.addEventListener("click", () => {
-  const url = previewDirectUrl || previewEmbed;
-  if (url) window.open(url, "_blank", "noopener");
+els.undockBtn?.addEventListener("click", () => {
+  if (!activeBuildId) return;
+  window.open(`/live?buildId=${encodeURIComponent(activeBuildId)}`, `path-live-${activeBuildId}`);
 });
 
 function postSelectMode() {
@@ -910,31 +973,66 @@ function relativeTime(timestamp) {
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-async function loadProjects() {
-  if (!els.projectList) return;
-  const res = await fetch("/api/builds");
-  const body = await res.json().catch(() => null);
-  const rows = Array.isArray(body?.builds) ? body.builds : [];
-  els.projectList.innerHTML = rows
-    .map((row) => {
-      const current = row.buildId === activeBuildId ? ' aria-current="true"' : "";
-      return `<button type="button" class="project-entry" data-build-id="${escapeHtml(row.buildId)}"${current}>
+function projectButton(row) {
+  const current = row.buildId === activeBuildId ? ' aria-current="true"' : "";
+  return `<button type="button" class="project-entry" data-build-id="${escapeHtml(row.buildId)}"${current}>
         <strong>${escapeHtml(row.displayTitle || "Project")}</strong>
-        <span class="project-meta"><span>${escapeHtml(row.creatorStatus || row.status || "")}</span><span>${escapeHtml(relativeTime(row.updatedAt))}</span><span class="repo-dot" data-state="${escapeHtml(row.repository || "local")}" title="${escapeHtml(row.repository || "local")}"></span></span>
+        <span class="project-meta"><span>${escapeHtml(row.creatorStatus || row.status || "")}</span><span>${escapeHtml(relativeTime(row.updatedAt))}</span></span>
       </button>`;
-    })
-    .join("");
-  els.projectList.querySelectorAll("[data-build-id]").forEach((button) => {
+}
+
+function bindProjectButtons(root) {
+  root?.querySelectorAll("[data-build-id]").forEach((button) => {
     button.addEventListener("click", () => {
       void openProject(button.getAttribute("data-build-id"), "push");
     });
   });
 }
 
-function closeProjectMenu() {
-  if (!els.sourceMenuPanel) return;
-  els.sourceMenuPanel.hidden = true;
-  els.sourceMenuBtn?.setAttribute("aria-expanded", "false");
+async function loadProjects() {
+  if (!els.projectList) return;
+  const res = await fetch("/api/builds");
+  const body = await res.json().catch(() => null);
+  const rows = Array.isArray(body?.builds) ? body.builds : [];
+  const active = rows.filter((row) => !row.archived);
+  const archived = rows.filter((row) => row.archived);
+  els.projectList.innerHTML = active.map(projectButton).join("");
+  bindProjectButtons(els.projectList);
+  if (els.archivedList && els.archivedToggle) {
+    const count = archived.length;
+    els.archivedToggle.hidden = count === 0;
+    if (els.archivedCount) els.archivedCount.textContent = count ? String(count) : "";
+    els.archivedList.innerHTML = archived.map(projectButton).join("");
+    bindProjectButtons(els.archivedList);
+    if (count === 0) els.archivedList.hidden = true;
+  }
+}
+
+function setRailMode(mode) {
+  const project = mode === "project";
+  if (els.projectsMode) els.projectsMode.hidden = project;
+  if (els.projectMode) els.projectMode.hidden = !project;
+}
+
+function renderProjectMode(view) {
+  if (!view || !els.projectModeTitle) return;
+  els.projectModeTitle.textContent = view.displayTitle || "Project";
+  const repo = view.repository?.validated
+    ? "Connected"
+    : view.identity?.repository === "connected" || view.identity?.repository === "github"
+      ? "Connected"
+      : "Local";
+  if (els.projectRepoState) els.projectRepoState.textContent = repo;
+  if (els.projectDetails) {
+    const sha = view.authoritativeSha ? String(view.authoritativeSha).slice(0, 12) : "";
+    els.projectDetails.innerHTML = `
+      <dt>Build</dt><dd>${escapeHtml(shortId(view.buildId))}</dd>
+      <dt>Branch</dt><dd>${escapeHtml(view.productBranch || "")}</dd>
+      <dt>Revision</dt><dd>${escapeHtml(sha)}</dd>`;
+  }
+  if (els.archiveBtn) els.archiveBtn.hidden = Boolean(view.archived);
+  if (els.restoreBtn) els.restoreBtn.hidden = !view.archived;
+  if (els.recoverBuildBtn) els.recoverBuildBtn.hidden = !view.needsRecovery;
 }
 
 async function openProject(buildId, mode) {
@@ -964,20 +1062,29 @@ async function openProject(buildId, mode) {
   document.querySelector(".app-shell")?.classList.remove("library-open");
 }
 
-els.sourceMenuBtn?.addEventListener("click", (event) => {
-  event.stopPropagation();
-  const open = els.sourceMenuPanel.hidden;
-  els.sourceMenuPanel.hidden = !open;
-  els.sourceMenuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+els.projectModeBtn?.addEventListener("click", () => {
+  if (!activeBuildId) return;
+  setRailMode("project");
+  void refreshRepositoryDialog();
 });
-document.addEventListener("click", (event) => {
-  if (!els.sourceMenuPanel || els.sourceMenuPanel.hidden) return;
-  const menu = document.getElementById("sourceMenu");
-  if (menu && !menu.contains(event.target)) closeProjectMenu();
+els.backToProjects?.addEventListener("click", () => setRailMode("projects"));
+els.archivedToggle?.addEventListener("click", () => {
+  if (!els.archivedList) return;
+  els.archivedList.hidden = !els.archivedList.hidden;
 });
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") closeProjectMenu();
-});
+async function setArchived(action) {
+  if (!activeBuildId) return;
+  const res = await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/${action}`, { method: "POST" });
+  const body = await res.json().catch(() => null);
+  if (body?.view) acceptView(body.view);
+  await loadProjects();
+  if (action === "archive") {
+    setRailMode("projects");
+    showComposer(true);
+  }
+}
+els.archiveBtn?.addEventListener("click", () => void setArchived("archive"));
+els.restoreBtn?.addEventListener("click", () => void setArchived("restore"));
 els.chatScroll?.addEventListener("scroll", () => {
   const gap = els.chatScroll.scrollHeight - els.chatScroll.scrollTop - els.chatScroll.clientHeight;
   chatStick = gap < 48;
@@ -997,13 +1104,11 @@ els.copyPathBtn?.addEventListener("click", async () => {
   if (!projectRoot) return;
   await navigator.clipboard.writeText(projectRoot);
   showHandoffResult("Copy Project Path", { ok: true, path: projectRoot });
-  els.sourceMenuPanel.hidden = true;
 });
 
 els.downloadZipBtn?.addEventListener("click", () => {
   if (!activeBuildId) return;
   window.location.assign(`/api/builds/${encodeURIComponent(activeBuildId)}/export`);
-  els.sourceMenuPanel.hidden = true;
 });
 
 els.renameTitleBtn?.addEventListener("click", () => {
@@ -1012,7 +1117,6 @@ els.renameTitleBtn?.addEventListener("click", () => {
   els.titleEditor.value = els.buildIdentity.textContent || "";
   els.buildIdentity.hidden = true;
   els.titleEditor.focus();
-  els.sourceMenuPanel.hidden = true;
 });
 
 async function commitTitle() {
@@ -1055,13 +1159,11 @@ async function refreshRepositoryDialog() {
   const disconnect = document.getElementById("repositoryDisconnectBtn");
   const push = document.getElementById("repositoryPushBtn");
   const nameField = document.getElementById("repositoryNameField");
-  if (state) {
-    state.textContent = repo.state === "github"
-      ? "GitHub connected"
-      : repo.state === "connected"
-        ? "Connected"
-        : "Local";
-  }
+  const label = repo.state === "github" || repo.state === "connected" || repo.validated
+    ? "Connected"
+    : "Local";
+  if (state) state.textContent = label;
+  if (els.projectRepoState) els.projectRepoState.textContent = label;
   if (hint) {
     hint.textContent = repo.github?.authenticated
       ? "GitHub CLI is available. Creating a repository happens only when you choose Connect."
@@ -1081,7 +1183,6 @@ async function refreshRepositoryDialog() {
 }
 
 els.repositoryBtn?.addEventListener("click", () => {
-  els.sourceMenuPanel.hidden = true;
   void refreshRepositoryDialog().then(() => {
     document.getElementById("repositoryDialog")?.showModal();
   });
