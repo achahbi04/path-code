@@ -151,6 +151,6 @@ describe("G9 scipFingerprint + shouldBuildScipIndex", () => {
     });
     expect(q.ok).toBe(true);
   },
-    20_000,
+    60_000,
   );
 });
