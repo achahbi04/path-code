@@ -565,6 +565,7 @@ export function projectBuildForSurface(
   requestLabel?: string | null;
   archived?: boolean;
   queuedRequest?: string | null;
+  canResume?: boolean;
   previewPreparing?: boolean;
   activeEngineering?: boolean;
   needsRecovery?: boolean;

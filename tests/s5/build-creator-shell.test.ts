@@ -395,7 +395,7 @@ describe("PATH Builder creator shell", () => {
       {
         buildId: "b",
         loop: { status: "paused" },
-        intent: { outcome: "site" },
+        intent: { outcome: "site", outcomeRevision: 1 },
         conversation: [{ role: "user", text: "start again", status: "queued" }],
         children: [{ kind: "engineer", classification: "CANCELLED", dispatchState: "consumed" }],
       },
@@ -410,7 +410,7 @@ describe("PATH Builder creator shell", () => {
       {
         buildId: "b",
         loop: { status: "paused" },
-        intent: { outcome: "site" },
+        intent: { outcome: "site", outcomeRevision: 1 },
         children: [{ kind: "engineer", classification: "FAILED", dispatchState: "consumed" }],
       },
       {},
