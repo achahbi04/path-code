@@ -93,6 +93,8 @@ describe("PATH Builder creator shell", () => {
     writeBuildRecord(runtimeRoot, record);
     const stored = readBuildRecord(runtimeRoot, record.buildId);
     expect(stored?.displayTitle).toBe("ICE meeting");
+    expect(stored).toBeTruthy();
+    if (!stored) return;
     expect(isArchived(stored)).toBe(false);
     stored.archivedAt = "2026-09-23T00:00:00.000Z";
     writeBuildRecord(runtimeRoot, stored);
