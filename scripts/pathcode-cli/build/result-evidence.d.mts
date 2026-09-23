@@ -10,6 +10,7 @@ export function decideEngineerProductAdoption(input: {
   projectRoot?: string;
   classification?: string;
   originSha?: string;
+  reportText?: string;
 }): {
   adopt: boolean;
   code: string;
@@ -19,4 +20,6 @@ export function decideEngineerProductAdoption(input: {
   sourceSha: string | null;
   taskBranch: string | null;
   fingerprint: string | null;
+  recoveredProviderClose?: boolean;
+  recoveredEmptyDiscovery?: boolean;
 };

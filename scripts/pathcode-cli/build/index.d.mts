@@ -121,6 +121,8 @@ export interface BuildRecord {
     pendingConversationSteer?: boolean;
     pendingSelectedElement?: SelectedElement | null;
     forceNextKind?: BuildChild["kind"];
+    fabricSteps?: string[];
+    pauseRequested?: boolean;
     lastRealityDelta?: object | null;
     lastConsumedActionId?: string | null;
     noProgressCount?: number;
@@ -347,6 +349,7 @@ export interface BuildController {
     buildId: string,
     input: { message: string; element?: SelectedElement },
   ): Promise<{ ok: boolean; build: BuildRecord }>;
+  pauseBuild(buildId: string): Promise<{ ok: boolean; build?: BuildRecord }>;
   tick(buildId: string): Promise<{
     ok?: boolean;
     code?: string;
@@ -354,6 +357,9 @@ export interface BuildController {
     action?: string;
     kind?: BuildChild["kind"];
     taskId?: string;
+    paused?: boolean;
+    blocked?: boolean;
+    done?: boolean;
   }>;
   assessCompletion(buildId: string): { complete: boolean; reason?: string };
   patchRuntimeState(
