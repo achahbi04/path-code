@@ -138,6 +138,7 @@ export function createGatewayRuntime(options = {}) {
         type === "session.engineering.result" ||
         type === "session.engineering.tool" ||
         type === "session.capability.preparing" ||
+        type === "session.engine.selected" ||
         type === "session.internal_error"
       ) {
         appendTaskTrace({
@@ -169,6 +170,13 @@ export function createGatewayRuntime(options = {}) {
             ...(typeof fields.added === "number" ? { added: fields.added } : {}),
             ...(typeof fields.removed === "number" ? { removed: fields.removed } : {}),
             ...(typeof fields.ok === "boolean" ? { ok: fields.ok } : {}),
+            ...(typeof fields.reason === "string" ? { reason: fields.reason.slice(0, 300) } : {}),
+            ...(typeof fields.selected === "string" ? { selected: fields.selected } : {}),
+            ...(fields.preferred === null || typeof fields.preferred === "string"
+              ? { preferred: fields.preferred ?? null }
+              : {}),
+            ...(Array.isArray(fields.ready) ? { ready: fields.ready.slice(0, 4).map(String) } : {}),
+            ...(Array.isArray(fields.fit) ? { fit: fields.fit.slice(0, 4).map(String) } : {}),
             ...(typeof fields.exitCode === "number" ? { exitCode: fields.exitCode } : {}),
           },
         });

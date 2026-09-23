@@ -9,9 +9,35 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 /**
+ * Model and provider the Antigravity bridge will actually use.
+ * Null provider when no project and no API key are configured.
+ * The model is the resolved AG1_MODEL / GOOGLE_CLOUD_MODEL value, which
+ * hydrateAg1CloudEnv sets before the bridge starts. It is not inferred
+ * from a catalog.
+ *
  * @param {NodeJS.ProcessEnv} [env]
- * @returns {NodeJS.ProcessEnv}
  */
+export function resolveAg1ExecutionIdentity(env = process.env) {
+  const model =
+    (typeof env.AG1_MODEL === "string" && env.AG1_MODEL.trim()) ||
+    (typeof env.GOOGLE_CLOUD_MODEL === "string" && env.GOOGLE_CLOUD_MODEL.trim()) ||
+    null;
+  const project =
+    (typeof env.GOOGLE_CLOUD_PROJECT === "string" && env.GOOGLE_CLOUD_PROJECT.trim()) ||
+    (typeof env.CLOUDSDK_CORE_PROJECT === "string" &&
+      env.CLOUDSDK_CORE_PROJECT.trim()) ||
+    "";
+  const hasKey = Boolean(
+    (typeof env.GEMINI_API_KEY === "string" && env.GEMINI_API_KEY.trim()) ||
+      (typeof env.GOOGLE_API_KEY === "string" && env.GOOGLE_API_KEY.trim()),
+  );
+  return {
+    model,
+    provider: project ? "Vertex AI" : hasKey ? "Google AI" : null,
+    mode: "bridge",
+  };
+}
+
 export function hydrateAg1CloudEnv(env = process.env) {
   const out = env;
   if (

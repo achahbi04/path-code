@@ -47,7 +47,7 @@ import {
   completenessClaim,
 } from "./objectives.mjs";
 import { decideEngineerProductAdoption } from "./result-evidence.mjs";
-import { resolveMutatingEngineAttempt } from "../ag10/engine-contract.mjs";
+import { resolveMutatingEngineAttempt, resolvePreferredEngine } from "../ag10/engine-contract.mjs";
 import { formatBuildStatus } from "./format.mjs";
 import { detectBuildArtifact } from "./runtime/artifact.mjs";
 import { appendBuildEvent } from "./events.mjs";
@@ -371,14 +371,16 @@ export function createBuildController(opts) {
    */
   function resolveDispatchPreferredEngine(kind, extra = {}) {
     if (kind === "challenge") return undefined;
+    if (extra.preferEngine === null || extra.preferredEngine === null) {
+      return undefined;
+    }
     const fromExtra =
       (typeof extra.preferredEngine === "string" && extra.preferredEngine) ||
       (typeof extra.preferEngine === "string" && extra.preferEngine) ||
       null;
-    if (extra.preferEngine === null || extra.preferredEngine === null) {
-      return undefined;
-    }
-    const resolved = fromExtra || controllerPreferredEngine;
+    const resolved = resolvePreferredEngine({
+      prefer: fromExtra || controllerPreferredEngine || null,
+    });
     return resolved || undefined;
   }
 
@@ -979,19 +981,6 @@ export function createBuildController(opts) {
       child.dispatchedAt = new Date().toISOString();
       child.taskId = started?.taskId || taskId;
     }
-    if (kind === "engineer") {
-      appendBuildEvent(runtimeRoot, buildId, "engine.decision", {
-        actionId,
-        taskId: child?.taskId || taskId,
-        intentRevision: record.intent?.outcomeRevision || null,
-        preferred: preferredEngine || null,
-        selected: preferredEngine || null,
-        reason: preferredEngine
-          ? `Preferred ${preferredEngine} selected for this attempt.`
-          : "No preferred engine; Engine Fabric default for this attempt.",
-        phase: "engineer",
-      });
-    }
     if (kind === "evaluate") record.loop.lastEvaluateTaskId = child?.taskId || taskId;
     if (kind === "challenge") record.loop.lastChallengeTaskId = child?.taskId || taskId;
     syncConversationLifecycle(record);
@@ -1231,12 +1220,20 @@ export function createBuildController(opts) {
           record.outcomeCriteria = briefToOutcomeCriteria(parsedBrief.brief);
         }
       } else {
+        const repeated = Boolean(record.productBriefError);
         record.productBriefError = {
           errors: parsedBrief.errors,
           taskId,
           at: new Date().toISOString(),
         };
-        record.loop.forceNextKind = "brief";
+        if (repeated) {
+          record.loop.status = "blocked";
+          record.loop.blockedReason =
+            "PRODUCT_BRIEF_UNREADABLE: the engineering engine did not return a usable product brief. PATH did not start another brief.";
+          record.loop.forceNextKind = undefined;
+        } else {
+          record.loop.forceNextKind = "brief";
+        }
       }
     }
 
@@ -1309,6 +1306,31 @@ export function createBuildController(opts) {
       const provenance = extractProviderProvenance(cp, snap, cognitiveText);
       if (provenance.provider) child.provider = provenance.provider;
       if (provenance.engineMode) child.engineMode = provenance.engineMode;
+      if (provenance.model) child.engineModel = provenance.model;
+      else if (provenance.provider) child.engineModel = null;
+      if (provenance.sessionId) child.engineSessionId = provenance.sessionId;
+      if (provenance.executionProvider) {
+        child.executionProvider = provenance.executionProvider;
+      }
+      if (Array.isArray(provenance.turns) && provenance.turns.length) {
+        child.engineTurns = provenance.turns;
+      }
+      if (child.kind === "engineer" && cp?.engineSelection?.selected) {
+        const sel = cp.engineSelection;
+        appendBuildEvent(runtimeRoot, buildId, "engine.decision", {
+          actionId: child.actionId,
+          taskId,
+          intentRevision: child.intentRevision || record.intent.outcomeRevision,
+          preferred: sel.preferred || null,
+          ready: Array.isArray(sel.ready) ? sel.ready : [],
+          fit: Array.isArray(sel.fit) ? sel.fit : [],
+          selected: sel.selected,
+          reason: sel.reason || "",
+          preferredHonored: sel.preferredHonored === true,
+          phase: "engineer",
+          executed: provenance.provider || null,
+        });
+      }
     }
     record.loop.lastConsumedActionId = child.actionId;
     record.loop.pendingReinspect = true;

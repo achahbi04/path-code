@@ -33,7 +33,7 @@ import {
 } from "./guards.mjs";
 import { SteeringQueue } from "./steering.mjs";
 import { createCopilotEngine } from "./copilot-sdk.mjs";
-import { createCursorEngine, resolveCursorApiKey } from "./cursor-sdk.mjs";
+import { createCursorEngine, resolveCursorApiKey, resolveCursorModel } from "./cursor-sdk.mjs";
 import {
   selectEngineForTurn,
   resolvePreferredEngine,
@@ -168,6 +168,67 @@ export async function createG10Fabric(options) {
    * leaves authoritative task/engine/worktree facts.
    * @param {string} engine
    */
+  /**
+   * Record an engine turn that actually started or finished.
+   * Attachment and readiness do not call this.
+   * @param {{
+   *   engine: string,
+   *   role?: string,
+   *   mode?: string | null,
+   *   provider?: string | null,
+   *   model?: string | null,
+   *   sessionId?: string | null,
+   *   state?: string,
+   *   startedAt?: string,
+   *   finishedAt?: string | null,
+   * }} partial
+   */
+  function noteEngineExecution(partial) {
+    const engine = String(partial?.engine || "").toLowerCase();
+    if (!/^(antigravity|copilot|cursor)$/.test(engine)) return checkpoint;
+    const role = /^(primary|repair|handoff)$/.test(String(partial.role || ""))
+      ? String(partial.role)
+      : "handoff";
+    const prior = Array.isArray(checkpoint.engineTurns) ? [...checkpoint.engineTurns] : [];
+    const last = prior[prior.length - 1];
+    const finishing =
+      last &&
+      last.engine === engine &&
+      last.role === role &&
+      !last.finishedAt &&
+      partial.state &&
+      partial.state !== "started";
+    if (finishing) {
+      prior[prior.length - 1] = {
+        ...last,
+        state: String(partial.state).slice(0, 40),
+        finishedAt: partial.finishedAt || new Date().toISOString(),
+        model: partial.model === undefined ? last.model : partial.model,
+        provider: partial.provider === undefined ? last.provider : partial.provider,
+        mode: partial.mode || last.mode,
+        sessionId: partial.sessionId || last.sessionId,
+      };
+    } else {
+      prior.push({
+        engine,
+        provider: typeof partial.provider === "string" ? partial.provider : null,
+        model: typeof partial.model === "string" && partial.model.trim() ? partial.model.trim() : null,
+        mode: typeof partial.mode === "string" ? partial.mode : null,
+        sessionId: typeof partial.sessionId === "string" ? partial.sessionId : null,
+        taskId: options.taskId,
+        role,
+        startedAt: partial.startedAt || new Date().toISOString(),
+        finishedAt: null,
+        state: partial.state || "started",
+      });
+    }
+    return persist({
+      engineTurns: prior.slice(-16),
+      latestEngineTurn: engine,
+      inFlightEngine: engine,
+    });
+  }
+
   function beginEngineTurn(engine) {
     try {
       reconcileTaskProcesses(options.runtimeRoot, options.taskId);
@@ -453,6 +514,18 @@ export async function createG10Fabric(options) {
 
     const before = captureTaskReality(options.worktreePath, options.toolEnv);
     beginEngineTurn("copilot");
+    const copilotRole = /^(primary|repair|handoff)$/.test(String(turn.role || ""))
+      ? String(turn.role)
+      : "handoff";
+    noteEngineExecution({
+      engine: "copilot",
+      role: copilotRole,
+      mode: copilot.getMode?.() || "none",
+      provider: null,
+      model: typeof turn.model === "string" ? turn.model : null,
+      sessionId: copilot.getSessionId?.() || null,
+      state: "started",
+    });
     steering.setMutationActive(true);
     try {
       const leased = await withMutationLease(
@@ -510,6 +583,13 @@ export async function createG10Fabric(options) {
           detail: "NO_PROGRESS_COLLABORATION — needs direction",
         });
       }
+      noteEngineExecution({
+        engine: "copilot",
+        role: copilotRole,
+        mode: copilot.getMode?.() || null,
+        sessionId: copilot.getSessionId?.() || null,
+        state: leased?.ok === true ? "finished" : "failed",
+      });
       persist({
         latestEngineTurn: "copilot",
         collaboration: {
@@ -570,6 +650,19 @@ export async function createG10Fabric(options) {
 
     const before = captureTaskReality(options.worktreePath, options.toolEnv);
     beginEngineTurn("cursor");
+    const cursorRole = /^(primary|repair|handoff)$/.test(String(turn.role || ""))
+      ? String(turn.role)
+      : "handoff";
+    const cursorModel = resolveCursorModel(options.toolEnv || process.env);
+    noteEngineExecution({
+      engine: "cursor",
+      role: cursorRole,
+      mode: "native_sdk",
+      provider: null,
+      model: cursorModel?.id || null,
+      sessionId: cursor.getSessionId?.() || null,
+      state: "started",
+    });
     steering.setMutationActive(true);
     try {
       const leased = await withMutationLease(
@@ -628,6 +721,14 @@ export async function createG10Fabric(options) {
           detail: "NO_PROGRESS_COLLABORATION — needs direction",
         });
       }
+      noteEngineExecution({
+        engine: "cursor",
+        role: cursorRole,
+        mode: cursor.getMode?.() || "native_sdk",
+        sessionId: cursor.getSessionId?.() || null,
+        model: cursorModel?.id || null,
+        state: leased?.ok === true ? "finished" : "failed",
+      });
       persist({
         latestEngineTurn: "cursor",
         cursorMode: cursor.getMode(),
@@ -902,6 +1003,7 @@ export async function createG10Fabric(options) {
     emitSession,
     persist,
     beginEngineTurn,
+    noteEngineExecution,
     noteEngineInterrupted,
     noteContinuityRestored,
     attachCopilot,

@@ -469,7 +469,7 @@ export async function createCopilotEngine(options) {
         return {
           ok: true,
           mode: "native_sdk",
-          text: text.slice(0, 8_000),
+          text: text.slice(0, 32_000),
           detail: "Copilot SDK turn completed",
           sessionId: activeSessionId,
           changedFiles: [],

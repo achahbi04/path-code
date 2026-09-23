@@ -223,7 +223,67 @@ export function createCheckpointSkeleton(partial) {
       typeof partial.inFlightEngine === "string"
         ? partial.inFlightEngine
         : undefined,
+    engineTurns: sealEngineTurns(partial.engineTurns),
+    engineSelection: sealEngineSelection(partial.engineSelection),
     updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * @param {unknown} value
+ */
+function sealEngineTurns(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((turn) => {
+      if (!turn || typeof turn !== "object") return null;
+      const engine = String(turn.engine || "").toLowerCase();
+      if (!/^(antigravity|copilot|cursor)$/.test(engine)) return null;
+      const role = String(turn.role || "");
+      return {
+        engine,
+        provider: typeof turn.provider === "string" ? turn.provider.slice(0, 80) : null,
+        model:
+          typeof turn.model === "string" && turn.model.trim()
+            ? turn.model.trim().slice(0, 80)
+            : null,
+        mode: typeof turn.mode === "string" ? turn.mode.slice(0, 40) : null,
+        sessionId:
+          typeof turn.sessionId === "string" ? turn.sessionId.slice(0, 120) : null,
+        taskId: typeof turn.taskId === "string" ? turn.taskId.slice(0, 80) : null,
+        role: /^(primary|repair|handoff)$/.test(role) ? role : "primary",
+        startedAt: typeof turn.startedAt === "string" ? turn.startedAt : null,
+        finishedAt: typeof turn.finishedAt === "string" ? turn.finishedAt : null,
+        state: typeof turn.state === "string" ? turn.state.slice(0, 40) : null,
+      };
+    })
+    .filter(Boolean)
+    .slice(-16);
+}
+
+/**
+ * @param {unknown} value
+ */
+function sealEngineSelection(value) {
+  if (!value || typeof value !== "object") return undefined;
+  const selected = String(value.selected || "").toLowerCase();
+  if (!/^(antigravity|copilot|cursor)$/.test(selected)) return undefined;
+  const names = (list) =>
+    (Array.isArray(list) ? list : [])
+      .map((item) => String(item || "").toLowerCase())
+      .filter((item) => /^(antigravity|copilot|cursor)$/.test(item))
+      .slice(0, 3);
+  return {
+    preferred:
+      typeof value.preferred === "string" && value.preferred.trim()
+        ? value.preferred.trim().slice(0, 40)
+        : null,
+    ready: names(value.ready),
+    fit: names(value.fit),
+    selected,
+    reason: typeof value.reason === "string" ? value.reason.slice(0, 300) : "",
+    preferredHonored: value.preferredHonored === true,
+    at: typeof value.at === "string" ? value.at : undefined,
   };
 }
 

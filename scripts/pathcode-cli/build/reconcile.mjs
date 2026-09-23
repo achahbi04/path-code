@@ -86,34 +86,29 @@ export function readTaskReportText(runtimeRoot, taskId) {
  * @param {string} [reportText]
  */
 export function extractProviderProvenance(cp, snap = null, reportText = "") {
-  const turnEngine = engineNameFromTurn(cp?.latestEngineTurn || cp?.inFlightEngine);
+  const turns = Array.isArray(cp?.engineTurns) ? cp.engineTurns : [];
+  const primary = turns.find((turn) => turn && turn.role === "primary" && turn.engine);
+  const latest = [...turns].reverse().find((turn) => turn && turn.engine);
+  const executed = primary || latest || null;
+  const turnEngine =
+    executed?.engine ||
+    engineNameFromTurn(cp?.latestEngineTurn || cp?.inFlightEngine);
+  const reportExecutor = String(reportText || "").match(/^ {2}executor\s+(\S+)/m);
+  const fromReport = reportExecutor
+    ? engineNameFromTurn(reportExecutor[1])
+    : null;
   const provider =
-    (typeof cp?.selectedEngine === "string" && cp.selectedEngine) ||
-    (typeof cp?.provider === "string" && cp.provider) ||
     turnEngine ||
-    (typeof snap?.engine === "string" && snap.engine) ||
-    (typeof snap?.provider === "string" && snap.provider) ||
+    fromReport ||
+    engineNameFromTurn(snap?.engine) ||
     null;
-  const engineMode =
-    (typeof cp?.cursorMode === "string" && cp.cursorMode) ||
-    (typeof cp?.agSessionMode === "string" && cp.agSessionMode) ||
-    (typeof cp?.copilotMode === "string" && cp.copilotMode) ||
-    (typeof snap?.engineMode === "string" && snap.engineMode) ||
-    null;
-
-  let fromReport = null;
-  let modeFromReport = null;
-  const fabric = String(reportText || "").match(
-    /Engine fabric\s*\n\s*(\S+)\s+(\S+)/i,
-  );
-  if (fabric) {
-    fromReport = fabric[1];
-    modeFromReport = fabric[2];
-  }
-
   return {
-    provider: provider || fromReport || null,
-    engineMode: engineMode || modeFromReport || null,
+    provider,
+    engineMode: executed?.mode || null,
+    model: executed?.model || null,
+    sessionId: executed?.sessionId || null,
+    executionProvider: executed?.provider || null,
+    turns,
   };
 }
 

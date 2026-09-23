@@ -61,6 +61,19 @@ export interface BuildChild {
   authoritativeSha?: string | null;
   semanticProofAccepted?: boolean;
   provider?: string;
+  engineMode?: string | null;
+  engineModel?: string | null;
+  engineSessionId?: string | null;
+  executionProvider?: string | null;
+  engineTurns?: Array<{
+    engine: string;
+    role?: string;
+    provider?: string | null;
+    model?: string | null;
+    mode?: string | null;
+    sessionId?: string | null;
+    state?: string | null;
+  }>;
   adoptedSha?: string | null;
   sourceSha?: string | null;
   failureReason?: string;
@@ -315,6 +328,7 @@ export interface Gateway {
     extra: { taskId: string; [key: string]: unknown },
   ) => unknown | Promise<unknown>;
   awaitTask?: (...args: unknown[]) => unknown | Promise<unknown>;
+  getResult?: (taskId: string) => unknown | Promise<unknown>;
   snapshotTask?: (taskId: string) => unknown;
   cancelTask?: (taskId: string) => unknown | Promise<unknown>;
 }
@@ -584,6 +598,10 @@ export function projectBuildForSurface(
       taskId?: string | null;
       kind?: string | null;
       engine?: string | null;
+      model?: string | null;
+      mode?: string | null;
+      sessionId?: string | null;
+      executionProvider?: string | null;
       startedAt?: string | null;
       endedAt?: string | null;
       status?: string | null;

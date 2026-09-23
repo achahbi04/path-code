@@ -37,7 +37,22 @@ export function extractProviderProvenance(
   checkpoint: unknown,
   snapshot?: unknown,
   reportText?: string,
-): { provider: string | null; engineMode: string | null };
+): {
+  provider: string | null;
+  engineMode: string | null;
+  model: string | null;
+  sessionId: string | null;
+  executionProvider: string | null;
+  turns: Array<{
+    engine?: string;
+    role?: string;
+    mode?: string | null;
+    model?: string | null;
+    sessionId?: string | null;
+    provider?: string | null;
+    state?: string;
+  }>;
+};
 export function classifyTraceTerminal(lines: object[] | null | undefined): {
   kind: "none" | "failure" | "success_unconfirmed";
   classification?: string;

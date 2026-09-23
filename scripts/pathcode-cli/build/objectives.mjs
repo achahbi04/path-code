@@ -32,6 +32,54 @@ function intentBlock(record) {
 }
 
 /**
+ * Latest creator message on the current intent revision, verbatim.
+ * @param {import('./types.mjs').BuildRecord} record
+ */
+export function currentCreatorRequest(record) {
+  const revision = Number(record?.intent?.outcomeRevision || 1);
+  const messages = (record?.conversation || []).filter(
+    (message) =>
+      message?.role === "user" && Number(message.intentRevision) === revision,
+  );
+  const last = messages[messages.length - 1];
+  return last ? String(last.text || "").trim() : "";
+}
+
+/**
+ * Sentences the creator already wrote as constraints. Transported verbatim.
+ * PATH does not judge whether a later diff complies.
+ * @param {string} text
+ */
+export function explicitCreatorConstraints(text) {
+  return String(text || "")
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .filter((sentence) =>
+      /\b(do not|don't|do nothing else|only change|only this|keep the current|preserve existing|do not modify)\b/i.test(
+        sentence,
+      ),
+    );
+}
+
+/**
+ * A follow-up turn is a creator request against a product that already exists.
+ * The first build, before any adopted result, stays a greenfield objective.
+ * @param {import('./types.mjs').BuildRecord} record
+ */
+export function isFollowUpCreatorTurn(record) {
+  const hasProduct = (record?.children || []).some(
+    (child) =>
+      child?.kind === "engineer" &&
+      child.adoptedSha &&
+      !child.orphanAbandoned,
+  );
+  if (!hasProduct) return false;
+  const revision = Number(record?.intent?.outcomeRevision || 1);
+  return revision > 1 && Boolean(currentCreatorRequest(record));
+}
+
+/**
  * @param {import('./types.mjs').BuildRecord} record
  * @param {string} gap
  */
@@ -41,6 +89,49 @@ export function frameEngineerObjective(record, gap) {
   const wantsWeb =
     productKind === "web" ||
     /website|web\s*app|landing/i.test(String(record.intent?.outcome || ""));
+  const selectedElement = record.loop?.pendingSelectedElement || null;
+  const selectionBlock = selectedElement
+    ? [
+        "",
+        "Operator selected this exact preview element payload. Use it as DOM/render context; do not infer a source file unless project evidence proves that mapping:",
+        JSON.stringify(selectedElement),
+      ].join("\n")
+    : "";
+  const creatorRequest = currentCreatorRequest(record);
+  const followUp = isFollowUpCreatorTurn(record);
+
+  if (followUp) {
+    const request = creatorRequest || String(gap || "").trim();
+    const constraints = explicitCreatorConstraints(request);
+    return [
+      "PATH Build engineer task — follow-up creator change.",
+      "The current creator request is the controlling engineering objective.",
+      "Do not treat this turn as a greenfield rebuild or as completion of the whole historical product.",
+      "",
+      "CURRENT CREATOR REQUEST",
+      request,
+      "",
+      "EXPLICIT CREATOR CONSTRAINTS",
+      constraints.length
+        ? constraints.map((line) => `- ${line}`).join("\n")
+        : "- (none stated beyond the request itself)",
+      "",
+      "Preserve unrelated existing product behavior and project state.",
+      "Do not close unrelated historical product gaps during this turn.",
+      "Make only engineering changes reasonably required to satisfy the current request and preserve the existing project's runnability.",
+      "Use existing project-native validation where it already applies.",
+      "Do not create unrelated architecture, manifest, or test scaffolding merely because a greenfield build would.",
+      "Commit on the existing task branch. Do not run git init or create a nested .git.",
+      selectionBlock,
+      "",
+      "Before you finish, inspect the diff this turn produced against the current creator request and the explicit constraints.",
+      "If you introduced unrelated changes, revert them in this same task.",
+      "If you cannot satisfy the request without violating a constraint, stop and report that honestly. Do not claim the task is verified.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   const greenfieldHint = binding?.originGitInit
     ? [
         "Greenfield context: this binding began as git-init-only — the Build folder IS already a git repository.",
@@ -52,15 +143,6 @@ export function frameEngineerObjective(record, gap) {
         "Do not stop at a marker file alone.",
       ].join("\n")
     : "Continue engineering toward the outcome with project-native validation.";
-
-  const selectedElement = record.loop?.pendingSelectedElement || null;
-  const selectionBlock = selectedElement
-    ? [
-        "",
-        "Operator selected this exact preview element payload. Use it as DOM/render context; do not infer a source file unless project evidence proves that mapping:",
-        JSON.stringify(selectedElement),
-      ].join("\n")
-    : "";
 
   return [
     "PATH Build engineer task — intentional product mutation is allowed.",

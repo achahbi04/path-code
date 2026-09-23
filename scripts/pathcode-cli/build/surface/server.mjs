@@ -56,12 +56,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(HERE, "public");
 
 function engineFromCheckpoint(checkpoint) {
-  const cursor = String(checkpoint?.cursorMode || "");
-  const copilot = String(checkpoint?.copilotMode || "");
-  const antigravity = String(checkpoint?.agSessionMode || "");
-  if (cursor && !/^(unavailable|none|auth_required)$/.test(cursor)) return "cursor";
-  if (copilot && !/^(unavailable|none|auth_required)$/.test(copilot)) return "copilot";
-  if (/antigravity|\bag1\b/.test(antigravity)) return "antigravity";
+  const turns = Array.isArray(checkpoint?.engineTurns) ? checkpoint.engineTurns : [];
+  const primary = turns.find((turn) => turn && turn.role === "primary" && turn.engine);
+  if (primary) return primary.engine;
+  const latest = String(checkpoint?.latestEngineTurn || checkpoint?.inFlightEngine || "");
+  const match = latest.match(/(?:^|:)(cursor|copilot|antigravity)$/i);
+  if (match) return match[1].toLowerCase();
+  const selected = String(checkpoint?.engineSelection?.selected || "");
+  if (/^(cursor|copilot|antigravity)$/.test(selected)) return selected;
   return null;
 }
 

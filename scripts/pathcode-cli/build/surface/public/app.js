@@ -303,6 +303,12 @@ function renderDrawer(view) {
     <h3>Current engineering task</h3>
     <dl class="activity-grid">
       <dt>Engine</dt><dd>${escapeHtml(current.engine || "not started")}</dd>
+      <dt>Selected</dt><dd>${escapeHtml(current.selectedEngine || current.engine || "not started")}</dd>
+      <dt>Provider</dt><dd>${escapeHtml(current.executionProvider || "unknown")}</dd>
+      <dt>Model</dt><dd>${escapeHtml(current.model || "unknown")}</dd>
+      <dt>Mode</dt><dd>${escapeHtml(current.mode || "unknown")}</dd>
+      <dt>Session</dt><dd>${escapeHtml(current.sessionId || "unknown")}</dd>
+      <dt>Why</dt><dd>${escapeHtml(current.selectionReason || "not recorded")}</dd>
       <dt>Task</dt><dd>${escapeHtml(current.taskId || "not dispatched")}</dd>
       <dt>Phase</dt><dd>${escapeHtml(current.phase || live.phase || view.progressLabel || "starting")}</dd>
       <dt>Result</dt><dd>${escapeHtml(current.classification || current.resultSha || "pending")}</dd>

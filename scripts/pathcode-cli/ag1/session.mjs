@@ -12,7 +12,8 @@ import { assertAg1VenvReady } from "./venv-guard.mjs";
 import { ensureAg1Runtime } from "./runtime-bootstrap.mjs";
 import { proveLocalSandboxConfinement } from "./sandbox-proof.mjs";
 import { detectAg1Auth } from "./auth-detect.mjs";
-import { hydrateAg1CloudEnv } from "./cloud-env.mjs";
+import { hydrateAg1CloudEnv, resolveAg1ExecutionIdentity } from "./cloud-env.mjs";
+import { primaryAdapterFor, selectPrimaryEngine } from "../ag10/engine-contract.mjs";
 import { admitPrimaryCheckout } from "./admission.mjs";
 import { commitTaskWorktree } from "./task-commit.mjs";
 import {
@@ -1056,16 +1057,21 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     ...(toolEnv ? { toolEnv } : {}),
   };
 
-  /** Prefer Cursor as primary when requested and ready — skip AG startTask. */
-  let cursorPrimaryDone = false;
+  /** Selected peer primary — skip AG startTask when Cursor or Copilot owns the turn. */
+  let peerPrimaryDone = false;
+  /** @type {'antigravity'|'copilot'|'cursor'|null} */
+  let primaryEngine = null;
   /** @type {string} */
-  let cursorPrimarySummary = "";
+  let peerPrimarySummary = "";
   const preferredEngine =
     typeof g10Fabric?.resolvePreferredEngine === "function"
       ? g10Fabric.resolvePreferredEngine({ prefer: options.preferredEngine })
       : null;
   const cursorReadyAtStart =
     g10Fabric?.getCursor?.()?.getMode?.() === "native_sdk";
+  const copilotModeAtStart = g10Fabric?.getCopilot?.()?.getMode?.() || "none";
+  const copilotReadyAtStart =
+    copilotModeAtStart === "native_sdk" || copilotModeAtStart === "cli_fallback";
 
   async function endCursorAttempt(outcome, detail) {
     const reason = String(detail || outcome || "Cursor was not ready").slice(0, 300);
@@ -1097,29 +1103,73 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     };
   }
 
-  if (preferredEngine === "cursor" && !cursorReadyAtStart) {
-    const cursor = g10Fabric?.getCursor?.();
-    const reason =
-      cursor?.getDegradeReason?.() ||
-      `Cursor mode ${cursor?.getMode?.() || "unavailable"}`;
-    return endCursorAttempt("CURSOR_NOT_READY", reason);
+  const readyPeers = {
+    antigravity: true,
+    copilot: copilotReadyAtStart,
+    cursor: cursorReadyAtStart,
+  };
+  const lastEngineRaw = String(
+    g10Fabric?.getCheckpoint?.()?.latestEngineTurn || "",
+  ).match(/(?:^|:)(antigravity|copilot|cursor)$/i);
+  const primarySelection = selectPrimaryEngine({
+    taskId,
+    prefer: preferredEngine,
+    ready: readyPeers,
+    lastEngine: lastEngineRaw ? lastEngineRaw[1].toLowerCase() : null,
+    preferContinuity: Boolean(isResume && lastEngineRaw),
+  });
+  const primaryAdapter = primaryAdapterFor(primarySelection, readyPeers);
+  const readyNames = ["antigravity", "copilot", "cursor"].filter(
+    (id) => readyPeers[id] === true,
+  );
+  try {
+    g10Fabric?.persist?.({
+      preferredEngine: preferredEngine || undefined,
+      engineSelection: {
+        preferred: preferredEngine,
+        ready: readyNames,
+        fit: Array.isArray(primarySelection.candidates)
+          ? primarySelection.candidates
+          : [],
+        selected: primarySelection.engine,
+        reason: primarySelection.reason,
+        preferredHonored: primarySelection.preferredHonored === true,
+        at: new Date().toISOString(),
+      },
+    });
+  } catch {
+    /* selection still emitted below */
+  }
+  emit("session.engine.selected", {
+    engine: primarySelection.engine,
+    phase: "primary",
+    detail: primarySelection.reason,
+    preferred: preferredEngine,
+    selected: primarySelection.engine,
+    reason: primarySelection.reason,
+    ready: readyNames,
+    fit: primarySelection.candidates || [],
+  });
+  if (!primaryAdapter) {
+    return endCursorAttempt(
+      "ENGINE_NOT_READY",
+      primarySelection.reason || "Selected engine is not ready",
+    );
   }
 
-  if (
-    preferredEngine === "cursor" &&
-    cursorReadyAtStart &&
-    typeof g10Fabric?.runCursorCollabTurn === "function"
-  ) {
+  if (primaryAdapter === "cursor" || primaryAdapter === "copilot") {
     emit("session.capability.collaborate", {
-      engine: "cursor",
+      engine: primaryAdapter,
       phase: "primary",
       label: "Collaborative engineering",
-      detail: "preferred Cursor engine taking the primary turn",
+      detail: `${primarySelection.reason}`,
     });
     try {
       const primaryPrompt = [
         "You are the primary collaborating engineering engine in this PATH task worktree.",
         "You may inspect, edit, build, test, and implement inside this workspace.",
+        "Carry out the engineering task as written, including its explicit creator constraints.",
+        "Do not expand the task beyond that text.",
         "Do not push, open PRs, deploy, or leave the worktree.",
         "",
         effectiveTaskText,
@@ -1128,18 +1178,26 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         .filter(Boolean)
         .join("\n");
       const turnBudgetMs = Math.min(wallMs - 30_000, 300_000);
-      const turn = await g10Fabric.runCursorCollabTurn({
-        prompt: primaryPrompt,
-        timeoutMs: Math.max(45_000, turnBudgetMs),
-        signal: ac.signal,
-      });
+      const runTurn =
+        primaryAdapter === "cursor"
+          ? g10Fabric?.runCursorCollabTurn
+          : g10Fabric?.runCopilotCollabTurn;
+      const turn = runTurn
+        ? await runTurn({
+            prompt: primaryPrompt,
+            role: "primary",
+            timeoutMs: Math.max(45_000, turnBudgetMs),
+            signal: ac.signal,
+          })
+        : null;
       if (turn?.ok) {
-        cursorPrimaryDone = true;
-        cursorPrimarySummary =
+        peerPrimaryDone = true;
+        primaryEngine = primaryAdapter;
+        peerPrimarySummary =
           typeof turn.text === "string" && turn.text.trim()
             ? turn.text.trim().slice(0, 32_000)
-            : turn.detail || "Cursor primary turn completed";
-        const turnNarration = extractEngineeringNarration(cursorPrimarySummary);
+            : turn.detail || `${primaryAdapter} primary turn completed`;
+        const turnNarration = extractEngineeringNarration(peerPrimarySummary);
         if (turnNarration.text) {
           emit("session.engineering.narration", {
             text: turnNarration.text,
@@ -1147,27 +1205,27 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
           });
         }
         emit("session.capability.collaborate", {
-          engine: "cursor",
+          engine: primaryAdapter,
           phase: "done",
           label: "Primary complete",
-          detail: "Cursor primary turn complete",
+          detail: `${primaryAdapter} primary turn complete`,
           mode: turn.mode || undefined,
         });
       } else if (turn?.code === "AUTH_REQUIRED") {
         return endCursorAttempt(
           "AUTH_REQUIRED",
-          turn?.detail || "Cursor authentication required",
+          turn?.detail || `${primaryAdapter} authentication required`,
         );
       } else {
         return endCursorAttempt(
-          turn?.code || "CURSOR_NOT_READY",
-          turn?.detail || "Cursor primary turn failed",
+          turn?.code || "ENGINE_NOT_READY",
+          turn?.detail || `${primaryAdapter} primary turn failed`,
         );
       }
     } catch (error) {
       return endCursorAttempt(
-        "CURSOR_NOT_READY",
-        error instanceof Error ? error.message : "Cursor primary error",
+        "ENGINE_NOT_READY",
+        error instanceof Error ? error.message : `${primaryAdapter} primary error`,
       );
     }
   }
@@ -1177,23 +1235,38 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   /** @type {Record<string, unknown>} */
   let terminalMsg;
 
-  if (cursorPrimaryDone) {
+  if (peerPrimaryDone) {
     agentFinished = true;
     startResult = { ok: true, pid: null };
     terminalMsg = {
       type: "finished",
-      summary: cursorPrimarySummary,
+      summary: peerPrimarySummary,
     };
     emit("session.engineering.bridge", {
       stage: "start_written",
-      detail: "cursor primary — Antigravity start skipped",
+      detail: `${primaryEngine} primary — Antigravity start skipped`,
     });
     emit("session.engineering.busy", {
       label: "Waiting for engineering result",
-      detail: "cursor primary complete",
+      detail: `${primaryEngine} primary complete`,
       since: Date.now(),
     });
   } else {
+    primaryEngine = "antigravity";
+    const agIdentity = resolveAg1ExecutionIdentity(process.env);
+    try {
+      g10Fabric?.noteEngineExecution?.({
+        engine: "antigravity",
+        role: "primary",
+        mode: "bridge",
+        provider: agIdentity.provider,
+        model: agIdentity.model,
+        sessionId: taskId,
+        state: "started",
+      });
+    } catch {
+      /* provenance is best-effort; the turn still runs */
+    }
     const startEnvelope = agBind
       ? await agBind.startOrRehydrate({
           workspace: startPayload.workspace,
@@ -1295,9 +1368,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   let engineeringHandoffSummary = "";
   let repairAttempts = 0;
   /** @type {string | null} */
-  let lastCollabEngine = cursorPrimaryDone ? "cursor" : null;
+  let lastCollabEngine = peerPrimaryDone ? primaryEngine : null;
   /** @type {Set<string>} */
-  const enginesSeen = new Set(cursorPrimaryDone ? ["cursor"] : []);
+  const enginesSeen = new Set(peerPrimaryDone && primaryEngine ? [primaryEngine] : []);
   /** @type {string[]} */
   const fabricRoutingNotes = [];
   markTiming("first_engine_terminal");
@@ -1372,12 +1445,14 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
           const cursorLive =
             g10Fabric?.getCursor?.()?.getMode?.() === "native_sdk" &&
             typeof g10Fabric?.runCursorCollabTurn === "function";
-          if (
-            cursorLive &&
-            (cursorPrimaryDone || lastCollabEngine === "cursor")
-          ) {
+          const copilotLive =
+            (g10Fabric?.getCopilot?.()?.getMode?.() === "native_sdk" ||
+              g10Fabric?.getCopilot?.()?.getMode?.() === "cli_fallback") &&
+            typeof g10Fabric?.runCopilotCollabTurn === "function";
+          if (cursorLive && lastCollabEngine === "cursor") {
             const turn = await g10Fabric.runCursorCollabTurn({
               prompt: continuePrompt,
+              role: "handoff",
               timeoutMs: Math.min(
                 180_000,
                 Math.max(30_000, wallMs - (Date.now() - startedAt) - 15_000),
@@ -1401,6 +1476,32 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
               continue;
             }
             // Soft-fail into validation / repair rotation.
+          } else if (copilotLive && lastCollabEngine === "copilot") {
+            const turn = await g10Fabric.runCopilotCollabTurn({
+              prompt: continuePrompt,
+              role: "handoff",
+              timeoutMs: Math.min(
+                180_000,
+                Math.max(30_000, wallMs - (Date.now() - startedAt) - 15_000),
+              ),
+              signal: ac.signal,
+            });
+            lastCollabEngine = "copilot";
+            enginesSeen.add("copilot");
+            if (ac.signal.aborted || turn?.code === "CANCELLED") {
+              agentCancelled = true;
+              terminalMsg = { type: "cancelled" };
+              break;
+            }
+            if (turn?.ok) {
+              const summary =
+                typeof turn.text === "string" && turn.text.trim()
+                  ? turn.text.trim().slice(0, 8_000)
+                  : turn.detail || "Copilot steering continue complete";
+              terminalMsg = { type: "finished", summary };
+              agentFinished = true;
+              continue;
+            }
           } else if (agBind?.isLive?.()) {
             const cont = agBind.continueNative({
               text: continuePrompt,
@@ -1439,8 +1540,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
                 ...(toolEnv ? { toolEnv } : {}),
                 resumeBrief:
                   g10Fabric?.reconcileResume?.()?.resumeBrief ||
-                  (cursorPrimaryDone
-                    ? "Peer Cursor already worked this task; apply operator steering from current reality."
+                  (peerPrimaryDone
+                    ? "The selected primary engine already worked this task; apply operator steering from current reality."
                     : undefined),
               },
             });
@@ -1661,6 +1762,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         const turn = g10Fabric
           ? await g10Fabric.runCursorCollabTurn({
               prompt: repairPrompt,
+              role: "repair",
               timeoutMs: turnBudgetMs,
               signal: ac.signal,
             })
@@ -1758,6 +1860,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         const turn = g10Fabric
           ? await g10Fabric.runCopilotCollabTurn({
               prompt: repairPrompt,
+              role: "repair",
               timeoutMs: turnBudgetMs,
             })
           : await (ag9Collab?.withCollabTurn
@@ -1931,8 +2034,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
               ...(toolEnv ? { toolEnv } : {}),
               resumeBrief:
                 g10Fabric?.reconcileResume?.()?.resumeBrief ||
-                (cursorPrimaryDone
-                  ? "Peer Cursor already worked this task; continue from current PATH/Git reality."
+                (peerPrimaryDone
+                  ? "The selected primary engine already worked this task; continue from current PATH/Git reality."
                   : undefined),
             },
           });
@@ -2305,6 +2408,23 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     changedFiles: resultChangedFiles,
   });
 
+  if (primaryEngine === "antigravity" && !peerPrimaryDone) {
+    try {
+      g10Fabric?.noteEngineExecution?.({
+        engine: "antigravity",
+        role: "primary",
+        state: classification === "VERIFIED" ? "finished" : "failed",
+        finishedAt: new Date().toISOString(),
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+  const recordedTurns = g10Fabric?.getCheckpoint?.()?.engineTurns || [];
+  const primaryTurn =
+    recordedTurns.find((turn) => turn && turn.role === "primary") || null;
+  const selectionRecord = g10Fabric?.getCheckpoint?.()?.engineSelection || null;
+
   emit("session.engineering.result", {
     classification:
       terminalDisposition === "GIT_IDENTITY_REQUIRED"
@@ -2369,7 +2489,13 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       blockReason: terminalSummary,
       advancesSession,
       preferredEngine: preferredEngine || null,
-      engine: lastCollabEngine || null,
+      engine: primaryTurn?.engine || primaryEngine || lastCollabEngine || null,
+      executor: primaryTurn?.engine || primaryEngine || null,
+      executionProvider: primaryTurn?.provider || null,
+      executionModel: primaryTurn?.model || null,
+      engineMode: primaryTurn?.mode || null,
+      executionSessionId: primaryTurn?.sessionId || null,
+      selectionReason: selectionRecord?.reason || null,
       cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || null,
       enginesUsed: [...enginesSeen],
       fabricRouting: fabricRoutingNotes.slice(),
@@ -2393,7 +2519,13 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       timingSummary: summarizeTimingMarks(timingMarks),
       advancesSession,
       preferredEngine: preferredEngine || null,
-      engine: lastCollabEngine || null,
+      engine: primaryTurn?.engine || primaryEngine || lastCollabEngine || null,
+      executor: primaryTurn?.engine || primaryEngine || null,
+      executionProvider: primaryTurn?.provider || null,
+      executionModel: primaryTurn?.model || null,
+      engineMode: primaryTurn?.mode || null,
+      executionSessionId: primaryTurn?.sessionId || null,
+      selectionReason: selectionRecord?.reason || null,
       cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || null,
       enginesUsed: [...enginesSeen],
       fabricRouting: fabricRoutingNotes.slice(),
@@ -2531,7 +2663,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     // may abbreviate structured envelopes needed by Build brief/evaluation/
     // challenge consumers.
     engineResultText: String(
-      cursorPrimarySummary ||
+      peerPrimarySummary ||
         (typeof terminalMsg?.summary === "string" ? terminalMsg.summary : ""),
     ).slice(0, 32_000),
     taskId: worktree.taskId,
@@ -2556,7 +2688,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     modelCalls: 0,
     repairAttempts,
     preferredEngine: preferredEngine || null,
-    engine: lastCollabEngine || null,
+    engine: primaryTurn?.engine || primaryEngine || lastCollabEngine || null,
+    executor: primaryTurn?.engine || primaryEngine || null,
+    executionModel: primaryTurn?.model || null,
     cursorMode: g10Fabric?.getCursor?.()?.getMode?.() || null,
     enginesUsed: [...enginesSeen],
     diagFile: typeof agent.getDiagFile === "function" ? agent.getDiagFile() : null,

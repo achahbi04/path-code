@@ -791,6 +791,10 @@ export function buildEngineeringReportModel(product, session = {}) {
     (typeof session.cursorMode === "string" && session.cursorMode) ||
     (typeof product.cursorMode === "string" && product.cursorMode) ||
     null;
+  const engineMode =
+    (typeof session.engineMode === "string" && session.engineMode) ||
+    (typeof product.engineMode === "string" && product.engineMode) ||
+    null;
   const enginesUsed = Array.isArray(session.enginesUsed)
     ? session.enginesUsed.map(String).filter(Boolean)
     : Array.isArray(product.enginesUsed)
@@ -801,6 +805,26 @@ export function buildEngineeringReportModel(product, session = {}) {
     : Array.isArray(product.fabricRouting)
       ? product.fabricRouting.map(String).filter(Boolean).slice(0, 8)
       : [];
+  const executor =
+    (typeof session.executor === "string" && session.executor) ||
+    (typeof product.executor === "string" && product.executor) ||
+    null;
+  const executionProvider =
+    (typeof session.executionProvider === "string" && session.executionProvider) ||
+    (typeof product.executionProvider === "string" && product.executionProvider) ||
+    null;
+  const executionModel =
+    (typeof session.executionModel === "string" && session.executionModel) ||
+    (typeof product.executionModel === "string" && product.executionModel) ||
+    null;
+  const executionSessionId =
+    (typeof session.executionSessionId === "string" && session.executionSessionId) ||
+    (typeof product.executionSessionId === "string" && product.executionSessionId) ||
+    null;
+  const selectionReason =
+    (typeof session.selectionReason === "string" && session.selectionReason) ||
+    (typeof product.selectionReason === "string" && product.selectionReason) ||
+    null;
 
   return {
     disposition,
@@ -827,8 +851,14 @@ export function buildEngineeringReportModel(product, session = {}) {
     preferredEngine,
     engine,
     cursorMode,
+    engineMode,
     enginesUsed,
     fabricRouting,
+    executor,
+    executionProvider,
+    executionModel,
+    executionSessionId,
+    selectionReason,
     reportPath:
       typeof product.engineeringReportPath === "string"
         ? product.engineeringReportPath
@@ -867,12 +897,28 @@ export function formatEngineeringReportPlain(model) {
   }
 
   if (
+    model.executor ||
     model.preferredEngine ||
     model.engine ||
     model.cursorMode ||
     (Array.isArray(model.enginesUsed) && model.enginesUsed.length > 0)
   ) {
     lines.push("Engine fabric");
+    if (model.executor) {
+      lines.push(`  executor   ${model.executor}`);
+    }
+    if (model.executionProvider) {
+      lines.push(`  provider   ${model.executionProvider}`);
+    }
+    if (model.executor) {
+      lines.push(`  model      ${model.executionModel || "unknown"}`);
+    }
+    if (model.engineMode) {
+      lines.push(`  mode       ${model.engineMode}`);
+    }
+    if (model.executionSessionId) {
+      lines.push(`  session    ${model.executionSessionId}`);
+    }
     if (model.preferredEngine) {
       lines.push(`  preferred  ${model.preferredEngine}`);
     }
@@ -882,8 +928,8 @@ export function formatEngineeringReportPlain(model) {
     if (Array.isArray(model.enginesUsed) && model.enginesUsed.length > 0) {
       lines.push(`  used       ${model.enginesUsed.join(" · ")}`);
     }
-    if (model.cursorMode) {
-      lines.push(`  cursor     ${model.cursorMode}`);
+    if (model.selectionReason) {
+      lines.push(`  why        ${model.selectionReason}`);
     }
     if (Array.isArray(model.fabricRouting) && model.fabricRouting.length > 0) {
       lines.push(`  routing    ${model.fabricRouting[model.fabricRouting.length - 1]}`);

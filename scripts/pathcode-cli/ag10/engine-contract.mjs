@@ -302,8 +302,77 @@ export function engineMeetsNeeds(cap, needs) {
  * }} input
  * @returns {EngineId}
  */
+/**
+ * Deterministic primary-turn rotation index from the task id.
+ * Attempt 0 is not a constant, so the first ready peer does not win every
+ * no-preference primary. This is not a quality score and not a random draw.
+ *
+ * @param {string | null | undefined} taskId
+ */
+export function primaryRotationAttempt(taskId) {
+  const text = String(taskId || "");
+  let n = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    n = (n + text.charCodeAt(i) * (i + 1)) >>> 0;
+  }
+  return n % 9973;
+}
+
 export function selectEngineForTurn(input = {}) {
   return explainEngineSelection(input).engine;
+}
+
+/**
+ * Ordinary primary selection. Same contract as explainEngineSelection.
+ * No-preference turns pass a task-derived attempt so rotation is real.
+ *
+ * @param {{
+ *   taskId?: string | null,
+ *   attempt?: number,
+ *   ready?: { antigravity?: boolean, copilot?: boolean, cursor?: boolean },
+ *   prefer?: string | null,
+ *   lastEngine?: string | null,
+ *   preferContinuity?: boolean,
+ *   needs?: TurnNeed[],
+ *   capabilities?: EngineCapability[],
+ *   forcePrefer?: boolean,
+ * }} [input]
+ */
+export function selectPrimaryEngine(input = {}) {
+  const attempt =
+    typeof input.attempt === "number" && input.attempt >= 0
+      ? input.attempt
+      : primaryRotationAttempt(input.taskId);
+  return explainEngineSelection({
+    role: "primary",
+    attempt,
+    ready: input.ready,
+    prefer: input.prefer ?? null,
+    lastEngine: input.lastEngine ?? null,
+    preferContinuity: input.preferContinuity !== false,
+    needs:
+      Array.isArray(input.needs) && input.needs.length > 0
+        ? input.needs
+        : ["continue", "code_edit"],
+    ...(Array.isArray(input.capabilities) ? { capabilities: input.capabilities } : {}),
+    ...(input.forcePrefer === true ? { forcePrefer: true } : {}),
+  });
+}
+
+/**
+ * Adapter to invoke for a selection. An unready engine is not treated as the
+ * executor.
+ *
+ * @param {{ engine?: string | null }} selection
+ * @param {{ antigravity?: boolean, copilot?: boolean, cursor?: boolean }} ready
+ * @returns {'antigravity'|'copilot'|'cursor'|null}
+ */
+export function primaryAdapterFor(selection, ready) {
+  const engine = String(selection?.engine || "");
+  if (engine === "cursor" && ready?.cursor === true) return "cursor";
+  if (engine === "copilot" && ready?.copilot === true) return "copilot";
+  if (engine === "antigravity" && ready?.antigravity !== false) return "antigravity";
+  return null;
 }
 
 /**

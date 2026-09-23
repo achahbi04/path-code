@@ -745,11 +745,10 @@ async def _run_engineering_task(payload: dict[str, Any]) -> None:
                     f"Engineering task:\n{task_text}\n\n"
                     f"Workspace: {workspace}\n"
                     f"Default command cwd: {default_cwd}\n"
-                    "Stay inside this workspace. You MUST investigate the repository, "
-                    "edit files as needed to complete the task, and run the project's "
-                    "existing test/typecheck scripts while debugging. Do not stop after "
-                    "only reading files — implement the fix. Prefer the default command "
-                    "cwd for package-local validation when it differs from the workspace root."
+                    "Stay inside this workspace. Carry out the engineering task as written, "
+                    "including its explicit creator constraints. Do not expand the task "
+                    "beyond that text. Use project-native checks when the task calls for "
+                    "validation. Do not push, deploy, or leave the workspace."
                 )
                 remaining = max(1.0, deadline - loop.time())
                 response = await asyncio.wait_for(agent.chat(prompt), timeout=remaining)

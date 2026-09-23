@@ -223,16 +223,27 @@ export function projectEngineeringActivity(build, extras = {}) {
         .filter(Boolean),
     )].slice(0, 24);
   const checkpointFiles = normalizeFiles(checkpoint?.changedFiles);
+  const executedTurn = (() => {
+    const turns = Array.isArray(checkpoint?.engineTurns) ? checkpoint.engineTurns : [];
+    return (
+      turns.find((turn) => turn && turn.role === "primary" && turn.engine) ||
+      [...turns].reverse().find((turn) => turn && turn.engine) ||
+      null
+    );
+  })();
   const traceEngine = [...(Array.isArray(extras.traceLines) ? extras.traceLines : [])]
     .reverse()
     .map((line) =>
       line?.type === "session.capability.collaborate" ? null : engineName(line?.engine),
     )
     .find(Boolean);
+  const checkpointMatchesLast =
+    !checkpoint?.taskId || checkpoint.taskId === (last?.taskId || null);
   const engine =
+    (checkpointMatchesLast ? engineName(executedTurn?.engine) : null) ||
     engineName(last?.provider) ||
-    engineName(checkpoint?.latestEngineTurn) ||
-    engineName(checkpoint?.inFlightEngine) ||
+    (checkpointMatchesLast ? engineName(checkpoint?.latestEngineTurn) : null) ||
+    (checkpointMatchesLast ? engineName(checkpoint?.inFlightEngine) : null) ||
     traceEngine ||
     null;
   const steps = projectTraceSteps(extras.traceLines, last?.kind || null, roots);
@@ -267,6 +278,16 @@ export function projectEngineeringActivity(build, extras = {}) {
   );
   const currentTask = {
     engine: currentOwnsCheckpoint ? engine : engineName(last?.provider),
+    model: currentOwnsCheckpoint ? executedTurn?.model || null : null,
+    mode: currentOwnsCheckpoint ? executedTurn?.mode || null : null,
+    executionProvider: currentOwnsCheckpoint ? executedTurn?.provider || null : null,
+    sessionId: currentOwnsCheckpoint ? executedTurn?.sessionId || null : null,
+    selectionReason: currentOwnsCheckpoint
+      ? checkpoint?.engineSelection?.reason || null
+      : null,
+    selectedEngine: currentOwnsCheckpoint
+      ? checkpoint?.engineSelection?.selected || null
+      : null,
     taskId: currentTaskId,
     phase,
     label: latestStep?.label || labelFromBuildEvents(events),

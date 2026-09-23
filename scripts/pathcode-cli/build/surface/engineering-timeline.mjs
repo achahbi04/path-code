@@ -132,6 +132,24 @@ function fromTraceLine(line, roots, ctx) {
   };
 
   if (type === "session.capability.collaborate") return null;
+  if (type === "session.engine.selected") {
+    return {
+      ...base,
+      kind: "fabric",
+      engine: engine || meta.selected || null,
+      status: "completed",
+      presentation: "diagnostic",
+      summary: "PATH selected an engineering route.",
+      diagnostics: {
+        preferred: meta.preferred || line?.preferred || null,
+        selected: meta.selected || engine || null,
+        reason: String(line?.detail || meta.reason || "").slice(0, 160),
+        ready: meta.ready || null,
+        fit: meta.fit || null,
+        mode: meta.mode || null,
+      },
+    };
+  }
   if (type === "session.task.received") {
     return {
       ...base,
@@ -317,6 +335,9 @@ function fromBuildEvent(event, buildId) {
         preferred: data.preferred || null,
         selected,
         reason,
+        ready: data.ready || null,
+        fit: data.fit || null,
+        executed: data.executed || null,
         fallback: data.fallback === true,
       },
     };
