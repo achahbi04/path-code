@@ -565,7 +565,25 @@ export function projectBuildForSurface(
   requestLabel?: string | null;
   archived?: boolean;
   queuedRequest?: string | null;
+  canPause?: boolean;
   canResume?: boolean;
+  requestReceipt?: {
+    acceptedAt?: string | null;
+    intentRevision?: number | null;
+    resultingSha?: string | null;
+    adopted?: boolean;
+    previewUrl?: string | null;
+    ready?: boolean;
+    tasks?: Array<{
+      taskId?: string | null;
+      kind?: string | null;
+      engine?: string | null;
+      startedAt?: string | null;
+      endedAt?: string | null;
+      status?: string | null;
+      adoptedSha?: string | null;
+    }>;
+  };
   previewPreparing?: boolean;
   activeEngineering?: boolean;
   needsRecovery?: boolean;

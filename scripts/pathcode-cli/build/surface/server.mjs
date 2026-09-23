@@ -215,13 +215,20 @@ export async function startPathBuildSurface(options) {
     const checkpoint = lastChild
       ? readTaskCheckpoint(runtimeRoot, lastChild.taskId)
       : null;
-    const traces = (build?.children || [])
-      .filter((child) => child?.taskId)
-      .map((child) => ({
-        taskId: child.taskId,
-        lines: readTaskTrace(child.taskId, runtimeRoot, 4000).lines || [],
-        engine: engineFromCheckpoint(readTaskCheckpoint(runtimeRoot, child.taskId)),
-      }));
+    const currentRevision = build?.intent?.outcomeRevision;
+    const currentChildren = (build?.children || []).filter(
+      (child) =>
+        child?.taskId &&
+        (currentRevision == null || child.intentRevision === currentRevision),
+    );
+    const tracedChildren = currentChildren.length
+      ? currentChildren
+      : (build?.children || []).filter((child) => child?.taskId).slice(-4);
+    const traces = tracedChildren.map((child) => ({
+      taskId: child.taskId,
+      lines: readTaskTrace(child.taskId, runtimeRoot, 200).lines || [],
+      engine: engineFromCheckpoint(readTaskCheckpoint(runtimeRoot, child.taskId)),
+    }));
     const traceLines = traces.length ? traces[traces.length - 1].lines : [];
     /** @type {{ files?: string[], summary?: string, commands?: string[] } | null} */
     let diff = null;
@@ -267,7 +274,11 @@ export async function startPathBuildSurface(options) {
       typeof checkpoint?.worktreePath === "string" ? checkpoint.worktreePath : "";
     /** @type {string[]} */
     let worktreeFiles = [];
-    if (worktreePath && existsSync(join(worktreePath, ".git"))) {
+    if (
+      build?.loop?.status !== "complete" &&
+      worktreePath &&
+      existsSync(join(worktreePath, ".git"))
+    ) {
       const porcelain = spawnSync(
         "git",
         ["status", "--porcelain"],
@@ -419,6 +430,15 @@ export async function startPathBuildSurface(options) {
           if (!build) {
             sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
             return;
+          }
+          if (build.authoritativeSha && build.loop?.status === "complete") {
+            const current = await coordinator.getRuntime(buildId);
+            const live =
+              current?.runtime?.status === "ready" ||
+              current?.preview?.status === "ready";
+            if (!live) {
+              await coordinator.startRuntime(buildId);
+            }
           }
           sendJson(res, 200, await viewFor(buildId));
           return;
@@ -668,14 +688,19 @@ export async function startPathBuildSurface(options) {
 
         if (
           method === "POST" &&
-          (action === "stop" || action === "resume" || action === "recover")
+          (action === "stop" ||
+            action === "pause" ||
+            action === "resume" ||
+            action === "recover")
         ) {
           const controlled =
             action === "stop"
               ? await coordinator.stopBuild(buildId)
-              : action === "recover"
-                ? await coordinator.recoverBuild(buildId)
-                : await coordinator.resumeBuild(buildId);
+              : action === "pause"
+                ? await coordinator.pauseBuild(buildId)
+                : action === "recover"
+                  ? await coordinator.recoverBuild(buildId)
+                  : await coordinator.resumeBuild(buildId);
           sendJson(res, controlled.ok ? 200 : 400, {
             ...controlled,
             view: await viewFor(buildId),

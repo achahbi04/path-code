@@ -121,6 +121,8 @@ export function createBuildCoordinatorClient(options) {
       request(BuildCoordinatorMethods.BUILD_MESSAGE, { buildId, input }),
     stopBuild: (buildId) =>
       request(BuildCoordinatorMethods.BUILD_STOP, { buildId }),
+    pauseBuild: (buildId) =>
+      request(BuildCoordinatorMethods.BUILD_PAUSE, { buildId }),
     resumeBuild: (buildId) =>
       request(BuildCoordinatorMethods.BUILD_RESUME, { buildId }),
     recoverBuild: (buildId) =>

@@ -24,14 +24,13 @@
           <button type="button" class="cta library-new" id="newBuildBtn">+ New project</button>
           <h2 class="library-label">Projects</h2>
           <div class="project-list" id="projectList"></div>
-          <button type="button" class="library-label archived-toggle" id="archivedToggle" hidden>Archived <span id="archivedCount"></span></button>
+          <button type="button" class="library-label archived-toggle" id="archivedToggle" hidden>Archived · <span id="archivedCount"></span></button>
           <div class="project-list archived-list" id="archivedList" hidden></div>
         </div>
         <div id="projectMode" hidden>
-          <button type="button" class="ghost project-back" id="backToProjects">← Back to Projects</button>
           <h2 class="library-label">Project</h2>
           <p class="project-mode-title" id="projectModeTitle"></p>
-          <details class="rail-section" id="sourceSection" open>
+          <details class="rail-section" id="sourceSection">
             <summary>Project Source</summary>
             <button type="button" class="ghost rail-action" id="openFolderBtn">Open Folder</button>
             <button type="button" class="ghost rail-action" id="copyPathBtn">Copy Project Path</button>
@@ -45,11 +44,11 @@
           <details class="rail-section" id="detailsSection">
             <summary>Project Details</summary>
             <dl class="rail-details" id="projectDetails"></dl>
+            <button type="button" class="ghost rail-action" id="renameTitleBtn">Rename</button>
+            <button type="button" class="ghost rail-action" id="archiveBtn">Archive</button>
+            <button type="button" class="ghost rail-action" id="restoreBtn" hidden>Restore</button>
+            <button type="button" class="ghost rail-action" id="recoverBuildBtn" hidden>Recover</button>
           </details>
-          <button type="button" class="ghost rail-action" id="renameTitleBtn">Rename</button>
-          <button type="button" class="ghost rail-action" id="archiveBtn">Archive</button>
-          <button type="button" class="ghost rail-action" id="restoreBtn" hidden>Restore</button>
-          <button type="button" class="ghost rail-action" id="recoverBuildBtn" hidden>Recover</button>
         </div>
       </aside>
       <button type="button" class="ghost tiny library-open" id="libraryOpen" hidden>Projects</button>
@@ -87,9 +86,6 @@
           <span class="status-pill" id="statusPill">Building…</span>
           <span class="criteria-line" id="criteriaLine"></span>
         </div>
-        <div class="topbar-actions">
-          <button type="button" class="ghost" id="projectModeBtn">Project</button>
-        </div>
       </header>
 
       <div class="workspace-grid">
@@ -117,6 +113,7 @@
                 placeholder="Ask PATH…"
               ></textarea>
               <div class="composer-row">
+                <button type="button" class="ghost composer-stop" id="pauseBuildBtn" hidden>Pause</button>
                 <button type="button" class="ghost composer-stop" id="stopBuildBtn" hidden>Stop</button>
                 <button type="button" class="ghost composer-stop" id="resumeBuildBtn" hidden>Resume</button>
                 <button type="submit" class="cta compact" id="sendBtn">Send</button>

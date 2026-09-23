@@ -28,14 +28,13 @@ const els = {
   drawer: document.getElementById("drawer"),
   drawerBody: document.getElementById("drawerBody"),
   projectPath: document.getElementById("projectPath"),
+  pauseBuildBtn: document.getElementById("pauseBuildBtn"),
   stopBuildBtn: document.getElementById("stopBuildBtn"),
   resumeBuildBtn: document.getElementById("resumeBuildBtn"),
   recoverBuildBtn: document.getElementById("recoverBuildBtn"),
   selectModeBtn: document.getElementById("selectModeBtn"),
   refreshPreviewBtn: document.getElementById("refreshPreviewBtn"),
   undockBtn: document.getElementById("undockBtn"),
-  projectModeBtn: document.getElementById("projectModeBtn"),
-  backToProjects: document.getElementById("backToProjects"),
   projectsMode: document.getElementById("projectsMode"),
   projectMode: document.getElementById("projectMode"),
   projectModeTitle: document.getElementById("projectModeTitle"),
@@ -545,6 +544,7 @@ function render(view) {
   renderDrawer(view);
   renderWorklog(view);
   updatePreview(view);
+  if (els.pauseBuildBtn) els.pauseBuildBtn.hidden = !view.canPause;
   els.stopBuildBtn.hidden = !view.canStop;
   const queuedWhilePaused = view.status === "paused" && Boolean(view.queuedRequest);
   els.resumeBuildBtn.hidden = !view.canResume;
@@ -767,9 +767,11 @@ async function controlBuild(action) {
   const button =
     action === "stop"
       ? els.stopBuildBtn
-      : action === "resume"
-        ? els.resumeBuildBtn
-        : els.recoverBuildBtn;
+      : action === "pause"
+        ? els.pauseBuildBtn
+        : action === "resume"
+          ? els.resumeBuildBtn
+          : els.recoverBuildBtn;
   button.disabled = true;
   try {
     const res = await fetch(
@@ -817,6 +819,7 @@ els.chatInput.addEventListener("keydown", (event) => {
   event.preventDefault();
   els.chatForm.requestSubmit();
 });
+els.pauseBuildBtn?.addEventListener("click", () => void controlBuild("pause"));
 els.stopBuildBtn.addEventListener("click", () => void controlBuild("stop"));
 els.resumeBuildBtn.addEventListener("click", () => void controlBuild("resume"));
 els.recoverBuildBtn.addEventListener("click", () => void controlBuild("recover"));
@@ -1069,15 +1072,7 @@ async function loadProjects() {
 }
 
 function setRailMode(mode) {
-  const project = mode === "project";
-  if (project && els.projectList) projectListScroll = els.projectList.scrollTop;
-  if (els.projectsMode) els.projectsMode.hidden = project;
-  if (els.projectMode) els.projectMode.hidden = !project;
-  if (!project && els.projectList) {
-    requestAnimationFrame(() => {
-      els.projectList.scrollTop = projectListScroll;
-    });
-  }
+  if (els.projectMode) els.projectMode.hidden = mode !== "project";
 }
 
 function renderProjectMode(view) {
@@ -1102,6 +1097,7 @@ function renderProjectMode(view) {
   if (els.archiveBtn) els.archiveBtn.hidden = Boolean(view.archived);
   if (els.restoreBtn) els.restoreBtn.hidden = !view.archived;
   if (els.recoverBuildBtn) els.recoverBuildBtn.hidden = !view.needsRecovery;
+  if (els.projectMode) els.projectMode.hidden = false;
 }
 
 async function openProject(buildId, mode, title) {
@@ -1138,12 +1134,6 @@ async function openProject(buildId, mode, title) {
   document.querySelector(".app-shell")?.classList.remove("library-open");
 }
 
-els.projectModeBtn?.addEventListener("click", () => {
-  if (!activeBuildId) return;
-  setRailMode("project");
-  void refreshRepositoryDialog();
-});
-els.backToProjects?.addEventListener("click", () => setRailMode("projects"));
 els.projectList?.addEventListener("scroll", () => {
   if (!els.projectsMode?.hidden) projectListScroll = els.projectList.scrollTop;
 });

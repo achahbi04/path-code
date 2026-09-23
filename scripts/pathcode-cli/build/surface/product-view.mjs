@@ -53,6 +53,37 @@ function creatorCriterionStatus(criterion, children) {
  *   diff?: object | null,
  * }} [extras]
  */
+function requestReceipt(build) {
+  const revision = build?.intent?.outcomeRevision;
+  const children = (Array.isArray(build?.children) ? build.children : []).filter(
+    (child) => child && child.intentRevision === revision && !child.orphanAbandoned,
+  );
+  const accepted = [...(Array.isArray(build?.conversation) ? build.conversation : [])]
+    .reverse()
+    .find(
+      (message) =>
+        message?.role === "user" &&
+        (revision == null || message.intentRevision === revision),
+    );
+  return {
+    acceptedAt: accepted?.at || null,
+    intentRevision: revision ?? null,
+    tasks: children.map((child) => ({
+      taskId: child.taskId || null,
+      kind: child.kind || null,
+      engine: child.provider || null,
+      startedAt: child.selectedAt || null,
+      endedAt: child.consumedAt || child.terminalAt || null,
+      status: child.classification || null,
+      adoptedSha: child.adoptedSha || null,
+    })),
+    resultingSha: build?.authoritativeSha || null,
+    adopted: children.some((child) => child.kind === "engineer" && child.adoptedSha),
+    previewUrl: build?.previewUrl || null,
+    ready: build?.loop?.status === "complete",
+  };
+}
+
 export function projectBuildForSurface(build, extras = {}) {
   if (!build || typeof build !== "object") {
     return {
@@ -390,8 +421,10 @@ export function projectBuildForSurface(build, extras = {}) {
     blockedReason: build.loop?.blockedReason || null,
     complete,
     canSteer: !blocked,
+    canPause: status === "running",
     canStop: status === "running",
     canResume: paused || blocked,
+    requestReceipt: requestReceipt(build),
     selectedElement: build.loop?.pendingSelectedElement || null,
     preview,
     runtime,

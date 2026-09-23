@@ -325,7 +325,7 @@ describe("S5 completion cannot ignore derived criteria", () => {
     writeBuildRecord(runtimeRoot, build);
     const assessment = controller.assessCompletion(build.buildId);
     expect(assessment.complete).toBe(false);
-    expect(assessment.reason).toMatch(/criteria_unproven|evaluate_required|challenge_required/);
+    expect(assessment.reason).toMatch(/engineering_result_required|criteria_unproven|no_required_criteria|derived_criteria_missing/);
     rmSync(runtimeRoot, { recursive: true, force: true });
     rmSync(target, { recursive: true, force: true });
   });

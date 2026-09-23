@@ -28,7 +28,6 @@ import {
 } from "./evidence.mjs";
 import {
   realityRefreshDepthA,
-  buildTargetedRevalidationObjective,
   parseStatusDirectives,
   readReportText,
 } from "./reinspect.mjs";
@@ -111,6 +110,28 @@ function syncConversationLifecycle(record) {
       msg.status = status;
     }
   }
+}
+
+function fabricStepsRemaining(record) {
+  const steps = record?.loop?.fabricSteps;
+  if (!Array.isArray(steps)) return [];
+  return steps
+    .filter((step) => typeof step === "string" && step.trim())
+    .map((step) => step.trim());
+}
+
+function adoptedEngineerForRevision(record) {
+  const rev = record?.intent?.outcomeRevision;
+  const engineers = (record?.children || []).filter(
+    (child) =>
+      child.kind === "engineer" &&
+      child.intentRevision === rev &&
+      !child.orphanAbandoned &&
+      child.dispatchState === "consumed" &&
+      child.adoptedSha &&
+      /VERIFIED|SUCCESS/i.test(String(child.classification || "")),
+  );
+  return engineers.length ? engineers[engineers.length - 1] : null;
 }
 
 function normalizeSelectedElement(value) {
@@ -605,6 +626,37 @@ export function createBuildController(opts) {
     record.loop.status = "paused";
     record.loop.pausedAt = new Date().toISOString();
     record.loop.pausedTaskId = active?.taskId || null;
+    record.loop.pauseRequested = false;
+    writeBuildRecord(runtimeRoot, record);
+    return { ok: true, build: readBuildRecord(runtimeRoot, buildId) };
+  }
+
+  /**
+   * Finish the current safe engineering boundary, then dispatch nothing else.
+   * Does not cancel the in-flight provider call.
+   * @param {string} buildId
+   */
+  async function pauseBuild(buildId) {
+    const record = readBuildRecord(runtimeRoot, buildId);
+    if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (record.loop.status === "complete") {
+      return { ok: true, alreadyComplete: true, build: record };
+    }
+    const active = [...(record.children || [])]
+      .reverse()
+      .find(
+        (child) =>
+          child.dispatchState === "selected" ||
+          child.dispatchState === "dispatched" ||
+          child.dispatchState === "terminal_seen",
+      );
+    record.loop.pauseRequested = true;
+    record.loop.pauseRequestedAt = new Date().toISOString();
+    if (!active) {
+      record.loop.status = "paused";
+      record.loop.pausedAt = record.loop.pauseRequestedAt;
+      record.loop.pauseRequested = false;
+    }
     writeBuildRecord(runtimeRoot, record);
     return { ok: true, build: readBuildRecord(runtimeRoot, buildId) };
   }
@@ -618,6 +670,7 @@ export function createBuildController(opts) {
     record.loop.status = "running";
     record.loop.resumedAt = new Date().toISOString();
     record.loop.blockedReason = undefined;
+    record.loop.pauseRequested = false;
     writeBuildRecord(runtimeRoot, record);
     const reconciled = await reconcileBuildChildren(buildId);
     record = readBuildRecord(runtimeRoot, buildId) || record;
@@ -969,22 +1022,54 @@ export function createBuildController(opts) {
     const classification = "VERIFIED";
     let reportBody = `PATH Build fake ${input.kind} result\n`;
 
+    /** @type {Record<string, unknown>} */
+    let sealed = {};
     if (input.kind === "engineer") {
       // Create a tiny marker file to simulate engineering progress
       const { writeFileSync, mkdirSync } = await import("node:fs");
       const { join } = await import("node:path");
-      mkdirSync(join(input.binding.projectRoot, "src"), { recursive: true });
+      const { spawnSync } = await import("node:child_process");
+      const root = input.binding.projectRoot;
+      mkdirSync(join(root, "src"), { recursive: true });
       writeFileSync(
-        join(input.binding.projectRoot, "src", "path-build-marker.txt"),
+        join(root, "src", "path-build-marker.txt"),
         `build=${input.buildId}\nkind=engineer\n`,
         "utf8",
       );
       writeFileSync(
-        join(input.binding.projectRoot, "package.json"),
+        join(root, "package.json"),
         `${JSON.stringify({ name: "path-build-proof", private: true, type: "module", scripts: { test: "node -e \"console.log('ok')\"" } }, null, 2)}\n`,
         "utf8",
       );
-      reportBody += "Created src/path-build-marker.txt and package.json\n";
+      writeFileSync(
+        join(root, "index.html"),
+        "<!doctype html><p><a class=\"btn-secondary\" href=\"#how-to-use\">Learn how ICE works</a></p>\n",
+        "utf8",
+      );
+      const gitEnv = {
+        ...process.env,
+        GIT_TERMINAL_PROMPT: "0",
+        GIT_AUTHOR_NAME: "PATH Build",
+        GIT_AUTHOR_EMAIL: "path-build@localhost",
+        GIT_COMMITTER_NAME: "PATH Build",
+        GIT_COMMITTER_EMAIL: "path-build@localhost",
+      };
+      const git = (args) =>
+        spawnSync("git", args, { cwd: root, encoding: "utf8", env: gitEnv });
+      const branch = `path/task-${input.taskId}`;
+      git(["checkout", "-B", branch]);
+      git(["add", "-A"]);
+      git(["commit", "-m", "PATH Build engineer result"]);
+      const sha = String(git(["rev-parse", "HEAD"]).stdout || "").trim();
+      const baseline = String(git(["rev-parse", "HEAD~1"]).stdout || "").trim();
+      sealed = {
+        sha,
+        baseline,
+        branch,
+        changedFiles: ["index.html", "package.json", "src/path-build-marker.txt"],
+        worktreePath: root,
+      };
+      reportBody += "Created src/path-build-marker.txt, package.json, and index.html\n";
     }
 
     if (input.kind === "brief") {
@@ -1040,11 +1125,15 @@ export function createBuildController(opts) {
         repoRoot: input.binding.projectRoot,
         worktreePath: input.binding.projectRoot,
         objective: input.objective.slice(0, 4_000),
-        headSha: reality.headSha,
+        headSha: sealed.sha || reality.headSha,
         diffFingerprint: reality.dirtyFingerprint,
-        finalState: "completed",
+        finalState: input.kind === "engineer" ? "VERIFIED" : "completed",
         validation: { classification },
-        changedFiles: reality.changedFiles,
+        changedFiles: sealed.changedFiles || reality.changedFiles,
+        sha: sealed.sha,
+        baseline: sealed.baseline,
+        branch: sealed.branch,
+        worktreePath: sealed.worktreePath || input.binding.projectRoot,
       }),
     );
     writeEngineeringReportFile(input.taskId, reportBody, runtimeRoot);
@@ -1226,6 +1315,15 @@ export function createBuildController(opts) {
 
     noteEngineerProductRoots(record, child, cp, snap, classification);
 
+    if (
+      child.kind === "engineer" &&
+      Array.isArray(cp?.fabricPlan?.remaining)
+    ) {
+      record.loop.fabricSteps = cp.fabricPlan.remaining
+        .filter((step) => typeof step === "string" && step.trim())
+        .map((step) => step.trim());
+    }
+
     // Adopt engineer results into authoritative Build product revision.
     /** @type {object | null} */
     let adoption = null;
@@ -1236,6 +1334,7 @@ export function createBuildController(opts) {
         checkpoint: cp,
         projectRoot: binding?.projectRoot || "",
         classification,
+        reportText,
       });
       if (!decision.adopt && decision.code === "NON_WEB") {
         child.classification = "NOT_VERIFIED";
@@ -1332,6 +1431,12 @@ export function createBuildController(opts) {
             delete binding.activeWorktreePath;
             child.adoptedSha = adoption.adoptedSha;
             child.sourceSha = adoption.sourceSha;
+            if (decision.recoveredProviderClose || decision.recoveredEmptyDiscovery) {
+              child.classification = "VERIFIED";
+              child.recoveredProviderClose = decision.recoveredProviderClose === true;
+              child.recoveredEmptyDiscovery = decision.recoveredEmptyDiscovery === true;
+              child.failureReason = undefined;
+            }
 
             // Greenfield honesty: "VERIFIED" with no product files is not progress.
             if (isEmptyProductTree(binding.projectRoot)) {
@@ -1615,6 +1720,37 @@ export function createBuildController(opts) {
       }
       // No product yet — do not block completion assessment / next dispatch.
       record.loop.pendingRuntimeRefresh = false;
+    }
+    const remainingFabric = fabricStepsRemaining(record);
+    if (remainingFabric.length) {
+      return {
+        ok: true,
+        complete: false,
+        reason: "fabric_plan_remaining",
+        build: record,
+      };
+    }
+    const adoptedEngineer = adoptedEngineerForRevision(record);
+    if (adoptedEngineer && record.authoritativeSha) {
+      const productKind =
+        record.productBrief?.productKind || record.artifactKind || "unknown";
+      const isVisual =
+        !fakeMode &&
+        (productKind === "web" ||
+          /website|web\s*app|landing/i.test(record.intent?.outcome || ""));
+      if (
+        isVisual &&
+        (!record.previewUrl ||
+          (record.runtimeHealth && record.runtimeHealth !== "ok"))
+      ) {
+        return {
+          ok: true,
+          complete: false,
+          reason: "preview_pending",
+          build: record,
+        };
+      }
+      return { ok: true, complete: true, reason: "ready", build: record };
     }
     if (record.loop.lastAdoptionError) {
       const recovered =
@@ -1950,6 +2086,20 @@ export function createBuildController(opts) {
       writeBuildRecord(runtimeRoot, record);
     }
 
+    if (record.loop.pauseRequested) {
+      record.loop.status = "paused";
+      record.loop.pausedAt = new Date().toISOString();
+      record.loop.pauseRequested = false;
+      writeBuildRecord(runtimeRoot, record);
+      return {
+        ok: true,
+        done: false,
+        paused: true,
+        build: readBuildRecord(runtimeRoot, buildId),
+        action: "paused",
+      };
+    }
+
     const completion = assessCompletion(buildId);
     if (completion.complete) {
       const marked = markComplete(buildId);
@@ -1965,23 +2115,17 @@ export function createBuildController(opts) {
       (c) => c.intentRevision === currentRevision && !c.orphanAbandoned,
     );
     const engineers = revisionChildren.filter((c) => c.kind === "engineer");
-    const evaluates = revisionChildren.filter((c) => c.kind === "evaluate");
-    const challenges = revisionChildren.filter((c) => c.kind === "challenge");
-    const demoted =
-      (record.loop.lastRealityDelta &&
-        Array.isArray(record.loop.lastRealityDelta.demotedIds) &&
-        record.loop.lastRealityDelta.demotedIds) ||
-      [];
     const bindingRoot =
       record.projectBindings?.[0]?.projectRoot ||
       record.projectBindings?.[0]?.path ||
       "";
     const productStillEmpty =
       Boolean(bindingRoot) && isEmptyProductTree(bindingRoot);
+    const plannedSteps = fabricStepsRemaining(record);
     const forceEngineer =
       record.loop.forceNextKind === "engineer" ||
       Boolean(record.loop.pendingConversationSteer) ||
-      productStillEmpty;
+      (productStillEmpty && engineers.length === 0 && plannedSteps.length === 0);
 
     /** @type {import('./types.mjs').BuildTaskKind} */
     let kind = "engineer";
@@ -2009,42 +2153,25 @@ export function createBuildController(opts) {
       record.loop.forceNextKind = undefined;
       record.loop.pendingConversationSteer = false;
       writeBuildRecord(runtimeRoot, record);
+    } else if (fabricStepsRemaining(record).length) {
+      kind = "engineer";
+      objective = frameEngineerObjective(record, fabricStepsRemaining(record)[0]);
+      record.loop.fabricSteps = fabricStepsRemaining(record).slice(1);
+      writeBuildRecord(runtimeRoot, record);
     } else if (engineers.length === 0) {
       kind = "engineer";
       objective = frameEngineerObjective(
         record,
         record.hypotheses.proposedNextAction || "",
       );
-    } else if (revisionChildren.at(-1)?.kind === "engineer") {
-      // Every engineering turn, including a no-op verification turn, must be
-      // followed by fresh assessment before another mutation is authorized.
+    } else if (record.loop.forceNextKind === "evaluate") {
       kind = "evaluate";
       objective = frameEvaluateObjective(record, {
         evidencePackage: buildEvidencePackage(record),
       });
-    } else if (completion.reason === "requirements_unsatisfied") {
-      kind = "engineer";
-      const openReqs = (record.intent.explicitRequirements || []).filter(
-        (r) => r.required !== false && r.status !== "SATISFIED",
-      );
-      const gap = [
-        "Close these explicit operator requirements in this turn (do not skip):",
-        ...openReqs.map((r) => `- [${r.id}] ${r.statement}`),
-        "If a README is required, create README.md at the repository root with how to run npm test.",
-      ].join("\n");
-      objective = frameEngineerObjective(record, gap);
-    } else if (
-      demoted.length > 0 &&
-      completion.reason === "criteria_unproven"
-    ) {
-      kind = "evaluate";
-      objective = buildTargetedRevalidationObjective(record, demoted);
-    } else if (completion.reason === "evaluate_required") {
-      kind = "evaluate";
-      objective = frameEvaluateObjective(record, {
-        evidencePackage: buildEvidencePackage(record),
-      });
-    } else if (completion.reason === "challenge_required") {
+      record.loop.forceNextKind = undefined;
+      writeBuildRecord(runtimeRoot, record);
+    } else if (record.loop.forceNextKind === "challenge") {
       kind = "challenge";
       const claim =
         (record.outcomeCriteria || []).find((c) => c.status === "PROVEN")
@@ -2053,40 +2180,31 @@ export function createBuildController(opts) {
         preferPeerHint: true,
         evidencePackage: buildEvidencePackage(record),
       });
-    } else if (
-      evaluates.length === 0 ||
-      (engineers.length > evaluates.length && engineers.length % 2 === 0)
-    ) {
-      kind = "evaluate";
-      objective = frameEvaluateObjective(record, {
-        evidencePackage: buildEvidencePackage(record),
-      });
-    } else if (
-      evaluates.length > 0 &&
-      challenges.length === 0 &&
-      (record.outcomeCriteria || []).some((c) => c.status === "PROVEN")
-    ) {
-      kind = "challenge";
-      const claim =
-        (record.outcomeCriteria || []).find((c) => c.status === "PROVEN")
-          ?.statement || completenessClaim(record);
-      objective = frameChallengeObjective(record, claim, {
-        preferPeerHint: true,
-        evidencePackage: buildEvidencePackage(record),
-      });
+      record.loop.forceNextKind = undefined;
+      writeBuildRecord(runtimeRoot, record);
+    } else if (engineers[engineers.length - 1]?.adoptedSha) {
+      return {
+        ok: true,
+        done: false,
+        action: "await_runtime_refresh",
+        reason: "preview_pending",
+        build: record,
+      };
     } else {
-      kind = "engineer";
-      objective = frameEngineerObjective(
-        record,
-        record.hypotheses.proposedNextAction ||
-          "Advance the highest-value remaining gap toward the Build outcome.",
-      );
-    }
-
-    // No-progress: force evaluate
-    if ((record.loop.noProgressCount || 0) >= 2 && kind === "engineer") {
-      kind = "evaluate";
-      objective = frameEvaluateObjective(record);
+      record.loop.status = "blocked";
+      record.loop.blockedReason =
+        engineers[engineers.length - 1]?.failureReason ||
+        "Engineering did not return a verified durable result.";
+      syncConversationLifecycle(record);
+      writeBuildRecord(runtimeRoot, record);
+      return {
+        ok: true,
+        done: false,
+        blocked: true,
+        action: "blocked",
+        reason: record.loop.blockedReason,
+        build: readBuildRecord(runtimeRoot, buildId),
+      };
     }
 
     const engineOverride = record.loop.preferredEngineOverride || null;
@@ -2583,6 +2701,7 @@ export function createBuildController(opts) {
     load,
     recover,
     stopBuild,
+    pauseBuild,
     resumeBuild,
     reconcileBuildChildren,
     runDepthA,

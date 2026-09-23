@@ -10,6 +10,7 @@ export const BuildCoordinatorMethods = Object.freeze({
   BUILD_EVENTS: "build.events",
   BUILD_MESSAGE: "build.message",
   BUILD_STOP: "build.stop",
+  BUILD_PAUSE: "build.pause",
   BUILD_RESUME: "build.resume",
   BUILD_RECOVER: "build.recover",
   BUILD_TICK: "build.tick",

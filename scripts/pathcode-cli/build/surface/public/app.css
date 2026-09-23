@@ -493,8 +493,19 @@ body {
 .archived-list { flex: 0 1 auto; max-height: 30%; }
 .archived-toggle { background: none; border: 0; text-align: left; cursor: pointer; font: inherit; }
 .library { height: 100%; overflow: hidden; }
-#projectsMode, #projectMode { min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; overflow: hidden; }
+#projectsMode { min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; overflow: hidden; }
+#projectMode {
+  flex: 0 0 auto;
+  max-height: 42%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  padding-top: 0.45rem;
+}
 #projectsMode[hidden], #projectMode[hidden] { display: none; }
+.archived-toggle::after { content: " ›"; }
 .project-back { text-align: left; }
 .project-mode-title { margin: 0.2rem 0 0.4rem; font-family: var(--font-display); font-size: 1.05rem; }
 .rail-label { margin: 0.7rem 0 0.15rem; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }

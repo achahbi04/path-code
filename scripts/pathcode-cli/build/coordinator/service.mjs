@@ -206,21 +206,28 @@ export async function createBuildCoordinatorService(options) {
   async function reconcileStartup() {
     const recovered = [];
     for (const build of listBuildRecords(runtimeRoot)) {
+      if (build?.archivedAt) {
+        recovered.push({
+          buildId: build.buildId,
+          ok: true,
+          skipped: "archived",
+          replayed: false,
+        });
+        continue;
+      }
+      // An already-adopted product is shown from its authoritative SHA.
+      // Historical children are not replayed, and its runtime is started
+      // only when that project is opened.
+      if (build?.loop?.status === "complete" && build.authoritativeSha) {
+        recovered.push({
+          buildId: build.buildId,
+          ok: true,
+          skipped: "authoritative_product",
+          replayed: false,
+        });
+        continue;
+      }
       try {
-        const binding = build.projectBindings?.[0];
-        const runtime = binding?.projectRoot
-          ? await runtimeManager.reconcile(build.buildId, binding.projectRoot, {
-              bindingId: binding.bindingId,
-              outcomeHint: build.intent?.outcome,
-              authoritativeSha: build.authoritativeSha || null,
-              descriptor: {
-                buildId: build.buildId,
-                bindingId: binding.bindingId,
-                projectRoot: binding.projectRoot,
-              },
-              restartAllowed: true,
-            })
-          : null;
         const result = await exclusive(build.buildId, () =>
           controller.recover(build.buildId),
         );
@@ -228,7 +235,7 @@ export async function createBuildCoordinatorService(options) {
           buildId: build.buildId,
           ok: result?.ok !== false,
           decisions: result?.decisions || [],
-          runtime: runtime?.runtime || null,
+          replayed: true,
         });
         const previousUpdatedAt = Date.parse(build?.updatedAt || "");
         const recentlyActive =
@@ -330,6 +337,24 @@ export async function createBuildCoordinatorService(options) {
           );
           if (result.ok) ensureLoop(buildId);
           return result;
+        });
+      case BuildCoordinatorMethods.BUILD_PAUSE:
+        return exclusive(buildId, async () => {
+          const result = await controller.pauseBuild(buildId);
+          if (!result.ok) return result;
+          const record = readBuildRecord(runtimeRoot, buildId);
+          if (record?.loop?.status === "paused") {
+            record.coordinator = {
+              ...(record.coordinator || {}),
+              autoRun: false,
+              owner: "path-build-coordinator",
+            };
+            writeBuildRecord(runtimeRoot, record);
+          }
+          appendBuildEvent(runtimeRoot, buildId, "build.pause_requested", {
+            settled: record?.loop?.status === "paused",
+          });
+          return { ...result, build: readBuildRecord(runtimeRoot, buildId) };
         });
       case BuildCoordinatorMethods.BUILD_STOP:
         await interruptActive(buildId, "cancel");

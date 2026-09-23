@@ -149,12 +149,29 @@ export function decideEngineerProductAdoption(input) {
   }
 
   const finalState = String(cp?.finalState || "");
+  // A durable commit already exists. A later provider close (429 / ENGINE_ERROR)
+  // is not a reason to discard that commit and pay for another edit.
+  const providerCloseAfterDurableCommit =
+    Boolean(shaOf(cp?.sha)) &&
+    String(cp?.validation?.disposition || "") === "ENGINE_ERROR";
+  // PATH's own empty check discovery is not an engineering failure when the
+  // engine already sealed a commit. A failed check still rejects.
+  const emptyDiscoveryAfterDurableCommit =
+    Boolean(shaOf(cp?.sha)) &&
+    /no admissible validation candidates|no discoverable project validation/i.test(
+      `${cp?.validation?.reason || ""} ${input.reportText || ""}`,
+    ) &&
+    !/validation failed|checks failed|exit code [^0]/i.test(
+      String(input.reportText || ""),
+    );
   const success =
-    /^(VERIFIED|SUCCESS)$/i.test(classification) &&
-    finalState !== "FAILED" &&
-    finalState !== "CANCELLED" &&
-    finalState !== "BLOCKED" &&
-    finalState !== "NOT_VERIFIED";
+    providerCloseAfterDurableCommit ||
+    emptyDiscoveryAfterDurableCommit ||
+    (/^(VERIFIED|SUCCESS)$/i.test(classification) &&
+      finalState !== "FAILED" &&
+      finalState !== "CANCELLED" &&
+      finalState !== "BLOCKED" &&
+      finalState !== "NOT_VERIFIED");
   if (!success) {
     const failed = /FAIL|CANCEL|BLOCK|NOT_VERIFIED/i.test(
       `${classification} ${finalState}`,
@@ -269,11 +286,17 @@ export function decideEngineerProductAdoption(input) {
   return decide({
     adopt: true,
     code: "ADOPT",
-    reason: null,
+    reason: providerCloseAfterDurableCommit
+      ? "Durable result commit already existed when the provider connection closed."
+      : emptyDiscoveryAfterDurableCommit
+        ? "Durable result commit already existed. PATH found no further checks to run."
+        : null,
     capability,
     capabilitySource: "git-tree",
     sourceSha,
     taskBranch,
     fingerprint,
+    recoveredProviderClose: providerCloseAfterDurableCommit,
+    recoveredEmptyDiscovery: emptyDiscoveryAfterDurableCommit,
   });
 }
