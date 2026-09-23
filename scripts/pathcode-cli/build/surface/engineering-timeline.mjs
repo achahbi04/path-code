@@ -146,19 +146,22 @@ function fromTraceLine(line, roots, ctx) {
       ...base,
       kind: "task_cancelled",
       status: "cancelled",
-      summary: "Engineering stopped",
+      summary: "STOPPED by user",
     };
   }
   if (type === "gateway.task.finished") {
     const status = String(meta.status || "").toLowerCase();
-    const failed = /fail|cancel|error/.test(status);
+    const cancelled = /cancel/.test(status) && !/fail|error/.test(status);
+    const failed = /fail|error/.test(status);
     return {
       ...base,
-      kind: failed ? "task_failed" : "result",
-      status: failed ? "failed" : "completed",
-      summary: failed
-        ? "FAILURE engineering failed"
-        : "RESULT engineering result ready",
+      kind: cancelled ? "task_cancelled" : failed ? "task_failed" : "result",
+      status: cancelled ? "cancelled" : failed ? "failed" : "completed",
+      summary: cancelled
+        ? "STOPPED by user"
+        : failed
+          ? "FAILURE engineering failed"
+          : "RESULT engineering result ready",
     };
   }
   if (type === "session.engineering.result") {
@@ -278,6 +281,14 @@ function fromBuildEvent(event, buildId) {
       summary: sha
         ? `PREVIEW ${sha.slice(0, 12)}`
         : `PREVIEW ${String(data.status || "updated")}`,
+    };
+  }
+  if (type === "build.paused") {
+    return {
+      ...base,
+      kind: "task_cancelled",
+      status: "cancelled",
+      summary: "STOPPED by user",
     };
   }
   if (type.endsWith(".failed")) {

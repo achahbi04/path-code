@@ -31,16 +31,21 @@
           <button type="button" class="ghost project-back" id="backToProjects">← Back to Projects</button>
           <h2 class="library-label">Project</h2>
           <p class="project-mode-title" id="projectModeTitle"></p>
-          <h3 class="rail-label">Source</h3>
-          <button type="button" class="ghost rail-action" id="openFolderBtn">Open Folder</button>
-          <button type="button" class="ghost rail-action" id="copyPathBtn">Copy Project Path</button>
-          <button type="button" class="ghost rail-action" id="downloadZipBtn">Download Project ZIP</button>
-          <button type="button" class="ghost rail-action" id="openCodeBtn">Open in PATH Code</button>
-          <h3 class="rail-label">Repository</h3>
-          <p class="rail-state" id="projectRepoState">Local</p>
-          <button type="button" class="ghost rail-action" id="repositoryBtn">Repository</button>
-          <h3 class="rail-label">Details</h3>
-          <dl class="rail-details" id="projectDetails"></dl>
+          <details class="rail-section" id="sourceSection" open>
+            <summary>Project Source</summary>
+            <button type="button" class="ghost rail-action" id="openFolderBtn">Open Folder</button>
+            <button type="button" class="ghost rail-action" id="copyPathBtn">Copy Project Path</button>
+            <button type="button" class="ghost rail-action" id="downloadZipBtn">Download Project ZIP</button>
+            <button type="button" class="ghost rail-action" id="openCodeBtn">Open in PATH Code</button>
+          </details>
+          <details class="rail-section" id="repoSection">
+            <summary>Repository <span class="rail-summary-value" id="projectRepoState">Local</span></summary>
+            <button type="button" class="ghost rail-action" id="repositoryBtn">Repository</button>
+          </details>
+          <details class="rail-section" id="detailsSection">
+            <summary>Project Details</summary>
+            <dl class="rail-details" id="projectDetails"></dl>
+          </details>
           <button type="button" class="ghost rail-action" id="renameTitleBtn">Rename</button>
           <button type="button" class="ghost rail-action" id="archiveBtn">Archive</button>
           <button type="button" class="ghost rail-action" id="restoreBtn" hidden>Restore</button>
@@ -104,6 +109,7 @@
             <div class="chat-scroll" id="chatScroll"></div>
             <div class="selection-chip" id="selectionChip" hidden></div>
             <p class="creator-status" id="creatorStatus" hidden>Understanding your request<span class="ellipsis" aria-hidden="true"></span></p>
+            <p class="queue-notice" id="queueNotice" hidden>QUEUED — project is paused</p>
             <form class="chat-composer" id="chatForm">
               <textarea
                 id="chatInput"
@@ -122,6 +128,7 @@
         <main class="preview-pane">
           <div class="preview-toolbar">
             <span class="preview-label" id="previewLabel">Live product</span>
+            <span class="preview-notice" id="previewNotice" hidden>Updating preview…</span>
             <div class="viewport-toggles" role="group" aria-label="Viewport">
               <button type="button" class="ghost tiny active" data-viewport="desktop">Desktop</button>
               <button type="button" class="ghost tiny" data-viewport="tablet">Tablet</button>
@@ -142,7 +149,15 @@
             </div>
             <iframe
               id="previewFrame"
+              class="preview-frame"
               title="Live product preview"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+              hidden
+            ></iframe>
+            <iframe
+              id="previewFrameIncoming"
+              class="preview-frame incoming"
+              title="Incoming live product preview"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
               hidden
             ></iframe>

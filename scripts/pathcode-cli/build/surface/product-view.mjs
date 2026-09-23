@@ -123,12 +123,13 @@ export function projectBuildForSurface(build, extras = {}) {
     runtime?.reason === "no_start_plan";
   const updatingPreview = Boolean(build.loop?.pendingRuntimeRefresh) && !childLive;
 
-  const lastFailed =
+  const lastClass = String(last?.classification || "");
+  const realFailed =
     Boolean(last) &&
     !last.adoptedSha &&
-    /FAIL|CANCEL|NOT_VERIFIED|BLOCKED/i.test(String(last.classification || ""));
+    /FAIL|NOT_VERIFIED|BLOCKED/i.test(lastClass);
   const replacementLive = childLive && kind === "engineer";
-  if (paused && lastFailed && !replacementLive) {
+  if (paused && realFailed && !replacementLive) {
     phase = "paused";
     uiState = "error";
     headline = "Failed — paused";
@@ -344,6 +345,17 @@ export function projectBuildForSurface(build, extras = {}) {
       return text ? text.slice(0, 72) : null;
     })(),
     archived: isArchived(build),
+    queuedRequest: (() => {
+      if (!paused) return null;
+      const queued = [...conversation].reverse().find(
+        (message) => message?.role === "user" && message?.status === "queued",
+      );
+      const text = String(queued?.text || "").replace(/\s+/g, " ").trim();
+      return text || null;
+    })(),
+    previewPreparing:
+      Boolean(build.loop?.pendingRuntimeRefresh) ||
+      (status === "running" && !previewReady),
     children: activity,
     conversation,
     activity,

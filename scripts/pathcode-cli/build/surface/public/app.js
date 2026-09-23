@@ -1,6 +1,6 @@
 /** PATH Build — visual builder client */
 
-import { previewFrameSrc, shouldAcceptViewRevision } from "./view-revision.js";
+import { previewFrameSrc, previewTransition, shouldAcceptViewRevision } from "./view-revision.js";
 
 const els = {
   landing: document.getElementById("landing"),
@@ -21,6 +21,8 @@ const els = {
   previewEmptyTitle: document.getElementById("previewEmptyTitle"),
   previewEmptyDetail: document.getElementById("previewEmptyDetail"),
   previewFrame: document.getElementById("previewFrame"),
+  previewFrameIncoming: document.getElementById("previewFrameIncoming"),
+  previewNotice: document.getElementById("previewNotice"),
   previewError: document.getElementById("previewError"),
   previewLabel: document.getElementById("previewLabel"),
   drawer: document.getElementById("drawer"),
@@ -52,6 +54,7 @@ const els = {
   openCodeBtn: document.getElementById("openCodeBtn"),
   projectList: document.getElementById("projectList"),
   creatorStatus: document.getElementById("creatorStatus"),
+  queueNotice: document.getElementById("queueNotice"),
   copyPathBtn: document.getElementById("copyPathBtn"),
   downloadZipBtn: document.getElementById("downloadZipBtn"),
   repositoryBtn: document.getElementById("repositoryBtn"),
@@ -86,6 +89,13 @@ let worklogFollow = true;
 let chatStick = true;
 /** @type {any} */
 let lastView = null;
+/** @type {{ buildId: string, src: string } | null} */
+let heldPreview = null;
+let projectListScroll = 0;
+/** @type {HTMLIFrameElement | null} */
+let visibleFrame = els.previewFrame;
+/** @type {HTMLIFrameElement | null} */
+let spareFrame = els.previewFrameIncoming;
 
 function showLandingError(msg) {
   if (!msg) {
@@ -152,7 +162,7 @@ function dayLabel(timestamp) {
 function splitEngineering(summary) {
   const text = String(summary || "");
   const match = text.match(
-    /^(READ|SEARCH|CREATE|EDIT|DELETE|RENAME|RUN|TEST|TYPECHECK|BUILD|LINT|RESULT|COMMIT|ADOPT|PREVIEW|FAILURE|INSPECT)\s+([\s\S]*)$/,
+    /^(READ|SEARCH|CREATE|EDIT|DELETE|RENAME|RUN|TEST|TYPECHECK|BUILD|LINT|RESULT|COMMIT|ADOPT|PREVIEW|FAILURE|STOPPED|INSPECT)\s+([\s\S]*)$/,
   );
   if (!match) return { verb: "", target: text };
   return { verb: match[1], target: match[2] };
@@ -324,7 +334,37 @@ function renderDrawer(view) {
   }
 }
 
+function commitPreviewSrc(nextSrc) {
+  if (!visibleFrame || !nextSrc) return;
+  const current = visibleFrame.getAttribute("src") || "";
+  if (current === nextSrc) {
+    visibleFrame.hidden = false;
+    return;
+  }
+  if (!current || !spareFrame) {
+    visibleFrame.hidden = false;
+    visibleFrame.src = nextSrc;
+    return;
+  }
+  spareFrame.onload = () => {
+    spareFrame.hidden = false;
+    spareFrame.classList.remove("incoming");
+    visibleFrame.hidden = true;
+    visibleFrame.classList.add("incoming");
+    const previous = visibleFrame;
+    visibleFrame = spareFrame;
+    spareFrame = previous;
+    spareFrame.removeAttribute("src");
+    els.previewFrame = visibleFrame;
+    if (selectMode) postSelectMode();
+  };
+  spareFrame.classList.add("incoming");
+  spareFrame.src = nextSrc;
+}
+
 function updatePreview(view) {
+  if (!view) return;
+  if (heldPreview && heldPreview.buildId !== view.buildId) heldPreview = null;
   const embed = view.preview?.embedPath || null;
   const direct = view.preview?.url || null;
   const runtimeFailed =
@@ -341,59 +381,71 @@ function updatePreview(view) {
     !runtimeFailed &&
     (view.preview?.status === "ready" || view.preview?.status === "stale");
 
-  const controls = Boolean(ready && (embed || direct));
+  const nextSrc = ready && embed ? previewFrameSrc(embed, view.authoritativeSha) : "";
+  const decision = previewTransition({
+    heldSrc: heldPreview?.src || "",
+    nextReady: Boolean(ready && nextSrc),
+    nextSrc,
+    nextFailed: runtimeFailed,
+    preparing: Boolean(view.previewPreparing) || view.status === "running",
+  });
+  const controls = decision.action !== "empty";
   document.querySelector(".preview-actions")?.toggleAttribute("hidden", !controls);
   document.querySelector(".viewport-toggles")?.toggleAttribute("hidden", !controls);
-
-  if (runtimeFailed) {
-    els.previewError.hidden = false;
-    const exitBit =
-      typeof view.runtime?.exitCode === "number"
-        ? ` (exit ${view.runtime.exitCode})`
-        : "";
-    const stderr =
-      view.runtime?.stderrTail ||
-      view.runtime?.error ||
-      view.runtime?.reason ||
-      view.detail ||
-      "Preview runtime is not running.";
-    els.previewError.textContent = `Preview failed${exitBit}: ${String(stderr).slice(0, 800)}`;
-    els.previewEmpty.hidden = true;
-    els.previewFrame.hidden = true;
-    els.previewFrame.src = "";
-    previewEmbed = null;
-    previewDirectUrl = null;
-    els.previewLabel.textContent = "Preview unavailable";
-    return;
+  if (els.previewNotice) {
+    els.previewNotice.hidden = !decision.notice;
+    els.previewNotice.textContent = decision.notice || "";
   }
 
-  els.previewError.hidden = true;
-
-  if (ready && embed) {
-    const nextSrc = previewFrameSrc(embed, view.authoritativeSha);
-    els.previewEmpty.hidden = true;
-    els.previewFrame.hidden = false;
-    if (previewEmbed !== nextSrc) {
-      previewEmbed = nextSrc;
-      previewDirectUrl = direct;
-      els.previewFrame.src = nextSrc;
+  if (decision.action === "empty") {
+    els.previewError.hidden = !runtimeFailed;
+    if (runtimeFailed) {
+      const exitBit =
+        typeof view.runtime?.exitCode === "number" ? ` (exit ${view.runtime.exitCode})` : "";
+      const stderr =
+        view.runtime?.stderrTail ||
+        view.runtime?.error ||
+        view.runtime?.reason ||
+        view.detail ||
+        "Preview runtime is not running.";
+      els.previewError.textContent = `Preview failed${exitBit}: ${String(stderr).slice(0, 800)}`;
     }
-    els.previewLabel.textContent = view.artifact?.framework
-      ? `Live · ${view.artifact.framework}`
-      : "Live product";
-  } else {
     els.previewEmpty.hidden = false;
-    if (!els.previewFrame.src) els.previewFrame.hidden = true;
+    if (visibleFrame) {
+      visibleFrame.hidden = true;
+      visibleFrame.removeAttribute("src");
+    }
+    previewEmbed = null;
+    previewDirectUrl = null;
+    heldPreview = null;
     els.previewLabel.textContent = view.progressLabel || "Preparing";
     if (els.previewEmptyTitle) {
-      els.previewEmptyTitle.textContent = view.progressLabel || "Preparing the live product…";
+      els.previewEmptyTitle.textContent = view.progressLabel || "Building first version…";
     }
     if (els.previewEmptyDetail) {
       els.previewEmptyDetail.textContent =
         view.detail ||
         "Your product will appear here as soon as the first runnable revision exists.";
     }
+    return;
   }
+
+  els.previewEmpty.hidden = true;
+  els.previewError.hidden = decision.notice !== "Preview update failed";
+  if (decision.notice === "Preview update failed") {
+    const reason = view.runtime?.reason || view.runtime?.error || view.detail || "";
+    els.previewError.textContent = reason
+      ? `Preview update failed: ${String(reason).slice(0, 240)}`
+      : "Preview update failed";
+  }
+  if (decision.action === "swap") commitPreviewSrc(decision.src);
+  else if (visibleFrame) visibleFrame.hidden = false;
+  previewEmbed = decision.src;
+  previewDirectUrl = direct;
+  heldPreview = { buildId: view.buildId, src: decision.src };
+  els.previewLabel.textContent = view.artifact?.framework
+    ? `Live · ${view.artifact.framework}`
+    : "Live product";
 }
 
 /**
@@ -494,7 +546,13 @@ function render(view) {
   renderWorklog(view);
   updatePreview(view);
   els.stopBuildBtn.hidden = !view.canStop;
+  const queuedWhilePaused = view.status === "paused" && Boolean(view.queuedRequest);
   els.resumeBuildBtn.hidden = !view.canResume;
+  els.resumeBuildBtn.textContent = queuedWhilePaused ? "Resume & apply" : "Resume";
+  if (els.queueNotice) {
+    els.queueNotice.hidden = !queuedWhilePaused;
+    els.queueNotice.textContent = queuedWhilePaused ? "QUEUED — project is paused" : "";
+  }
   els.recoverBuildBtn.hidden = !view.needsRecovery;
   void loadProjects();
 
@@ -668,6 +726,7 @@ async function sendMessage(text) {
   if (lastView) {
     lastView = {
       ...lastView,
+      queuedRequest: lastView.status === "paused" ? trimmed : lastView.queuedRequest,
       conversation: [...(lastView.conversation || []), optimistic],
     };
     render(lastView);
@@ -698,16 +757,6 @@ async function sendMessage(text) {
     selectedElement = null;
     els.selectionChip.hidden = true;
     els.chatInput.value = "";
-    // Soft-refresh preview shortly after engineering may land
-    setTimeout(() => {
-      if (els.previewFrame.src) {
-        const src = els.previewFrame.src;
-        els.previewFrame.src = "about:blank";
-        setTimeout(() => {
-          els.previewFrame.src = src;
-        }, 50);
-      }
-    }, 8_000);
   } finally {
     els.sendBtn.disabled = false;
   }
@@ -780,10 +829,17 @@ function showComposer(pushHistory) {
   projectRoot = null;
   previewEmbed = null;
   previewDirectUrl = null;
+  heldPreview = null;
   selectedElement = null;
   lastView = null;
-  els.previewFrame.src = "";
-  els.previewFrame.hidden = true;
+  if (visibleFrame) {
+    visibleFrame.removeAttribute("src");
+    visibleFrame.hidden = true;
+  }
+  if (spareFrame) {
+    spareFrame.removeAttribute("src");
+    spareFrame.hidden = true;
+  }
   els.previewEmpty.hidden = false;
   els.drawerBody.innerHTML = "";
   els.projectPath.textContent = "";
@@ -941,7 +997,7 @@ document.querySelectorAll("[data-viewport]").forEach((btn) => {
 
 window.addEventListener("message", (ev) => {
   const data = ev.data || {};
-  if (ev.source !== els.previewFrame.contentWindow) return;
+  if (!visibleFrame || ev.source !== visibleFrame.contentWindow) return;
   if (data.source !== "path-build-preview") return;
   if (data.type === "path-build:element-selected" && data.element) {
     selectedElement = data.element;
@@ -984,7 +1040,8 @@ function projectButton(row) {
 function bindProjectButtons(root) {
   root?.querySelectorAll("[data-build-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      void openProject(button.getAttribute("data-build-id"), "push");
+      const title = button.querySelector("strong")?.textContent || "project";
+      void openProject(button.getAttribute("data-build-id"), "push", title);
     });
   });
 }
@@ -998,6 +1055,9 @@ async function loadProjects() {
   const archived = rows.filter((row) => row.archived);
   els.projectList.innerHTML = active.map(projectButton).join("");
   bindProjectButtons(els.projectList);
+  if (els.projectList && !els.projectsMode?.hidden) {
+    els.projectList.scrollTop = projectListScroll;
+  }
   if (els.archivedList && els.archivedToggle) {
     const count = archived.length;
     els.archivedToggle.hidden = count === 0;
@@ -1010,8 +1070,14 @@ async function loadProjects() {
 
 function setRailMode(mode) {
   const project = mode === "project";
+  if (project && els.projectList) projectListScroll = els.projectList.scrollTop;
   if (els.projectsMode) els.projectsMode.hidden = project;
   if (els.projectMode) els.projectMode.hidden = !project;
+  if (!project && els.projectList) {
+    requestAnimationFrame(() => {
+      els.projectList.scrollTop = projectListScroll;
+    });
+  }
 }
 
 function renderProjectMode(view) {
@@ -1025,17 +1091,20 @@ function renderProjectMode(view) {
   if (els.projectRepoState) els.projectRepoState.textContent = repo;
   if (els.projectDetails) {
     const sha = view.authoritativeSha ? String(view.authoritativeSha).slice(0, 12) : "";
+    const previewSha = String(view.identity?.previewSha || view.previewRevision || "").slice(0, 12);
     els.projectDetails.innerHTML = `
       <dt>Build</dt><dd>${escapeHtml(shortId(view.buildId))}</dd>
+      <dt>Path</dt><dd>${escapeHtml(view.projectRoot || "")}</dd>
       <dt>Branch</dt><dd>${escapeHtml(view.productBranch || "")}</dd>
-      <dt>Revision</dt><dd>${escapeHtml(sha)}</dd>`;
+      <dt>Revision</dt><dd>${escapeHtml(sha)}</dd>
+      <dt>Preview</dt><dd>${escapeHtml(previewSha)}</dd>`;
   }
   if (els.archiveBtn) els.archiveBtn.hidden = Boolean(view.archived);
   if (els.restoreBtn) els.restoreBtn.hidden = !view.archived;
   if (els.recoverBuildBtn) els.recoverBuildBtn.hidden = !view.needsRecovery;
 }
 
-async function openProject(buildId, mode) {
+async function openProject(buildId, mode, title) {
   if (!buildId) return;
   const url = new URL(location.href);
   url.searchParams.set("buildId", buildId);
@@ -1044,12 +1113,19 @@ async function openProject(buildId, mode) {
   activeBuildId = buildId;
   worklogFollow = true;
   chatStick = true;
+  heldPreview = null;
+  previewEmbed = null;
+  const loading = `Loading ${title || "project"}…`;
+  if (els.buildIdentity) els.buildIdentity.textContent = loading;
   if (els.chatScroll) els.chatScroll.innerHTML = "";
   if (els.worklogScroll) els.worklogScroll.innerHTML = "";
-  if (els.previewFrame) {
-    els.previewFrame.hidden = true;
-    els.previewFrame.removeAttribute("src");
+  if (els.worklogCurrent) els.worklogCurrent.textContent = "";
+  if (visibleFrame) {
+    visibleFrame.hidden = true;
+    visibleFrame.removeAttribute("src");
   }
+  if (els.previewEmpty) els.previewEmpty.hidden = false;
+  if (els.previewEmptyTitle) els.previewEmptyTitle.textContent = loading;
   if (els.previewStage) els.previewStage.scrollTop = 0;
   setWorkspaceVisible(true);
   const res = await fetch(`/api/builds/${encodeURIComponent(buildId)}`);
@@ -1068,6 +1144,9 @@ els.projectModeBtn?.addEventListener("click", () => {
   void refreshRepositoryDialog();
 });
 els.backToProjects?.addEventListener("click", () => setRailMode("projects"));
+els.projectList?.addEventListener("scroll", () => {
+  if (!els.projectsMode?.hidden) projectListScroll = els.projectList.scrollTop;
+});
 els.archivedToggle?.addEventListener("click", () => {
   if (!els.archivedList) return;
   els.archivedList.hidden = !els.archivedList.hidden;

@@ -10,6 +10,7 @@ import {
   writeBuildRecord,
 } from "../../scripts/pathcode-cli/build/index.mjs";
 import { projectEngineeringTimeline } from "../../scripts/pathcode-cli/build/surface/engineering-timeline.mjs";
+import { previewTransition } from "../../scripts/pathcode-cli/build/surface/public/view-revision.js";
 import { projectBuildForSurface } from "../../scripts/pathcode-cli/build/surface/product-view.mjs";
 import {
   creatorConversation,
@@ -355,5 +356,96 @@ describe("PATH Builder creator shell", () => {
     expect(git(project, ["remote"]).stdout).not.toContain("origin");
     expect(existsSync(bare)).toBe(true);
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("treats a user stop as paused and keeps a real failure", () => {
+    const stopped = projectEngineeringTimeline(
+      { buildId: "b", children: [] },
+      {
+        traces: [
+          {
+            taskId: "t",
+            lines: [
+              { type: "session.cancelled" },
+              { type: "gateway.task.finished", meta: { status: "cancelled" } },
+            ],
+          },
+        ],
+        events: [{ type: "build.paused", at: "2026-09-23T10:00:00.000Z", data: {} }],
+      },
+    );
+    expect(stopped.entries.some((entry) => entry.summary === "STOPPED by user")).toBe(true);
+    expect(stopped.entries.some((entry) => entry.summary.startsWith("FAILURE"))).toBe(false);
+    const failed = projectEngineeringTimeline(
+      { buildId: "b", children: [] },
+      {
+        traces: [
+          {
+            taskId: "t",
+            lines: [{ type: "gateway.task.finished", meta: { status: "failed" } }],
+          },
+        ],
+        events: [],
+      },
+    );
+    expect(failed.entries.some((entry) => entry.kind === "task_failed")).toBe(true);
+    expect(failed.entries.some((entry) => entry.summary.startsWith("FAILURE"))).toBe(true);
+
+    const userPause = projectBuildForSurface(
+      {
+        buildId: "b",
+        loop: { status: "paused" },
+        intent: { outcome: "site" },
+        conversation: [{ role: "user", text: "start again", status: "queued" }],
+        children: [{ kind: "engineer", classification: "CANCELLED", dispatchState: "consumed" }],
+      },
+      {},
+    );
+    expect(userPause.progressLabel).toBe("Paused");
+    expect(userPause.headline).toBe("Paused");
+    expect(userPause.queuedRequest).toBe("start again");
+    expect(userPause.canResume).toBe(true);
+
+    const failedThenPaused = projectBuildForSurface(
+      {
+        buildId: "b",
+        loop: { status: "paused" },
+        intent: { outcome: "site" },
+        children: [{ kind: "engineer", classification: "FAILED", dispatchState: "consumed" }],
+      },
+      {},
+    );
+    expect(failedThenPaused.headline).toBe("Failed — paused");
+  });
+
+  it("keeps the last good preview until the next revision is ready", () => {
+    const preparing = previewTransition({
+      heldSrc: "/embed/?rev=aaa",
+      nextReady: false,
+      nextSrc: "",
+      preparing: true,
+    });
+    expect(preparing).toEqual({
+      action: "hold",
+      src: "/embed/?rev=aaa",
+      notice: "New revision preparing…",
+    });
+    const ready = previewTransition({
+      heldSrc: "/embed/?rev=aaa",
+      nextReady: true,
+      nextSrc: "/embed/?rev=bbb",
+    });
+    expect(ready.action).toBe("swap");
+    expect(ready.src).toBe("/embed/?rev=bbb");
+    expect(ready.notice).toBe("");
+    const failed = previewTransition({
+      heldSrc: "/embed/?rev=aaa",
+      nextReady: false,
+      nextFailed: true,
+    });
+    expect(failed.notice).toBe("Preview update failed");
+    expect(failed.src).toBe("/embed/?rev=aaa");
+    const first = previewTransition({ nextReady: false, preparing: true });
+    expect(first.action).toBe("empty");
   });
 });
