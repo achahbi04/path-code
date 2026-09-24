@@ -172,6 +172,8 @@ export async function startPathBuildSurface(options) {
   const coordinator = coordinatorHandle.client;
   const syncRuntimeForBuild = (buildId) => coordinator.syncRuntime(buildId);
   const ensureLoop = (buildId) => coordinator.ensureLoop(buildId);
+  /** @type {Set<string>} */
+  const previewOpenAttempts = new Set();
 
   /**
    * @param {string} [buildId]
@@ -433,12 +435,25 @@ export async function startPathBuildSurface(options) {
             sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
             return;
           }
-          if (build.authoritativeSha && build.loop?.status === "complete") {
+          const openKey = `${buildId}:${build.authoritativeSha || ""}`;
+          const root = build.projectBindings?.[0]?.projectRoot || null;
+          if (
+            build.authoritativeSha &&
+            build.loop?.status !== "running" &&
+            !previewOpenAttempts.has(openKey) &&
+            root &&
+            existsSync(root) &&
+            detectBuildArtifact(root, { outcomeHint: build.intent?.outcome })
+              ?.preview?.capability === "web"
+          ) {
             const current = await coordinator.getRuntime(buildId);
             const live =
               current?.runtime?.status === "ready" ||
               current?.preview?.status === "ready";
             if (!live) {
+              // Once per revision per surface process: a preview that fails to
+              // start must not be restarted on every poll; Refresh retries.
+              previewOpenAttempts.add(openKey);
               await coordinator.startRuntime(buildId);
             }
           }
