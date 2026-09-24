@@ -50,9 +50,14 @@
             <button type="button" class="ghost rail-action" id="recoverBuildBtn" hidden>Recover</button>
           </details>
         </div>
+        <footer class="code-identity" id="codeIdentity" aria-label="Running code">
+          <span class="code-identity-main" id="codeIdentityMain">Code: checking…</span>
+          <span class="code-identity-procs" id="codeIdentityProcs"></span>
+        </footer>
       </aside>
       <button type="button" class="ghost tiny library-open" id="libraryOpen" hidden>Projects</button>
       <div class="shell-main">
+      <div class="stale-code" id="staleCode" role="alert" hidden></div>
 
     <!-- Landing / create -->
     <section class="landing" id="landing">

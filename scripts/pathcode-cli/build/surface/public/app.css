@@ -493,6 +493,38 @@ body {
 .archived-list { flex: 0 1 auto; max-height: 30%; }
 .archived-toggle { background: none; border: 0; text-align: left; cursor: pointer; font: inherit; }
 .library { height: 100%; overflow: hidden; }
+.code-identity {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.66rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.code-identity-main { color: var(--ink); }
+.code-identity-procs { white-space: pre-line; }
+.code-identity.is-stale .code-identity-main { color: var(--danger); }
+.stale-code {
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  max-width: min(92%, 760px);
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: rgba(40, 10, 8, 0.95);
+  color: var(--ink);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.stale-code[hidden] { display: none; }
+.stale-code strong { color: var(--danger); }
 #projectsMode { min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; overflow: hidden; }
 #projectMode {
   flex: 0 0 auto;

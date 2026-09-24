@@ -38,6 +38,7 @@ import {
 } from "../ag10/engine-contract.mjs";
 import { resolveCursorApiKey } from "../ag10/cursor-sdk.mjs";
 import { probeCopilotReadiness } from "../ag10/engine-readiness.mjs";
+import { loadedCodeIdentity } from "../build/identity.mjs";
 import {
   findLatestResumableCheckpoint,
   markTaskInterrupted,
@@ -1066,6 +1067,7 @@ export function createGatewayRuntime(options = {}) {
             runtimeRoot,
             packageRoot,
             projectBound: Boolean(project.projectRoot),
+            identity: loadedCodeIdentity("gateway"),
           });
         case GatewayMethods.PROJECT_BIND: {
           const r = await bindProject(params);

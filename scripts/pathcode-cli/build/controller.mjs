@@ -195,12 +195,15 @@ function normalizeSelectedElement(value) {
  *   gateway: BuildGatewayPort,
  *   fakeMode?: boolean,
  *   preferredEngine?: string | null,
+ *   dispatchIdentity?: () => object,
  * }} opts
  */
 export function createBuildController(opts) {
   const runtimeRoot = opts.runtimeRoot;
   const gateway = opts.gateway;
   const fakeMode = opts.fakeMode === true;
+  const dispatchIdentity =
+    typeof opts.dispatchIdentity === "function" ? opts.dispatchIdentity : null;
   const controllerPreferredEngine =
     typeof opts.preferredEngine === "string" && opts.preferredEngine.trim()
       ? opts.preferredEngine.trim()
@@ -980,6 +983,7 @@ export function createBuildController(opts) {
       child.dispatchState = "dispatched";
       child.dispatchedAt = new Date().toISOString();
       child.taskId = started?.taskId || taskId;
+      if (dispatchIdentity) child.dispatchedBy = dispatchIdentity();
     }
     if (kind === "evaluate") record.loop.lastEvaluateTaskId = child?.taskId || taskId;
     if (kind === "challenge") record.loop.lastChallengeTaskId = child?.taskId || taskId;

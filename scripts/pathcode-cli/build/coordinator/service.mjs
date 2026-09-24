@@ -18,6 +18,7 @@ import { detectBuildArtifact } from "../runtime/artifact.mjs";
 import { appendBuildEvent, readBuildEvents } from "../events.mjs";
 import { ensureGateway } from "../../gateway/ensure.mjs";
 import { readPathPackageVersion } from "../../paths.mjs";
+import { loadedCodeIdentity } from "../identity.mjs";
 import {
   BUILD_COORDINATOR_PROTOCOL_VERSION,
   BuildCoordinatorMethods,
@@ -74,12 +75,24 @@ export async function createBuildCoordinatorService(options) {
         };
       })();
 
+  const codeIdentity = loadedCodeIdentity("coordinator");
   const controller = createBuildController({
     runtimeRoot,
     gateway,
     fakeMode,
     preferredEngine,
+    dispatchIdentity: () => ({
+      coordinatorSha: codeIdentity.sha,
+      coordinatorDirty: codeIdentity.dirty,
+      coordinatorPid: codeIdentity.pid,
+      gatewaySha: gatewayHandle?.hello?.identity?.sha ?? null,
+      gatewayDirty: gatewayHandle?.hello?.identity?.dirty ?? null,
+      gatewayPid: gatewayHandle?.hello?.identity?.pid ?? null,
+      version: codeIdentity.version,
+    }),
   });
+  /** @type {Set<string>} */
+  const identityAnnounced = new Set();
   const runtimeManager = createBuildRuntimeManager({ runtimeRoot });
   const runtimeSync = createBuildRuntimeSync({
     runtimeRoot,
@@ -120,6 +133,13 @@ export async function createBuildCoordinatorService(options) {
       return { ok: true, running: false, reason: "auto_run_disabled_or_terminal" };
     }
     const startedAt = new Date().toISOString();
+    if (!identityAnnounced.has(buildId)) {
+      identityAnnounced.add(buildId);
+      appendBuildEvent(runtimeRoot, buildId, "coordinator.identity", {
+        ...codeIdentity,
+        gateway: gatewayHandle?.hello?.identity || null,
+      });
+    }
     const promise = exclusive(buildId, () =>
       controller.runUntilDone(buildId, {
         // Release the per-Build mutation gate between cognitive children so
@@ -284,6 +304,9 @@ export async function createBuildCoordinatorService(options) {
           pid: process.pid,
           role: "path-build-coordinator",
           fakeMode,
+          identity: codeIdentity,
+          gatewayIdentity: gatewayHandle?.hello?.identity || null,
+          gatewayPid: gatewayHandle?.hello?.identity?.pid ?? null,
         };
       case BuildCoordinatorMethods.STATUS:
         return {

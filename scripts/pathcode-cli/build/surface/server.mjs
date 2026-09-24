@@ -48,6 +48,7 @@ import {
 } from "../runtime/proxy.mjs";
 import { launchPathCodeInTerminal } from "./handoff.mjs";
 import { ensureBuildCoordinator } from "../coordinator/ensure.mjs";
+import { assessServingIdentity, loadedCodeIdentity } from "../identity.mjs";
 import { sanitizeBuildEventValue, surfaceViewSanitizeLimits } from "../events.mjs";
 import { readTaskCheckpoint } from "../../ag10/task-checkpoint.mjs";
 import { readTaskTrace } from "../../task-trace.mjs";
@@ -174,6 +175,11 @@ export async function startPathBuildSurface(options) {
   const ensureLoop = (buildId) => coordinator.ensureLoop(buildId);
   /** @type {Set<string>} */
   const previewOpenAttempts = new Set();
+  const surfaceIdentity = loadedCodeIdentity("surface");
+  /** @type {Set<string>} */
+  const identityAnnounced = new Set();
+  /** @type {{ at: number, value: any } | null} */
+  let servingCache = null;
 
   /**
    * @param {string} [buildId]
@@ -314,6 +320,16 @@ export async function startPathBuildSurface(options) {
       traces,
     });
     const coordinatorStatus = id ? await coordinator.status() : { loops: [] };
+    const serving = await servingIdentity();
+    if (id && stored && !identityAnnounced.has(id)) {
+      identityAnnounced.add(id);
+      appendBuildEvent(runtimeRoot, id, "surface.identity", {
+        surface: surfaceIdentity,
+        processes: serving.processes,
+        stale: serving.stale,
+        exact: serving.exact,
+      });
+    }
     return {
       ...view,
       loopRunning: Boolean(
@@ -321,7 +337,30 @@ export async function startPathBuildSurface(options) {
       ),
       fakeMode,
       preferredEngine: preferredEngine || null,
+      serving,
     };
+  }
+
+  async function servingIdentity() {
+    if (servingCache && Date.now() - servingCache.at < 1_000) return servingCache.value;
+    let hello = null;
+    try {
+      hello = await coordinator.hello("surface");
+    } catch {
+      hello = null;
+    }
+    const value = {
+      ...assessServingIdentity({
+        surface: surfaceIdentity,
+        coordinator: hello?.identity,
+        coordinatorPid: hello?.pid ?? null,
+        gateway: hello?.gatewayIdentity,
+        gatewayExpected: hello ? !hello.fakeMode : true,
+      }),
+      coordinatorReused: coordinatorHandle.started !== true,
+    };
+    servingCache = { at: Date.now(), value };
+    return value;
   }
 
   /**
@@ -391,6 +430,11 @@ export async function startPathBuildSurface(options) {
           preferredEngine,
           runtimeRoot,
         });
+        return;
+      }
+
+      if (method === "GET" && path === "/api/identity") {
+        sendJson(res, 200, { ok: true, ...(await servingIdentity()) });
         return;
       }
 
@@ -1061,6 +1105,7 @@ export async function startPathBuildSurface(options) {
     runtimeRoot,
     fakeMode,
     coordinator,
+    identity: () => servingIdentity(),
     stop: async () => {
       await new Promise((resolveStop) => {
         server.close(() => resolveStop());

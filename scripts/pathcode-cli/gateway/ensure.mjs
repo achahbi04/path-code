@@ -137,7 +137,7 @@ export async function ensureGateway(options = {}) {
     if (ok) {
       const client = createGatewayClient({ socketPath, runtimeRoot });
       await client.connect();
-      await client.hello("cli");
+      const hello = await client.hello("cli");
       return {
         mode: "socket",
         client,
@@ -146,6 +146,7 @@ export async function ensureGateway(options = {}) {
         packageRoot,
         started: false,
         reclaimed: false,
+        hello,
       };
     }
   }
@@ -172,7 +173,7 @@ export async function ensureGateway(options = {}) {
 
   const client = createGatewayClient({ socketPath, runtimeRoot });
   await client.connect();
-  await client.hello("cli");
+  const hello = await client.hello("cli");
   return {
     mode: "socket",
     client,
@@ -180,6 +181,7 @@ export async function ensureGateway(options = {}) {
     runtimeRoot,
     packageRoot,
     started: true,
+    hello,
     pidPath: resolveGatewayPidPath(runtimeRoot),
     reclaimed: reclaim.reclaimed,
     interruptedTaskIds: reclaim.marked,

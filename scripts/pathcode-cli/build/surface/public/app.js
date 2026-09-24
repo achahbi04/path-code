@@ -11,6 +11,10 @@ const els = {
   statusPill: document.getElementById("statusPill"),
   criteriaLine: document.getElementById("criteriaLine"),
   buildIdentity: document.getElementById("buildIdentity"),
+  codeIdentity: document.getElementById("codeIdentity"),
+  codeIdentityMain: document.getElementById("codeIdentityMain"),
+  codeIdentityProcs: document.getElementById("codeIdentityProcs"),
+  staleCode: document.getElementById("staleCode"),
   chatScroll: document.getElementById("chatScroll"),
   chatForm: document.getElementById("chatForm"),
   chatInput: document.getElementById("chatInput"),
@@ -458,6 +462,7 @@ function updatePreview(view) {
  */
 function render(view) {
   lastView = view;
+  if (view?.serving) renderServingIdentity(view.serving);
   if (!view || (view.phase === "idle" && !activeBuildId) || (!view.buildId && !activeBuildId)) {
     setWorkspaceVisible(false);
     return;
@@ -1319,6 +1324,36 @@ window.addEventListener("popstate", () => {
   if (id) void openProject(id, "none");
   else showComposer(false);
 });
+
+function renderServingIdentity(serving) {
+  if (!serving || !els.codeIdentity) return;
+  const procs = Array.isArray(serving.processes) ? serving.processes : [];
+  els.codeIdentityMain.textContent = `PATH ${serving.version || ""} · ${serving.label || "unknown"}`;
+  els.codeIdentityProcs.textContent = procs
+    .map((p) => `${p.role} ${p.label} pid ${p.pid ?? "?"}${p.stale ? " STALE" : ""}`)
+    .join("\n");
+  els.codeIdentity.classList.toggle("is-stale", Boolean(serving.stale || !serving.exact));
+  els.codeIdentity.dataset.sha = serving.sha || "";
+  const warnings = Array.isArray(serving.warnings) ? serving.warnings : [];
+  els.staleCode.hidden = warnings.length === 0;
+  els.staleCode.innerHTML = warnings.length
+    ? `<strong>${serving.stale ? "Stale code" : "Unattributable code"}</strong> — ${warnings
+        .map((w) => escapeHtml(w))
+        .join("<br />")}`
+    : "";
+}
+
+async function refreshServingIdentity() {
+  try {
+    const res = await fetch("/api/identity");
+    if (res.ok) renderServingIdentity(await res.json());
+  } catch {
+    /* surface offline; the next poll retries */
+  }
+}
+
+void refreshServingIdentity();
+setInterval(() => void refreshServingIdentity(), 5_000);
 
 (async () => {
   try {

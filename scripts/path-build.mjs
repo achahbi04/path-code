@@ -90,6 +90,17 @@ export async function runPathBuildMain(argv = process.argv.slice(2)) {
   });
 
   process.stdout.write(`PATH Build ready: ${surface.url}\n`);
+  const serving = await surface.identity();
+  process.stdout.write(`PATH Build ${serving.version || packageVersion()} · code ${serving.label}\n`);
+  for (const proc of serving.processes) {
+    const started = proc.processStartedAt ? `, started ${proc.processStartedAt}` : "";
+    process.stdout.write(
+      `  ${proc.role.padEnd(11)} ${proc.label.padEnd(20)} pid ${proc.pid ?? "?"}${started}${proc.stale ? "  STALE" : ""}\n`,
+    );
+  }
+  for (const warning of serving.warnings) {
+    process.stdout.write(`  WARNING: ${warning}\n`);
+  }
   process.stdout.write(
     "Real Gateway fabric — engines: Cursor / Copilot / Antigravity as available.\n",
   );

@@ -494,9 +494,35 @@ export type RuntimeStartResult =
     };
 export function createBuildRuntimeManager(options: { runtimeRoot: string }): RuntimeManager;
 
+export interface ServingProcessIdentity {
+  role: "surface" | "coordinator" | "gateway";
+  pid: number | null;
+  version: string | null;
+  sha: string | null;
+  dirty: boolean | null;
+  label: string;
+  packageRoot: string | null;
+  processStartedAt: string | null;
+  currentSha: string | null;
+  stale: boolean;
+  exact: boolean;
+  reasons: string[];
+}
+export interface ServingIdentity {
+  version: string | null;
+  sha: string | null;
+  label: string;
+  processes: ServingProcessIdentity[];
+  stale: boolean;
+  exact: boolean;
+  warnings: string[];
+  coordinatorReused: boolean;
+}
+
 export interface BuildSurface {
   url: string;
   stop(): Promise<void>;
+  identity(): Promise<ServingIdentity>;
 }
 export function startPathBuildSurface(options: {
   packageRoot: string;

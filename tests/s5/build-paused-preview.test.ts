@@ -7,9 +7,12 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 
-import { startPathBuildSurface } from "../../scripts/pathcode-cli/build/index.mjs";
-import { updateBuildRecord } from "../../scripts/pathcode-cli/build/record.mjs";
-import { readBuildEvents } from "../../scripts/pathcode-cli/build/events.mjs";
+import {
+  readBuildEvents,
+  readBuildRecord,
+  startPathBuildSurface,
+  writeBuildRecord,
+} from "../../scripts/pathcode-cli/build/index.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
 
 type View = {
@@ -65,12 +68,13 @@ describe("paused Build preview on open", () => {
       git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "site");
     }
     const sha = git("rev-parse", "HEAD");
-    updateBuildRecord(runtimeRoot, body.buildId, (r) => {
-      r.authoritativeSha = sha;
-      r.loop.status = "paused";
-      r.loop.pausedAt = new Date().toISOString();
-      r.coordinator = { ...(r.coordinator || {}), autoRun: false };
-      return r;
+    const record = readBuildRecord(runtimeRoot, body.buildId);
+    expect(record).toBeTruthy();
+    writeBuildRecord(runtimeRoot, {
+      ...record!,
+      authoritativeSha: sha,
+      loop: { ...record!.loop, status: "paused", pausedAt: new Date().toISOString() },
+      coordinator: { ...(record!.coordinator || {}), autoRun: false },
     });
     return { surface, runtimeRoot, buildId: body.buildId, sha };
   }
