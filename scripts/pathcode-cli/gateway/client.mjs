@@ -264,6 +264,7 @@ export function createGatewayClient(options = {}) {
     request,
     onEvent,
     onTaskEvent,
+    shutdown: () => request(GatewayMethods.SHUTDOWN, {}),
     close,
     isConnected: () => connected,
   };

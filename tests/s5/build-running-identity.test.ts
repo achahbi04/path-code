@@ -56,10 +56,13 @@ describe("running Build identity", () => {
     temps.push(pkg, runtimeRoot, target);
     cpSync(join(REPO, "scripts"), join(pkg, "scripts"), { recursive: true });
     copyFileSync(join(REPO, "package.json"), join(pkg, "package.json"));
+    const template = mkdtempSync(join(tmpdir(), "identity-git-template-"));
+    temps.push(template);
     const git = (...args: string[]) =>
       execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], {
         cwd: pkg,
         encoding: "utf8",
+        env: { ...process.env, GIT_TEMPLATE_DIR: template, GIT_CONFIG_NOSYSTEM: "1" },
       }).trim();
     git("init", "-q");
     git("add", "-A");
@@ -151,8 +154,9 @@ describe("running Build identity", () => {
     expect(moved.warnings.join("\n")).toContain(loadedSha.slice(0, 7));
     expect(moved.warnings.join("\n")).toContain(checkoutSha.slice(0, 7));
 
-    // A Builder started after the commit reuses the coordinator that still
-    // runs the old code: the new surface is current, the coordinator is not.
+    // A Builder started after the commit must not inherit the stale
+    // coordinator. It starts a new one on the current checkout.
+    const firstCoordinatorPid = proc(moved, "coordinator").pid;
     const probe = `
       const { startPathBuildSurface } = await import(${JSON.stringify(surfaceModule)});
       const s = await startPathBuildSurface(${JSON.stringify({
@@ -172,12 +176,13 @@ describe("running Build identity", () => {
         timeout: 60_000,
       }),
     ) as Serving;
-    expect(second.coordinatorReused).toBe(true);
+    expect(second.coordinatorReused).toBe(false);
     expect(proc(second, "surface").sha).toBe(checkoutSha);
     expect(proc(second, "surface").stale).toBe(false);
-    expect(proc(second, "coordinator").sha).toBe(loadedSha);
-    expect(proc(second, "coordinator").stale).toBe(true);
-    expect(second.stale).toBe(true);
-    expect(second.warnings.some((w) => /coordinator/i.test(w))).toBe(true);
+    expect(proc(second, "coordinator").sha).toBe(checkoutSha);
+    expect(proc(second, "coordinator").stale).toBe(false);
+    expect(proc(second, "coordinator").pid).not.toBe(firstCoordinatorPid);
+    expect(second.stale).toBe(false);
+    expect(second.warnings).toEqual([]);
   }, 120_000);
 });

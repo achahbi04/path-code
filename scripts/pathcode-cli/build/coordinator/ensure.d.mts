@@ -10,6 +10,21 @@ export function ensureBuildCoordinator(options: {
       protocolVersion?: number;
       pid?: number;
       packageVersion?: string;
+      fakeMode?: boolean;
+      identity?: {
+        role?: string;
+        pid?: number;
+        version?: string | null;
+        sha?: string | null;
+        dirty?: boolean | null;
+      };
+      gatewayIdentity?: {
+        role?: string;
+        pid?: number;
+        version?: string | null;
+        sha?: string | null;
+        dirty?: boolean | null;
+      } | null;
     }>;
     close(): void;
     shutdown(): Promise<unknown>;

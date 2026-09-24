@@ -105,6 +105,25 @@ export function formatCodeLabel(identity) {
   return `${identity.sha.slice(0, 7)}${identity.dirty ? "+uncommitted" : ""}`;
 }
 
+/**
+ * True only when `identity` is the code this checkout would load right now.
+ * A missing identity is never reusable — that process predates reporting.
+ *
+ * @param {any} identity
+ * @param {string} [packageRoot]
+ */
+export function identityMatchesCurrentCheckout(identity, packageRoot) {
+  if (!identity || typeof identity !== "object" || !identity.sha) return false;
+  const root = packageRoot || identity.packageRoot;
+  if (!root) return false;
+  if (identity.packageRoot && canonical(identity.packageRoot) !== canonical(root)) {
+    return false;
+  }
+  const current = currentCheckoutState(root);
+  if (!current.sha || current.sha !== identity.sha) return false;
+  return (current.changeFingerprint || null) === (identity.changeFingerprint || null);
+}
+
 const ROLE_NAMES = {
   surface: "Builder",
   coordinator: "Engineering coordinator",

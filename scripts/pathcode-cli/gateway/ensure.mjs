@@ -3,7 +3,7 @@
  * S4 — Reclaim stale pid/socket files against host process reality.
  */
 
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { identityMatchesCurrentCheckout } from "../build/identity.mjs";
 import { resolvePathPackageRoot, resolvePathRuntimeRoot } from "../paths.mjs";
 import {
   resolveGatewaySocketPath,
@@ -107,6 +108,58 @@ export function reclaimStaleGatewayOwnership(runtimeRoot, socketPath) {
   };
 }
 
+function socketOwnerPid(socketPath) {
+  try {
+    const raw = execFileSync("lsof", ["-t", socketPath], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 2_000,
+    });
+    const pid = Number(String(raw).trim().split("\n")[0]);
+    return Number.isFinite(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function retireStaleGateway(client, hello, runtimeRoot, socketPath) {
+  const pid =
+    hello?.identity?.pid ??
+    hello?.pid ??
+    readGatewayPid(runtimeRoot) ??
+    socketOwnerPid(socketPath);
+  try {
+    await Promise.race([
+      client.shutdown(),
+      sleep(1_500).then(() => {
+        throw new Error("shutdown timeout");
+      }),
+    ]);
+  } catch {
+    // old Gateways ignore shutdown; SIGTERM below stops them
+  }
+  try {
+    client.close();
+  } catch {
+    // already closed
+  }
+  if (Number.isFinite(pid) && pid !== process.pid && isPidAlive(pid)) {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      // already exiting
+    }
+    const deadline = Date.now() + 8_000;
+    while (Date.now() < deadline && isPidAlive(pid)) {
+      await sleep(100);
+    }
+  }
+}
+
 /**
  * Connect to an existing gateway or spawn one.
  *
@@ -138,16 +191,19 @@ export async function ensureGateway(options = {}) {
       const client = createGatewayClient({ socketPath, runtimeRoot });
       await client.connect();
       const hello = await client.hello("cli");
-      return {
-        mode: "socket",
-        client,
-        socketPath,
-        runtimeRoot,
-        packageRoot,
-        started: false,
-        reclaimed: false,
-        hello,
-      };
+      if (identityMatchesCurrentCheckout(hello?.identity, packageRoot)) {
+        return {
+          mode: "socket",
+          client,
+          socketPath,
+          runtimeRoot,
+          packageRoot,
+          started: false,
+          reclaimed: false,
+          hello,
+        };
+      }
+      await retireStaleGateway(client, hello, runtimeRoot, socketPath);
     }
   }
 

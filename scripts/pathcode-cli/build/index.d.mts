@@ -77,6 +77,15 @@ export interface BuildChild {
   adoptedSha?: string | null;
   sourceSha?: string | null;
   failureReason?: string;
+  dispatchedBy?: {
+    coordinatorSha?: string | null;
+    coordinatorDirty?: boolean | null;
+    coordinatorPid?: number | null;
+    gatewaySha?: string | null;
+    gatewayDirty?: boolean | null;
+    gatewayPid?: number | null;
+    version?: string | null;
+  };
 }
 
 export interface ProductBrief {
