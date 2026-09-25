@@ -194,6 +194,7 @@ export interface BuildRecord {
       | "failed"
       | "review"
       | "discarded"
+      | "superseded"
       | "paused";
     intentRevision?: number;
   }>;

@@ -762,4 +762,114 @@ describe("creator candidate review", () => {
     rmSync(runtimeRoot, { recursive: true, force: true });
     rmSync(target, { recursive: true, force: true });
   }, 120_000);
+
+  it("one creator request projects as one card: orphan QUEUED cannot survive Apply", async () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "path-history-truth-rt-"));
+    const target = mkdtempSync(join(tmpdir(), "path-history-truth-proj-"));
+    const controller = createBuildController({
+      runtimeRoot,
+      fakeMode: true,
+      gateway: fakeGateway(),
+    });
+    const started = await controller.startBuild("Build a marker page", {
+      targetDir: target,
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    await controller.runUntilDone(started.build.buildId, { maxSteps: 8 });
+    await controller.discardCandidate(started.build.buildId);
+
+    // First B attempt (queued / orphaned when a corrected B follows).
+    await controller.applyConversation(started.build.buildId, {
+      message: "add a logo to the dark-mode homepage, plolish it like an apple website",
+    });
+    const afterB1 = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    const msgB1 = (afterB1.conversation || []).find((message) =>
+      String(message.text || "").includes("plolish"),
+    );
+    expect(msgB1?.status).toBeTruthy();
+    expect(msgB1?.status).not.toBe("discarded");
+
+    // Corrected B — advances revision; orphan B1 must not stay visible as QUEUED.
+    await controller.applyConversation(started.build.buildId, {
+      message: "add a logo to the dark-mode homepage, polish it like an apple website",
+    });
+    const afterB2 = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    expect(afterB2.intent.outcomeRevision).toBeGreaterThan(2);
+    expect(
+      afterB2.conversation?.find((message) => message.id === msgB1?.id)?.status,
+    ).toBe("superseded");
+    const msgB2 = (afterB2.conversation || []).find((message) =>
+      String(message.text || "").includes("polish it like an apple"),
+    );
+    expect(msgB2?.id).not.toBe(msgB1?.id);
+
+    const { projectBuildForSurface } = await import(
+      "../../scripts/pathcode-cli/build/surface/product-view.mjs"
+    );
+    const earlyView = projectBuildForSurface(afterB2);
+    const logoCards = (earlyView.conversation || []).filter((message) =>
+      /add a logo/i.test(String(message.text || "")),
+    );
+    expect(logoCards).toHaveLength(1);
+    expect(logoCards[0]?.id).toBe(msgB2?.id);
+    expect(logoCards[0]?.status).not.toBe("discarded");
+
+    const ran = await controller.runUntilDone(started.build.buildId, { maxSteps: 10 });
+    expect(ran.build?.pendingCandidate?.status).toBe("pending");
+    const applied = await controller.applyCandidate(started.build.buildId);
+    expect(applied.ok).toBe(true);
+
+    const final = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    expect(final.authoritativeSha).toBeTruthy();
+    expect(final.pendingCandidate).toBeUndefined();
+    expect((final.adoptionHistory || []).length).toBe(1);
+    expect(final.conversation?.find((message) => message.id === msgB1?.id)?.status).toBe(
+      "superseded",
+    );
+    expect(final.conversation?.find((message) => message.id === msgB2?.id)?.status).toBe(
+      "applied",
+    );
+    expect(
+      final.conversation?.find((message) => message.role === "user" && message.intentRevision === 1)
+        ?.status,
+    ).toBe("discarded");
+
+    const view = projectBuildForSurface(final);
+    const visibleLogo = (view.conversation || []).filter((message) =>
+      /add a logo/i.test(String(message.text || "")),
+    );
+    expect(visibleLogo).toHaveLength(1);
+    expect(visibleLogo[0]?.status).toBe("applied");
+    expect(visibleLogo[0]?.id).toBe(msgB2?.id);
+    expect(
+      view.conversation?.find((message) => message.intentRevision === 1)?.status,
+    ).toBe("discarded");
+
+    // Reload / recover must not resurrect QUEUED B1.
+    const recovered = createBuildController({
+      runtimeRoot,
+      fakeMode: true,
+      gateway: fakeGateway(),
+    });
+    await recovered.recover(started.build.buildId);
+    const afterReload = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    const reloadView = projectBuildForSurface(afterReload);
+    expect(
+      (reloadView.conversation || []).filter((message) =>
+        /add a logo/i.test(String(message.text || "")),
+      ),
+    ).toHaveLength(1);
+    expect(
+      reloadView.conversation?.find((message) =>
+        /add a logo/i.test(String(message.text || "")),
+      )?.status,
+    ).toBe("applied");
+    expect(afterReload.conversation?.find((message) => message.id === msgB1?.id)?.status).toBe(
+      "superseded",
+    );
+
+    rmSync(runtimeRoot, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }, 120_000);
 });

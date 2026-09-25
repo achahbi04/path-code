@@ -53,7 +53,7 @@
  * @property {string} at
  * @property {object} [element]
  * @property {string} [kind]
- * @property {'queued'|'incorporated'|'preparing'|'applying'|'being_applied'|'applied'|'failed'|'review'|'discarded'} [status]
+ * @property {'queued'|'incorporated'|'preparing'|'applying'|'being_applied'|'applied'|'failed'|'review'|'discarded'|'superseded'} [status]
  * @property {number} [intentRevision]
  *
  * @typedef {object} BuildArtifact

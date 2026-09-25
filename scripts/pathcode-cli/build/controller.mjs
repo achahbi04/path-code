@@ -128,8 +128,54 @@ function syncConversationLifecycle(record) {
     }
     for (const msg of record.conversation) {
       if (!msg || msg.intentRevision !== rev) continue;
+      // Terminal creator decisions and superseded orphans are sticky.
+      if (msg.status === "superseded") continue;
       if (msg.status === "applied" && status !== "applied") continue;
+      if (msg.status === "discarded" && status !== "discarded" && !awaitingCandidate) {
+        continue;
+      }
       msg.status = status;
+    }
+  }
+  supersedeOrphanedCreatorRequests(record);
+}
+
+/**
+ * One creator request → one visible card. When a later revision reaches a real
+ * creator outcome (or simply advances past an unfinished earlier request),
+ * orphaned earlier queued/preparing cards must not remain as a second QUEUED.
+ *
+ * @param {import('./types.mjs').BuildRecord} record
+ */
+function supersedeOrphanedCreatorRequests(record) {
+  if (!Array.isArray(record?.conversation)) return;
+  const kids = Array.isArray(record.children) ? record.children : [];
+  const currentRev = Number(record.intent?.outcomeRevision);
+  if (!Number.isFinite(currentRev)) return;
+  for (const msg of record.conversation) {
+    if (!msg || msg.role !== "user") continue;
+    if (
+      msg.status === "applied" ||
+      msg.status === "discarded" ||
+      msg.status === "superseded"
+    ) {
+      continue;
+    }
+    const rev = msg.intentRevision;
+    if (!Number.isFinite(rev) || rev >= currentRev) continue;
+    const engineers = kids.filter(
+      (child) =>
+        child.kind === "engineer" &&
+        child.intentRevision === rev &&
+        !child.orphanAbandoned,
+    );
+    const adopted = engineers.some((child) => Boolean(child.adoptedSha));
+    const discarded = engineers.some(
+      (child) => child.taskId && child.taskId === record.lastDiscardedCandidate?.taskId,
+    );
+    // No creator decision on this older revision — newer request replaced it.
+    if (!adopted && !discarded) {
+      msg.status = "superseded";
     }
   }
 }
@@ -639,6 +685,12 @@ export function createBuildController(opts) {
       await runDepthA(buildId);
       record = readBuildRecord(runtimeRoot, buildId) || record;
     }
+
+    // Heal conversation truth on recover/reconcile so orphan QUEUED cards
+    // left by corrected re-sends become superseded and stay that way.
+    syncConversationLifecycle(record);
+    writeBuildRecord(runtimeRoot, record);
+    record = readBuildRecord(runtimeRoot, buildId) || record;
 
     return { ok: true, build: record, decisions };
   }
@@ -3091,4 +3143,9 @@ export function createBuildController(opts) {
   };
 }
 
-export { formatBuildStatus, readBuildRecord, findLatestActiveBuild };
+export {
+  formatBuildStatus,
+  readBuildRecord,
+  findLatestActiveBuild,
+  syncConversationLifecycle,
+};

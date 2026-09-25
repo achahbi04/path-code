@@ -251,7 +251,9 @@ export function creatorConversation(conversation) {
       !(
         message?.role === "assistant" &&
         UNDERSTANDING_CARD.test(String(message.text || ""))
-      ),
+      ) &&
+      // Superseded orphan requests are durable history, not a second creator card.
+      message?.status !== "superseded",
   );
 }
 

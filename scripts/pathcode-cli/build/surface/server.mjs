@@ -26,6 +26,7 @@ import {
   readPendingConversations,
   appendBuildEvent,
 } from "../index.mjs";
+import { syncConversationLifecycle } from "../controller.mjs";
 import { projectBuildForSurface } from "./product-view.mjs";
 import { displayTitleFor, isCreatorProject, libraryRow } from "./project-library.mjs";
 import {
@@ -198,7 +199,22 @@ export async function startPathBuildSurface(options) {
     if (!id) {
       id = selectSurfaceBuildId(listBuildRecords(runtimeRoot)) || "";
     }
-    const stored = id ? readBuildRecord(runtimeRoot, id) : null;
+    let stored = id ? readBuildRecord(runtimeRoot, id) : null;
+    // Heal durable conversation truth on every surface read so orphan QUEUED
+    // cards (corrected re-sends) become superseded without requiring a recover.
+    if (stored) {
+      const before = (stored.conversation || [])
+        .map((message) => `${message.id}:${message.status}`)
+        .join("|");
+      syncConversationLifecycle(stored);
+      const after = (stored.conversation || [])
+        .map((message) => `${message.id}:${message.status}`)
+        .join("|");
+      if (before !== after) {
+        writeBuildRecord(runtimeRoot, stored);
+        stored = readBuildRecord(runtimeRoot, id) || stored;
+      }
+    }
     const pending = id ? readPendingConversations(runtimeRoot, id) : [];
     const build =
       stored && pending.length
