@@ -624,6 +624,7 @@ export function projectBuildForSurface(
 ): {
   phase: string;
   headline: string;
+  detail?: string;
   buildId?: string;
   projectRoot?: string;
   criteria?: Array<OutcomeCriterion & { creatorStatus?: string }>;
