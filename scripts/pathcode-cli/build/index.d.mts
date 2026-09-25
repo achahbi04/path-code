@@ -156,14 +156,22 @@ export interface BuildRecord {
   pendingCandidate?: {
     status?: string;
     taskId?: string;
+    actionId?: string;
+    intentRevision?: number;
     sourceSha?: string | null;
     taskBranch?: string | null;
+    worktreePath?: string | null;
     files?: string[];
     requestText?: string;
     diffSummary?: string;
+    capability?: string | null;
+    capabilitySource?: string | null;
+    resultFingerprint?: string | null;
+    createdAt?: string;
   };
   lastAppliedCandidate?: { taskId?: string; adoptedSha?: string; at?: string };
   lastDiscardedCandidate?: { taskId?: string; sourceSha?: string | null; at?: string };
+  adoptionHistory?: unknown[];
   createdAt: string;
   updatedAt: string;
   originKind?: "build-created" | "existing-project";
@@ -183,7 +191,10 @@ export interface BuildRecord {
       | "being_applied"
       | "incorporated"
       | "applied"
-      | "failed";
+      | "failed"
+      | "review"
+      | "discarded"
+      | "paused";
     intentRevision?: number;
   }>;
   productBranch?: string;
@@ -648,6 +659,31 @@ export function projectBuildForSurface(
   queuedRequest?: string | null;
   canPause?: boolean;
   canResume?: boolean;
+  canApply?: boolean;
+  canDiscard?: boolean;
+  pendingCandidate?: {
+    taskId?: string | null;
+    sourceSha?: string | null;
+    taskBranch?: string | null;
+    files?: string[];
+    requestText?: string;
+    diffSummary?: string;
+  } | null;
+  lastDiscardedCandidate?: {
+    taskId?: string | null;
+    sourceSha?: string | null;
+    at?: string | null;
+  } | null;
+  lastAppliedCandidate?: {
+    taskId?: string | null;
+    adoptedSha?: string | null;
+    at?: string | null;
+  } | null;
+  candidatePreview?: {
+    status?: string;
+    embedPath?: string;
+    kind?: string;
+  } | null;
   requestReceipt?: {
     acceptedAt?: string | null;
     intentRevision?: number | null;
@@ -705,6 +741,12 @@ export interface BuildCoordinatorClient {
   ensureLoop(buildId: string): Promise<{ running: boolean; deduped: boolean }>;
   stopBuild(buildId: string): Promise<{ ok: boolean; build: BuildRecord }>;
   recoverBuild(buildId: string): Promise<{ ok: boolean; build: BuildRecord }>;
+  applyCandidate(
+    buildId: string,
+  ): Promise<{ ok: boolean; deduped?: boolean; build: BuildRecord }>;
+  discardCandidate(
+    buildId: string,
+  ): Promise<{ ok: boolean; deduped?: boolean; build: BuildRecord }>;
   messageBuild(
     buildId: string,
     input: { message: string; element?: SelectedElement },

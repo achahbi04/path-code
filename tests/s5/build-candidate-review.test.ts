@@ -97,7 +97,7 @@ describe("creator candidate review", () => {
     expect(view.canApply).toBe(true);
     expect(view.canDiscard).toBe(true);
     expect(view.candidatePreview?.embedPath).toContain("/preview-candidate/");
-    expect(view.conversation.find((message) => message.role === "user")?.status).toBe("review");
+    expect(view.conversation?.find((message) => message.role === "user")?.status).toBe("review");
     expect(view.headline).toBe("Review this result");
 
     rmSync(runtimeRoot, { recursive: true, force: true });
@@ -156,7 +156,7 @@ describe("creator candidate review", () => {
     const view = projectBuildForSurface(afterDiscard);
     expect(view.candidatePreview).toBeNull();
     expect(view.canApply).toBe(false);
-    expect(view.conversation.find((message) => message.role === "user")?.status).toBe(
+    expect(view.conversation?.find((message) => message.role === "user")?.status).toBe(
       "discarded",
     );
     expect(view.headline).not.toMatch(/Failed/i);
@@ -171,7 +171,7 @@ describe("creator candidate review", () => {
       })),
     };
     const recoveredView = projectBuildForSurface(storedFailed);
-    expect(recoveredView.conversation.find((message) => message.role === "user")?.status).toBe(
+    expect(recoveredView.conversation?.find((message) => message.role === "user")?.status).toBe(
       "discarded",
     );
 
@@ -301,7 +301,7 @@ describe("creator candidate review", () => {
     );
     expect(projectBuildForSurface(after).candidatePreview).toBeNull();
     expect(
-      projectBuildForSurface(after).conversation.every(
+      projectBuildForSurface(after).conversation?.every(
         (message) => message.status !== "failed",
       ),
     ).toBe(true);
@@ -420,7 +420,7 @@ describe("creator candidate review", () => {
       })),
     };
     const recovered = projectBuildForSurface(storedFailed);
-    expect(recovered.conversation.find((message) => message.role === "user")?.status).toBe(
+    expect(recovered.conversation?.find((message) => message.role === "user")?.status).toBe(
       "review",
     );
     expect(recovered.headline).toBe("Review this result");
