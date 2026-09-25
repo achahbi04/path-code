@@ -6,6 +6,9 @@ Ended: `PHASE 3 — COMPLETE, READY FOR OPERATOR VERIFICATION`
 
 Bound to the PATH Builder genuine repair roadmap (D2 / D3 / D4).
 
+**SHA:** `eb8f2a4cee2cc3c8e8254b9ebc8cc2dedecf1b5f`  
+**Cold check:** first `npm run check` green on that SHA.
+
 ## Contract
 
 - **D2:** `NON_WEB` (and empty-tree Apply) are truthful non-success. Zero automatic PATH-authored engineer turns.
