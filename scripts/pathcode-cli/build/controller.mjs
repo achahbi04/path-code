@@ -189,6 +189,21 @@ function fabricStepsRemaining(record) {
 }
 
 /**
+ * Stale evaluate/challenge forceNextKind values must never dispatch.
+ * Strip them on load and before tick so dead cognitive branches stay dead.
+ * @param {import('./types.mjs').BuildRecord | null | undefined} record
+ */
+function stripStaleCognitiveForceNextKind(record) {
+  if (!record?.loop) return false;
+  const kind = record.loop.forceNextKind;
+  if (kind === "evaluate" || kind === "challenge") {
+    delete record.loop.forceNextKind;
+    return true;
+  }
+  return false;
+}
+
+/**
  * Creator Discard is a completed decision for that engineer result.
  * Resume/tick must not treat it as an unresolved engineering failure.
  * @param {import('./types.mjs').BuildRecord} record
@@ -1490,12 +1505,15 @@ export function createBuildController(opts) {
         reportText,
       });
       if (!decision.adopt && decision.code === "NON_WEB") {
+        // Capability mismatch is a truthful non-success for the creator —
+        // never invent a PATH-authored follow-up engineer turn.
         child.classification = "NOT_VERIFIED";
         child.failureReason = decision.reason;
-        record.loop.forceNextKind = "engineer";
+        record.loop.forceNextKind = undefined;
+        record.loop.fabricSteps = [];
         record.loop.pendingRuntimeRefresh = false;
-        record.hypotheses.proposedNextAction =
-          "The previous result was not a previewable website for the current intent. Build that website in this project. Do not replace it with a CLI or sample program.";
+        record.loop.status = "blocked";
+        record.loop.blockedReason = decision.reason;
         appendBuildEvent(runtimeRoot, buildId, "engineer.intent_rejected", {
           taskId,
           actionId: child.actionId,
@@ -1740,14 +1758,18 @@ export function createBuildController(opts) {
       child.sourceSha = adoption.sourceSha;
     }
     if (isEmptyProductTree(binding.projectRoot)) {
+      // Empty tree after Apply is a truthful non-success — do not invent a
+      // PATH-authored repair engineer. Creator must send the next request.
       if (child) {
         child.classification = "NOT_VERIFIED";
         child.adoptionEmpty = true;
       }
-      record.loop.forceNextKind = "engineer";
+      record.loop.forceNextKind = undefined;
+      record.loop.fabricSteps = [];
       record.loop.pendingRuntimeRefresh = false;
-      record.hypotheses.proposedNextAction =
-        "Previous engineer claimed success but left an empty Build folder. Establish real product files (index.html or package + start) in this binding — do NOT run git init (the folder is already a git repo).";
+      record.loop.status = "blocked";
+      record.loop.blockedReason =
+        "Applied revision left an empty product tree. Send a creator request to continue.";
     }
     appendBuildEvent(runtimeRoot, buildId, "candidate.applied", {
       taskId: pending.taskId,
@@ -2437,10 +2459,9 @@ export function createBuildController(opts) {
       return { ok: true, done: true, build: marked.build, action: "complete" };
     }
 
-    // Decide next kind
-    // Action sequencing is revision-local. Historical children from a prior
-    // completed product iteration must not bias the new engineer → evaluate →
-    // challenge cycle.
+    // Decide next kind. Revision-local: only a creator request or an explicit
+    // fabric step may start an engineer. evaluate/challenge are never dispatched.
+    stripStaleCognitiveForceNextKind(record);
     const currentRevision = record.intent.outcomeRevision;
     const revisionChildren = record.children.filter(
       (c) => c.intentRevision === currentRevision && !c.orphanAbandoned,
@@ -2472,22 +2493,23 @@ export function createBuildController(opts) {
       objective = productBriefObjective(record);
       record.loop.forceNextKind = undefined;
       writeBuildRecord(runtimeRoot, record);
-    } else if (forceEngineer) {
-      kind = "engineer";
-      objective = frameEngineerObjective(
-        record,
-        productStillEmpty
-          ? record.hypotheses.proposedNextAction ||
-              "Establish the previewable website named by the current intent in this Build folder. A CLI or unrelated sample is not the product. Do not run git init — the repository already exists."
-          : record.hypotheses.proposedNextAction || "",
-      );
-      record.loop.forceNextKind = undefined;
-      record.loop.pendingConversationSteer = false;
-      writeBuildRecord(runtimeRoot, record);
     } else if (fabricStepsRemaining(record).length) {
+      // Explicit fabric steps outrank a steer flag so step text is never dropped.
       kind = "engineer";
       objective = frameEngineerObjective(record, fabricStepsRemaining(record)[0]);
       record.loop.fabricSteps = fabricStepsRemaining(record).slice(1);
+      record.loop.forceNextKind = undefined;
+      record.loop.pendingConversationSteer = false;
+      writeBuildRecord(runtimeRoot, record);
+    } else if (forceEngineer) {
+      kind = "engineer";
+      // Creator / steer text only — never invent a PATH repair sentence.
+      objective = frameEngineerObjective(
+        record,
+        record.hypotheses.proposedNextAction || "",
+      );
+      record.loop.forceNextKind = undefined;
+      record.loop.pendingConversationSteer = false;
       writeBuildRecord(runtimeRoot, record);
     } else if (engineers.length === 0) {
       kind = "engineer";
@@ -2495,24 +2517,6 @@ export function createBuildController(opts) {
         record,
         record.hypotheses.proposedNextAction || "",
       );
-    } else if (record.loop.forceNextKind === "evaluate") {
-      kind = "evaluate";
-      objective = frameEvaluateObjective(record, {
-        evidencePackage: buildEvidencePackage(record),
-      });
-      record.loop.forceNextKind = undefined;
-      writeBuildRecord(runtimeRoot, record);
-    } else if (record.loop.forceNextKind === "challenge") {
-      kind = "challenge";
-      const claim =
-        (record.outcomeCriteria || []).find((c) => c.status === "PROVEN")
-          ?.statement || completenessClaim(record);
-      objective = frameChallengeObjective(record, claim, {
-        preferPeerHint: true,
-        evidencePackage: buildEvidencePackage(record),
-      });
-      record.loop.forceNextKind = undefined;
-      writeBuildRecord(runtimeRoot, record);
     } else if (engineers[engineers.length - 1]?.adoptedSha) {
       return {
         ok: true,

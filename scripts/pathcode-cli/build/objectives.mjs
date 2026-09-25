@@ -101,16 +101,22 @@ export function frameEngineerObjective(record, gap) {
   const followUp = isFollowUpCreatorTurn(record);
 
   if (followUp) {
-    const request = creatorRequest || String(gap || "").trim();
-    const constraints = explicitCreatorConstraints(request);
+    const request = String(creatorRequest || "").trim();
+    const step = String(gap || "").trim();
+    const controlling = request || step;
+    const constraints = explicitCreatorConstraints(controlling);
+    const fabricStepBlock =
+      step && step !== request
+        ? ["", "CURRENT FABRIC STEP", step, ""]
+        : [];
     return [
       "PATH Build engineer task — follow-up creator change.",
       "The current creator request is the controlling engineering objective.",
       "Do not treat this turn as a greenfield rebuild or as completion of the whole historical product.",
       "",
       "CURRENT CREATOR REQUEST",
-      request,
-      "",
+      controlling,
+      ...fabricStepBlock,
       "EXPLICIT CREATOR CONSTRAINTS",
       constraints.length
         ? constraints.map((line) => `- ${line}`).join("\n")

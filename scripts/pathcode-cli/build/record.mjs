@@ -115,6 +115,13 @@ export function writeBuildRecord(runtimeRoot, record) {
   const previous = readBuildRecord(runtimeRoot, record.buildId);
   mkdirSync(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  if (
+    record?.loop &&
+    (record.loop.forceNextKind === "evaluate" ||
+      record.loop.forceNextKind === "challenge")
+  ) {
+    delete record.loop.forceNextKind;
+  }
   const next = {
     ...record,
     schema: BUILD_RECORD_SCHEMA,
@@ -146,7 +153,16 @@ export function readBuildRecord(runtimeRoot, buildId) {
   try {
     const raw = JSON.parse(readFileSync(path, "utf8"));
     if (!raw || typeof raw !== "object" || !raw.buildId) return null;
-    return /** @type {import('./types.mjs').BuildRecord} */ (raw);
+    const record = /** @type {import('./types.mjs').BuildRecord} */ (raw);
+    // Phase 3: persisted evaluate/challenge forceNextKind must never dispatch.
+    if (
+      record.loop &&
+      (record.loop.forceNextKind === "evaluate" ||
+        record.loop.forceNextKind === "challenge")
+    ) {
+      delete record.loop.forceNextKind;
+    }
+    return record;
   } catch {
     return null;
   }
