@@ -142,6 +142,28 @@ function fabricStepsRemaining(record) {
     .map((step) => step.trim());
 }
 
+/**
+ * Creator Discard is a completed decision for that engineer result.
+ * Resume/tick must not treat it as an unresolved engineering failure.
+ * @param {import('./types.mjs').BuildRecord} record
+ */
+function revisionDiscardedWithoutAdoption(record) {
+  if (!record || record.pendingCandidate?.status === "pending") return false;
+  const discardedTaskId = record.lastDiscardedCandidate?.taskId;
+  if (!discardedTaskId) return false;
+  const rev = record.intent?.outcomeRevision;
+  const engineers = (record.children || []).filter(
+    (child) =>
+      child.kind === "engineer" &&
+      !child.orphanAbandoned &&
+      (rev == null || child.intentRevision === rev),
+  );
+  const latest = engineers.length ? engineers[engineers.length - 1] : null;
+  if (!latest?.taskId) return false;
+  if (latest.adoptedSha) return false;
+  return latest.taskId === discardedTaskId;
+}
+
 function adoptedEngineerForRevision(record) {
   const rev = record?.intent?.outcomeRevision;
   const engineers = (record?.children || []).filter(
@@ -712,6 +734,20 @@ export function createBuildController(opts) {
       return {
         ok: reconciled.ok !== false,
         awaitingReview: true,
+        build: readBuildRecord(runtimeRoot, buildId),
+        decisions: reconciled.decisions || [],
+      };
+    }
+    // Discarded candidate is terminal for that result — idle usable state,
+    // composer enabled, no auto-engine, authoritative SHA unchanged.
+    if (revisionDiscardedWithoutAdoption(record)) {
+      record.loop.status = "paused";
+      record.loop.pausedAt = record.loop.pausedAt || new Date().toISOString();
+      syncConversationLifecycle(record);
+      writeBuildRecord(runtimeRoot, record);
+      return {
+        ok: reconciled.ok !== false,
+        awaitCreator: true,
         build: readBuildRecord(runtimeRoot, buildId),
         decisions: reconciled.decisions || [],
       };
@@ -2432,6 +2468,20 @@ export function createBuildController(opts) {
         action: "await_runtime_refresh",
         reason: "preview_pending",
         build: record,
+      };
+    } else if (revisionDiscardedWithoutAdoption(record)) {
+      record.loop.status = "paused";
+      record.loop.blockedReason = undefined;
+      record.loop.pausedAt = record.loop.pausedAt || new Date().toISOString();
+      syncConversationLifecycle(record);
+      writeBuildRecord(runtimeRoot, record);
+      return {
+        ok: true,
+        done: false,
+        paused: true,
+        awaitCreator: true,
+        action: "await_creator_after_discard",
+        build: readBuildRecord(runtimeRoot, buildId),
       };
     } else {
       record.loop.status = "blocked";

@@ -170,7 +170,9 @@ describe("creator candidate review", () => {
     });
     expect(emptyView.uiState).toBe("paused");
     expect(emptyView.headline).not.toMatch(/Preview unavailable|Failed/i);
-    expect(String(emptyView.detail || "")).toMatch(/No applied product exists yet/i);
+    expect(String(emptyView.detail || "")).toMatch(
+      /Send a new request when you want to continue/i,
+    );
     expect(String(emptyView.detail || "")).not.toMatch(/no_preview_capability/i);
 
     const awaitingView = projectBuildForSurface(
@@ -208,6 +210,36 @@ describe("creator candidate review", () => {
     expect(emptyAfter?.runtimeHealth).toBe("awaiting_product");
     expect(emptyAfter?.loop.pendingRuntimeRefresh).toBe(false);
     expect(emptyAfter?.previewUrl == null).toBe(true);
+
+    // Resume after Discard must stay idle/usable — never Needs attention / blocked.
+    const beforeResumeSha = emptyAfter?.authoritativeSha || null;
+    const resumed = await emptyLive.resumeBuild(started.build.buildId);
+    expect(resumed.ok).toBe(true);
+    expect(resumed.awaitCreator).toBe(true);
+    const afterResume = readBuildRecord(runtimeRoot, started.build.buildId);
+    expect(afterResume?.authoritativeSha || null).toBe(beforeResumeSha);
+    expect(afterResume?.loop.status).toBe("paused");
+    expect(afterResume?.loop.blockedReason).toBeFalsy();
+    expect(afterResume?.pendingCandidate).toBeUndefined();
+    const resumeView = projectBuildForSurface(afterResume);
+    expect(resumeView.canSteer).toBe(true);
+    expect(resumeView.canResume).toBe(false);
+    expect(resumeView.uiState).not.toBe("error");
+    expect(resumeView.headline).not.toMatch(/Needs attention|Failed/i);
+    expect(String(resumeView.blockedReason || "")).not.toMatch(
+      /verified durable result/i,
+    );
+    // Tick must not block or dispatch after Discard.
+    const tick = await emptyLive.tick(started.build.buildId);
+    expect(tick.blocked).toBeFalsy();
+    expect(tick.action).not.toBe("blocked");
+    expect(tick.awaitCreator || tick.paused).toBeTruthy();
+    const afterTick = readBuildRecord(runtimeRoot, started.build.buildId);
+    expect(afterTick?.loop.status).not.toBe("blocked");
+    expect(afterTick?.authoritativeSha || null).toBe(beforeResumeSha);
+    expect(
+      (afterTick?.children || []).filter((child) => child.kind === "engineer").length,
+    ).toBe((emptyAfter?.children || []).filter((child) => child.kind === "engineer").length);
 
     // Historical FAILED label recovers from S2 discarded + lastDiscardedCandidate.
     const storedFailed = {

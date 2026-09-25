@@ -393,7 +393,14 @@ export interface BuildController {
   recover(buildId: string): Promise<{ ok: boolean; build: BuildRecord }>;
   resumeBuild(
     buildId: string,
-  ): Promise<{ ok: boolean; awaitingReview?: boolean; build: BuildRecord }>;
+  ): Promise<{
+    ok: boolean;
+    awaitingReview?: boolean;
+    awaitCreator?: boolean;
+    alreadyComplete?: boolean;
+    build: BuildRecord;
+    decisions?: unknown[];
+  }>;
   consumeChildResult(
     buildId: string,
     taskId: string,
@@ -420,6 +427,8 @@ export interface BuildController {
     paused?: boolean;
     blocked?: boolean;
     done?: boolean;
+    awaitCreator?: boolean;
+    awaitingReview?: boolean;
   }>;
   assessCompletion(buildId: string): { complete: boolean; reason?: string };
   patchRuntimeState(
@@ -660,8 +669,10 @@ export function projectBuildForSurface(
   queuedRequest?: string | null;
   canPause?: boolean;
   canResume?: boolean;
+  canSteer?: boolean;
   canApply?: boolean;
   canDiscard?: boolean;
+  blockedReason?: string | null;
   pendingCandidate?: {
     taskId?: string | null;
     sourceSha?: string | null;

@@ -123,8 +123,8 @@ export function projectBuildForSurface(build, extras = {}) {
 
   const status = String(build.loop?.status || "unknown");
   const complete = status === "complete";
-  const blocked = status === "blocked";
   const paused = status === "paused";
+  const blocked = status === "blocked";
   const awaitingReview =
     status === "awaiting_review" ||
     build.pendingCandidate?.status === "pending";
@@ -141,6 +141,11 @@ export function projectBuildForSurface(build, extras = {}) {
           diffSummary: build.pendingCandidate.diffSummary || "",
         }
       : null;
+  const discardedTerminal =
+    Boolean(build.lastDiscardedCandidate) &&
+    !pendingCandidate &&
+    !blocked &&
+    paused;
   const binding = (build.projectBindings || [])[0] || null;
   const projectRoot = binding?.projectRoot || null;
   const kids = Array.isArray(build.children) ? build.children : [];
@@ -201,10 +206,10 @@ export function projectBuildForSurface(build, extras = {}) {
     headline = "Paused";
     if (build.lastDiscardedCandidate && emptyTreePreview) {
       detail =
-        "That candidate was discarded. No applied product exists yet — Resume to continue.";
+        "That candidate was discarded. Send a new request when you want to continue.";
     } else if (build.lastDiscardedCandidate) {
       detail =
-        "That candidate was discarded. Showing the current authoritative product.";
+        "That candidate was discarded. Showing the current authoritative product — send a new request to change it.";
     } else {
       detail = "Engineering is paused. Resume to continue from durable state.";
     }
@@ -478,7 +483,8 @@ export function projectBuildForSurface(build, extras = {}) {
     canSteer: !blocked,
     canPause: status === "running",
     canStop: status === "running",
-    canResume: (paused || blocked) && !awaitingReview,
+    // Discarded candidate is already a completed decision — no Resume loop.
+    canResume: (paused || blocked) && !awaitingReview && !discardedTerminal,
     canApply: Boolean(pendingCandidate),
     canDiscard: Boolean(pendingCandidate),
     pendingCandidate,

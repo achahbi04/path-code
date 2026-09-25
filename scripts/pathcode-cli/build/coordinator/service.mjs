@@ -404,12 +404,14 @@ export async function createBuildCoordinatorService(options) {
           if (!result.ok) return result;
           const record = readBuildRecord(runtimeRoot, buildId);
           const awaiting = record?.pendingCandidate?.status === "pending";
+          const awaitCreator = Boolean(result.awaitCreator);
           if (awaiting) {
             record.loop.status = "awaiting_review";
           }
           record.coordinator = {
             ...(record.coordinator || {}),
-            autoRun: !awaiting,
+            // Discarded candidate is terminal — do not auto-start engineering.
+            autoRun: !awaiting && !awaitCreator,
             owner: "path-build-coordinator",
           };
           writeBuildRecord(runtimeRoot, record);
@@ -419,9 +421,13 @@ export async function createBuildCoordinatorService(options) {
             method === BuildCoordinatorMethods.BUILD_RECOVER
               ? "build.recovered"
               : "build.resumed",
-            { decisions: result.decisions || [], awaitingReview: awaiting },
+            {
+              decisions: result.decisions || [],
+              awaitingReview: awaiting,
+              awaitCreator,
+            },
           );
-          if (!awaiting) setImmediate(() => ensureLoop(buildId));
+          if (!awaiting && !awaitCreator) setImmediate(() => ensureLoop(buildId));
           return { ...result, build: readBuildRecord(runtimeRoot, buildId) };
         });
       case BuildCoordinatorMethods.BUILD_APPLY:
