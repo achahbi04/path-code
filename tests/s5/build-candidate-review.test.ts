@@ -844,7 +844,7 @@ describe("creator candidate review", () => {
     expect(visibleLogo[0]?.id).toBe(msgB2?.id);
     expect(
       view.conversation?.find((message) =>
-        /Create a dark-mode homepage/i.test(String(message.text || "")),
+        /Build a marker page/i.test(String(message.text || "")),
       )?.status,
     ).toBe("discarded");
 
