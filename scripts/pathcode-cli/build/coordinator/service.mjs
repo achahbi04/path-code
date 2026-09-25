@@ -447,7 +447,7 @@ export async function createBuildCoordinatorService(options) {
         return exclusive(buildId, async () => {
           const result = await controller.discardCandidate(buildId);
           if (!result.ok) return result;
-          const record = readBuildRecord(runtimeRoot, buildId);
+          let record = readBuildRecord(runtimeRoot, buildId);
           record.coordinator = {
             ...(record.coordinator || {}),
             autoRun: record.loop?.status === "running",
@@ -458,6 +458,17 @@ export async function createBuildCoordinatorService(options) {
             taskId: record.lastDiscardedCandidate?.taskId || null,
             deduped: result.deduped === true,
           });
+          if (!result.deduped) {
+            // Drop candidate preview process, then restore authoritative
+            // preview (or truthful empty/awaiting_product) with zero engine.
+            try {
+              await runtimeManager.stop(buildId);
+            } catch {
+              /* ignore */
+            }
+            await runtimeSync.sync(buildId);
+            record = readBuildRecord(runtimeRoot, buildId) || record;
+          }
           if (record.loop?.status === "running") {
             setImmediate(() => ensureLoop(buildId));
           }

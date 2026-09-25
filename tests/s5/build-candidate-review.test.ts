@@ -161,6 +161,53 @@ describe("creator candidate review", () => {
     );
     expect(view.headline).not.toMatch(/Failed/i);
     expect(view.headline).toBe("Paused");
+    // Empty authoritative product after Discard is not a preview failure.
+    const emptyView = projectBuildForSurface(afterDiscard, {
+      runtime: {
+        status: "unavailable",
+        reason: "no_preview_capability",
+      },
+    });
+    expect(emptyView.uiState).toBe("paused");
+    expect(emptyView.headline).not.toMatch(/Preview unavailable|Failed/i);
+    expect(String(emptyView.detail || "")).toMatch(/No applied product exists yet/i);
+    expect(String(emptyView.detail || "")).not.toMatch(/no_preview_capability/i);
+
+    const awaitingView = projectBuildForSurface(
+      { ...afterDiscard!, runtimeHealth: "awaiting_product" },
+      { runtime: { status: "awaiting_product", reason: "empty_tree" } },
+    );
+    expect(awaitingView.uiState).toBe("paused");
+    expect(awaitingView.headline).not.toMatch(/Failed|unavailable/i);
+
+    // Non-fake first-product Discard parks on awaiting_product (no engine).
+    const emptyLive = createBuildController({
+      runtimeRoot,
+      fakeMode: false,
+      gateway: fakeGateway(),
+    });
+    const staged = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    staged.pendingCandidate = {
+      status: "pending",
+      taskId: engineer!.taskId,
+      actionId: "engineer:restage",
+      intentRevision: staged.intent.outcomeRevision,
+      sourceSha: candidateSha,
+      taskBranch: `path/task-${engineer!.taskId}`,
+      worktreePath: target,
+      files: ["index.html"],
+      requestText: "restage",
+      createdAt: new Date().toISOString(),
+    };
+    staged.loop.status = "awaiting_review";
+    delete staged.lastDiscardedCandidate;
+    writeBuildRecord(runtimeRoot, staged);
+    const emptyDiscard = await emptyLive.discardCandidate(started.build.buildId);
+    expect(emptyDiscard.ok).toBe(true);
+    const emptyAfter = readBuildRecord(runtimeRoot, started.build.buildId);
+    expect(emptyAfter?.runtimeHealth).toBe("awaiting_product");
+    expect(emptyAfter?.loop.pendingRuntimeRefresh).toBe(false);
+    expect(emptyAfter?.previewUrl == null).toBe(true);
 
     // Historical FAILED label recovers from S2 discarded + lastDiscardedCandidate.
     const storedFailed = {
@@ -305,6 +352,36 @@ describe("creator candidate review", () => {
         (message) => message.status !== "failed",
       ),
     ).toBe(true);
+
+    // Non-fake Discard must request authoritative runtime restore when product exists.
+    const liveController = createBuildController({
+      runtimeRoot,
+      fakeMode: false,
+      gateway: fakeGateway(),
+    });
+    const again = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    again.pendingCandidate = {
+      status: "pending",
+      taskId,
+      actionId: "engineer:candidate-b2",
+      intentRevision: again.intent.outcomeRevision,
+      sourceSha: candidateSha,
+      taskBranch,
+      worktreePath: target,
+      files: ["index.html"],
+      requestText: "Change the title only again",
+      createdAt: new Date().toISOString(),
+    };
+    again.loop.status = "awaiting_review";
+    writeBuildRecord(runtimeRoot, again);
+    const discardLive = await liveController.discardCandidate(started.build.buildId);
+    expect(discardLive.ok).toBe(true);
+    const afterLive = readBuildRecord(runtimeRoot, started.build.buildId);
+    expect(afterLive?.authoritativeSha).toBe(authoritative);
+    expect(afterLive?.pendingCandidate).toBeUndefined();
+    expect(afterLive?.loop.pendingRuntimeRefresh).toBe(true);
+    expect(existsSync(join(target, "index.html"))).toBe(true);
+    expect(readFileSync(join(target, "index.html"), "utf8")).not.toContain("candidate-b");
 
     rmSync(runtimeRoot, { recursive: true, force: true });
     rmSync(target, { recursive: true, force: true });

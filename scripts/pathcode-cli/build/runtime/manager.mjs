@@ -311,18 +311,28 @@ export function createBuildRuntimeManager(opts) {
 
     const artifact = detect(buildId, root, ctx);
     if (artifact.preview.capability === "none" || artifact.preview.mode === "none") {
+      const emptyTree = (artifact.signals || []).includes("empty_tree");
+      // Empty origin / no applied product is a truthful idle state, not a
+      // preview failure. Callers must not paint this as "Preview failed".
       const state = {
         runtimeId: `rt-${randomUUID().slice(0, 8)}`,
         buildId,
         bindingId: ctx.bindingId || "",
         projectRoot: root,
-        status: "unavailable",
-        reason: "no_preview_capability",
+        status: emptyTree ? "awaiting_product" : "unavailable",
+        reason: emptyTree ? "empty_tree" : "no_preview_capability",
         artifact,
+        authoritativeSha: ctx.authoritativeSha || null,
         startedAt: new Date().toISOString(),
       };
       persist(buildId, state);
-      return { ok: false, code: "NO_PREVIEW", runtime: state, artifact };
+      return {
+        ok: emptyTree,
+        skipped: emptyTree,
+        code: emptyTree ? "EMPTY_TREE" : "NO_PREVIEW",
+        runtime: state,
+        artifact,
+      };
     }
 
     const port = await findFreePort(4173);

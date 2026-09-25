@@ -171,7 +171,10 @@ export function projectBuildForSurface(build, extras = {}) {
     runtime?.status === "unavailable";
   const emptyTreePreview =
     runtime?.reason === "no_preview_capability" ||
-    runtime?.reason === "no_start_plan";
+    runtime?.reason === "no_start_plan" ||
+    runtime?.reason === "empty_tree" ||
+    runtime?.status === "awaiting_product" ||
+    build.runtimeHealth === "awaiting_product";
   const updatingPreview = Boolean(build.loop?.pendingRuntimeRefresh) && !childLive;
 
   const lastClass = String(last?.classification || "");
@@ -196,9 +199,15 @@ export function projectBuildForSurface(build, extras = {}) {
     phase = "paused";
     uiState = "paused";
     headline = "Paused";
-    detail = build.lastDiscardedCandidate
-      ? "That candidate was discarded. Resume to continue from the current product."
-      : "Engineering is paused. Resume to continue from durable state.";
+    if (build.lastDiscardedCandidate && emptyTreePreview) {
+      detail =
+        "That candidate was discarded. No applied product exists yet — Resume to continue.";
+    } else if (build.lastDiscardedCandidate) {
+      detail =
+        "That candidate was discarded. Showing the current authoritative product.";
+    } else {
+      detail = "Engineering is paused. Resume to continue from durable state.";
+    }
     progressLabel = "Paused";
   } else if (complete) {
     phase = "complete";

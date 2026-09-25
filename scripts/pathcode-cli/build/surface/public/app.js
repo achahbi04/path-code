@@ -388,16 +388,21 @@ function updatePreview(view) {
   }
   const embed = candidateEmbed || view.preview?.embedPath || null;
   const direct = candidateEmbed ? null : view.preview?.url || null;
+  const emptyProductRuntime =
+    view.runtime?.status === "awaiting_product" ||
+    view.runtime?.reason === "empty_tree" ||
+    view.runtimeHealth === "awaiting_product" ||
+    ((view.runtime?.reason === "no_preview_capability" ||
+      view.runtime?.reason === "no_start_plan") &&
+      (view.lastDiscardedCandidate ||
+        view.uiState === "paused" ||
+        (view.uiState !== "error" && view.status === "running")));
   const runtimeFailed =
     (view.runtime?.status === "failed" ||
       view.runtime?.status === "exited" ||
       view.runtime?.status === "unhealthy" ||
       view.runtime?.status === "unavailable") &&
-    !(
-      view.runtime?.reason === "no_preview_capability" &&
-      view.uiState !== "error" &&
-      view.status === "running"
-    );
+    !emptyProductRuntime;
   const ready =
     Boolean(candidateEmbed) ||
     (!runtimeFailed &&
@@ -457,8 +462,14 @@ function updatePreview(view) {
       els.previewEmptyDetail.textContent =
         view.detail ||
         (view.lastDiscardedCandidate
-          ? "The candidate was discarded. The live product appears here after you Apply a result."
+          ? "That candidate was discarded. Apply a result to make it the live product."
           : "Your product will appear here as soon as the first runnable revision exists.");
+    }
+    // Never leave a red "Preview failed: no_preview_capability" after Discard
+    // of a first-product candidate — that is empty product truth, not failure.
+    if (emptyProductRuntime) {
+      els.previewError.hidden = true;
+      els.previewError.textContent = "";
     }
     return;
   }
@@ -1058,7 +1069,10 @@ els.refreshPreviewBtn.addEventListener("click", async () => {
   await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/runtime/restart`, {
     method: "POST",
   });
-  if (els.previewFrame.src) {
+  const res = await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}`);
+  const view = await res.json().catch(() => null);
+  if (view?.buildId) acceptView(view);
+  else if (els.previewFrame.src) {
     const src = els.previewFrame.src.split("?")[0];
     els.previewFrame.src = `${src}?t=${Date.now()}`;
   }

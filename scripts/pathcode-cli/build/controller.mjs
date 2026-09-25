@@ -1726,6 +1726,28 @@ export function createBuildController(opts) {
     if (record.loop.status === "paused") {
       record.loop.pausedAt = now;
     }
+    // Restore authoritative preview immediately when a product exists; otherwise
+    // park on truthful empty/no-product state (never leave candidate preview).
+    if (binding?.projectRoot && !fakeMode) {
+      const { detectBuildArtifact } = await import("./runtime/artifact.mjs");
+      const artifact = detectBuildArtifact(binding.projectRoot, {
+        outcomeHint: record.intent?.outcome,
+      });
+      const emptyTree = (artifact.signals || []).includes("empty_tree");
+      const webReady =
+        artifact.preview?.capability === "web" &&
+        !emptyTree &&
+        artifact.preview?.mode !== "none";
+      if (webReady) {
+        record.loop.pendingRuntimeRefresh = true;
+      } else {
+        record.previewUrl = null;
+        record.runtimeHealth = emptyTree ? "awaiting_product" : "n/a";
+        record.loop.pendingRuntimeRefresh = false;
+      }
+    } else {
+      record.loop.pendingRuntimeRefresh = false;
+    }
     appendBuildEvent(runtimeRoot, buildId, "candidate.discarded", {
       taskId: pending.taskId,
       sourceSha: pending.sourceSha,
