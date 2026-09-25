@@ -164,6 +164,7 @@ export function displayTitleFor(build) {
 export function creatorStatusLabel(build) {
   const status = build?.loop?.status;
   if (status === "running") return "Building";
+  if (status === "awaiting_review") return "Review";
   if (status === "paused") return "Paused";
   if (status === "blocked") return "Needs attention";
   return "Ready";
@@ -185,6 +186,7 @@ export function creatorPhase(build) {
   if (live?.kind === "challenge") return "reviewing";
   const status = build?.loop?.status;
   if (status === "complete") return "ready";
+  if (status === "awaiting_review") return "reviewing";
   if (status === "paused") return "paused";
   if (status === "blocked") return "attention";
   const conversation = Array.isArray(build?.conversation) ? build.conversation : [];

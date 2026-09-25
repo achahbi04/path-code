@@ -3,7 +3,7 @@
  * @typedef {'SATISFIED'|'VIOLATED'|'UNKNOWN'} RequirementStatus
  * @typedef {'brief'|'engineer'|'evaluate'|'challenge'} BuildTaskKind
  * @typedef {'selected'|'dispatched'|'terminal_seen'|'consumed'} ChildDispatchState
- * @typedef {'running'|'paused'|'blocked'|'complete'} BuildLoopStatus
+ * @typedef {'running'|'paused'|'blocked'|'complete'|'awaiting_review'} BuildLoopStatus
  *
  * @typedef {object} EvidenceRef
  * @property {'git'|'fs'|'check'|'runtime'|'report'|'validation'} kind
@@ -53,7 +53,7 @@
  * @property {string} at
  * @property {object} [element]
  * @property {string} [kind]
- * @property {'queued'|'incorporated'|'preparing'|'applying'|'being_applied'|'applied'|'failed'} [status]
+ * @property {'queued'|'incorporated'|'preparing'|'applying'|'being_applied'|'applied'|'failed'|'review'|'discarded'} [status]
  * @property {number} [intentRevision]
  *
  * @typedef {object} BuildArtifact
@@ -131,6 +131,9 @@
  * @property {string} [displayTitle]
  * @property {string} [archivedAt]
  * @property {{ syncAdopted?: boolean, lastSyncedSha?: string | null, lastSyncError?: string | null, lastSyncedAt?: string | null, remoteUrl?: string | null, kind?: string, validated?: boolean }} [repository]
+ * @property {object} [pendingCandidate]
+ * @property {object} [lastAppliedCandidate]
+ * @property {object} [lastDiscardedCandidate]
  * @property {string} createdAt
  * @property {string} updatedAt
  */

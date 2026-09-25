@@ -1,6 +1,6 @@
 /** PATH Build — visual builder client */
 
-import { previewFrameSrc, previewTransition, shouldAcceptViewRevision } from "./view-revision.js";
+import { previewFrameSrc, previewTransition, shouldAcceptBuildView } from "./view-revision.js";
 
 const els = {
   landing: document.getElementById("landing"),
@@ -15,6 +15,12 @@ const els = {
   codeIdentityMain: document.getElementById("codeIdentityMain"),
   codeIdentityProcs: document.getElementById("codeIdentityProcs"),
   staleCode: document.getElementById("staleCode"),
+  candidateReview: document.getElementById("candidateReview"),
+  candidateReviewRequest: document.getElementById("candidateReviewRequest"),
+  candidateReviewFiles: document.getElementById("candidateReviewFiles"),
+  candidateReviewDiff: document.getElementById("candidateReviewDiff"),
+  applyCandidateBtn: document.getElementById("applyCandidateBtn"),
+  discardCandidateBtn: document.getElementById("discardCandidateBtn"),
   chatScroll: document.getElementById("chatScroll"),
   chatForm: document.getElementById("chatForm"),
   chatInput: document.getElementById("chatInput"),
@@ -374,8 +380,14 @@ function commitPreviewSrc(nextSrc) {
 function updatePreview(view) {
   if (!view) return;
   if (heldPreview && heldPreview.buildId !== view.buildId) heldPreview = null;
-  const embed = view.preview?.embedPath || null;
-  const direct = view.preview?.url || null;
+  const candidateEmbed = view.candidatePreview?.embedPath || null;
+  // Candidate preview is only valid while pending. Never keep painting a
+  // discarded/applied candidate as last-known-good product.
+  if (!candidateEmbed && heldPreview && String(heldPreview.src || "").includes("/preview-candidate/")) {
+    heldPreview = null;
+  }
+  const embed = candidateEmbed || view.preview?.embedPath || null;
+  const direct = candidateEmbed ? null : view.preview?.url || null;
   const runtimeFailed =
     (view.runtime?.status === "failed" ||
       view.runtime?.status === "exited" ||
@@ -387,16 +399,23 @@ function updatePreview(view) {
       view.status === "running"
     );
   const ready =
-    !runtimeFailed &&
-    (view.preview?.status === "ready" || view.preview?.status === "stale");
+    Boolean(candidateEmbed) ||
+    (!runtimeFailed &&
+      (view.preview?.status === "ready" || view.preview?.status === "stale"));
 
-  const nextSrc = ready && embed ? previewFrameSrc(embed, view.authoritativeSha) : "";
+  const nextSrc =
+    ready && embed
+      ? previewFrameSrc(embed, view.pendingCandidate?.sourceSha || view.authoritativeSha)
+      : "";
   const decision = previewTransition({
     heldSrc: heldPreview?.src || "",
     nextReady: Boolean(ready && nextSrc),
     nextSrc,
-    nextFailed: runtimeFailed,
-    preparing: Boolean(view.previewPreparing) || view.status === "running",
+    nextFailed: runtimeFailed && !candidateEmbed,
+    preparing:
+      !candidateEmbed &&
+      (Boolean(view.previewPreparing) || view.status === "running"),
+    allowCandidateHold: Boolean(candidateEmbed),
   });
   const controls = decision.action !== "empty";
   document.querySelector(".preview-actions")?.toggleAttribute("hidden", !controls);
@@ -429,12 +448,17 @@ function updatePreview(view) {
     heldPreview = null;
     els.previewLabel.textContent = view.progressLabel || "Preparing";
     if (els.previewEmptyTitle) {
-      els.previewEmptyTitle.textContent = view.progressLabel || "Building first version…";
+      els.previewEmptyTitle.textContent =
+        view.lastDiscardedCandidate || view.status === "paused"
+          ? view.progressLabel || "No product applied yet"
+          : view.progressLabel || "Building first version…";
     }
     if (els.previewEmptyDetail) {
       els.previewEmptyDetail.textContent =
         view.detail ||
-        "Your product will appear here as soon as the first runnable revision exists.";
+        (view.lastDiscardedCandidate
+          ? "The candidate was discarded. The live product appears here after you Apply a result."
+          : "Your product will appear here as soon as the first runnable revision exists.");
     }
     return;
   }
@@ -452,9 +476,39 @@ function updatePreview(view) {
   previewEmbed = decision.src;
   previewDirectUrl = direct;
   heldPreview = { buildId: view.buildId, src: decision.src };
-  els.previewLabel.textContent = view.artifact?.framework
-    ? `Live · ${view.artifact.framework}`
-    : "Live product";
+  els.previewLabel.textContent = candidateEmbed
+    ? "Candidate preview"
+    : view.artifact?.framework
+      ? `Live · ${view.artifact.framework}`
+      : "Live product";
+}
+
+function renderCandidateReview(view) {
+  if (!els.candidateReview) return;
+  const candidate = view?.pendingCandidate;
+  const show = Boolean(view?.canApply && candidate);
+  els.candidateReview.hidden = !show;
+  if (!show) return;
+  const request = String(candidate.requestText || view.outcome || "").trim();
+  const files = Array.isArray(candidate.files) ? candidate.files.filter(Boolean) : [];
+  if (els.candidateReviewRequest) {
+    els.candidateReviewRequest.textContent = request
+      ? `Request: ${request.slice(0, 160)}`
+      : "An engineer result is ready for your decision.";
+  }
+  if (els.candidateReviewFiles) {
+    els.candidateReviewFiles.textContent = files.length
+      ? `Files: ${files.slice(0, 8).join(", ")}${files.length > 8 ? "…" : ""}`
+      : "Files: see candidate preview";
+  }
+  if (els.candidateReviewDiff) {
+    const sha = candidate.sourceSha ? String(candidate.sourceSha).slice(0, 12) : "";
+    els.candidateReviewDiff.textContent = candidate.diffSummary
+      ? candidate.diffSummary
+      : sha
+        ? `Candidate ${sha}`
+        : "";
+  }
 }
 
 /**
@@ -530,9 +584,11 @@ function render(view) {
     els.chatInput.disabled = !editable;
     els.sendBtn.disabled = !editable;
     if (!editable) {
-      els.chatInput.placeholder = view.projectRoot
-        ? "This project needs attention before it can take a new message."
-        : "This record has no product folder.";
+      els.chatInput.placeholder = view.starting
+        ? "Creating the project folder…"
+        : view.projectRoot
+          ? "This project needs attention before it can take a new message."
+          : "This record has no product folder.";
     } else {
       els.chatInput.placeholder = "Ask PATH…";
     }
@@ -543,6 +599,9 @@ function render(view) {
     verifying: "Verifying",
     reviewing: "Reviewing",
   };
+  if (view.status === "awaiting_review") {
+    phaseLabels.reviewing = "Review this result";
+  }
   if (els.creatorStatus) {
     const label = phaseLabels[view.creatorPhase];
     els.creatorStatus.hidden = !label;
@@ -554,6 +613,7 @@ function render(view) {
   renderChat(view);
   renderDrawer(view);
   renderWorklog(view);
+  renderCandidateReview(view);
   updatePreview(view);
   if (els.pauseBuildBtn) els.pauseBuildBtn.hidden = !view.canPause;
   els.stopBuildBtn.hidden = !view.canStop;
@@ -584,7 +644,20 @@ function render(view) {
 function acceptView(view) {
   if (!view) return;
   const revision = Number(view.viewRevision);
-  if (!shouldAcceptViewRevision(renderedRevision, revision)) return;
+  if (
+    !shouldAcceptBuildView({
+      previousBuildId: lastView?.buildId || null,
+      nextBuildId: view.buildId || null,
+      previousRevision: renderedRevision,
+      nextRevision: revision,
+    })
+  ) {
+    return;
+  }
+  if (view.buildId && lastView?.buildId && view.buildId !== lastView.buildId) {
+    renderedRevision = -1;
+    heldPreview = null;
+  }
   if (Number.isFinite(revision)) {
     renderedRevision = Math.max(renderedRevision, revision);
   }
@@ -630,7 +703,8 @@ async function startBuild() {
     headline: "Starting your build",
     progressLabel: "Preparing project",
     detail: "PATH is creating the Build session and project folder.",
-    conversation: [{ role: "user", text: outcome, kind: "outcome", status: "incorporated" }],
+    conversation: [{ role: "user", text: outcome, kind: "outcome", status: "queued" }],
+    starting: true,
     canStop: false,
     canResume: false,
     activity: [],
@@ -663,6 +737,7 @@ async function startBuild() {
     startedOk = true;
     activeBuildId = body.buildId;
     projectRoot = body.projectRoot || null;
+    renderedRevision = -1;
     if (body.view) {
       acceptView(body.view);
     } else {
@@ -782,8 +857,12 @@ async function controlBuild(action) {
         ? els.pauseBuildBtn
         : action === "resume"
           ? els.resumeBuildBtn
-          : els.recoverBuildBtn;
-  button.disabled = true;
+          : action === "apply"
+            ? els.applyCandidateBtn
+            : action === "discard"
+              ? els.discardCandidateBtn
+              : els.recoverBuildBtn;
+  if (button) button.disabled = true;
   try {
     const res = await fetch(
       `/api/builds/${encodeURIComponent(activeBuildId)}/${action}`,
@@ -797,6 +876,13 @@ async function controlBuild(action) {
       });
       return;
     }
+    if (action === "apply" || action === "discard") {
+      heldPreview = null;
+      if (visibleFrame && String(visibleFrame.src || "").includes("/preview-candidate/")) {
+        visibleFrame.removeAttribute("src");
+        visibleFrame.hidden = true;
+      }
+    }
     if (body.view) acceptView(body.view);
   } catch (error) {
     showHandoffResult(action, {
@@ -804,7 +890,7 @@ async function controlBuild(action) {
       message: error instanceof Error ? error.message : String(error),
     });
   } finally {
-    button.disabled = false;
+    if (button) button.disabled = false;
   }
 }
 
@@ -834,6 +920,8 @@ els.pauseBuildBtn?.addEventListener("click", () => void controlBuild("pause"));
 els.stopBuildBtn.addEventListener("click", () => void controlBuild("stop"));
 els.resumeBuildBtn.addEventListener("click", () => void controlBuild("resume"));
 els.recoverBuildBtn.addEventListener("click", () => void controlBuild("recover"));
+els.applyCandidateBtn?.addEventListener("click", () => void controlBuild("apply"));
+els.discardCandidateBtn?.addEventListener("click", () => void controlBuild("discard"));
 
 function showComposer(pushHistory) {
   if (events) events.close();
@@ -854,6 +942,7 @@ function showComposer(pushHistory) {
     spareFrame.removeAttribute("src");
     spareFrame.hidden = true;
   }
+  if (els.candidateReview) els.candidateReview.hidden = true;
   els.previewEmpty.hidden = false;
   els.drawerBody.innerHTML = "";
   els.projectPath.textContent = "";

@@ -167,7 +167,13 @@ describe("shared authority", () => {
     expect(started.ok).toBe(true);
     if (!started.ok) return;
     const ran = await controller.runUntilDone(started.build.buildId, { maxSteps: 8 });
-    expect(ran.done).toBe(true);
+    expect(ran.awaitingReview).toBe(true);
+    const applied = await controller.applyCandidate(started.build.buildId);
+    expect(applied.ok).toBe(true);
+    const finished = await controller.runUntilDone(started.build.buildId, {
+      maxSteps: 6,
+    });
+    expect(finished.done).toBe(true);
     const record = readBuildRecord(runtimeRoot, started.build.buildId);
     const kinds = (record?.children || []).map((child) => child.kind);
     expect(kinds.filter((kind) => kind === "engineer")).toHaveLength(1);
@@ -210,7 +216,16 @@ describe("shared authority", () => {
     ];
     const { writeBuildRecord } = await import("../../scripts/pathcode-cli/build/record.mjs");
     writeBuildRecord(runtimeRoot, record);
-    const ran = await controller.runUntilDone(started.build.buildId, { maxSteps: 10 });
+    for (let i = 0; i < 3; i += 1) {
+      const step = await controller.runUntilDone(started.build.buildId, {
+        maxSteps: 6,
+      });
+      expect(step.awaitingReview || step.build?.loop.status).toBeTruthy();
+      expect(step.build?.loop.status).toBe("awaiting_review");
+      const applied = await controller.applyCandidate(started.build.buildId);
+      expect(applied.ok).toBe(true);
+    }
+    const ran = await controller.runUntilDone(started.build.buildId, { maxSteps: 6 });
     expect(ran.done).toBe(true);
     const after = readBuildRecord(runtimeRoot, started.build.buildId);
     const engineers = (after?.children || []).filter((child) => child.kind === "engineer");

@@ -11,7 +11,7 @@ import {
   statSync,
   rmSync,
 } from "node:fs";
-import { dirname, join, extname, resolve } from "node:path";
+import { dirname, join, extname, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -48,6 +48,7 @@ import {
 } from "../runtime/proxy.mjs";
 import { launchPathCodeInTerminal } from "./handoff.mjs";
 import { ensureBuildCoordinator } from "../coordinator/ensure.mjs";
+import { resolveCandidatePreviewRoot } from "../candidate.mjs";
 import { assessServingIdentity, loadedCodeIdentity } from "../identity.mjs";
 import { sanitizeBuildEventValue, surfaceViewSanitizeLimits } from "../events.mjs";
 import { readTaskCheckpoint } from "../../ag10/task-checkpoint.mjs";
@@ -70,11 +71,19 @@ function engineFromCheckpoint(checkpoint) {
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
+  ".htm": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
   ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
   ".ico": "image/x-icon",
+  ".txt": "text/plain; charset=utf-8",
 };
 
 /**
@@ -382,6 +391,37 @@ export async function startPathBuildSurface(options) {
     const method = req.method || "GET";
 
     try {
+      const candidateMatch = path.match(/^\/preview-candidate\/([^/]+)(?:\/(.*))?$/);
+      if (candidateMatch && (method === "GET" || method === "HEAD")) {
+        const buildId = decodeURIComponent(candidateMatch[1]);
+        const build = readBuildRecord(runtimeRoot, buildId);
+        const candidate = build?.pendingCandidate;
+        if (!build || candidate?.status !== "pending") {
+          sendJson(res, 404, { ok: false, code: "NO_PENDING_CANDIDATE" });
+          return;
+        }
+        const rooted = resolveCandidatePreviewRoot({
+          runtimeRoot,
+          buildId,
+          projectRoot: build.projectBindings?.[0]?.projectRoot || null,
+          candidate,
+        });
+        if (!rooted.ok) {
+          sendJson(res, 503, rooted);
+          return;
+        }
+        let rel = `/${candidateMatch[2] || ""}`;
+        if (rel === "/" || rel === "") rel = "/index.html";
+        const filePath = resolve(rooted.root, `.${rel}`);
+        const relCheck = relative(resolve(rooted.root), filePath);
+        if (relCheck.startsWith("..") || relCheck.includes(`..${sep}`)) {
+          res.writeHead(403).end("Forbidden");
+          return;
+        }
+        sendFile(res, filePath);
+        return;
+      }
+
       // Preview proxy (same-origin embed)
       const previewMatch = path.match(/^\/preview\/([^/]+)(?:\/(.*))?$/);
       if (previewMatch && (method === "GET" || method === "HEAD" || method === "POST")) {
@@ -484,6 +524,7 @@ export async function startPathBuildSurface(options) {
           if (
             build.authoritativeSha &&
             build.loop?.status !== "running" &&
+            build.loop?.status !== "awaiting_review" &&
             !previewOpenAttempts.has(openKey) &&
             root &&
             existsSync(root) &&
@@ -744,6 +785,18 @@ export async function startPathBuildSurface(options) {
               return applied;
             })
             .catch(() => {});
+          return;
+        }
+
+        if (method === "POST" && (action === "apply" || action === "discard")) {
+          const decided =
+            action === "apply"
+              ? await coordinator.applyCandidate(buildId)
+              : await coordinator.discardCandidate(buildId);
+          sendJson(res, decided.ok ? 200 : 400, {
+            ...decided,
+            view: await viewFor(buildId),
+          });
           return;
         }
 

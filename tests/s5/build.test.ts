@@ -217,13 +217,21 @@ describe("S5 PATH Build", () => {
       maxSteps: 8,
     });
     expect(ran.ok).toBe(true);
-    expect(ran.done).toBe(true);
-    expect(ran.build?.loop.status).toBe("complete");
+    expect(ran.awaitingReview).toBe(true);
+    expect(ran.build?.loop.status).toBe("awaiting_review");
+    expect(existsSync(join(target, "package.json"))).toBe(false);
+    const applied = await controller.applyCandidate(started.build.buildId);
+    expect(applied.ok).toBe(true);
+    const finished = await controller.runUntilDone(started.build.buildId, {
+      maxSteps: 6,
+    });
+    expect(finished.done).toBe(true);
+    expect(finished.build?.loop.status).toBe("complete");
     expect(existsSync(join(target, "package.json"))).toBe(true);
     expect(existsSync(join(target, "src", "path-build-marker.txt"))).toBe(true);
 
     // Idempotent consume
-    const child = ran.build.children[0];
+    const child = finished.build.children[0];
     expect(child).toBeDefined();
     const again = await controller.consumeChildResult(
       started.build.buildId,
@@ -262,6 +270,8 @@ describe("S5 PATH Build", () => {
     expect(started.ok).toBe(true);
     if (!started.ok) return;
     await controller.runUntilDone(started.build.buildId, { maxSteps: 6 });
+    await controller.applyCandidate(started.build.buildId);
+    await controller.runUntilDone(started.build.buildId, { maxSteps: 6 });
     let rec = readBuildRecord(runtimeRoot, started.build.buildId);
     expect(rec?.loop.status).toBe("complete");
     const revised = await controller.reviseIntent(started.build.buildId, {
@@ -283,7 +293,13 @@ describe("S5 PATH Build", () => {
     const reran = await controller.runUntilDone(started.build.buildId, {
       maxSteps: 8,
     });
-    expect(reran.done).toBe(true);
+    if (reran.awaitingReview) {
+      await controller.applyCandidate(started.build.buildId);
+    }
+    const reranDone = await controller.runUntilDone(started.build.buildId, {
+      maxSteps: 6,
+    });
+    expect(reranDone.done).toBe(true);
     expect(reran.build.intent.outcomeRevision).toBe(rec.intent.outcomeRevision);
     const changed = await controller.applyConversation(started.build.buildId, {
       message: "Make the product output friendlier",
@@ -299,7 +315,13 @@ describe("S5 PATH Build", () => {
     const changedRun = await controller.runUntilDone(started.build.buildId, {
       maxSteps: 8,
     });
-    expect(changedRun.done).toBe(true);
+    if (changedRun.awaitingReview) {
+      await controller.applyCandidate(started.build.buildId);
+    }
+    const changedDone = await controller.runUntilDone(started.build.buildId, {
+      maxSteps: 6,
+    });
+    expect(changedDone.done).toBe(true);
   },
     180_000,
   );

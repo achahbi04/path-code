@@ -125,6 +125,22 @@ export function projectBuildForSurface(build, extras = {}) {
   const complete = status === "complete";
   const blocked = status === "blocked";
   const paused = status === "paused";
+  const awaitingReview =
+    status === "awaiting_review" ||
+    build.pendingCandidate?.status === "pending";
+  const pendingCandidate =
+    awaitingReview && build.pendingCandidate?.status === "pending"
+      ? {
+          taskId: build.pendingCandidate.taskId || null,
+          sourceSha: build.pendingCandidate.sourceSha || null,
+          taskBranch: build.pendingCandidate.taskBranch || null,
+          files: Array.isArray(build.pendingCandidate.files)
+            ? build.pendingCandidate.files
+            : [],
+          requestText: build.pendingCandidate.requestText || "",
+          diffSummary: build.pendingCandidate.diffSummary || "",
+        }
+      : null;
   const binding = (build.projectBindings || [])[0] || null;
   const projectRoot = binding?.projectRoot || null;
   const kids = Array.isArray(build.children) ? build.children : [];
@@ -164,7 +180,13 @@ export function projectBuildForSurface(build, extras = {}) {
     !last.adoptedSha &&
     /FAIL|NOT_VERIFIED|BLOCKED/i.test(lastClass);
   const replacementLive = childLive && kind === "engineer";
-  if (paused && realFailed && !replacementLive) {
+  if (awaitingReview) {
+    phase = "review";
+    uiState = "review";
+    headline = "Review this result";
+    detail = "Apply to make it the product, or Discard to keep the current product.";
+    progressLabel = "Awaiting your review";
+  } else if (paused && realFailed && !replacementLive) {
     phase = "paused";
     uiState = "error";
     headline = "Failed — paused";
@@ -174,7 +196,9 @@ export function projectBuildForSurface(build, extras = {}) {
     phase = "paused";
     uiState = "paused";
     headline = "Paused";
-    detail = "Engineering is paused. Resume to continue from durable state.";
+    detail = build.lastDiscardedCandidate
+      ? "That candidate was discarded. Resume to continue from the current product."
+      : "Engineering is paused. Resume to continue from durable state.";
     progressLabel = "Paused";
   } else if (complete) {
     phase = "complete";
@@ -251,7 +275,8 @@ export function projectBuildForSurface(build, extras = {}) {
       (msg) =>
         msg?.intentRevision === build.intent?.outcomeRevision &&
         msg?.status === "failed",
-    )
+    ) &&
+    !build.lastDiscardedCandidate
   ) {
     phase = "failed";
     uiState = "error";
@@ -279,18 +304,35 @@ export function projectBuildForSurface(build, extras = {}) {
     progressLabel = "Needs attention";
   }
 
-  const       conversation = Array.isArray(build.conversation)
-    ? build.conversation.map((m) => ({
-        id: m.id,
-        role: m.role,
-        text: m.text,
-        at: m.at,
-        kind: m.kind || null,
-        status:
-          paused && (m.status === "applying" || m.status === "preparing")
-            ? "paused"
-            : m.status || null,
-      })).filter((message) => creatorConversation([message]).length)
+  const conversation = Array.isArray(build.conversation)
+    ? build.conversation.map((m) => {
+        let status = m.status || null;
+        if (
+          awaitingReview &&
+          (status === "failed" || status === "queued")
+        ) {
+          status = "review";
+        } else if (
+          !awaitingReview &&
+          build.lastDiscardedCandidate &&
+          (status === "failed" || status === "review" || status === "queued")
+        ) {
+          status = "discarded";
+        } else if (
+          paused &&
+          (status === "applying" || status === "preparing")
+        ) {
+          status = "paused";
+        }
+        return {
+          id: m.id,
+          role: m.role,
+          text: m.text,
+          at: m.at,
+          kind: m.kind || null,
+          status,
+        };
+      }).filter((message) => creatorConversation([message]).length)
     : [
         {
           id: "outcome",
@@ -427,7 +469,31 @@ export function projectBuildForSurface(build, extras = {}) {
     canSteer: !blocked,
     canPause: status === "running",
     canStop: status === "running",
-    canResume: paused || blocked,
+    canResume: (paused || blocked) && !awaitingReview,
+    canApply: Boolean(pendingCandidate),
+    canDiscard: Boolean(pendingCandidate),
+    pendingCandidate,
+    lastDiscardedCandidate: build.lastDiscardedCandidate
+      ? {
+          taskId: build.lastDiscardedCandidate.taskId || null,
+          sourceSha: build.lastDiscardedCandidate.sourceSha || null,
+          at: build.lastDiscardedCandidate.at || null,
+        }
+      : null,
+    lastAppliedCandidate: build.lastAppliedCandidate
+      ? {
+          taskId: build.lastAppliedCandidate.taskId || null,
+          adoptedSha: build.lastAppliedCandidate.adoptedSha || null,
+          at: build.lastAppliedCandidate.at || null,
+        }
+      : null,
+    candidatePreview: pendingCandidate
+      ? {
+          status: "ready",
+          embedPath: `/preview-candidate/${encodeURIComponent(build.buildId)}/`,
+          kind: "candidate",
+        }
+      : null,
     requestReceipt: requestReceipt(build),
     selectedElement: build.loop?.pendingSelectedElement || null,
     preview,

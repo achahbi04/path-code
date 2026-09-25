@@ -137,7 +137,7 @@ export interface BuildRecord {
   projectBindings: ProjectBinding[];
   children: BuildChild[];
   loop: {
-    status: "running" | "paused" | "blocked" | "complete";
+    status: "running" | "paused" | "blocked" | "complete" | "awaiting_review";
     pendingReinspect: boolean;
     pendingRuntimeRefresh?: boolean;
     pendingConversationSteer?: boolean;
@@ -153,6 +153,17 @@ export interface BuildRecord {
     lastChallengeTaskId?: string | null;
     blockedReason?: string;
   };
+  pendingCandidate?: {
+    status?: string;
+    taskId?: string;
+    sourceSha?: string | null;
+    taskBranch?: string | null;
+    files?: string[];
+    requestText?: string;
+    diffSummary?: string;
+  };
+  lastAppliedCandidate?: { taskId?: string; adoptedSha?: string; at?: string };
+  lastDiscardedCandidate?: { taskId?: string; sourceSha?: string | null; at?: string };
   createdAt: string;
   updatedAt: string;
   originKind?: "build-created" | "existing-project";
@@ -356,7 +367,22 @@ export interface BuildController {
   runUntilDone(
     buildId: string,
     options?: { maxSteps?: number },
-  ): Promise<{ ok: boolean; done: boolean; build: BuildRecord }>;
+  ): Promise<{
+    ok: boolean;
+    done: boolean;
+    awaitingReview?: boolean;
+    build: BuildRecord;
+  }>;
+  applyCandidate(
+    buildId: string,
+  ): Promise<{ ok: boolean; deduped?: boolean; build: BuildRecord }>;
+  discardCandidate(
+    buildId: string,
+  ): Promise<{ ok: boolean; deduped?: boolean; build: BuildRecord }>;
+  recover(buildId: string): Promise<{ ok: boolean; build: BuildRecord }>;
+  resumeBuild(
+    buildId: string,
+  ): Promise<{ ok: boolean; awaitingReview?: boolean; build: BuildRecord }>;
   consumeChildResult(
     buildId: string,
     taskId: string,

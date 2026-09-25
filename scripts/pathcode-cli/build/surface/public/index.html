@@ -58,6 +58,18 @@
       <button type="button" class="ghost tiny library-open" id="libraryOpen" hidden>Projects</button>
       <div class="shell-main">
       <div class="stale-code" id="staleCode" role="alert" hidden></div>
+      <div class="candidate-review" id="candidateReview" hidden>
+        <div class="candidate-review-copy">
+          <p class="candidate-review-kicker">Creator review</p>
+          <p id="candidateReviewRequest"></p>
+          <p id="candidateReviewFiles"></p>
+          <p id="candidateReviewDiff"></p>
+        </div>
+        <div class="candidate-review-actions">
+          <button type="button" class="cta compact" id="applyCandidateBtn">Apply</button>
+          <button type="button" class="ghost" id="discardCandidateBtn">Discard</button>
+        </div>
+      </div>
 
     <!-- Landing / create -->
     <section class="landing" id="landing">

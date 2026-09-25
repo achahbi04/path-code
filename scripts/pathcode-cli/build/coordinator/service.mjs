@@ -403,9 +403,13 @@ export async function createBuildCoordinatorService(options) {
           const result = await controller.resumeBuild(buildId);
           if (!result.ok) return result;
           const record = readBuildRecord(runtimeRoot, buildId);
+          const awaiting = record?.pendingCandidate?.status === "pending";
+          if (awaiting) {
+            record.loop.status = "awaiting_review";
+          }
           record.coordinator = {
             ...(record.coordinator || {}),
-            autoRun: true,
+            autoRun: !awaiting,
             owner: "path-build-coordinator",
           };
           writeBuildRecord(runtimeRoot, record);
@@ -415,9 +419,48 @@ export async function createBuildCoordinatorService(options) {
             method === BuildCoordinatorMethods.BUILD_RECOVER
               ? "build.recovered"
               : "build.resumed",
-            { decisions: result.decisions || [] },
+            { decisions: result.decisions || [], awaitingReview: awaiting },
           );
-          setImmediate(() => ensureLoop(buildId));
+          if (!awaiting) setImmediate(() => ensureLoop(buildId));
+          return { ...result, build: readBuildRecord(runtimeRoot, buildId) };
+        });
+      case BuildCoordinatorMethods.BUILD_APPLY:
+        return exclusive(buildId, async () => {
+          const result = await controller.applyCandidate(buildId);
+          if (!result.ok) return result;
+          const record = readBuildRecord(runtimeRoot, buildId);
+          record.coordinator = {
+            ...(record.coordinator || {}),
+            autoRun: true,
+            owner: "path-build-coordinator",
+          };
+          writeBuildRecord(runtimeRoot, record);
+          appendBuildEvent(runtimeRoot, buildId, "build.applied", {
+            taskId: result.adoption?.taskId || record.lastAppliedCandidate?.taskId,
+            adoptedSha: result.adoption?.adoptedSha || record.authoritativeSha,
+            deduped: result.deduped === true,
+          });
+          if (!result.deduped) setImmediate(() => ensureLoop(buildId));
+          return { ...result, build: readBuildRecord(runtimeRoot, buildId) };
+        });
+      case BuildCoordinatorMethods.BUILD_DISCARD:
+        return exclusive(buildId, async () => {
+          const result = await controller.discardCandidate(buildId);
+          if (!result.ok) return result;
+          const record = readBuildRecord(runtimeRoot, buildId);
+          record.coordinator = {
+            ...(record.coordinator || {}),
+            autoRun: record.loop?.status === "running",
+            owner: "path-build-coordinator",
+          };
+          writeBuildRecord(runtimeRoot, record);
+          appendBuildEvent(runtimeRoot, buildId, "build.discarded", {
+            taskId: record.lastDiscardedCandidate?.taskId || null,
+            deduped: result.deduped === true,
+          });
+          if (record.loop?.status === "running") {
+            setImmediate(() => ensureLoop(buildId));
+          }
           return { ...result, build: readBuildRecord(runtimeRoot, buildId) };
         });
       case BuildCoordinatorMethods.BUILD_TICK:

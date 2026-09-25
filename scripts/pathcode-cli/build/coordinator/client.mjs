@@ -127,6 +127,10 @@ export function createBuildCoordinatorClient(options) {
       request(BuildCoordinatorMethods.BUILD_RESUME, { buildId }),
     recoverBuild: (buildId) =>
       request(BuildCoordinatorMethods.BUILD_RECOVER, { buildId }),
+    applyCandidate: (buildId) =>
+      request(BuildCoordinatorMethods.BUILD_APPLY, { buildId }),
+    discardCandidate: (buildId) =>
+      request(BuildCoordinatorMethods.BUILD_DISCARD, { buildId }),
     tickBuild: (buildId) =>
       request(BuildCoordinatorMethods.BUILD_TICK, { buildId }),
     runBuild: (buildId, options = {}) =>

@@ -216,14 +216,17 @@ export function listBuildRecords(runtimeRoot) {
  */
 export function selectSurfaceBuildId(records) {
   const running = (Array.isArray(records) ? records : []).filter(
-    (build) => build?.loop?.status === "running" && build.buildId,
+    (build) =>
+      (build?.loop?.status === "running" ||
+        build?.loop?.status === "awaiting_review") &&
+      build.buildId,
   );
   return running.length === 1 ? running[0].buildId : null;
 }
 
 export function findLatestActiveBuild(runtimeRoot) {
   const rank = (build) =>
-    build?.loop?.status === "running"
+    build?.loop?.status === "running" || build?.loop?.status === "awaiting_review"
       ? 2
       : build?.loop?.status === "paused" || build?.loop?.status === "blocked"
         ? 1

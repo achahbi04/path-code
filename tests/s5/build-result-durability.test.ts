@@ -327,9 +327,15 @@ describe("durable website result after worktree disposal", () => {
     expect(recon.ok).toBe(true);
     const child = recon.build.children.find((c) => c.taskId === taskId);
     expect(child?.dispatchState).toBe("consumed");
-    expect(child?.adoptedSha).toBeTruthy();
-    expect(gitHeadSha(root)).toBe(child?.adoptedSha);
-    expect(recon.build.authoritativeSha).toBe(child?.adoptedSha);
+    expect(child?.adoptedSha).toBeFalsy();
+    expect(recon.build.pendingCandidate?.status).toBe("pending");
+    expect(recon.build.authoritativeSha || originSha).toBe(originSha);
+    const applied = await restarted.applyCandidate(build.buildId);
+    expect(applied.ok).toBe(true);
+    const adopted = applied.build.children.find((c) => c.taskId === taskId);
+    expect(adopted?.adoptedSha).toBeTruthy();
+    expect(gitHeadSha(root)).toBe(adopted?.adoptedSha);
+    expect(applied.build.authoritativeSha).toBe(adopted?.adoptedSha);
     const tree = git(root, ["ls-tree", "-r", "--name-only", "HEAD"]);
     expect(tree.stdout).toContain("index.html");
     expect(git(root, ["cat-file", "-e", `${resultingSha}^{commit}`]).status).toBe(0);

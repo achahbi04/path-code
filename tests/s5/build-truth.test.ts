@@ -16,6 +16,8 @@ import { projectEngineeringActivity } from "../../scripts/pathcode-cli/build/sur
 import { frameEngineerObjective } from "../../scripts/pathcode-cli/build/objectives.mjs";
 import {
   previewFrameSrc,
+  previewTransition,
+  shouldAcceptBuildView,
   shouldAcceptViewRevision,
 } from "../../scripts/pathcode-cli/build/surface/public/view-revision.js";
 
@@ -176,6 +178,21 @@ describe("S5 truthful Build projection", () => {
     expect(shouldAcceptViewRevision(-1, 1_000_000)).toBe(true);
     expect(shouldAcceptViewRevision(5_000_004, 5_000_003)).toBe(false);
     expect(shouldAcceptViewRevision(5_000_004, 5_000_005)).toBe(true);
+    expect(
+      shouldAcceptBuildView({
+        previousBuildId: "a",
+        nextBuildId: "b",
+        previousRevision: 9_000_000,
+        nextRevision: 1,
+      }),
+    ).toBe(true);
+    expect(
+      previewTransition({
+        heldSrc: "/preview-candidate/x/?rev=cand",
+        nextReady: false,
+        allowCandidateHold: false,
+      }).action,
+    ).toBe("empty");
     expect(previewFrameSrc("http://127.0.0.1:7822/preview/build/", "abc123")).toBe(
       "http://127.0.0.1:7822/preview/build/?rev=abc123",
     );

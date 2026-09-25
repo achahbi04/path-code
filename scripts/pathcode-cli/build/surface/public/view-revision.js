@@ -13,6 +13,28 @@ export function shouldAcceptViewRevision(previous, next) {
 }
 
 /**
+ * Accept the next view for the active Build. Revision order is per Build —
+ * switching projects must not let an unrelated older counter suppress the
+ * newly selected Build's first projection.
+ *
+ * @param {{
+ *   previousBuildId?: string | null,
+ *   nextBuildId?: string | null,
+ *   previousRevision?: number,
+ *   nextRevision?: number,
+ * }} input
+ */
+export function shouldAcceptBuildView(input) {
+  const previousBuildId = input.previousBuildId || null;
+  const nextBuildId = input.nextBuildId || null;
+  const previousRevision =
+    previousBuildId && nextBuildId && previousBuildId !== nextBuildId
+      ? -1
+      : input.previousRevision;
+  return shouldAcceptViewRevision(previousRevision, input.nextRevision);
+}
+
+/**
  * Preview iframe URL. The revision query is cache-busting projection metadata
  * so a newly adopted product SHA cannot keep painting the previous document.
  *
@@ -26,10 +48,17 @@ export function previewFrameSrc(embed, authoritativeSha) {
   return `${base}?rev=${encodeURIComponent(sha)}`;
 }
 
+function isCandidatePreviewSrc(src) {
+  return typeof src === "string" && src.includes("/preview-candidate/");
+}
+
 /**
  * Last-known-good preview. A preparing or failed revision must not replace
  * a visible preview with an empty stage. The first product still uses the
  * empty state, because nothing good exists yet.
+ *
+ * A discarded/applied candidate URL is never held — candidate preview is only
+ * valid while the Build still has a pending candidate.
  *
  * @param {{
  *   heldSrc?: string | null,
@@ -37,11 +66,16 @@ export function previewFrameSrc(embed, authoritativeSha) {
  *   nextSrc?: string | null,
  *   nextFailed?: boolean,
  *   preparing?: boolean,
+ *   allowCandidateHold?: boolean,
  * }} input
  */
 export function previewTransition(input) {
-  const held = typeof input.heldSrc === "string" && input.heldSrc ? input.heldSrc : "";
+  const heldRaw = typeof input.heldSrc === "string" && input.heldSrc ? input.heldSrc : "";
   const next = typeof input.nextSrc === "string" && input.nextSrc ? input.nextSrc : "";
+  const held =
+    isCandidatePreviewSrc(heldRaw) && input.allowCandidateHold === false
+      ? ""
+      : heldRaw;
   if (input.nextReady && next) {
     return { action: next === held ? "keep" : "swap", src: next, notice: "" };
   }

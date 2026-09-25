@@ -119,6 +119,9 @@ describe("PATH Build durable coordinator", () => {
     const deadline = Date.now() + 20_000;
     let final = readBuildRecord(runtimeRoot, record.buildId);
     while (final?.loop.status !== "complete" && Date.now() < deadline) {
+      if (final?.loop.status === "awaiting_review") {
+        await coordinator.applyCandidate(record.buildId);
+      }
       await new Promise((resolve) => setTimeout(resolve, 50));
       final = readBuildRecord(runtimeRoot, record.buildId);
     }
@@ -157,6 +160,9 @@ describe("PATH Build durable coordinator", () => {
     const deadline = Date.now() + 20_000;
     let final = readBuildRecord(runtimeRoot, record.buildId);
     while (final?.loop.status !== "complete" && Date.now() < deadline) {
+      if (final?.loop.status === "awaiting_review") {
+        await coordinator.applyCandidate(record.buildId);
+      }
       await new Promise((resolve) => setTimeout(resolve, 50));
       final = readBuildRecord(runtimeRoot, record.buildId);
     }
@@ -186,7 +192,7 @@ describe("PATH Build durable coordinator", () => {
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     const durable = readBuildRecord(runtimeRoot, buildId)!;
-    expect(durable.loop.status).toBe("paused");
+    expect(["paused", "awaiting_review"]).toContain(durable.loop.status);
     expect(durable.coordinator?.autoRun).toBe(false);
     expect(
       durable.children.some(
@@ -222,12 +228,20 @@ describe("PATH Build durable coordinator", () => {
 
       const recovered = await coordinator.recoverBuild(buildId);
       expect(recovered.ok).toBe(true);
-      expect(recovered.build.loop.status).toBe("running");
-      expect(recovered.build.coordinator?.autoRun).toBe(true);
+      expect(["running", "awaiting_review"]).toContain(recovered.build.loop.status);
+      if (recovered.build.loop.status === "awaiting_review") {
+        const applied = await coordinator.applyCandidate(buildId);
+        expect(applied.ok).toBe(true);
+      } else {
+        expect(recovered.build.coordinator?.autoRun).toBe(true);
+      }
 
       const deadline = Date.now() + 20_000;
       let final = readBuildRecord(runtimeRoot, buildId);
       while (final?.loop.status !== "complete" && Date.now() < deadline) {
+        if (final?.loop.status === "awaiting_review") {
+          await coordinator.applyCandidate(buildId);
+        }
         await new Promise((resolve) => setTimeout(resolve, 50));
         final = readBuildRecord(runtimeRoot, buildId);
       }
@@ -255,14 +269,16 @@ describe("PATH Build durable coordinator", () => {
             String(msg.text || "").includes("usage section"),
         ),
       ).toBe(true);
-      expect(["running", "complete"]).toContain(revised.loop.status);
+      expect(["running", "complete", "awaiting_review"]).toContain(
+        revised.loop.status,
+      );
       expect(revised.intent.outcomeRevision).toBe(2);
       expect(revised.productBrief?.intentRevision).toBe(2);
       expect(
         revised.children.some(
           (child: any) =>
             child.kind === "engineer" && child.intentRevision === 2,
-        ) || revised.loop.status === "running",
+        ) || ["running", "awaiting_review"].includes(revised.loop.status),
       ).toBe(true);
     },
     60_000,

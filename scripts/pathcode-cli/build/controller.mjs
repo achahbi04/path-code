@@ -4,6 +4,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { readTaskCheckpoint } from "../ag10/task-checkpoint.mjs";
 import { resolvePathRuntimeRoot } from "../paths.mjs";
 import {
@@ -21,7 +22,6 @@ import {
 } from "./record.mjs";
 import { ensureBuildOrigin, isBindableProject } from "./origin.mjs";
 import { isEmptyProductTree } from "./adopt.mjs";
-import { syncAdoptedRevisionIfEnabled } from "./surface/repository.mjs";
 import {
   captureBindingReality,
   makeEvidenceRef,
@@ -47,6 +47,11 @@ import {
   completenessClaim,
 } from "./objectives.mjs";
 import { decideEngineerProductAdoption } from "./result-evidence.mjs";
+import { writeResultLifecycle } from "../result-lifecycle.mjs";
+import {
+  makePendingCandidate,
+  restoreAuthoritativeCheckout,
+} from "./candidate.mjs";
 import { resolveMutatingEngineAttempt, resolvePreferredEngine } from "../ag10/engine-contract.mjs";
 import { formatBuildStatus } from "./format.mjs";
 import { detectBuildArtifact } from "./runtime/artifact.mjs";
@@ -83,6 +88,15 @@ function syncConversationLifecycle(record) {
     const engineers = revKids.filter((child) => child.kind === "engineer");
     const latestEngineer = engineers.length ? engineers[engineers.length - 1] : null;
     const latestAdopted = Boolean(latestEngineer?.adoptedSha);
+    const awaitingCandidate =
+      record.pendingCandidate?.status === "pending" &&
+      (record.pendingCandidate.intentRevision == null ||
+        record.pendingCandidate.intentRevision === rev);
+    const discardedThisRevision =
+      !awaitingCandidate &&
+      !latestAdopted &&
+      Boolean(latestEngineer?.taskId) &&
+      record.lastDiscardedCandidate?.taskId === latestEngineer.taskId;
     const live = (kind) =>
       revKids.some(
         (child) =>
@@ -95,13 +109,21 @@ function syncConversationLifecycle(record) {
       latestEngineer &&
       latestEngineer.dispatchState === "consumed" &&
       !latestEngineer.adoptedSha &&
+      !awaitingCandidate &&
+      !discardedThisRevision &&
       /FAIL|CANCEL|NOT_VERIFIED|BLOCKED/i.test(String(latestEngineer.classification || ""));
     let status = "queued";
-    if (live("engineer")) status = "applying";
+    if (awaitingCandidate) status = "review";
+    else if (discardedThisRevision) status = "discarded";
+    else if (live("engineer")) status = "applying";
     else if (latestAdopted) status = "applied";
     else if (latestFailed) status = "failed";
     else if (live("brief") || live("evaluate") || live("challenge")) status = "preparing";
-    else if (revKids.some((child) => child.dispatchState === "consumed")) {
+    else if (
+      !awaitingCandidate &&
+      !discardedThisRevision &&
+      revKids.some((child) => child.dispatchState === "consumed")
+    ) {
       status = "failed";
     }
     for (const msg of record.conversation) {
@@ -628,8 +650,12 @@ export function createBuildController(opts) {
         };
       }
     }
-    record.loop.status = "paused";
-    record.loop.pausedAt = new Date().toISOString();
+    if (record.pendingCandidate?.status === "pending") {
+      record.loop.status = "awaiting_review";
+    } else {
+      record.loop.status = "paused";
+      record.loop.pausedAt = new Date().toISOString();
+    }
     record.loop.pausedTaskId = active?.taskId || null;
     record.loop.pauseRequested = false;
     writeBuildRecord(runtimeRoot, record);
@@ -657,7 +683,10 @@ export function createBuildController(opts) {
       );
     record.loop.pauseRequested = true;
     record.loop.pauseRequestedAt = new Date().toISOString();
-    if (!active) {
+    if (record.pendingCandidate?.status === "pending") {
+      record.loop.status = "awaiting_review";
+      record.loop.pauseRequested = false;
+    } else if (!active) {
       record.loop.status = "paused";
       record.loop.pausedAt = record.loop.pauseRequestedAt;
       record.loop.pauseRequested = false;
@@ -672,16 +701,26 @@ export function createBuildController(opts) {
     if (record.loop.status === "complete") {
       return { ok: true, alreadyComplete: true, build: record, decisions: [] };
     }
-    record.loop.status = "running";
+    const reconciled = await reconcileBuildChildren(buildId);
+    record = readBuildRecord(runtimeRoot, buildId) || record;
     record.loop.resumedAt = new Date().toISOString();
     record.loop.blockedReason = undefined;
     record.loop.pauseRequested = false;
+    if (record.pendingCandidate?.status === "pending") {
+      record.loop.status = "awaiting_review";
+      writeBuildRecord(runtimeRoot, record);
+      return {
+        ok: reconciled.ok !== false,
+        awaitingReview: true,
+        build: readBuildRecord(runtimeRoot, buildId),
+        decisions: reconciled.decisions || [],
+      };
+    }
+    record.loop.status = "running";
     writeBuildRecord(runtimeRoot, record);
-    const reconciled = await reconcileBuildChildren(buildId);
-    record = readBuildRecord(runtimeRoot, buildId) || record;
     return {
       ok: reconciled.ok !== false,
-      build: record,
+      build: readBuildRecord(runtimeRoot, buildId),
       decisions: reconciled.decisions || [],
     };
   }
@@ -1350,7 +1389,7 @@ export function createBuildController(opts) {
         .map((step) => step.trim());
     }
 
-    // Adopt engineer results into authoritative Build product revision.
+    // Stage a creator-review candidate. Authoritative product SHA moves only on Apply.
     /** @type {object | null} */
     let adoption = null;
     if (child.kind === "engineer") {
@@ -1388,119 +1427,51 @@ export function createBuildController(opts) {
           capabilitySource: decision.capabilitySource,
         });
       } else if (decision.adopt) {
-        const { adoptEngineerResultIntoBuild, ensureBuildProductBranch } =
-          await import("./adopt.mjs");
         const productBranch =
           record.productBranch || `path-build/${record.buildId.slice(0, 8)}`;
         record.productBranch = productBranch;
-        ensureBuildProductBranch({
+        if (decision.recoveredProviderClose || decision.recoveredEmptyDiscovery) {
+          child.classification = "VERIFIED";
+          child.recoveredProviderClose = decision.recoveredProviderClose === true;
+          child.recoveredEmptyDiscovery = decision.recoveredEmptyDiscovery === true;
+          child.failureReason = undefined;
+        }
+        child.sourceSha = decision.sourceSha || cp?.sha || child.sourceSha || null;
+        record.pendingCandidate = makePendingCandidate({
+          record,
+          child,
+          checkpoint: cp,
+          decision,
           projectRoot: binding?.projectRoot || "",
-          productBranch,
         });
+        record.loop.status = "awaiting_review";
+        record.loop.forceNextKind = undefined;
+        record.loop.pendingRuntimeRefresh = false;
+        record.loop.lastAdoptionError = undefined;
         if (binding?.projectRoot) {
-          const liveWorktree =
-            typeof cp?.worktreePath === "string" &&
-            cp.worktreePath &&
-            existsSync(cp.worktreePath)
-              ? cp.worktreePath
-              : null;
-          adoption = adoptEngineerResultIntoBuild({
-            runtimeRoot,
-            buildId,
+          restoreAuthoritativeCheckout({
             projectRoot: binding.projectRoot,
             productBranch,
-            taskId,
-            taskBranch: decision.taskBranch || binding.activeTaskBranch || null,
-            sourceSha: decision.sourceSha,
-            worktreePath: liveWorktree,
+            authoritativeSha: record.authoritativeSha || null,
+            worktreePath:
+              typeof cp?.worktreePath === "string" ? cp.worktreePath : null,
           });
-          if (adoption?.ok) {
-            if (!Array.isArray(record.adoptionHistory)) {
-              record.adoptionHistory = [];
-            }
-            record.adoptionHistory.push({
-              buildId,
-              taskId,
-              actionId: child.actionId,
-              intentRevision: child.intentRevision || record.intent.outcomeRevision,
-              engine: child.provider || null,
-              resultId: child.resultFingerprint || adoption.sourceSha,
-              parentSha: record.authoritativeSha || null,
-              sourceSha: adoption.sourceSha,
-              adoptedSha: adoption.adoptedSha,
-              projectRoot: adoption.projectRoot,
-              productBranch: adoption.productBranch,
-              files: Array.isArray(cp?.changedFiles) ? cp.changedFiles.slice(0, 40) : [],
-              mode: adoption.mode,
-              adoptedAt: adoption.adoptedAt,
-              capability: decision.capability,
-              capabilitySource: decision.capabilitySource,
-              resultFingerprint: decision.fingerprint,
-            });
-            record.authoritativeSha = adoption.adoptedSha;
-            try {
-              syncAdoptedRevisionIfEnabled(record, binding.projectRoot);
-            } catch (err) {
-              record.repository = {
-                ...(record.repository || {}),
-                lastSyncError: err instanceof Error ? err.message : String(err),
-              };
-            }
-            record.loop.lastAdoptionError = undefined;
-            record.loop.forceNextKind = undefined;
-            record.loop.pendingRuntimeRefresh = !fakeMode;
-            if (fakeMode) {
-              record.runtimeHealth = "ok";
-              record.previewUrl = record.previewUrl || "http://127.0.0.1:0/fake";
-            }
-            // Product reality is now primary — clear transient worktree pointer.
-            delete binding.activeWorktreePath;
-            child.adoptedSha = adoption.adoptedSha;
-            child.sourceSha = adoption.sourceSha;
-            if (decision.recoveredProviderClose || decision.recoveredEmptyDiscovery) {
-              child.classification = "VERIFIED";
-              child.recoveredProviderClose = decision.recoveredProviderClose === true;
-              child.recoveredEmptyDiscovery = decision.recoveredEmptyDiscovery === true;
-              child.failureReason = undefined;
-            }
-
-            // Greenfield honesty: "VERIFIED" with no product files is not progress.
-            if (isEmptyProductTree(binding.projectRoot)) {
-              child.classification = "NOT_VERIFIED";
-              child.adoptionEmpty = true;
-              record.loop.forceNextKind = "engineer";
-              record.loop.pendingRuntimeRefresh = false;
-              record.hypotheses.proposedNextAction =
-                "Previous engineer claimed success but left an empty Build folder. Establish real product files (index.html or package + start) in this binding — do NOT run git init (the folder is already a git repo).";
-            }
-          } else if (adoption && !adoption.ok) {
-            record.loop.lastAdoptionError = {
-              code: adoption.code,
-              message: adoption.message,
-              at: new Date().toISOString(),
-              taskId,
-            };
-            if (/VERIFIED|SUCCESS/i.test(String(child.classification || ""))) {
-              child.classification = "NOT_VERIFIED";
-            }
-            child.adoptionError = {
-              code: adoption.code,
-              message: adoption.message,
-            };
-            record.loop.forceNextKind = "engineer";
-            record.loop.pendingRuntimeRefresh = false;
-            if (isEmptyProductTree(binding.projectRoot)) {
-              record.hypotheses.proposedNextAction =
-                `Adoption failed (${adoption.code}): ${adoption.message}. Re-establish the product in the Build folder without nested git init.`;
-            }
-          }
         }
+        appendBuildEvent(runtimeRoot, buildId, "candidate.ready", {
+          taskId,
+          actionId: child.actionId,
+          intentRevision: child.intentRevision || record.intent.outcomeRevision,
+          sourceSha: record.pendingCandidate.sourceSha,
+          taskBranch: record.pendingCandidate.taskBranch,
+          files: record.pendingCandidate.files,
+        });
       }
     }
 
     if (
       child.kind === "engineer" &&
       !child.adoptedSha &&
+      !record.pendingCandidate &&
       cp?.preferredEngine === "cursor" &&
       cp?.cursorMode &&
       cp.cursorMode !== "none" &&
@@ -1574,7 +1545,201 @@ export function createBuildController(opts) {
       probe,
       reportPath,
       adoption,
+      candidate: readBuildRecord(runtimeRoot, buildId)?.pendingCandidate || null,
     };
+  }
+
+  /**
+   * Creator Apply — the only path that may move the authoritative product SHA.
+   * @param {string} buildId
+   */
+  async function applyCandidate(buildId) {
+    const record = readBuildRecord(runtimeRoot, buildId);
+    if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    const pending = record.pendingCandidate;
+    if (!pending || pending.status !== "pending") {
+      if (record.lastAppliedCandidate) {
+        return { ok: true, deduped: true, build: record };
+      }
+      return { ok: false, code: "NO_PENDING_CANDIDATE" };
+    }
+    const child = (record.children || []).find((row) => row.taskId === pending.taskId);
+    if (child?.adoptedSha) {
+      record.lastAppliedCandidate = {
+        taskId: pending.taskId,
+        adoptedSha: child.adoptedSha,
+        at: new Date().toISOString(),
+      };
+      delete record.pendingCandidate;
+      record.loop.status = "running";
+      writeBuildRecord(runtimeRoot, record);
+      return { ok: true, deduped: true, build: readBuildRecord(runtimeRoot, buildId) };
+    }
+    const binding = primaryBinding(record);
+    if (!binding?.projectRoot) {
+      return { ok: false, code: "NO_PROJECT_ROOT", build: record };
+    }
+    const { adoptEngineerResultIntoBuild } = await import("./adopt.mjs");
+    const productBranch =
+      record.productBranch || `path-build/${record.buildId.slice(0, 8)}`;
+    record.productBranch = productBranch;
+    const adoption = adoptEngineerResultIntoBuild({
+      runtimeRoot,
+      buildId,
+      projectRoot: binding.projectRoot,
+      productBranch,
+      taskId: pending.taskId,
+      taskBranch: pending.taskBranch || binding.activeTaskBranch || null,
+      sourceSha: pending.sourceSha,
+      worktreePath:
+        pending.worktreePath &&
+        resolveWorktreeIfSeparate(pending.worktreePath, binding.projectRoot),
+    });
+    if (!adoption?.ok) {
+      record.loop.lastAdoptionError = {
+        code: adoption?.code,
+        message: adoption?.message,
+        at: new Date().toISOString(),
+        taskId: pending.taskId,
+      };
+      if (child) {
+        child.adoptionError = {
+          code: adoption?.code,
+          message: adoption?.message,
+        };
+      }
+      writeBuildRecord(runtimeRoot, record);
+      return { ok: false, ...adoption, build: readBuildRecord(runtimeRoot, buildId) };
+    }
+    if (!Array.isArray(record.adoptionHistory)) record.adoptionHistory = [];
+    record.adoptionHistory.push({
+      buildId,
+      taskId: pending.taskId,
+      actionId: pending.actionId || child?.actionId,
+      intentRevision: pending.intentRevision || record.intent.outcomeRevision,
+      engine: child?.provider || null,
+      resultId: pending.resultFingerprint || adoption.sourceSha,
+      parentSha: record.authoritativeSha || null,
+      sourceSha: adoption.sourceSha,
+      adoptedSha: adoption.adoptedSha,
+      projectRoot: adoption.projectRoot,
+      productBranch: adoption.productBranch,
+      files: Array.isArray(pending.files) ? pending.files.slice(0, 40) : [],
+      mode: adoption.mode,
+      adoptedAt: adoption.adoptedAt,
+      capability: pending.capability,
+      capabilitySource: pending.capabilitySource,
+      resultFingerprint: pending.resultFingerprint,
+    });
+    record.authoritativeSha = adoption.adoptedSha;
+    record.lastAppliedCandidate = {
+      taskId: pending.taskId,
+      adoptedSha: adoption.adoptedSha,
+      at: adoption.adoptedAt,
+    };
+    delete record.pendingCandidate;
+    record.loop.lastAdoptionError = undefined;
+    record.loop.forceNextKind = undefined;
+    record.loop.pendingRuntimeRefresh = !fakeMode;
+    record.loop.status = "running";
+    if (fakeMode) {
+      record.runtimeHealth = "ok";
+      record.previewUrl = record.previewUrl || "http://127.0.0.1:0/fake";
+    }
+    delete binding.activeWorktreePath;
+    if (child) {
+      child.adoptedSha = adoption.adoptedSha;
+      child.sourceSha = adoption.sourceSha;
+    }
+    if (isEmptyProductTree(binding.projectRoot)) {
+      if (child) {
+        child.classification = "NOT_VERIFIED";
+        child.adoptionEmpty = true;
+      }
+      record.loop.forceNextKind = "engineer";
+      record.loop.pendingRuntimeRefresh = false;
+      record.hypotheses.proposedNextAction =
+        "Previous engineer claimed success but left an empty Build folder. Establish real product files (index.html or package + start) in this binding — do NOT run git init (the folder is already a git repo).";
+    }
+    appendBuildEvent(runtimeRoot, buildId, "candidate.applied", {
+      taskId: pending.taskId,
+      sourceSha: adoption.sourceSha,
+      adoptedSha: adoption.adoptedSha,
+      mode: adoption.mode,
+    });
+    syncConversationLifecycle(record);
+    writeBuildRecord(runtimeRoot, record);
+    return {
+      ok: true,
+      build: readBuildRecord(runtimeRoot, buildId),
+      adoption,
+    };
+  }
+
+  /**
+   * Creator Discard — S2 DISCARDED, keep report and task branch, restore product.
+   * @param {string} buildId
+   */
+  async function discardCandidate(buildId) {
+    const record = readBuildRecord(runtimeRoot, buildId);
+    if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    const pending = record.pendingCandidate;
+    if (!pending || pending.status !== "pending") {
+      if (record.lastDiscardedCandidate) {
+        return { ok: true, deduped: true, build: record };
+      }
+      return { ok: false, code: "NO_PENDING_CANDIDATE" };
+    }
+    const binding = primaryBinding(record);
+    const now = new Date().toISOString();
+    writeResultLifecycle({
+      runtimeRoot,
+      taskId: pending.taskId,
+      projectRoot: binding?.projectRoot || null,
+      entry: {
+        taskId: pending.taskId,
+        worktreePath: pending.worktreePath,
+        branch: pending.taskBranch,
+      },
+      patch: {
+        status: "DISCARDED",
+        discardedAt: now,
+      },
+    });
+    if (binding?.projectRoot) {
+      restoreAuthoritativeCheckout({
+        projectRoot: binding.projectRoot,
+        productBranch: record.productBranch || null,
+        authoritativeSha: record.authoritativeSha || null,
+        worktreePath: pending.worktreePath,
+      });
+    }
+    record.lastDiscardedCandidate = {
+      taskId: pending.taskId,
+      sourceSha: pending.sourceSha,
+      at: now,
+    };
+    delete record.pendingCandidate;
+    const adoptedThisRevision = adoptedEngineerForRevision(record);
+    record.loop.status = adoptedThisRevision && record.authoritativeSha ? "running" : "paused";
+    record.loop.pauseRequested = false;
+    if (record.loop.status === "paused") {
+      record.loop.pausedAt = now;
+    }
+    appendBuildEvent(runtimeRoot, buildId, "candidate.discarded", {
+      taskId: pending.taskId,
+      sourceSha: pending.sourceSha,
+      reportRetained: true,
+      taskBranchRetained: pending.taskBranch || null,
+    });
+    syncConversationLifecycle(record);
+    writeBuildRecord(runtimeRoot, record);
+    return { ok: true, build: readBuildRecord(runtimeRoot, buildId) };
+  }
+
+  function resolveWorktreeIfSeparate(worktreePath, projectRoot) {
+    if (!worktreePath || !existsSync(worktreePath)) return null;
+    return resolve(worktreePath) === resolve(projectRoot) ? null : worktreePath;
   }
 
   /**
@@ -1720,6 +1885,14 @@ export function createBuildController(opts) {
     const record = readBuildRecord(runtimeRoot, buildId);
     if (!record) {
       return { ok: false, code: "BUILD_NOT_FOUND" };
+    }
+    if (record.pendingCandidate?.status === "pending" || record.loop.status === "awaiting_review") {
+      return {
+        ok: true,
+        complete: false,
+        reason: "awaiting_review",
+        build: record,
+      };
     }
     if (record.loop.pendingReinspect) {
       return {
@@ -1989,6 +2162,22 @@ export function createBuildController(opts) {
         reason: record.loop.blockedReason,
       };
     }
+    if (
+      record.pendingCandidate?.status === "pending" ||
+      record.loop.status === "awaiting_review"
+    ) {
+      if (record.loop.status !== "awaiting_review") {
+        record.loop.status = "awaiting_review";
+        writeBuildRecord(runtimeRoot, record);
+      }
+      return {
+        ok: true,
+        done: false,
+        awaitingReview: true,
+        action: "awaiting_review",
+        build: readBuildRecord(runtimeRoot, buildId),
+      };
+    }
 
     // One active child at a time — await / reconcile rather than dispatching another.
     const active = [...(record.children || [])]
@@ -2002,12 +2191,15 @@ export function createBuildController(opts) {
     if (active) {
       if (active.dispatchState === "terminal_seen") {
         await consumeChildResult(buildId, active.taskId);
+        const after = readBuildRecord(runtimeRoot, buildId);
+        const review = after?.pendingCandidate?.status === "pending";
         return {
           ok: true,
           done: false,
-          action: "consumed_active",
+          awaitingReview: review,
+          action: review ? "awaiting_review" : "consumed_active",
           taskId: active.taskId,
-          build: readBuildRecord(runtimeRoot, buildId),
+          build: after,
         };
       }
       if (!fakeMode) {
@@ -2037,12 +2229,15 @@ export function createBuildController(opts) {
       }
       // fakeMode: force-consume active so the loop can progress
       await consumeChildResult(buildId, active.taskId);
+      const afterFake = readBuildRecord(runtimeRoot, buildId);
+      const reviewFake = afterFake?.pendingCandidate?.status === "pending";
       return {
         ok: true,
         done: false,
-        action: "fake_consumed_active",
+        awaitingReview: reviewFake,
+        action: reviewFake ? "awaiting_review" : "fake_consumed_active",
         taskId: active.taskId,
-        build: readBuildRecord(runtimeRoot, buildId),
+        build: afterFake,
       };
     }
 
@@ -2330,12 +2525,13 @@ export function createBuildController(opts) {
         reason: step.reason || step.completionReason,
       });
       if (!step.ok) return { ok: false, steps, error: step };
-      if (step.done || step.blocked || step.paused) {
+      if (step.done || step.blocked || step.paused || step.awaitingReview) {
         return {
           ok: true,
           done: Boolean(step.done),
           blocked: Boolean(step.blocked),
           paused: Boolean(step.paused),
+          awaitingReview: Boolean(step.awaitingReview),
           steps,
           build: readBuildRecord(runtimeRoot, buildId),
         };
@@ -2373,6 +2569,33 @@ export function createBuildController(opts) {
     if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
     const text = String(input.message || "").trim();
     if (!text) return { ok: false, code: "MESSAGE_REQUIRED" };
+    if (
+      record.pendingCandidate?.status === "pending" ||
+      record.loop.status === "awaiting_review"
+    ) {
+      if (!Array.isArray(record.conversation)) record.conversation = [];
+      const already = record.conversation.some(
+        (msg) => msg.role === "user" && String(msg.text || "").trim() === text,
+      );
+      if (!already) {
+        record.conversation.push({
+          id: `msg-${randomUUID().slice(0, 8)}`,
+          role: "user",
+          text,
+          at: new Date().toISOString(),
+          kind: "queued_during_review",
+          status: "queued",
+        });
+      }
+      record.loop.status = "awaiting_review";
+      writeBuildRecord(runtimeRoot, record);
+      return {
+        ok: true,
+        queued: true,
+        awaitingReview: true,
+        build: readBuildRecord(runtimeRoot, buildId),
+      };
+    }
     const selectedElement = normalizeSelectedElement(input.element);
 
     const classified = classifyConversationMessage(text, {
@@ -2738,6 +2961,8 @@ export function createBuildController(opts) {
     markComplete,
     tick,
     runUntilDone,
+    applyCandidate,
+    discardCandidate,
     reviseIntent,
     patchRuntimeState,
     formatStatus: (buildId) => {
