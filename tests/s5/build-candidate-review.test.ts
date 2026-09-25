@@ -843,7 +843,9 @@ describe("creator candidate review", () => {
     expect(visibleLogo[0]?.status).toBe("applied");
     expect(visibleLogo[0]?.id).toBe(msgB2?.id);
     expect(
-      view.conversation?.find((message) => message.intentRevision === 1)?.status,
+      view.conversation?.find((message) =>
+        /Create a dark-mode homepage/i.test(String(message.text || "")),
+      )?.status,
     ).toBe("discarded");
 
     // Reload / recover must not resurrect QUEUED B1.
