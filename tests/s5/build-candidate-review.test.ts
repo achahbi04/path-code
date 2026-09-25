@@ -539,4 +539,227 @@ describe("creator candidate review", () => {
     rmSync(runtimeRoot, { recursive: true, force: true });
     rmSync(target, { recursive: true, force: true });
   }, 60_000);
+
+  it("Discard → Request B → candidate B → Apply once; statuses do not leak across requests", async () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "path-discard-continue-rt-"));
+    const target = mkdtempSync(join(tmpdir(), "path-discard-continue-proj-"));
+    const controller = createBuildController({
+      runtimeRoot,
+      fakeMode: true,
+      gateway: fakeGateway(),
+    });
+    const started = await controller.startBuild("Build a marker page", {
+      targetDir: target,
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    const authBefore = started.build.authoritativeSha || gitHeadSha(target);
+    const ranA = await controller.runUntilDone(started.build.buildId, { maxSteps: 8 });
+    const engineerA = (ranA.build?.children || []).find((child) => child.kind === "engineer");
+    const candidateA = ranA.build?.pendingCandidate?.sourceSha;
+    expect(candidateA).toBeTruthy();
+    const msgA = (ranA.build?.conversation || []).find((message) => message.role === "user");
+    expect(msgA?.status).toBe("review");
+
+    const discarded = await controller.discardCandidate(started.build.buildId);
+    expect(discarded.ok).toBe(true);
+    const afterDiscard = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    expect(afterDiscard.pendingCandidate).toBeUndefined();
+    expect(afterDiscard.authoritativeSha || null).toBe(authBefore || null);
+    expect(afterDiscard.loop.status).toBe("paused");
+    expect(
+      afterDiscard.conversation?.find((message) => message.id === msgA?.id)?.status,
+    ).toBe("discarded");
+    expect(
+      readLifecycleFromCheckpoint(readTaskCheckpoint(runtimeRoot, engineerA!.taskId)).status,
+    ).toBe("DISCARDED");
+
+    const { projectBuildForSurface } = await import(
+      "../../scripts/pathcode-cli/build/surface/product-view.mjs"
+    );
+    // Projection: Request B queued must NOT inherit DISCARDED/APPLIED/FAILED from A.
+    const leakProbe = projectBuildForSurface({
+      ...afterDiscard,
+      intent: { ...afterDiscard.intent, outcomeRevision: 2 },
+      conversation: [
+        ...(afterDiscard.conversation || []),
+        {
+          id: "msg-b-queued",
+          role: "user",
+          text: "add a logo and polish like Apple",
+          at: new Date().toISOString(),
+          kind: "change",
+          status: "queued",
+          intentRevision: 2,
+        },
+      ],
+    });
+    expect(
+      leakProbe.conversation?.find((message) => message.id === msgA?.id)?.status,
+    ).toBe("discarded");
+    expect(
+      leakProbe.conversation?.find((message) => message.id === "msg-b-queued")?.status,
+    ).toBe("queued");
+    expect(
+      leakProbe.conversation?.find((message) => message.id === "msg-b-queued")?.status,
+    ).not.toBe("discarded");
+
+    const appliedLeak = projectBuildForSurface({
+      ...afterDiscard,
+      lastDiscardedCandidate: undefined,
+      lastAppliedCandidate: {
+        taskId: engineerA!.taskId,
+        adoptedSha: candidateA!,
+        at: new Date().toISOString(),
+      },
+      conversation: [
+        {
+          id: "msg-a-applied",
+          role: "user",
+          text: "request A",
+          at: new Date().toISOString(),
+          kind: "outcome",
+          status: "applied",
+          intentRevision: 1,
+        },
+        {
+          id: "msg-b-new",
+          role: "user",
+          text: "request B",
+          at: new Date().toISOString(),
+          kind: "change",
+          status: "queued",
+          intentRevision: 2,
+        },
+      ],
+      intent: { ...afterDiscard.intent, outcomeRevision: 2 },
+      loop: { ...afterDiscard.loop, status: "paused" },
+      children: (afterDiscard.children || []).map((child) =>
+        child.taskId === engineerA!.taskId
+          ? { ...child, adoptedSha: candidateA }
+          : child,
+      ),
+    });
+    expect(
+      appliedLeak.conversation?.find((message) => message.id === "msg-b-new")?.status,
+    ).toBe("queued");
+    expect(
+      appliedLeak.conversation?.find((message) => message.id === "msg-b-new")?.status,
+    ).not.toBe("applied");
+
+    const failedLeak = projectBuildForSurface({
+      ...afterDiscard,
+      lastDiscardedCandidate: undefined,
+      conversation: [
+        {
+          id: "msg-a-failed",
+          role: "user",
+          text: "request A failed",
+          at: new Date().toISOString(),
+          kind: "outcome",
+          status: "failed",
+          intentRevision: 1,
+        },
+        {
+          id: "msg-b-after-fail",
+          role: "user",
+          text: "request B after fail",
+          at: new Date().toISOString(),
+          kind: "change",
+          status: "queued",
+          intentRevision: 2,
+        },
+      ],
+      intent: { ...afterDiscard.intent, outcomeRevision: 2 },
+      loop: { ...afterDiscard.loop, status: "paused" },
+    });
+    expect(
+      failedLeak.conversation?.find((message) => message.id === "msg-b-after-fail")
+        ?.status,
+    ).toBe("queued");
+    expect(
+      failedLeak.conversation?.find((message) => message.id === "msg-b-after-fail")
+        ?.status,
+    ).not.toBe("failed");
+
+    // Re-arm on NEW request B.
+    const engineersBefore = (afterDiscard.children || []).filter(
+      (child) => child.kind === "engineer",
+    ).length;
+    const steered = await controller.applyConversation(started.build.buildId, {
+      message: "add a logo and polish like Apple",
+    });
+    expect(steered.ok).toBe(true);
+    const afterSteer = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    expect(afterSteer.loop.status).toBe("running");
+    expect(afterSteer.intent.outcomeRevision).toBe(2);
+    const msgB = (afterSteer.conversation || []).find(
+      (message) =>
+        message.role === "user" &&
+        String(message.text || "").includes("add a logo"),
+    );
+    expect(msgB).toBeTruthy();
+    expect(msgB?.intentRevision).toBe(2);
+    expect(msgB?.status).not.toBe("discarded");
+    expect(
+      afterSteer.conversation?.find((message) => message.id === msgA?.id)?.status,
+    ).toBe("discarded");
+    expect(afterSteer.lastDiscardedCandidate?.taskId).toBe(engineerA!.taskId);
+    expect(afterSteer.authoritativeSha || null).toBe(authBefore || null);
+
+    const viewB = projectBuildForSurface(afterSteer);
+    expect(
+      viewB.conversation?.find((message) => message.id === msgB?.id)?.status,
+    ).not.toBe("discarded");
+
+    const ranB = await controller.runUntilDone(started.build.buildId, { maxSteps: 10 });
+    expect(ranB.build?.pendingCandidate?.status).toBe("pending");
+    expect(ranB.build?.pendingCandidate?.intentRevision).toBe(2);
+    expect(ranB.build?.authoritativeSha || null).toBe(authBefore || null);
+    const engineersAfter = (ranB.build?.children || []).filter(
+      (child) => child.kind === "engineer",
+    );
+    expect(engineersAfter.length).toBe(engineersBefore + 1);
+    const engineerB = engineersAfter[engineersAfter.length - 1];
+    expect(engineerB?.intentRevision).toBe(2);
+    expect(engineerB?.taskId).not.toBe(engineerA!.taskId);
+    const viewReview = projectBuildForSurface(ranB.build);
+    expect(viewReview.canApply).toBe(true);
+    expect(viewReview.canDiscard).toBe(true);
+    expect(
+      viewReview.conversation?.find((message) => message.id === msgB?.id)?.status,
+    ).toBe("review");
+    expect(
+      viewReview.conversation?.find((message) => message.id === msgA?.id)?.status,
+    ).toBe("discarded");
+
+    const appliedB = await controller.applyCandidate(started.build.buildId);
+    expect(appliedB.ok).toBe(true);
+    expect(appliedB.deduped).toBeFalsy();
+    const afterApply = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    expect(afterApply.authoritativeSha).toBe(ranB.build?.pendingCandidate?.sourceSha || appliedB.build?.authoritativeSha);
+    expect(afterApply.authoritativeSha).not.toBe(authBefore);
+    expect(afterApply.pendingCandidate).toBeUndefined();
+    expect((afterApply.adoptionHistory || []).length).toBe(1);
+    expect(
+      afterApply.conversation?.find((message) => message.id === msgB?.id)?.status,
+    ).toBe("applied");
+    expect(
+      afterApply.conversation?.find((message) => message.id === msgA?.id)?.status,
+    ).toBe("discarded");
+    expect(
+      readLifecycleFromCheckpoint(readTaskCheckpoint(runtimeRoot, engineerA!.taskId)).status,
+    ).toBe("DISCARDED");
+    const secondApply = await controller.applyCandidate(started.build.buildId);
+    expect(secondApply.deduped).toBe(true);
+    expect((readBuildRecord(runtimeRoot, started.build.buildId)?.adoptionHistory || []).length).toBe(1);
+    expect(
+      (readBuildRecord(runtimeRoot, started.build.buildId)?.children || []).filter(
+        (child) => child.kind === "engineer",
+      ).length,
+    ).toBe(engineersAfter.length);
+
+    rmSync(runtimeRoot, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }, 120_000);
 });

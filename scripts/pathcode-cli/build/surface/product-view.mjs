@@ -134,6 +134,10 @@ export function projectBuildForSurface(build, extras = {}) {
           taskId: build.pendingCandidate.taskId || null,
           sourceSha: build.pendingCandidate.sourceSha || null,
           taskBranch: build.pendingCandidate.taskBranch || null,
+          intentRevision:
+            Number.isFinite(build.pendingCandidate.intentRevision)
+              ? build.pendingCandidate.intentRevision
+              : null,
           files: Array.isArray(build.pendingCandidate.files)
             ? build.pendingCandidate.files
             : [],
@@ -318,19 +322,39 @@ export function projectBuildForSurface(build, extras = {}) {
     progressLabel = "Needs attention";
   }
 
+  const discardedIntentRevision = (() => {
+    const discardedTaskId = build.lastDiscardedCandidate?.taskId;
+    if (!discardedTaskId) return null;
+    const child = (build.children || []).find(
+      (entry) => entry?.taskId === discardedTaskId,
+    );
+    return Number.isFinite(child?.intentRevision) ? child.intentRevision : null;
+  })();
+
   const conversation = Array.isArray(build.conversation)
     ? build.conversation.map((m) => {
         let status = m.status || null;
+        const messageRev = Number.isFinite(m.intentRevision)
+          ? m.intentRevision
+          : null;
+        const belongsToDiscardedRevision =
+          discardedIntentRevision != null &&
+          messageRev === discardedIntentRevision;
         if (
           awaitingReview &&
+          pendingCandidate &&
+          (pendingCandidate.intentRevision == null ||
+            messageRev == null ||
+            messageRev === pendingCandidate.intentRevision) &&
           (status === "failed" || status === "queued")
         ) {
           status = "review";
         } else if (
           !awaitingReview &&
-          build.lastDiscardedCandidate &&
+          belongsToDiscardedRevision &&
           (status === "failed" || status === "review" || status === "queued")
         ) {
+          // Only the discarded request inherits DISCARDED — never later requests.
           status = "discarded";
         } else if (
           paused &&
@@ -345,6 +369,7 @@ export function projectBuildForSurface(build, extras = {}) {
           at: m.at,
           kind: m.kind || null,
           status,
+          intentRevision: messageRev,
         };
       }).filter((message) => creatorConversation([message]).length)
     : [

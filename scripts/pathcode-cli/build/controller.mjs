@@ -2714,6 +2714,41 @@ export function createBuildController(opts) {
         element: selectedElement || undefined,
         status: activeChild ? "queued" : "incorporated",
       });
+    } else {
+      // Same creator text already on the current revision after Discard/pause:
+      // re-arm only — do not mint another intent revision or duplicate messages.
+      const existing = (record.conversation || []).find(
+        (msg) => msg.role === "user" && String(msg.text || "").trim() === text,
+      );
+      const onCurrentRevision =
+        existing &&
+        Number.isFinite(existing.intentRevision) &&
+        existing.intentRevision === record.intent?.outcomeRevision;
+      if (
+        onCurrentRevision &&
+        (record.loop.status === "paused" ||
+          record.loop.status === "blocked" ||
+          record.loop.pendingConversationSteer)
+      ) {
+        record.loop.status = "running";
+        record.loop.blockedReason = undefined;
+        record.loop.pauseRequested = false;
+        if (!record.loop.forceNextKind) {
+          record.loop.forceNextKind = fakeMode ? "engineer" : "brief";
+        }
+        record.loop.pendingConversationSteer = true;
+        record.hypotheses.proposedNextAction =
+          classified.engineerObjectiveHint ||
+          record.hypotheses.proposedNextAction;
+        if (existing.status === "discarded") existing.status = "queued";
+        syncConversationLifecycle(record);
+        writeBuildRecord(runtimeRoot, record);
+        return {
+          ok: true,
+          rearmed: true,
+          build: readBuildRecord(runtimeRoot, buildId),
+        };
+      }
     }
     if (selectedElement) {
       record.loop.pendingSelectedElement = selectedElement;
@@ -2894,8 +2929,16 @@ export function createBuildController(opts) {
     record.loop.lastEvaluateTaskId = undefined;
     record.loop.lastChallengeTaskId = undefined;
     if (!fakeMode) record.loop.forceNextKind = "brief";
-    if (record.loop.status === "complete") {
+    // A NEW creator request after pause/Discard/block must re-arm the loop.
+    // Discard correctly left paused+autoRun false; this message starts Request N+1 only.
+    if (
+      record.loop.status === "complete" ||
+      record.loop.status === "paused" ||
+      record.loop.status === "blocked"
+    ) {
       record.loop.status = "running";
+      record.loop.blockedReason = undefined;
+      record.loop.pauseRequested = false;
     }
     writeBuildRecord(runtimeRoot, record);
 

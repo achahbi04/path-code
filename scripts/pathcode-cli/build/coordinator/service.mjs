@@ -358,8 +358,36 @@ export async function createBuildCoordinatorService(options) {
             buildId,
             params.input || {},
           );
-          if (result.ok) ensureLoop(buildId);
-          return result;
+          if (!result.ok) return result;
+          const record = readBuildRecord(runtimeRoot, buildId);
+          if (record) {
+            // Creator message after Discard/pause re-arms autonomous work for
+            // THIS request only — never resurrects a discarded candidate.
+            if (
+              record.loop?.status === "paused" ||
+              record.loop?.status === "blocked"
+            ) {
+              record.loop.status = "running";
+              record.loop.blockedReason = undefined;
+              record.loop.pauseRequested = false;
+            }
+            record.coordinator = {
+              ...(record.coordinator || {}),
+              autoRun: true,
+              owner: "path-build-coordinator",
+            };
+            writeBuildRecord(runtimeRoot, record);
+            appendBuildEvent(runtimeRoot, buildId, "build.steer_rearmed", {
+              intentRevision: record.intent?.outcomeRevision ?? null,
+              status: record.loop?.status || null,
+              autoRun: true,
+            });
+          }
+          ensureLoop(buildId);
+          return {
+            ...result,
+            build: readBuildRecord(runtimeRoot, buildId),
+          };
         });
       case BuildCoordinatorMethods.BUILD_PAUSE:
         return exclusive(buildId, async () => {
