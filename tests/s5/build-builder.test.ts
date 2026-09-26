@@ -283,12 +283,15 @@ describe("S5 runtime manager + surface builder", () => {
       children: [],
       hypotheses: {},
       conversation: [{ id: "1", role: "user", text: "Site", at: "t" }],
+      authoritativeSha: "abc123",
+      lastAppliedCandidate: { adoptedSha: "abc123", at: "2026-01-01T00:00:00.000Z" },
     }, {
       preview: { status: "ready", embedPath: "/preview/b1/", url: "http://127.0.0.1:9/" },
       runtime: { status: "ready", url: "http://127.0.0.1:9/" },
     });
     expect(view.uiState).toMatch(/ready|applying/);
     expect(view.preview.embedPath).toBe("/preview/b1/");
+    expect(view.progressLabel).toBe("Ready");
   });
 });
 
