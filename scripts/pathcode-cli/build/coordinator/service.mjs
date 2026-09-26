@@ -16,7 +16,8 @@ import { createBuildRuntimeManager } from "../runtime/manager.mjs";
 import { createBuildRuntimeSync } from "../runtime/sync.mjs";
 import { detectBuildArtifact } from "../runtime/artifact.mjs";
 import { appendBuildEvent, readBuildEvents } from "../events.mjs";
-import { ensureGateway } from "../../gateway/ensure.mjs";
+import { ensureGateway, readGatewayPid } from "../../gateway/ensure.mjs";
+import { terminateOwnedPid, withTimeout } from "../shutdown.mjs";
 import { readPathPackageVersion } from "../../paths.mjs";
 import { loadedCodeIdentity } from "../identity.mjs";
 import {
@@ -594,7 +595,21 @@ export async function createBuildCoordinatorService(options) {
     close: async () => {
       shuttingDown = true;
       await runtimeManager.stopAll();
-      gatewayHandle?.client?.close();
+      if (gatewayHandle?.client) {
+        try {
+          await withTimeout(gatewayHandle.client.shutdown(), 1_500, null);
+        } catch {
+          // Gateway may already be exiting
+        }
+        try {
+          gatewayHandle.client.close();
+        } catch {
+          // ignore
+        }
+      }
+      const gatewayPid =
+        gatewayHandle?.hello?.identity?.pid ?? readGatewayPid(runtimeRoot);
+      await terminateOwnedPid(gatewayPid, { termMs: 3_000, killMs: 2_000 });
     },
   };
 }

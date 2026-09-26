@@ -54,6 +54,15 @@ import { assessServingIdentity, loadedCodeIdentity } from "../identity.mjs";
 import { sanitizeBuildEventValue, surfaceViewSanitizeLimits } from "../events.mjs";
 import { readTaskCheckpoint } from "../../ag10/task-checkpoint.mjs";
 import { readTaskTrace } from "../../task-trace.mjs";
+import {
+  closeHttpServerBounded,
+  terminateOwnedPid,
+  withTimeout,
+} from "../shutdown.mjs";
+import {
+  resolveBuildCoordinatorPidPath,
+} from "../coordinator/server.mjs";
+import { readGatewayPid } from "../../gateway/ensure.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(HERE, "public");
@@ -1175,20 +1184,48 @@ export async function startPathBuildSurface(options) {
     fakeMode,
     coordinator,
     identity: () => servingIdentity(),
-    stop: async () => {
-      await new Promise((resolveStop) => {
-        server.close(() => resolveStop());
-      });
-      // Fake coordinators are test/proof hosts and must not leak detached
-      // processes. Real coordinators deliberately outlive browser surfaces.
-      if (fakeMode) {
+    /**
+     * @param {{ teardownOwned?: boolean }} [opts]
+     * Operator Ctrl-C must pass teardownOwned:true so coordinator, Gateway,
+     * and Build runtimes do not outlive the surface.
+     */
+    stop: async (opts = {}) => {
+      const teardownOwned = opts.teardownOwned === true || fakeMode === true;
+      await closeHttpServerBounded(server, 2_000);
+      if (teardownOwned) {
+        let coordinatorPid = null;
         try {
-          await coordinator.shutdown();
+          const raw = readFileSync(
+            resolveBuildCoordinatorPidPath(runtimeRoot),
+            "utf8",
+          );
+          coordinatorPid = Number(String(raw).split("\n")[0]);
         } catch {
-          // it may already be stopping
+          coordinatorPid = null;
+        }
+        const gatewayPidBefore = readGatewayPid(runtimeRoot);
+        try {
+          await withTimeout(coordinator.shutdown(), 3_000, null);
+        } catch {
+          // shutdown RPC may already be racing process exit
+        }
+        try {
+          coordinator.close();
+        } catch {
+          // ignore
+        }
+        await terminateOwnedPid(coordinatorPid, { termMs: 3_000, killMs: 2_000 });
+        await terminateOwnedPid(gatewayPidBefore ?? readGatewayPid(runtimeRoot), {
+          termMs: 3_000,
+          killMs: 2_000,
+        });
+      } else {
+        try {
+          coordinator.close();
+        } catch {
+          // ignore
         }
       }
-      coordinator.close();
     },
   };
 }

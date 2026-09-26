@@ -32,7 +32,7 @@ describe("S5 PATH Build product surface", () => {
 
   afterEach(async () => {
     if (surface) {
-      await surface.stop();
+      await surface.stop({ teardownOwned: true });
       surface = null;
     }
     if (runtimeRoot) {

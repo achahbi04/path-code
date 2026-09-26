@@ -141,7 +141,12 @@ export async function startGatewayServer(options = {}) {
 
         if (method === GatewayMethods.SHUTDOWN) {
           setImmediate(() => {
-            stop();
+            try {
+              stop();
+            } catch {
+              // ignore
+            }
+            process.exit(0);
           });
         }
       }

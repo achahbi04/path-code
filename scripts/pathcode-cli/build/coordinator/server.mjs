@@ -118,7 +118,9 @@ export async function startBuildCoordinatorServer(options) {
             );
             socket.write(`${JSON.stringify({ id, result })}\n`);
             if (method === BuildCoordinatorMethods.SHUTDOWN) {
-              setImmediate(() => void stop());
+              setImmediate(() => {
+                void stop().finally(() => process.exit(0));
+              });
             }
           } catch (error) {
             socket.write(

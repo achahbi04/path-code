@@ -106,13 +106,26 @@ export async function runPathBuildMain(argv = process.argv.slice(2)) {
   );
   process.stdout.write("Press Ctrl-C to stop.\n");
 
+  let shuttingDown = false;
   const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     process.stdout.write("\nStopping PATH Build…\n");
+    const forceTimer = setTimeout(() => {
+      process.stderr.write(
+        "PATH Build shutdown timed out; forcing exit.\n",
+      );
+      process.exit(1);
+    }, 12_000);
+    forceTimer.unref?.();
     try {
-      await surface.stop();
-    } catch {
-      // ignore
+      await surface.stop({ teardownOwned: true });
+    } catch (error) {
+      process.stderr.write(
+        `PATH Build stop error: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
     }
+    clearTimeout(forceTimer);
     process.exit(0);
   };
   process.on("SIGINT", () => void shutdown());
