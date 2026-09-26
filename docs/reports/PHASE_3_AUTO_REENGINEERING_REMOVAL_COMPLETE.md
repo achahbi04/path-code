@@ -8,7 +8,8 @@ Bound to the PATH Builder genuine repair roadmap (D2 / D3 / D4), plus the
 startBuild creator-seed correction (no PATH-authored first-engineer product
 instruction).
 
-**Implementation SHA:** `42cba9850ffdc8607f9289b7e35b46ef4cbae834`  
+**Implementation SHA:** `5c4e9c6aff721293864b016968dbd8f95bf721f6`  
+**Creator-seed fix:** `42cba9850ffdc8607f9289b7e35b46ef4cbae834`  
 **Prior incomplete tip:** `eb8f2a4` still seeded a PATH product instruction on `startBuild`.
 
 ## Contract
