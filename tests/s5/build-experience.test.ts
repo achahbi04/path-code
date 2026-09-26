@@ -692,10 +692,12 @@ describe("PATH Build experience", () => {
   });
 
   it("refuses to adopt a non-web result for a website intent", () => {
+    const outcome = "Build a polished public website for ICE";
     const record = {
-      intent: { outcome: "Build a polished public website for ICE", outcomeRevision: 1 },
+      intent: { outcome, outcomeRevision: 1 },
       productBrief: { productKind: "web" },
       projectBindings: [{ originGitInit: true }],
+      conversation: [{ role: "user", intentRevision: 1, text: outcome }],
     };
     expect(adoptionAllowedForIntent(record, "cli").ok).toBe(false);
     expect(adoptionAllowedForIntent(record, "web").ok).toBe(true);
@@ -707,9 +709,13 @@ describe("PATH Build experience", () => {
         capabilityFromChangedFiles(["index.html", "css/styles.css"]) || "none",
       ).ok,
     ).toBe(true);
-    const objective = frameEngineerObjective(record, "establish the product");
-    expect(objective).toContain("previewable website");
+    const objective = frameEngineerObjective(record, outcome);
+    expect(objective).toContain("CURRENT CREATOR REQUEST");
+    expect(objective).toContain(outcome);
     expect(objective).toContain("PATH Build outcome");
+    expect(objective).not.toContain(
+      "Establish the software architecture, manifests, and runnable structure required by the outcome.",
+    );
     expect(objective).not.toContain("package.json OR a static index.html");
   });
 

@@ -273,6 +273,79 @@ describe("Phase 3 auto-reengineering removal", () => {
     expect(objective).not.toContain("Establish or modify architecture");
   });
 
+  it("startBuild seeds proposedNextAction as the verbatim creator outcome only", async () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "path-p3-seed-rt-"));
+    const target = mkdtempSync(join(tmpdir(), "path-p3-seed-proj-"));
+    const outcome = "Build a dark-mode homepage with a main header";
+    const controller = createBuildController({
+      runtimeRoot,
+      fakeMode: true,
+      gateway: baseGateway,
+    });
+    const started = await controller.startBuild(outcome, { targetDir: target });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    const afterStart = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    expect(afterStart.hypotheses.proposedNextAction).toBe(outcome);
+    expect(afterStart.hypotheses.proposedNextAction).not.toMatch(
+      /architecture|manifests|runnable structure/i,
+    );
+
+    await controller.runUntilDone(started.build.buildId, { maxSteps: 8 });
+    const after = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    const eng = (after.children || []).find((child) => child.kind === "engineer");
+    expect(eng?.objective).toContain("CURRENT CREATOR REQUEST");
+    expect(eng?.objective).toContain(outcome);
+    expect(eng?.objective).not.toContain(
+      "Establish the software architecture, manifests, and runnable structure required by the outcome.",
+    );
+    expect(eng?.objective).not.toContain("Highest-value gap");
+
+    rmSync(runtimeRoot, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }, 60_000);
+
+  it("provider fallback retries the same creator objective without PATH repair text", async () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "path-p3-fallback-rt-"));
+    const target = mkdtempSync(join(tmpdir(), "path-p3-fallback-proj-"));
+    const outcome = "Build a marker page";
+    const controller = createBuildController({
+      runtimeRoot,
+      fakeMode: true,
+      gateway: baseGateway,
+    });
+    const started = await controller.startBuild(outcome, { targetDir: target });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    const before = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    const seed = before.hypotheses.proposedNextAction;
+    expect(seed).toBe(outcome);
+
+    // Simulate Cursor-unavailable fallback: force another engineer without rewriting the objective seed.
+    before.loop.preferredEngineOverride = "copilot";
+    before.loop.forceNextKind = "engineer";
+    before.loop.status = "running";
+    writeBuildRecord(runtimeRoot, before);
+
+    const afterForce = readBuildRecord(runtimeRoot, started.build.buildId)!;
+    expect(afterForce.hypotheses.proposedNextAction).toBe(seed);
+    expect(afterForce.hypotheses.proposedNextAction).not.toMatch(
+      /previewable website|empty Build folder|architecture, manifests/i,
+    );
+
+    const framed = frameEngineerObjective(
+      afterForce,
+      afterForce.hypotheses.proposedNextAction || "",
+    );
+    expect(framed).toContain(outcome);
+    expect(framed).not.toContain(
+      "Establish the software architecture, manifests, and runnable structure required by the outcome.",
+    );
+
+    rmSync(runtimeRoot, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }, 60_000);
+
   it("controller no longer writes the retired PATH NON_WEB / empty-tree repair sentences", () => {
     const source = readFileSync(
       join(
@@ -290,6 +363,10 @@ describe("Phase 3 auto-reengineering removal", () => {
     expect(source).not.toContain(
       "Establish the previewable website named by the current intent in this Build folder",
     );
+    expect(source).not.toContain(
+      "Establish the software architecture, manifests, and runnable structure required by the outcome.",
+    );
+    expect(source).not.toContain("Re-align product with revised outcome:");
     expect(source).not.toMatch(
       /forceNextKind === ["']evaluate["']/,
     );

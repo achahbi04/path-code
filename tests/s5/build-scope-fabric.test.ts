@@ -69,19 +69,26 @@ describe("scope fidelity objectives", () => {
     ]);
   });
 
-  it("still allows a greenfield build to establish architecture and a runnable product", () => {
+  it("still allows a greenfield build to carry the creator request as the only product instruction", () => {
+    const outcome = "Build a polished public website for ICE";
     const record = {
-      intent: { outcome: "Build a polished public website for ICE", outcomeRevision: 1 },
+      intent: { outcome, outcomeRevision: 1 },
       productBrief: { productKind: "web" },
       projectBindings: [{ originGitInit: true }],
-      conversation: [],
+      conversation: [
+        { role: "user", intentRevision: 1, text: outcome },
+      ],
       children: [],
     };
-    const objective = frameEngineerObjective(record, "establish the product");
-    expect(objective).toContain("Establish or modify architecture, manifests, code, tests, and config as needed.");
-    expect(objective).toContain("previewable website");
-    expect(objective).toContain("manifests");
-    expect(objective).not.toContain("CURRENT CREATOR REQUEST");
+    const objective = frameEngineerObjective(record, outcome);
+    expect(objective).toContain("CURRENT CREATOR REQUEST");
+    expect(objective).toContain(outcome);
+    expect(objective).toContain("Do NOT run `git init`");
+    expect(objective).not.toContain("Establish or modify architecture, manifests, code, tests, and config as needed.");
+    expect(objective).not.toContain("Highest-value gap");
+    expect(objective).not.toContain(
+      "Establish the software architecture, manifests, and runnable structure required by the outcome.",
+    );
   });
 
   it("does not invent a one-file limit for a complex follow-up", () => {

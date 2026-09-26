@@ -85,10 +85,6 @@ export function isFollowUpCreatorTurn(record) {
  */
 export function frameEngineerObjective(record, gap) {
   const binding = (record.projectBindings || [])[0];
-  const productKind = record.productBrief?.productKind || "unknown";
-  const wantsWeb =
-    productKind === "web" ||
-    /website|web\s*app|landing/i.test(String(record.intent?.outcome || ""));
   const selectedElement = record.loop?.pendingSelectedElement || null;
   const selectionBlock = selectedElement
     ? [
@@ -99,16 +95,25 @@ export function frameEngineerObjective(record, gap) {
     : "";
   const creatorRequest = currentCreatorRequest(record);
   const followUp = isFollowUpCreatorTurn(record);
+  const request =
+    String(creatorRequest || "").trim() ||
+    String(gap || "").trim() ||
+    String(record?.intent?.outcome || "").trim();
+  const step = String(gap || "").trim();
+  const constraints = explicitCreatorConstraints(request || step);
+  const fabricStepBlock =
+    step && request && step !== request
+      ? ["", "CURRENT FABRIC STEP", step, ""]
+      : [];
+  const workspaceContract = binding?.originGitInit
+    ? [
+        "Workspace contract: this binding is already a git repository.",
+        "Do NOT run `git init`. Do NOT create a nested .git. Commit on the existing repo / task branch only.",
+      ].join("\n")
+    : "Commit on the existing task branch. Do not run git init or create a nested .git.";
 
   if (followUp) {
-    const request = String(creatorRequest || "").trim();
-    const step = String(gap || "").trim();
     const controlling = request || step;
-    const constraints = explicitCreatorConstraints(controlling);
-    const fabricStepBlock =
-      step && step !== request
-        ? ["", "CURRENT FABRIC STEP", step, ""]
-        : [];
     return [
       "PATH Build engineer task — follow-up creator change.",
       "The current creator request is the controlling engineering objective.",
@@ -127,7 +132,7 @@ export function frameEngineerObjective(record, gap) {
       "Make only engineering changes reasonably required to satisfy the current request and preserve the existing project's runnability.",
       "Use existing project-native validation where it already applies.",
       "Do not create unrelated architecture, manifest, or test scaffolding merely because a greenfield build would.",
-      "Commit on the existing task branch. Do not run git init or create a nested .git.",
+      workspaceContract,
       selectionBlock,
       "",
       "Before you finish, inspect the diff this turn produced against the current creator request and the explicit constraints.",
@@ -138,33 +143,27 @@ export function frameEngineerObjective(record, gap) {
       .join("\n");
   }
 
-  const greenfieldHint = binding?.originGitInit
-    ? [
-        "Greenfield context: this binding began as git-init-only — the Build folder IS already a git repository.",
-        "CRITICAL: Do NOT run `git init`. Do NOT create a nested .git. Commit on the existing repo / task branch only.",
-        wantsWeb
-          ? "This intent is a website. The product of this turn must be a previewable website in this worktree (index.html or an equivalent web entry the outcome names). A CLI, library, or unrelated sample program does not satisfy the intent. Commit that website on the existing task branch. If you add package.json, include a `test` script that runs a local node check of the site with no install and no npx; PATH admits test, typecheck, lint, check, and build as validation."
-          : "Establish the software the outcome names in this worktree, with a project-native check when the stack has one.",
-        "git add + git commit on the existing repository (never re-init).",
-        "Do not stop at a marker file alone.",
-      ].join("\n")
-    : "Continue engineering toward the outcome with project-native validation.";
-
+  // Greenfield / first product turn: creator request (or explicit Fabric step) only.
+  const controlling = request || step;
   return [
     "PATH Build engineer task — intentional product mutation is allowed.",
-    "Close the following product gap with real engineering in this project.",
-    "Establish or modify architecture, manifests, code, tests, and config as needed.",
-    "Validate with project-native checks when possible.",
-    greenfieldHint,
+    "The creator request below is the controlling engineering objective.",
+    "PATH does not author additional product instructions for this turn.",
     "",
-    intentBlock(record),
+    "CURRENT CREATOR REQUEST",
+    controlling,
+    ...fabricStepBlock,
+    "EXPLICIT CREATOR CONSTRAINTS",
+    constraints.length
+      ? constraints.map((line) => `- ${line}`).join("\n")
+      : "- (none stated beyond the request itself)",
+    "",
+    workspaceContract,
     selectionBlock,
     "",
-    "Highest-value gap to close now:",
-    gap ||
-      record.hypotheses?.proposedNextAction ||
-      "Establish the software architecture, manifests, runnable entrypoints, and tests required by the outcome.",
+    intentBlock(record),
     "",
+    "Validate with project-native checks when possible.",
     "When done, summarize what exists now vs what still remains for the Build outcome.",
   ]
     .filter(Boolean)

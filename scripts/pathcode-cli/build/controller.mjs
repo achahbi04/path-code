@@ -611,11 +611,9 @@ export function createBuildController(opts) {
     const bound = await gateway.bindProject(projectRoot);
     if (bound && bound.ok === false) return bound;
 
-    record.hypotheses.proposedNextAction =
-      "Establish the software architecture, manifests, and runnable structure required by the outcome.";
-    record.hypotheses.gapPlan = [
-      "origin established — first engineer establishes architecture",
-    ];
+    // Creator outcome is the only product instruction seed — never a PATH repair sentence.
+    record.hypotheses.proposedNextAction = String(outcome || "").trim();
+    record.hypotheses.gapPlan = [];
     record.loop.pendingReinspect = false;
     record.productBranch = `path-build/${record.buildId.slice(0, 8)}`;
     record.adoptionHistory = [];
@@ -2939,16 +2937,15 @@ export function createBuildController(opts) {
         derivedAt: now,
       };
     }
-    // Hypotheses are disposable; force next engineering toward new requirements.
+    // Hypotheses carry creator text only — never PATH-authored product instructions.
     const newReqGap = (revision.addRequirements || [])
       .map((r) => String(r.statement || "").trim())
       .filter(Boolean)
-      .map((s) => `MUST satisfy now: ${s}`)
       .join("\n");
     record.hypotheses.proposedNextAction =
       newReqGap ||
       (typeof revision.outcome === "string" && revision.outcome.trim()
-        ? `Re-align product with revised outcome: ${revision.outcome.trim().slice(0, 500)}`
+        ? revision.outcome.trim().slice(0, 8_000)
         : record.hypotheses.proposedNextAction || "");
     record.hypotheses.architectureNotes = [
       record.hypotheses.architectureNotes || "",
