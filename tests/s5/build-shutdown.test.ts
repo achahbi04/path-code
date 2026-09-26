@@ -4,7 +4,12 @@
  */
 import { describe, expect, it, afterEach } from "vitest";
 import { createServer } from "node:http";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  mkdtempSync,
+  rmSync,
+  readFileSync,
+  existsSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import http from "node:http";
@@ -18,7 +23,6 @@ import {
 import { startPathBuildSurface } from "../../scripts/pathcode-cli/build/surface/server.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
 import { resolveBuildCoordinatorPidPath } from "../../scripts/pathcode-cli/build/coordinator/server.mjs";
-import { readFileSync, existsSync } from "node:fs";
 
 describe("PATH Build shutdown lifecycle", () => {
   let surface: Awaited<ReturnType<typeof startPathBuildSurface>> | null = null;
@@ -40,7 +44,7 @@ describe("PATH Build shutdown lifecycle", () => {
   });
 
   it("closeHttpServerBounded returns while a keep-alive response is open", async () => {
-    const server = createServer((req, res) => {
+    const server = createServer((_req, res) => {
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         Connection: "keep-alive",
@@ -48,12 +52,17 @@ describe("PATH Build shutdown lifecycle", () => {
       res.write(": keepalive\n\n");
       // Intentionally never end — mimics the Builder SSE stream.
     });
-    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
     const addr = server.address();
     if (!addr || typeof addr === "string") throw new Error("no address");
     const port = addr.port;
 
-    const held = await new Promise((resolve, reject) => {
+    const held = await new Promise<{
+      req: http.ClientRequest;
+      res: http.IncomingMessage;
+    }>((resolve, reject) => {
       const req = http.get(`http://127.0.0.1:${port}/`, (res) => {
         resolve({ req, res });
       });
@@ -74,31 +83,43 @@ describe("PATH Build shutdown lifecycle", () => {
       runtimeRoot,
       openBrowser: false,
       fakeMode: true,
+      autoLoop: false,
       host: "127.0.0.1",
       port: 0,
     });
 
-    // Create a Build so /events has a real stream target.
-    const created = await fetch(`${surface.url}api/builds`, {
+    const targetDir = join(runtimeRoot, "shutdown-app");
+    const created = await fetch(new URL("/api/builds", surface.url), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ outcome: "Shutdown proof page" }),
+      body: JSON.stringify({
+        outcome: "Shutdown proof page",
+        targetDir,
+      }),
     });
     expect(created.ok).toBe(true);
-    const body = await created.json();
-    const buildId = body?.build?.buildId || body?.view?.buildId;
+    const body = (await created.json()) as {
+      ok?: boolean;
+      build?: { buildId?: string };
+      view?: { buildId?: string };
+    };
+    const buildId = body.build?.buildId || body.view?.buildId;
     expect(buildId).toBeTruthy();
 
-    const sse = await new Promise((resolve, reject) => {
+    const surfaceUrl = surface.url;
+    const sse = await new Promise<{
+      req: http.ClientRequest;
+      res: http.IncomingMessage;
+    }>((resolve, reject) => {
       const req = http.get(
-        `${surface.url}api/builds/${buildId}/events`,
+        new URL(`/api/builds/${buildId}/events`, surfaceUrl),
         (res) => resolve({ req, res }),
       );
       req.on("error", reject);
     });
 
     const pidPath = resolveBuildCoordinatorPidPath(runtimeRoot);
-    let coordinatorPid = null;
+    let coordinatorPid: number | null = null;
     if (existsSync(pidPath)) {
       coordinatorPid = Number(String(readFileSync(pidPath, "utf8")).split("\n")[0]);
     }
@@ -109,22 +130,17 @@ describe("PATH Build shutdown lifecycle", () => {
     expect(Date.now() - started).toBeLessThan(8_000);
 
     sse.req.destroy();
-    if (Number.isFinite(coordinatorPid) && coordinatorPid > 0) {
+    if (coordinatorPid != null && Number.isFinite(coordinatorPid) && coordinatorPid > 0) {
       expect(isAlivePid(coordinatorPid)).toBe(false);
     }
   }, 30_000);
 
   it("withTimeout and terminateOwnedPid refuse self and are bounded", async () => {
     const started = Date.now();
-    const value = await withTimeout(
-      new Promise(() => {}),
-      200,
-      "fallback",
-    );
+    const value = await withTimeout(new Promise<string>(() => {}), 200, "fallback");
     expect(value).toBe("fallback");
     expect(Date.now() - started).toBeLessThan(1_000);
 
-    // Must never signal the current process (isAlivePid excludes self).
     const result = await terminateOwnedPid(process.pid);
     expect(result).toEqual({ ok: true, killed: false });
     expect(isAlivePid(process.pid)).toBe(false);

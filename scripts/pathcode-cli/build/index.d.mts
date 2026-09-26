@@ -577,7 +577,7 @@ export interface ServingIdentity {
 
 export interface BuildSurface {
   url: string;
-  stop(): Promise<void>;
+  stop(opts?: { teardownOwned?: boolean }): Promise<void>;
   identity(): Promise<ServingIdentity>;
 }
 export function startPathBuildSurface(options: {
@@ -587,6 +587,7 @@ export function startPathBuildSurface(options: {
   fakeMode?: boolean;
   autoLoop?: boolean;
   port?: number;
+  host?: string;
 }): Promise<BuildSurface>;
 export function projectBuildForSurface(
   record:
