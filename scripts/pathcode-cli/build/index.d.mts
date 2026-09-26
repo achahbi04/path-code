@@ -145,6 +145,9 @@ export interface BuildRecord {
     forceNextKind?: BuildChild["kind"];
     fabricSteps?: string[];
     pauseRequested?: boolean;
+    pauseRequestedAt?: string;
+    pausedAt?: string;
+    resumedAt?: string;
     lastRealityDelta?: object | null;
     lastConsumedActionId?: string | null;
     noProgressCount?: number;
@@ -707,6 +710,11 @@ export function projectBuildForSurface(
   lastAppliedCandidate?: {
     taskId?: string | null;
     adoptedSha?: string | null;
+    at?: string | null;
+  } | null;
+  lastGoodPreview?: {
+    embedPath: string;
+    sha: string;
     at?: string | null;
   } | null;
   candidatePreview?: {

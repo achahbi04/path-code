@@ -135,7 +135,7 @@ describe("Phase 4 preview + lifecycle truth", () => {
       const loaded = readBuildRecord(runtimeRoot, record.buildId)!;
       loaded.loop.status = "paused";
       loaded.runtimeHealth = "failed";
-      loaded.previewUrl = null;
+      delete loaded.previewUrl;
       writeBuildRecord(runtimeRoot, loaded);
 
       const again = readBuildRecord(runtimeRoot, record.buildId)!;
