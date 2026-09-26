@@ -322,9 +322,12 @@ describe("Phase 3 auto-reengineering removal", () => {
     expect(seed).toBe(outcome);
 
     // Simulate Cursor-unavailable fallback: force another engineer without rewriting the objective seed.
-    before.loop.preferredEngineOverride = "copilot";
-    before.loop.forceNextKind = "engineer";
-    before.loop.status = "running";
+    const loop = before.loop as typeof before.loop & {
+      preferredEngineOverride?: string;
+    };
+    loop.preferredEngineOverride = "copilot";
+    loop.forceNextKind = "engineer";
+    loop.status = "running";
     writeBuildRecord(runtimeRoot, before);
 
     const afterForce = readBuildRecord(runtimeRoot, started.build.buildId)!;

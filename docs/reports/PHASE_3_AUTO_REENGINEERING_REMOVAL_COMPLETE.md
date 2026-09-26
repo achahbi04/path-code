@@ -4,17 +4,21 @@ Ended: `PHASE 3 — COMPLETE, READY FOR OPERATOR VERIFICATION`
 
 ## Closeout
 
-Bound to the PATH Builder genuine repair roadmap (D2 / D3 / D4).
+Bound to the PATH Builder genuine repair roadmap (D2 / D3 / D4), plus the
+startBuild creator-seed correction (no PATH-authored first-engineer product
+instruction).
 
-**SHA:** `eb8f2a4cee2cc3c8e8254b9ebc8cc2dedecf1b5f`  
-**Cold check:** first `npm run check` green on that SHA.
+**Implementation SHA:** `42cba9850ffdc8607f9289b7e35b46ef4cbae834`  
+**Prior incomplete tip:** `eb8f2a4` still seeded a PATH product instruction on `startBuild`.
 
 ## Contract
 
 - **D2:** `NON_WEB` (and empty-tree Apply) are truthful non-success. Zero automatic PATH-authored engineer turns.
 - **D3:** Fabric steps are real instructions. Follow-up objectives include `CURRENT FABRIC STEP` alongside the creator request; fabric queue outranks a bare steer so step text is never silently dropped.
 - **D4:** `forceNextKind: evaluate|challenge` never dispatches. Load/write migrate those values away. Dead evaluate/challenge tick branches removed.
-- Exit: the only thing that starts an engineer is a creator request or an explicitly chosen fabric step.
+- **Creator seed:** `startBuild` sets `hypotheses.proposedNextAction` to the **verbatim creator outcome**. Greenfield engineer objectives use `CURRENT CREATOR REQUEST` only for product instructions (workspace git contract remains).
+- **Provider fallback:** may select another engine for the same creator-authorized task; does not rewrite `proposedNextAction` or invent a PATH repair objective.
+- Exit: the only product engineering instruction sources are the creator request and an explicit Engine Fabric step.
 
 ## Falsification
 
@@ -23,7 +27,9 @@ Bound to the PATH Builder genuine repair roadmap (D2 / D3 / D4).
 1. NON_WEB → blocked, no new engineer on tick, no PATH repair `proposedNextAction`
 2. Two-step follow-up fabric → distinct objectives, each with creator request + step text
 3. Loaded `forceNextKind: evaluate|challenge` → no cognitive dispatch
-4. Source assertion: retired PATH repair sentences and evaluate/challenge force branches are gone
+4. `startBuild` seed equals creator outcome; first engineer objective carries it, not PATH architecture text
+5. Fallback leaves the same creator seed unchanged
+6. Source assertion: retired PATH repair / architecture seed sentences are gone
 
 ## Preserve
 
