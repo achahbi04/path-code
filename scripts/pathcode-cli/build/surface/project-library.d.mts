@@ -26,6 +26,7 @@ export function libraryRow(build?: object | null): {
   status: string;
   phase: string;
   updatedAt: string | null;
+  activityAt: string | null;
   repository: string;
   authoritativeSha: string | null;
   archived: boolean;

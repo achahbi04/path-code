@@ -171,9 +171,11 @@ export interface BuildRecord {
   };
   lastAppliedCandidate?: { taskId?: string; adoptedSha?: string; at?: string };
   lastDiscardedCandidate?: { taskId?: string; sourceSha?: string | null; at?: string };
+  lastGoodPreview?: { embedPath: string; sha: string; at?: string };
   adoptionHistory?: unknown[];
   createdAt: string;
   updatedAt: string;
+  lifecycleActivityAt?: string;
   originKind?: "build-created" | "existing-project";
   productBrief?: ProductBrief;
   criteriaAuthority?: "caller";
@@ -243,6 +245,20 @@ export function writeBuildRecord(
   runtimeRoot: string,
   record: BuildRecord | Record<string, unknown>,
 ): BuildRecord;
+export function touchLifecycleActivity(
+  record: BuildRecord | Record<string, unknown>,
+  at?: string,
+): BuildRecord | Record<string, unknown>;
+export function setLastGoodPreview(
+  record: BuildRecord | Record<string, unknown>,
+  input: { sha: string; at?: string; embedPath?: string },
+): BuildRecord | Record<string, unknown>;
+export function projectLastGoodPreview(
+  build?: BuildRecord | Record<string, unknown> | null,
+): { embedPath: string; sha: string; at: string | null } | null;
+export function lifecycleActivityAtFor(
+  build?: BuildRecord | Record<string, unknown> | null,
+): string | null;
 export function listBuildRecords(runtimeRoot: string): BuildRecord[];
 export function findLatestActiveBuild(runtimeRoot: string): BuildRecord | null;
 export function selectSurfaceBuildId(

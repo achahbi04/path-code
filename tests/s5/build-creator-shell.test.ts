@@ -416,6 +416,8 @@ describe("PATH Builder creator shell", () => {
       {},
     );
     expect(failedThenPaused.headline).toBe("Failed — paused");
+    expect(failedThenPaused.progressLabel).toBe("Needs attention");
+    expect(failedThenPaused.creatorStatus).toBe("Needs attention");
   });
 
   it("keeps the last good preview until the next revision is ready", () => {

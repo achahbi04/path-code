@@ -512,7 +512,13 @@ export async function startPathBuildSurface(options) {
         const rows = listBuildRecords(runtimeRoot)
           .filter((build) => isCreatorProject(build))
           .slice()
-          .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))
+          .sort((a, b) => {
+            const rowA = libraryRow(a);
+            const rowB = libraryRow(b);
+            const atA = rowA.activityAt || a.createdAt || "";
+            const atB = rowB.activityAt || b.createdAt || "";
+            return String(atB).localeCompare(String(atA));
+          })
           .slice(0, 200);
         sendJson(res, 200, {
           ok: true,
@@ -525,7 +531,9 @@ export async function startPathBuildSurface(options) {
             outcome: b.intent?.outcome,
             projectRoot: b.projectBindings?.[0]?.projectRoot || null,
             originKind: b.originKind || b.projectBindings?.[0]?.originKind || null,
+            // Keep persistence clock separate from rail activity clock.
             updatedAt: b.updatedAt,
+            activityAt: row.activityAt,
           };
           }),
         });

@@ -17,6 +17,10 @@ export {
   readPendingConversations,
   drainPendingConversations,
   resolveBuildConversationQueuePath,
+  touchLifecycleActivity,
+  setLastGoodPreview,
+  projectLastGoodPreview,
+  lifecycleActivityAtFor,
 } from "./record.mjs";
 export {
   appendBuildEvent,

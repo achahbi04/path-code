@@ -134,8 +134,10 @@
  * @property {object} [pendingCandidate]
  * @property {object} [lastAppliedCandidate]
  * @property {object} [lastDiscardedCandidate]
+ * @property {{ embedPath: string, sha: string, at?: string }} [lastGoodPreview]
  * @property {string} createdAt
  * @property {string} updatedAt
+ * @property {string} [lifecycleActivityAt]
  */
 
 export {};

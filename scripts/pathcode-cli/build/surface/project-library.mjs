@@ -5,6 +5,7 @@
 
 import { homedir, tmpdir } from "node:os";
 import { resolve, sep } from "node:path";
+import { lifecycleActivityAtFor } from "../lifecycle-truth.mjs";
 
 const UNDERSTANDING_CARD =
   /^Understanding that request before engineering/i;
@@ -159,15 +160,43 @@ export function displayTitleFor(build) {
 }
 
 /**
+ * Creator/product lifecycle label — not controller/process internals.
+ * Meanings: Building | Ready to review | Ready | Needs attention | Paused
+ *
  * @param {object | null | undefined} build
  */
 export function creatorStatusLabel(build) {
   const status = build?.loop?.status;
+  const pending = build?.pendingCandidate?.status === "pending";
+  if (pending || status === "awaiting_review") return "Ready to review";
   if (status === "running") return "Building";
-  if (status === "awaiting_review") return "Review";
-  if (status === "paused") return "Paused";
   if (status === "blocked") return "Needs attention";
-  return "Ready";
+  if (status === "paused") {
+    const kids = Array.isArray(build?.children) ? build.children : [];
+    const last = kids.length ? kids[kids.length - 1] : null;
+    const failed =
+      Boolean(last) &&
+      !last.adoptedSha &&
+      /FAIL|NOT_VERIFIED|BLOCKED/i.test(String(last.classification || ""));
+    const failedConversation = (Array.isArray(build?.conversation)
+      ? build.conversation
+      : []
+    ).some(
+      (message) =>
+        message?.intentRevision === build?.intent?.outcomeRevision &&
+        message?.status === "failed",
+    );
+    if ((failed || failedConversation) && !build?.lastDiscardedCandidate) {
+      return "Needs attention";
+    }
+    return "Paused";
+  }
+  if (status === "complete") return "Ready";
+  // Applied product idle — never blank/ambiguous.
+  if (build?.authoritativeSha || build?.lastAppliedCandidate?.adoptedSha) {
+    return "Ready";
+  }
+  return "Building";
 }
 
 /**
@@ -222,12 +251,15 @@ export function hasActiveEngineering(build) {
  */
 export function libraryRow(build) {
   const repo = build?.repository && typeof build.repository === "object" ? build.repository : {};
+  const activityAt = lifecycleActivityAtFor(build);
   return {
     buildId: build?.buildId || null,
     displayTitle: displayTitleFor(build),
     status: creatorStatusLabel(build),
     phase: creatorPhase(build),
+    // Persistence clock (recover may rewrite). Prefer activityAt for the rail.
     updatedAt: build?.updatedAt || build?.createdAt || null,
+    activityAt,
     repository:
       repo.validated && repo.kind === "github"
         ? "github"

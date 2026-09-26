@@ -17,6 +17,18 @@ export function writeBuildRecord(
   runtimeRoot: string,
   record: BuildRecord,
 ): BuildRecord;
+export function touchLifecycleActivity(
+  record: BuildRecord,
+  at?: string,
+): BuildRecord;
+export function setLastGoodPreview(
+  record: BuildRecord,
+  input: { sha: string; at?: string; embedPath?: string },
+): BuildRecord;
+export function projectLastGoodPreview(
+  build?: BuildRecord | null,
+): { embedPath: string; sha: string; at: string | null } | null;
+export function lifecycleActivityAtFor(build?: BuildRecord | null): string | null;
 export function readBuildRecord(
   runtimeRoot: string,
   buildId: string,

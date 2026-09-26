@@ -17,6 +17,7 @@ import {
   hasActiveEngineering,
   isArchived,
 } from "./project-library.mjs";
+import { projectLastGoodPreview } from "../lifecycle-truth.mjs";
 
 /**
  * Creator-facing criterion lifecycle. UNKNOWN stays the stored value.
@@ -197,13 +198,13 @@ export function projectBuildForSurface(build, extras = {}) {
     uiState = "review";
     headline = "Review this result";
     detail = "Apply to make it the product, or Discard to keep the current product.";
-    progressLabel = "Awaiting your review";
+    progressLabel = "Ready to review";
   } else if (paused && realFailed && !replacementLive) {
     phase = "paused";
     uiState = "error";
     headline = "Failed — paused";
     detail = "The current engineering task failed. Engineering is paused.";
-    progressLabel = "Failed — paused";
+    progressLabel = "Needs attention";
   } else if (paused) {
     phase = "paused";
     uiState = "paused";
@@ -227,7 +228,7 @@ export function projectBuildForSurface(build, extras = {}) {
   } else if (blocked) {
     phase = "blocked";
     uiState = "error";
-    headline = "Needs your input";
+    headline = "Needs attention";
     detail =
       build.loop?.blockedReason ||
       "PATH could not advance honestly. Adjust the request and continue.";
@@ -301,7 +302,7 @@ export function projectBuildForSurface(build, extras = {}) {
     headline = "Needs attention";
     detail = "That request ended without an adopted product revision.";
     progressLabel = "Needs attention";
-  } else if (previewReady) {
+  } else if (previewReady && !updatingPreview && build.authoritativeSha) {
     phase = "preview";
     uiState = "ready";
     headline = "Ready";
@@ -527,6 +528,7 @@ export function projectBuildForSurface(build, extras = {}) {
           at: build.lastAppliedCandidate.at || null,
         }
       : null,
+    lastGoodPreview: projectLastGoodPreview(build),
     candidatePreview: pendingCandidate
       ? {
           status: "ready",

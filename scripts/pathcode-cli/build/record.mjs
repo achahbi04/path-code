@@ -18,6 +18,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { ensureAg9RuntimeDirs } from "../ag9/layout.mjs";
 import { appendBuildTransitionEvents } from "./events.mjs";
 import { deriveDisplayTitle } from "./surface/project-library.mjs";
+export {
+  touchLifecycleActivity,
+  setLastGoodPreview,
+  projectLastGoodPreview,
+  lifecycleActivityAtFor,
+} from "./lifecycle-truth.mjs";
 
 export const BUILD_RECORD_SCHEMA = "pathcode.s5.build-record.v1";
 
@@ -102,6 +108,8 @@ export function createBuildRecordSkeleton(input) {
     displayTitle: deriveDisplayTitle(outcome),
     createdAt: now,
     updatedAt: now,
+    // Creator/product activity clock — not bumped by recover/persistence alone.
+    lifecycleActivityAt: now,
   };
   return record;
 }
@@ -122,10 +130,16 @@ export function writeBuildRecord(runtimeRoot, record) {
   ) {
     delete record.loop.forceNextKind;
   }
+  // `updatedAt` remains the generic persistence clock (recover may bump it).
+  // `lifecycleActivityAt` is only whatever the caller set — never auto-bumped here.
   const next = {
     ...record,
     schema: BUILD_RECORD_SCHEMA,
     updatedAt: new Date().toISOString(),
+    lifecycleActivityAt:
+      typeof record.lifecycleActivityAt === "string" && record.lifecycleActivityAt
+        ? record.lifecycleActivityAt
+        : previous?.lifecycleActivityAt || record.createdAt || undefined,
   };
   writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, "utf8");
   renameSync(tmp, path);

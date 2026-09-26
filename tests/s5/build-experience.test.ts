@@ -742,7 +742,7 @@ describe("PATH Build experience", () => {
       },
       {},
     );
-    expect(paused.progressLabel).toBe("Failed — paused");
+    expect(paused.progressLabel).toBe("Needs attention");
     expect((paused.conversation || []).find((row) => row.role === "assistant")?.status).toBe("failed");
     expect(paused.criteria?.[0]?.creatorStatus).toBe("pending");
     const evaluating = projectBuildForSurface(

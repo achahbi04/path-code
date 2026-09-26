@@ -412,8 +412,14 @@ function updatePreview(view) {
     ready && embed
       ? previewFrameSrc(embed, view.pendingCandidate?.sourceSha || view.authoritativeSha)
       : "";
+  // Durable last-good seeds hold across refresh / project switch / restart.
+  // Candidate embeds are never treated as last-good product.
+  const durableHold =
+    !candidateEmbed && view.lastGoodPreview?.embedPath
+      ? previewFrameSrc(view.lastGoodPreview.embedPath, view.lastGoodPreview.sha)
+      : "";
   const decision = previewTransition({
-    heldSrc: heldPreview?.src || "",
+    heldSrc: heldPreview?.src || durableHold || "",
     nextReady: Boolean(ready && nextSrc),
     nextSrc,
     nextFailed: runtimeFailed && !candidateEmbed,
@@ -1150,7 +1156,7 @@ function projectButton(row) {
   const current = row.buildId === activeBuildId ? ' aria-current="true"' : "";
   return `<button type="button" class="project-entry" data-build-id="${escapeHtml(row.buildId)}"${current}>
         <strong>${escapeHtml(row.displayTitle || "Project")}</strong>
-        <span class="project-meta"><span>${escapeHtml(row.creatorStatus || row.status || "")}</span><span>${escapeHtml(relativeTime(row.updatedAt))}</span></span>
+        <span class="project-meta"><span>${escapeHtml(row.creatorStatus || row.status || "")}</span><span>${escapeHtml(relativeTime(row.activityAt || row.updatedAt))}</span></span>
       </button>`;
 }
 

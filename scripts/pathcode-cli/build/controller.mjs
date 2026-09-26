@@ -19,6 +19,8 @@ import {
   findLatestActiveBuild,
   scrubBuildTempFiles,
   drainPendingConversations,
+  touchLifecycleActivity,
+  setLastGoodPreview,
 } from "./record.mjs";
 import { ensureBuildOrigin, isBindableProject } from "./origin.mjs";
 import { isEmptyProductTree } from "./adopt.mjs";
@@ -742,6 +744,7 @@ export function createBuildController(opts) {
     } else {
       record.loop.status = "paused";
       record.loop.pausedAt = new Date().toISOString();
+      touchLifecycleActivity(record, record.loop.pausedAt);
     }
     record.loop.pausedTaskId = active?.taskId || null;
     record.loop.pauseRequested = false;
@@ -773,10 +776,12 @@ export function createBuildController(opts) {
     if (record.pendingCandidate?.status === "pending") {
       record.loop.status = "awaiting_review";
       record.loop.pauseRequested = false;
+      touchLifecycleActivity(record);
     } else if (!active) {
       record.loop.status = "paused";
       record.loop.pausedAt = record.loop.pauseRequestedAt;
       record.loop.pauseRequested = false;
+      touchLifecycleActivity(record, record.loop.pausedAt);
     }
     writeBuildRecord(runtimeRoot, record);
     return { ok: true, build: readBuildRecord(runtimeRoot, buildId) };
@@ -793,6 +798,7 @@ export function createBuildController(opts) {
     record.loop.resumedAt = new Date().toISOString();
     record.loop.blockedReason = undefined;
     record.loop.pauseRequested = false;
+    touchLifecycleActivity(record, record.loop.resumedAt);
     if (record.pendingCandidate?.status === "pending") {
       record.loop.status = "awaiting_review";
       writeBuildRecord(runtimeRoot, record);
@@ -1552,6 +1558,7 @@ export function createBuildController(opts) {
         record.loop.forceNextKind = undefined;
         record.loop.pendingRuntimeRefresh = false;
         record.loop.lastAdoptionError = undefined;
+        touchLifecycleActivity(record);
         if (binding?.projectRoot) {
           restoreAuthoritativeCheckout({
             projectRoot: binding.projectRoot,
@@ -1746,6 +1753,7 @@ export function createBuildController(opts) {
     record.loop.forceNextKind = undefined;
     record.loop.pendingRuntimeRefresh = !fakeMode;
     record.loop.status = "running";
+    touchLifecycleActivity(record, adoption.adoptedAt || new Date().toISOString());
     if (fakeMode) {
       record.runtimeHealth = "ok";
       record.previewUrl = record.previewUrl || "http://127.0.0.1:0/fake";
@@ -1768,6 +1776,11 @@ export function createBuildController(opts) {
       record.loop.status = "blocked";
       record.loop.blockedReason =
         "Applied revision left an empty product tree. Send a creator request to continue.";
+    } else {
+      setLastGoodPreview(record, {
+        sha: adoption.adoptedSha,
+        at: adoption.adoptedAt,
+      });
     }
     appendBuildEvent(runtimeRoot, buildId, "candidate.applied", {
       taskId: pending.taskId,
@@ -1831,6 +1844,7 @@ export function createBuildController(opts) {
     const adoptedThisRevision = adoptedEngineerForRevision(record);
     record.loop.status = adoptedThisRevision && record.authoritativeSha ? "running" : "paused";
     record.loop.pauseRequested = false;
+    touchLifecycleActivity(record, now);
     if (record.loop.status === "paused") {
       record.loop.pausedAt = now;
     }
@@ -2257,6 +2271,7 @@ export function createBuildController(opts) {
     }
     const record = /** @type {import('./types.mjs').BuildRecord} */ (assessment.build);
     record.loop.status = "complete";
+    touchLifecycleActivity(record);
     writeBuildRecord(runtimeRoot, record);
     return { ok: true, build: record };
   }
@@ -2796,6 +2811,7 @@ export function createBuildController(opts) {
           record.hypotheses.proposedNextAction;
         if (existing.status === "discarded") existing.status = "queued";
         syncConversationLifecycle(record);
+        touchLifecycleActivity(record);
         writeBuildRecord(runtimeRoot, record);
         return {
           ok: true,
@@ -2848,6 +2864,7 @@ export function createBuildController(opts) {
       }
       syncConversationLifecycle(after);
       after.hypotheses.proposedNextAction = classified.engineerObjectiveHint;
+      touchLifecycleActivity(after);
       writeBuildRecord(runtimeRoot, after);
     }
 
