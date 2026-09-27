@@ -451,9 +451,27 @@ export async function startPathBuildSurface(options) {
       const previewMatch = path.match(/^\/preview\/([^/]+)(?:\/(.*))?$/);
       if (previewMatch && (method === "GET" || method === "HEAD" || method === "POST")) {
         const buildId = decodeURIComponent(previewMatch[1]);
-        const runtimeState = await coordinator.getRuntime(buildId);
-        const targetUrl =
+        let runtimeState = await coordinator.getRuntime(buildId);
+        let targetUrl =
           runtimeState.runtime?.url || runtimeState.preview?.url;
+        // After Builder/coordinator restart the applied product identity is
+        // durable, but the HTTP server that served it is ephemeral. Rematerialize
+        // on demand so /preview/:id never stays a permanent blank 503.
+        if (!targetUrl || runtimeState.preview?.status !== "ready") {
+          const buildRec = readBuildRecord(runtimeRoot, buildId);
+          const root = buildRec?.projectBindings?.[0]?.projectRoot || null;
+          const webCapable =
+            root &&
+            existsSync(root) &&
+            detectBuildArtifact(root, { outcomeHint: buildRec?.intent?.outcome })
+              ?.preview?.capability === "web";
+          if (buildRec?.authoritativeSha && webCapable) {
+            await coordinator.startRuntime(buildId);
+            runtimeState = await coordinator.getRuntime(buildId);
+            targetUrl =
+              runtimeState.runtime?.url || runtimeState.preview?.url || null;
+          }
+        }
         if (!targetUrl) {
           sendJson(res, 503, {
             ok: false,
@@ -558,21 +576,22 @@ export async function startPathBuildSurface(options) {
             build.authoritativeSha &&
             build.loop?.status !== "running" &&
             build.loop?.status !== "awaiting_review" &&
-            !previewOpenAttempts.has(openKey) &&
             root &&
             existsSync(root) &&
             detectBuildArtifact(root, { outcomeHint: build.intent?.outcome })
               ?.preview?.capability === "web"
           ) {
             const current = await coordinator.getRuntime(buildId);
-            const live =
-              current?.runtime?.status === "ready" ||
-              current?.preview?.status === "ready";
-            if (!live) {
+            const live = current?.preview?.status === "ready";
+            if (!live && !previewOpenAttempts.has(openKey)) {
               // Once per revision per surface process: a preview that fails to
               // start must not be restarted on every poll; Refresh retries.
               previewOpenAttempts.add(openKey);
-              await coordinator.startRuntime(buildId);
+              const started = await coordinator.startRuntime(buildId);
+              if (started?.ok === false || started?.runtime?.status !== "ready") {
+                // Allow a later open/refresh to retry after a failed attempt.
+                previewOpenAttempts.delete(openKey);
+              }
             }
           }
           sendJson(res, 200, await viewFor(buildId));
@@ -896,6 +915,8 @@ export async function startPathBuildSurface(options) {
           }
 
           if (method === "POST" && sub === "restart") {
+            const openKey = `${buildId}:${gate.build?.authoritativeSha || ""}`;
+            previewOpenAttempts.delete(openKey);
             const started = await coordinator.restartRuntime(buildId);
             sendJson(res, started.ok ? 200 : 400, {
               ...started,

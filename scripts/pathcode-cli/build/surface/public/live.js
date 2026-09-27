@@ -1,4 +1,4 @@
-import { previewFrameSrc, previewTransition } from "./view-revision.js";
+import { previewFrameSrc, previewTransition, previewNeedsCommit } from "./view-revision.js";
 
 const params = new URLSearchParams(location.search);
 const buildId = params.get("buildId");
@@ -34,14 +34,17 @@ async function refresh() {
   if (title) title.textContent = view.displayTitle || "Project";
   const embed = view.preview?.embedPath || null;
   const runtimeFailed = ["failed", "exited", "unhealthy", "unavailable"].includes(view.runtime?.status);
-  const ready = !runtimeFailed && (view.preview?.status === "ready" || view.preview?.status === "stale");
+  const ready = !runtimeFailed && view.preview?.status === "ready";
   const nextSrc = ready && embed ? previewFrameSrc(embed, view.authoritativeSha) : "";
   const decision = previewTransition({
     heldSrc,
     nextReady: Boolean(ready && nextSrc),
     nextSrc,
     nextFailed: runtimeFailed,
-    preparing: Boolean(view.previewPreparing) || view.status === "running",
+    preparing:
+      Boolean(view.previewPreparing) ||
+      view.status === "running" ||
+      (Boolean(view.lastGoodPreview?.sha) && !ready && !runtimeFailed),
   });
   const notice = document.getElementById("liveNotice");
   if (notice) {
@@ -53,7 +56,10 @@ async function refresh() {
     if (empty) empty.hidden = false;
     return;
   }
-  if (decision.action === "swap" && decision.src !== heldSrc) frame.src = decision.src;
+  const current = frame.getAttribute("src") || "";
+  if (previewNeedsCommit(decision, current)) {
+    frame.src = decision.src;
+  }
   heldSrc = decision.src;
   frame.hidden = false;
   if (empty) empty.hidden = true;

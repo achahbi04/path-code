@@ -17,3 +17,7 @@ export function previewTransition(input: {
   preparing?: boolean;
   allowCandidateHold?: boolean;
 }): { action: "keep" | "swap" | "hold" | "empty"; src: string; notice: string };
+export function previewNeedsCommit(
+  decision: { action?: string; src?: string },
+  currentSrc?: string | null,
+): boolean;

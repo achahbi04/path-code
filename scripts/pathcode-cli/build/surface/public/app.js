@@ -1,6 +1,6 @@
 /** PATH Build — visual builder client */
 
-import { previewFrameSrc, previewTransition, shouldAcceptBuildView } from "./view-revision.js";
+import { previewFrameSrc, previewTransition, previewNeedsCommit, shouldAcceptBuildView } from "./view-revision.js";
 
 const els = {
   landing: document.getElementById("landing"),
@@ -405,27 +405,27 @@ function updatePreview(view) {
     !emptyProductRuntime;
   const ready =
     Boolean(candidateEmbed) ||
-    (!runtimeFailed &&
-      (view.preview?.status === "ready" || view.preview?.status === "stale"));
+    (!runtimeFailed && view.preview?.status === "ready");
+  // "stale" means a persisted dead URL — not paintable until rematerialized.
 
   const nextSrc =
     ready && embed
       ? previewFrameSrc(embed, view.pendingCandidate?.sourceSha || view.authoritativeSha)
       : "";
-  // Durable last-good seeds hold across refresh / project switch / restart.
-  // Candidate embeds are never treated as last-good product.
-  const durableHold =
-    !candidateEmbed && view.lastGoodPreview?.embedPath
-      ? previewFrameSrc(view.lastGoodPreview.embedPath, view.lastGoodPreview.sha)
-      : "";
+  // lastGoodPreview is durable identity for rematerialization. It must NOT be
+  // navigated into the iframe until the runtime is actually serving — otherwise
+  // restart loads /preview/:id → 503 JSON and a same-URL "keep" never repaints.
+  // Mid-session heldPreview (already painted HTML) still holds across prepare/fail.
   const decision = previewTransition({
-    heldSrc: heldPreview?.src || durableHold || "",
+    heldSrc: heldPreview?.src || "",
     nextReady: Boolean(ready && nextSrc),
     nextSrc,
     nextFailed: runtimeFailed && !candidateEmbed,
     preparing:
       !candidateEmbed &&
-      (Boolean(view.previewPreparing) || view.status === "running"),
+      (Boolean(view.previewPreparing) ||
+        view.status === "running" ||
+        (Boolean(view.lastGoodPreview?.sha) && !ready && !runtimeFailed)),
     allowCandidateHold: Boolean(candidateEmbed),
   });
   const controls = decision.action !== "empty";
@@ -462,14 +462,18 @@ function updatePreview(view) {
       els.previewEmptyTitle.textContent =
         view.lastDiscardedCandidate || view.status === "paused"
           ? view.progressLabel || "No product applied yet"
-          : view.progressLabel || "Building first version…";
+          : view.lastGoodPreview?.sha && !runtimeFailed
+            ? "Restoring preview…"
+            : view.progressLabel || "Building first version…";
     }
     if (els.previewEmptyDetail) {
       els.previewEmptyDetail.textContent =
         view.detail ||
         (view.lastDiscardedCandidate
           ? "That candidate was discarded. Apply a result to make it the live product."
-          : "Your product will appear here as soon as the first runnable revision exists.");
+          : view.lastGoodPreview?.sha && !runtimeFailed
+            ? "Reopening the last applied product in the preview runtime."
+            : "Your product will appear here as soon as the first runnable revision exists.");
     }
     // Never leave a red "Preview failed: no_preview_capability" after Discard
     // of a first-product candidate — that is empty product truth, not failure.
@@ -488,8 +492,12 @@ function updatePreview(view) {
       ? `Preview update failed: ${String(reason).slice(0, 240)}`
       : "Preview update failed";
   }
-  if (decision.action === "swap") commitPreviewSrc(decision.src);
-  else if (visibleFrame) visibleFrame.hidden = false;
+  const frameSrc = visibleFrame?.getAttribute("src") || "";
+  if (previewNeedsCommit(decision, frameSrc)) {
+    commitPreviewSrc(decision.src);
+  } else if (visibleFrame) {
+    visibleFrame.hidden = false;
+  }
   previewEmbed = decision.src;
   previewDirectUrl = direct;
   heldPreview = { buildId: view.buildId, src: decision.src };

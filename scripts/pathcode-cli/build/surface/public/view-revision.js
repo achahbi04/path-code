@@ -91,3 +91,21 @@ export function previewTransition(input) {
   }
   return { action: "empty", src: "", notice: "" };
 }
+
+/**
+ * Whether the iframe must navigate (or first-paint) for this decision.
+ * `keep`/`hold` with an unloaded frame still requires commit — otherwise a
+ * restart that seeds the same last-good URL never paints and stays blank.
+ *
+ * @param {{ action?: string, src?: string }} decision
+ * @param {string | null | undefined} currentSrc
+ */
+export function previewNeedsCommit(decision, currentSrc) {
+  const src = typeof decision?.src === "string" ? decision.src : "";
+  if (!src || decision?.action === "empty") return false;
+  const current = typeof currentSrc === "string" ? currentSrc : "";
+  if (!current) return true;
+  if (decision.action === "swap") return current !== src;
+  // keep/hold: already painted this src — do not reload.
+  return false;
+}
