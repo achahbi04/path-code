@@ -744,7 +744,8 @@ describe("PATH Build experience", () => {
     );
     expect(paused.progressLabel).toBe("Needs attention");
     expect((paused.conversation || []).find((row) => row.role === "assistant")?.status).toBe("failed");
-    expect(paused.criteria?.[0]?.creatorStatus).toBe("pending");
+    // Phase 5: creator view never surfaces manufactured outcome criteria.
+    expect(paused.criteria).toEqual([]);
     const evaluating = projectBuildForSurface(
       {
         buildId: "build-eval",
@@ -755,7 +756,7 @@ describe("PATH Build experience", () => {
       },
       {},
     );
-    expect(evaluating.criteria?.[0]?.creatorStatus).toBe("evaluating");
+    expect(evaluating.criteria).toEqual([]);
     const inconclusive = projectBuildForSurface(
       {
         buildId: "build-unknown",
@@ -766,7 +767,7 @@ describe("PATH Build experience", () => {
       },
       {},
     );
-    expect(inconclusive.criteria?.[0]?.creatorStatus).toBe("inconclusive");
+    expect(inconclusive.criteria).toEqual([]);
     const proven = projectBuildForSurface(
       {
         buildId: "build-proven",
@@ -777,6 +778,6 @@ describe("PATH Build experience", () => {
       },
       {},
     );
-    expect(proven.criteria?.[0]?.creatorStatus).toBe("proven");
+    expect(proven.criteria).toEqual([]);
   });
 });

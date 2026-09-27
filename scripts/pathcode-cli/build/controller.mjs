@@ -60,7 +60,6 @@ import { detectBuildArtifact } from "./runtime/artifact.mjs";
 import { appendBuildEvent } from "./events.mjs";
 import { mechanicalProbeBinding } from "./mechanical-probe.mjs";
 import {
-  briefToOutcomeCriteria,
   deriveProductBrief,
   inferProductKind,
   parseProductBriefResult,
@@ -515,16 +514,18 @@ export function createBuildController(opts) {
         : "build-created";
     record.originKind = originKind;
 
-    // Product brief → concrete acceptance criteria (not only c-runnable/c-outcome).
+    // Phase 5: product brief still describes the product; outcomeCriteria are not derived from it.
     const brief = deriveProductBrief(String(outcome || ""), {
       buildId: record.buildId,
       intentRevision: record.intent.outcomeRevision,
     });
     record.productBrief = brief;
 
+    // Phase 5: do not manufacture outcomeCriteria from the brief as a
+    // product-facing verification artefact. Caller-supplied criteria remain
+    // an explicit harness opt-in (tests), never a default ceremony.
     if (Array.isArray(options.initialCriteria) && options.initialCriteria.length) {
       record.criteriaAuthority = "caller";
-      // Caller-supplied criteria are authoritative (tests / harnesses).
       const now = new Date().toISOString();
       record.outcomeCriteria = options.initialCriteria.map((c, i) => ({
         id: c.id || `c-${i + 1}`,
@@ -536,7 +537,7 @@ export function createBuildController(opts) {
         source: "caller",
       }));
     } else {
-      record.outcomeCriteria = briefToOutcomeCriteria(brief);
+      record.outcomeCriteria = [];
     }
 
     record.conversation = [
@@ -1366,9 +1367,8 @@ export function createBuildController(opts) {
         parsedBrief.brief.stale = false;
         record.productBrief = parsedBrief.brief;
         record.productBriefError = undefined;
-        if (record.criteriaAuthority !== "caller") {
-          record.outcomeCriteria = briefToOutcomeCriteria(parsedBrief.brief);
-        }
+        // Phase 5: brief acceptanceCriteria stay on the brief only — never
+        // promoted into product-facing outcomeCriteria.
       } else {
         const repeated = Boolean(record.productBriefError);
         record.productBriefError = {
@@ -1995,30 +1995,7 @@ export function createBuildController(opts) {
       }
     }
 
-    // Seed criteria from evaluate if empty
-    if (
-      ctx.kind === "evaluate" &&
-      (!record.outcomeCriteria || record.outcomeCriteria.length === 0)
-    ) {
-      record.outcomeCriteria = [
-        {
-          id: "c-runnable",
-          statement: "Core software surface is runnable with project-native checks",
-          required: true,
-          status: "UNKNOWN",
-          evidence: [],
-          updatedAt: now,
-        },
-        {
-          id: "c-outcome",
-          statement: `Product reflects outcome: ${record.intent.outcome.slice(0, 200)}`,
-          required: true,
-          status: "UNKNOWN",
-          evidence: [],
-          updatedAt: now,
-        },
-      ];
-    }
+    // Phase 5: never seed manufactured runnable/outcome criteria from evaluate.
     return { structuredAccepted: Boolean(parsed.structured) };
   }
 
@@ -2118,7 +2095,19 @@ export function createBuildController(opts) {
     const requiredReqs = (record.intent.explicitRequirements || []).filter(
       (r) => r.required,
     );
+    // Phase 5: empty criteria is the default product path — completion is
+    // decided by adoption/preview above, not manufactured verification rows.
+    // Caller-supplied criteria (criteriaAuthority === "caller") remain an
+    // explicit harness dependency when present.
     if (requiredCriteria.length === 0) {
+      if ((record.intent.explicitRequirements || []).length === 0) {
+        return {
+          ok: true,
+          complete: false,
+          reason: "engineering_result_required",
+          build: record,
+        };
+      }
       return {
         ok: true,
         complete: false,
@@ -2939,7 +2928,7 @@ export function createBuildController(opts) {
         revision: nextBriefRevision,
         revisionContext: String(revision.note || "").slice(0, 2_000),
       };
-      record.outcomeCriteria = briefToOutcomeCriteria(record.productBrief);
+      // Phase 5: do not regenerate outcomeCriteria from the brief.
     } else {
       record.productBrief = {
         ...priorBrief,

@@ -100,10 +100,9 @@ describe("S5 Build exact-origin identity", () => {
     expect(started.projectRoot).toBe(canon(target));
     expect(started.build.projectBindings[0]!.projectRoot).toBe(canon(target));
     expect(started.build.projectBindings[0]!.originKind).toBe("build-created");
-    expect(started.build.outcomeCriteria.length).toBeGreaterThan(2);
-    expect(
-      started.build.outcomeCriteria.some((c) => /landing|hero|cta|render|website|page/i.test(c.statement)),
-    ).toBe(true);
+    // Phase 5: no manufactured outcomeCriteria from the brief.
+    expect(started.build.outcomeCriteria).toEqual([]);
+    expect(started.build.productBrief?.acceptanceCriteria?.length).toBeGreaterThan(2);
   });
 });
 
@@ -258,7 +257,7 @@ describe("S5 runtime manager + surface builder", () => {
     expect(canon(body.projectRoot)).toBe(canon(targetDir));
     expect(canon(body.projectRoot)).not.toBe(canon(homedir()));
     expect(existsSync(join(targetDir, ".git"))).toBe(true);
-    expect(body.view.criteria.length).toBeGreaterThan(2);
+    expect(body.view.criteria).toEqual([]);
     expect(body.view.conversation?.length).toBeGreaterThan(0);
 
     const html = await (await fetch(surface.url)).text();
@@ -318,17 +317,16 @@ describe("S5 completion cannot ignore derived criteria", () => {
     expect(started.ok).toBe(true);
     if (!started.ok) return;
     const build = started.build;
-    // Prove only generics
-    for (const c of build.outcomeCriteria) {
-      if (c.id === "c-runnable" || c.id === "c-outcome") c.status = "PROVEN";
-    }
+    // Phase 5: default builds have no manufactured criteria and cannot complete
+    // without an adopted engineering result.
+    expect(build.outcomeCriteria).toEqual([]);
     const { writeBuildRecord } = await import(
       "../../scripts/pathcode-cli/build/record.mjs"
     );
     writeBuildRecord(runtimeRoot, build);
     const assessment = controller.assessCompletion(build.buildId);
     expect(assessment.complete).toBe(false);
-    expect(assessment.reason).toMatch(/engineering_result_required|criteria_unproven|no_required_criteria|derived_criteria_missing/);
+    expect(assessment.reason).toMatch(/engineering_result_required|no_required_criteria/);
     rmSync(runtimeRoot, { recursive: true, force: true });
     rmSync(target, { recursive: true, force: true });
   });

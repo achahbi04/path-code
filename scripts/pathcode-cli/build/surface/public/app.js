@@ -282,12 +282,6 @@ function renderWorklog(view) {
 }
 
 function renderDrawer(view) {
-  const criteria = (view.criteria || [])
-    .map(
-      (c) =>
-        `<li>[${escapeHtml(c.creatorStatus || "pending")}] ${escapeHtml(c.statement)}</li>`,
-    )
-    .join("");
   const live = view.engineeringActivity || {};
   const current = live.currentTask || live;
   const revision = live.latestRevision || null;
@@ -341,8 +335,6 @@ function renderDrawer(view) {
     }
     <h3>Live trace</h3>
     <ul>${steps || "<li>None yet</li>"}</ul>
-    <h3>Outcome verification</h3>
-    <ul>${criteria || "<li>Pending</li>"}</ul>
   `;
   if (view.projectRoot) {
     els.projectPath.textContent = view.projectRoot;
@@ -574,20 +566,15 @@ function render(view) {
   els.statusPill.textContent = phaseText;
   els.statusPill.dataset.state = state;
   if (els.criteriaLine) {
-    const projection = view.criteriaProjection;
-    const summary = projection?.project || view.criteriaSummary;
-    if (projection?.split && summary?.total) {
-      els.criteriaLine.textContent = `project ${summary.met}/${summary.total} proven`;
-    } else if (summary?.total) {
-      els.criteriaLine.textContent = `${summary.met} / ${summary.total}`;
-    } else {
-      els.criteriaLine.textContent = "";
-    }
+    // Phase 5: no manufactured criteria ceremony in the creator chrome.
+    els.criteriaLine.textContent = "";
+    els.criteriaLine.hidden = true;
   }
   if (els.requestLine) {
-    const projection = view.criteriaProjection;
-    const live = ["understanding", "engineering", "verifying", "reviewing"].includes(view.creatorPhase);
-    if (projection?.split && live) {
+    const live = ["understanding", "engineering", "verifying", "reviewing"].includes(
+      view.creatorPhase,
+    );
+    if (live) {
       const requestPhase = {
         understanding: "Understanding",
         engineering: "Engineering",
@@ -595,9 +582,9 @@ function render(view) {
         reviewing: "Reviewing",
       }[view.creatorPhase] || "Current request";
       els.requestLine.hidden = false;
-      els.requestLine.textContent = `Current request · ${requestPhase}${
-        view.requestLabel ? ` · ${view.requestLabel}` : ""
-      }`;
+      els.requestLine.textContent = view.requestLabel
+        ? `Current request · ${requestPhase} · ${view.requestLabel}`
+        : `Current request · ${requestPhase}`;
     } else {
       els.requestLine.hidden = true;
       els.requestLine.textContent = "";

@@ -11,24 +11,30 @@ function intentBlock(record) {
   const reqs = (record.intent.explicitRequirements || [])
     .map((r) => `- [${r.id}] (${r.status}) ${r.statement}`)
     .join("\n");
-  const criteria = (record.outcomeCriteria || [])
-    .map((c) => `- [${c.id}] required=${c.required} (${c.status}) ${c.statement}`)
-    .join("\n");
+  // Phase 5: do not instruct engines to invent outcome-criteria ceremony.
+  const callerCriteria =
+    record.criteriaAuthority === "caller"
+      ? (record.outcomeCriteria || [])
+          .map((c) => `- [${c.id}] required=${c.required} (${c.status}) ${c.statement}`)
+          .join("\n")
+      : "";
   return [
     `PATH Build outcome (revision ${record.intent.outcomeRevision}):`,
     record.intent.outcome,
     "",
     "Explicit operator requirements (must remain respected; do not silently weaken):",
     reqs || "- (none stated)",
-    "",
-    "Outcome criteria:",
-    criteria || "- (none yet — propose an initial set if evaluating)",
+    callerCriteria
+      ? ["", "Caller-supplied acceptance checks (harness only):", callerCriteria].join(
+          "\n",
+        )
+      : "",
     "",
     `Product kind: ${record.productBrief?.productKind || "unknown"}`,
     record.productBrief?.revisionContext
       ? `Latest operator request: ${record.productBrief.revisionContext}`
       : "",
-  ].filter((line) => line !== undefined).join("\n");
+  ].filter((line) => line !== undefined && line !== "").join("\n");
 }
 
 /**

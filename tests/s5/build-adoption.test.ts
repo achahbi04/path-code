@@ -271,11 +271,21 @@ describe("S5 Build authoritative adoption", () => {
     });
     const started = await controller.startBuild(
       "Build a professional website for ICE",
-      { targetDir: target, originKind: "build-created" },
+      {
+        targetDir: target,
+        originKind: "build-created",
+        // Explicit harness criteria — Phase 5 no longer manufactures these.
+        initialCriteria: [
+          { id: "c-runnable", statement: "Site is runnable", required: true },
+          { id: "c-outcome", statement: "Outcome reflected", required: true },
+          { id: "c-visual", statement: "Visual homepage", required: true },
+        ],
+      },
     );
     expect(started.ok).toBe(true);
     if (!started.ok) return;
     const build = started.build;
+    expect(build.criteriaAuthority).toBe("caller");
     for (const c of build.outcomeCriteria) c.status = "PROVEN";
     build.authoritativeSha = "abc123";
     build.loop.pendingReinspect = false;
@@ -360,7 +370,15 @@ describe("S5 Build authoritative adoption", () => {
     });
     const started = await controller.startBuild(
       "Build a professional website for ICE with hero and emergency value",
-      { targetDir: target, originKind: "build-created" },
+      {
+        targetDir: target,
+        originKind: "build-created",
+        initialCriteria: [
+          { id: "c-runnable", statement: "Runnable", required: true },
+          { id: "c-outcome", statement: "Outcome", required: true },
+          { id: "c-hero", statement: "Hero present", required: true },
+        ],
+      },
     );
     expect(started.ok).toBe(true);
     if (!started.ok) return;
