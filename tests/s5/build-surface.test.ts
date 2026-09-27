@@ -131,7 +131,8 @@ describe("S5 PATH Build product surface", () => {
     expect(body.view.phase).not.toBe("idle");
     expect(body.view.projectRoot).toBeTruthy();
     expect(canon(body.view.projectRoot)).toBe(canon(targetDir));
-    expect(body.view.criteria?.length || 0).toBeGreaterThan(0);
+    // Phase 5: creator view has no manufactured outcome criteria.
+    expect(body.view.criteria || []).toEqual([]);
 
     const latest = await fetch(new URL("/api/builds/latest", surface.url));
     const view = (await latest.json()) as {
