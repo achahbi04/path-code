@@ -30,28 +30,50 @@
         <div id="projectMode" hidden>
           <h2 class="library-label">Project</h2>
           <p class="project-mode-title" id="projectModeTitle"></p>
-          <details class="rail-section" id="sourceSection">
-            <summary>Project Source</summary>
-            <button type="button" class="ghost rail-action" id="openFolderBtn">Open Folder</button>
-            <button type="button" class="ghost rail-action" id="copyPathBtn">Copy Project Path</button>
-            <button type="button" class="ghost rail-action" id="downloadZipBtn">Download Project ZIP</button>
-            <button type="button" class="ghost rail-action" id="openCodeBtn">Open in PATH Code</button>
-          </details>
-          <details class="rail-section" id="repoSection">
-            <summary>Repository <span class="rail-summary-value" id="projectRepoState">Local</span></summary>
-            <button type="button" class="ghost rail-action" id="repositoryBtn">Repository</button>
-          </details>
-          <details class="rail-section" id="detailsSection">
-            <summary>Project Details</summary>
-            <dl class="rail-details" id="projectDetails"></dl>
-            <button type="button" class="ghost rail-action" id="renameTitleBtn">Rename</button>
-            <button type="button" class="ghost rail-action" id="archiveBtn">Archive</button>
-            <button type="button" class="ghost rail-action" id="restoreBtn" hidden>Restore</button>
-            <button type="button" class="ghost rail-action" id="recoverBuildBtn" hidden>Recover</button>
-          </details>
+          <div class="rail-rows" id="railRows">
+            <section class="rail-row" data-rail="source">
+              <button type="button" class="rail-row-head" id="sourceRowHead" aria-expanded="false" aria-controls="sourceRowBody">
+                <span class="rail-chevron" aria-hidden="true"></span>
+                <span class="rail-row-label">Project Source</span>
+                <span class="rail-row-value" aria-hidden="true"></span>
+              </button>
+              <div class="rail-row-body" id="sourceRowBody" hidden>
+                <button type="button" class="ghost rail-action" id="openFolderBtn">Open Folder</button>
+                <button type="button" class="ghost rail-action" id="copyPathBtn">Copy Project Path</button>
+                <button type="button" class="ghost rail-action" id="downloadZipBtn">Download Project ZIP</button>
+                <button type="button" class="ghost rail-action" id="openCodeBtn">Open in PATH Code</button>
+              </div>
+            </section>
+            <section class="rail-row" data-rail="repo">
+              <button type="button" class="rail-row-head" id="repoRowHead" aria-expanded="false" aria-controls="repoRowBody">
+                <span class="rail-chevron" aria-hidden="true"></span>
+                <span class="rail-row-label">Repository</span>
+                <span class="rail-row-value" id="projectRepoState">Local</span>
+              </button>
+              <div class="rail-row-body" id="repoRowBody" hidden>
+                <button type="button" class="ghost rail-action" id="repositoryBtn">Manage repository…</button>
+              </div>
+            </section>
+            <section class="rail-row" data-rail="details">
+              <button type="button" class="rail-row-head" id="detailsRowHead" aria-expanded="false" aria-controls="detailsRowBody">
+                <span class="rail-chevron" aria-hidden="true"></span>
+                <span class="rail-row-label">Project Details</span>
+                <span class="rail-row-value" aria-hidden="true"></span>
+              </button>
+              <div class="rail-row-body" id="detailsRowBody" hidden>
+                <dl class="rail-details" id="projectDetails"></dl>
+                <button type="button" class="ghost rail-action" id="renameTitleBtn">Rename</button>
+                <button type="button" class="ghost rail-action" id="archiveBtn">Archive</button>
+                <button type="button" class="ghost rail-action" id="restoreBtn" hidden>Restore</button>
+                <button type="button" class="ghost rail-action" id="recoverBuildBtn" hidden>Recover</button>
+              </div>
+            </section>
+          </div>
         </div>
-        <footer class="code-identity" id="codeIdentity" aria-label="Running code">
+        <footer class="code-identity" id="codeIdentity" aria-label="Running code identity">
+          <span class="code-identity-kicker">Build identity</span>
           <span class="code-identity-main" id="codeIdentityMain">Code: checking…</span>
+          <span class="code-identity-sha" id="codeIdentitySha"></span>
           <span class="code-identity-procs" id="codeIdentityProcs"></span>
         </footer>
       </aside>

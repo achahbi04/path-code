@@ -13,6 +13,7 @@ const els = {
   buildIdentity: document.getElementById("buildIdentity"),
   codeIdentity: document.getElementById("codeIdentity"),
   codeIdentityMain: document.getElementById("codeIdentityMain"),
+  codeIdentitySha: document.getElementById("codeIdentitySha"),
   codeIdentityProcs: document.getElementById("codeIdentityProcs"),
   staleCode: document.getElementById("staleCode"),
   candidateReview: document.getElementById("candidateReview"),
@@ -1190,6 +1191,38 @@ function setRailMode(mode) {
   if (els.projectMode) els.projectMode.hidden = mode !== "project";
 }
 
+/**
+ * Phase 6 project-rail accordion. Replaces <details>/<summary> with a row
+ * system: consistent height, left label, right value, chevron.
+ * @param {string} railKey
+ * @param {boolean} [forceOpen]
+ */
+function setRailRowOpen(railKey, forceOpen) {
+  const row = document.querySelector(`.rail-row[data-rail="${railKey}"]`);
+  if (!row) return;
+  const head = row.querySelector(".rail-row-head");
+  const body = row.querySelector(".rail-row-body");
+  if (!head || !body) return;
+  const next =
+    typeof forceOpen === "boolean" ? forceOpen : row.getAttribute("data-open") !== "true";
+  row.setAttribute("data-open", next ? "true" : "false");
+  head.setAttribute("aria-expanded", next ? "true" : "false");
+  body.hidden = !next;
+}
+
+function bindRailRows() {
+  document.querySelectorAll(".rail-row-head").forEach((head) => {
+    if (head.dataset.bound === "1") return;
+    head.dataset.bound = "1";
+    head.addEventListener("click", () => {
+      const row = head.closest(".rail-row");
+      const key = row?.getAttribute("data-rail");
+      if (!key) return;
+      setRailRowOpen(key);
+    });
+  });
+}
+
 function renderProjectMode(view) {
   if (!view || !els.projectModeTitle) return;
   els.projectModeTitle.textContent = view.displayTitle || "Project";
@@ -1213,6 +1246,7 @@ function renderProjectMode(view) {
   if (els.restoreBtn) els.restoreBtn.hidden = !view.archived;
   if (els.recoverBuildBtn) els.recoverBuildBtn.hidden = !view.needsRecovery;
   if (els.projectMode) els.projectMode.hidden = false;
+  bindRailRows();
 }
 
 async function openProject(buildId, mode, title) {
@@ -1432,12 +1466,28 @@ window.addEventListener("popstate", () => {
 function renderServingIdentity(serving) {
   if (!serving || !els.codeIdentity) return;
   const procs = Array.isArray(serving.processes) ? serving.processes : [];
+  const sha = typeof serving.sha === "string" ? serving.sha : "";
+  const shortSha = sha ? sha.slice(0, 12) : "";
   els.codeIdentityMain.textContent = `PATH ${serving.version || ""} · ${serving.label || "unknown"}`;
+  if (els.codeIdentitySha) {
+    els.codeIdentitySha.textContent = shortSha
+      ? `${shortSha}${serving.exact === false || serving.stale ? " · stale" : ""}`
+      : "";
+    els.codeIdentitySha.hidden = !shortSha;
+  }
   els.codeIdentityProcs.textContent = procs
-    .map((p) => `${p.role} ${p.label} pid ${p.pid ?? "?"}${p.stale ? " STALE" : ""}`)
+    .map((p) => {
+      const pSha =
+        typeof p.sha === "string" && p.sha
+          ? p.sha.slice(0, 7)
+          : typeof p.identity?.sha === "string"
+            ? p.identity.sha.slice(0, 7)
+            : "";
+      return `${p.role}${pSha ? ` ${pSha}` : ""} pid ${p.pid ?? "?"}${p.stale ? " STALE" : ""}`;
+    })
     .join("\n");
   els.codeIdentity.classList.toggle("is-stale", Boolean(serving.stale || !serving.exact));
-  els.codeIdentity.dataset.sha = serving.sha || "";
+  els.codeIdentity.dataset.sha = sha;
   const warnings = Array.isArray(serving.warnings) ? serving.warnings : [];
   els.staleCode.hidden = warnings.length === 0;
   els.staleCode.innerHTML = warnings.length
@@ -1458,6 +1508,7 @@ async function refreshServingIdentity() {
 
 void refreshServingIdentity();
 setInterval(() => void refreshServingIdentity(), 5_000);
+bindRailRows();
 
 (async () => {
   try {
