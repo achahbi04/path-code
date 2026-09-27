@@ -1,0 +1,602 @@
+{
+  "schema": "pathcode.builder.phase7.acceptance.v1",
+  "startedAt": "2026-09-27T13:41:07.301Z",
+  "builderSha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+  "buildId": "351d7275-a6ea-498b-a48d-a32e91f669f4",
+  "iceId": "dcca5ffb-f748-4778-bc91-876ac8ae0176",
+  "creatorRequest": "Add a slim “What’s new” banner under the main header that announces one short product update, with a subtle dismiss control. Keep the existing dark-mode homepage, logo, polish, and CVR footer intact — do not replace the site.",
+  "resume": true,
+  "identityAttribution": "Harness lives under docs/reports/PHASE_7_ACCEPTANCE/ (outside CODE_PATHS scripts+package.json). Builder loaded identity must remain exact SHA 2ae7540 with dirty=false.",
+  "steps": {
+    "checkout_head": {
+      "ok": true,
+      "at": "2026-09-27T13:41:07.340Z",
+      "head": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+      "scriptsPorcelain": "(clean)",
+      "resume": true
+    },
+    "baseline": {
+      "ok": true,
+      "at": "2026-09-27T13:41:07.344Z",
+      "priorAuth": "a95f0e7db67412f88b9f07e5567efbffee2cb73f",
+      "priorEngineers": 3,
+      "phase7BaselineEngineers": 2,
+      "projectRoot": "/Users/achahbi/PATH Builds/create-a-dark-mode-homepage-with-a-m-5ae591",
+      "pending": "fb2c9e24ea78a3246466311ee24f72ad9ea40d63",
+      "iceAuth": "bb9cb660c8e2a994cc00bd1069dc62dbbd25c9d5"
+    },
+    "surface_started": {
+      "ok": true,
+      "at": "2026-09-27T13:41:08.992Z",
+      "url": "http://127.0.0.1:7788/"
+    },
+    "preflight_identity": {
+      "ok": true,
+      "at": "2026-09-27T13:41:09.072Z",
+      "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+      "processShas": [
+        {
+          "role": "surface",
+          "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+          "stale": false,
+          "exact": true,
+          "dirty": false
+        },
+        {
+          "role": "coordinator",
+          "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+          "stale": false,
+          "exact": true,
+          "dirty": false
+        },
+        {
+          "role": "gateway",
+          "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+          "stale": false,
+          "exact": true,
+          "dirty": false
+        }
+      ]
+    },
+    "preflight_dark_mode": {
+      "ok": true,
+      "at": "2026-09-27T13:41:09.751Z",
+      "authoritativeSha": "a95f0e7db67412f88b9f07e5567efbffee2cb73f",
+      "previewStatus": "ready",
+      "pending": "fb2c9e24ea78a3246466311ee24f72ad9ea40d63"
+    },
+    "preflight_ice_readonly": {
+      "ok": true,
+      "at": "2026-09-27T13:41:10.435Z",
+      "authoritativeSha": "bb9cb660c8e2a994cc00bd1069dc62dbbd25c9d5",
+      "previewStatus": "ready",
+      "loopStatus": "paused",
+      "engineCallsAuthorized": false
+    },
+    "run1_resume_existing_candidate": {
+      "ok": true,
+      "at": "2026-09-27T13:41:10.491Z",
+      "taskId": "1f7db2f5-ed2e-49a2-af2e-268a1601e5d8",
+      "sourceSha": "fb2c9e24ea78a3246466311ee24f72ad9ea40d63",
+      "files": [
+        "index.html",
+        "styles.css"
+      ]
+    },
+    "run1_discard": {
+      "ok": true,
+      "at": "2026-09-27T13:41:11.356Z",
+      "authoritativeSha": "a95f0e7db67412f88b9f07e5567efbffee2cb73f",
+      "head": "a95f0e7db67412f88b9f07e5567efbffee2cb73f",
+      "lastDiscardedTaskId": "1f7db2f5-ed2e-49a2-af2e-268a1601e5d8"
+    },
+    "run2_message": {
+      "ok": true,
+      "at": "2026-09-27T13:41:12.049Z",
+      "status": 200
+    },
+    "run2_candidate": {
+      "ok": true,
+      "at": "2026-09-27T13:42:14.193Z",
+      "taskId": "0d4ff76d-4e85-411d-99f9-af9d862c9552",
+      "provider": "cursor",
+      "sourceSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+      "files": [
+        "index.html",
+        "styles.css"
+      ],
+      "diffSummary": "810a63a PATH: verified task 0d4ff76d-4e85-411d-99f9-af9d862c9552\n index.html | 43 +++++++++++++++++++++++++++++++++++++\n styles.css | 71 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n 2 files changed, 114 insertions(+)"
+    },
+    "phase7_live_scenario_complete": {
+      "ok": true,
+      "at": "2026-09-27T13:42:23.036Z",
+      "authoritativeSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+      "head": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+      "provider1": "cursor",
+      "provider2": "cursor",
+      "run1CandidateSha": "fb2c9e24ea78a3246466311ee24f72ad9ea40d63",
+      "run2CandidateSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+      "adoptionCountDelta": 1
+    },
+    "closeout_begin": {
+      "ok": true,
+      "at": "2026-09-27T13:42:23.090Z",
+      "builderSha": "2ae7540da76e8d311e64465958d5f6ce03a72c25"
+    },
+    "cold_check": {
+      "ok": true,
+      "at": "2026-09-27T13:50:09.469Z",
+      "status": 0
+    },
+    "pack": {
+      "ok": true,
+      "at": "2026-09-27T13:50:11.065Z",
+      "tgz": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1/docs/reports/PHASE_7_ACCEPTANCE/pack/path-code-1.0.1.tgz"
+    },
+    "audit_release": {
+      "ok": true,
+      "at": "2026-09-27T13:50:11.614Z",
+      "status": 0
+    },
+    "isolated_install": {
+      "ok": true,
+      "at": "2026-09-27T13:50:41.356Z",
+      "installRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-p7-isolated-FroLfH",
+      "binExists": true
+    },
+    "phase7_closeout_complete": {
+      "ok": true,
+      "at": "2026-09-27T13:50:42.684Z"
+    }
+  },
+  "invariants": {
+    "identity_exact": {
+      "ok": true,
+      "detail": {
+        "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+        "processShas": [
+          {
+            "role": "surface",
+            "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+            "stale": false,
+            "exact": true,
+            "dirty": false
+          },
+          {
+            "role": "coordinator",
+            "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+            "stale": false,
+            "exact": true,
+            "dirty": false
+          },
+          {
+            "role": "gateway",
+            "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+            "stale": false,
+            "exact": true,
+            "dirty": false
+          }
+        ]
+      },
+      "at": "2026-09-27T13:41:09.072Z"
+    },
+    "run1_one_engineer_turn": {
+      "ok": true,
+      "detail": {
+        "newEngineers": 0,
+        "taskId": "1f7db2f5-ed2e-49a2-af2e-268a1601e5d8",
+        "provider": "cursor",
+        "resume": true
+      },
+      "at": "2026-09-27T13:41:10.492Z"
+    },
+    "run1_existing_engineer": {
+      "ok": true,
+      "detail": {
+        "taskId": "1f7db2f5-ed2e-49a2-af2e-268a1601e5d8"
+      },
+      "at": "2026-09-27T13:41:10.492Z"
+    },
+    "run1_objective_preserves_request": {
+      "ok": true,
+      "detail": {
+        "requestInPending": "Add a slim “What’s new” banner under the main header that announces one short product update, with a subtle dismiss control. Keep the existing dark-mode homepage, logo, polish, and CVR footer intact — do not replace the ",
+        "objectiveHasRequest": true
+      },
+      "at": "2026-09-27T13:41:10.492Z"
+    },
+    "run1_no_greenfield_mandate": {
+      "ok": true,
+      "detail": {
+        "prohibited": false,
+        "antiGreenfieldPresent": true,
+        "objectiveSlice": "PATH Build engineer task — follow-up creator change.\nThe current creator request is the controlling engineering objective.\nDo not treat this turn as a greenfield rebuild or as completion of the whole historical product.\nCURRENT CREATOR REQUEST\nAdd a slim “What’s new” banner under the main header that announces one short product update, with a subtle dismiss control. Keep the existing dark-mode homepage, logo, polish, and CVR footer intact — do no"
+      },
+      "at": "2026-09-27T13:41:10.495Z"
+    },
+    "run1_no_path_authored_repair": {
+      "ok": true,
+      "detail": {
+        "objectiveSlice": "PATH Build engineer task — follow-up creator change.\nThe current creator request is the controlling engineering objective.\nDo not treat this turn as a greenfield rebuild or as completion of the whole historical product.\nCURRENT CREATOR REQUEST\nAdd a slim “What’s new” banner under the main header that announces one short product update, with a subtle dismiss control. Keep the existing dark-mode hom"
+      },
+      "at": "2026-09-27T13:41:10.495Z"
+    },
+    "run1_candidate_until_apply": {
+      "ok": true,
+      "detail": {
+        "pending": "pending",
+        "authoritativeSha": "a95f0e7db67412f88b9f07e5567efbffee2cb73f",
+        "sourceSha": "fb2c9e24ea78a3246466311ee24f72ad9ea40d63"
+      },
+      "at": "2026-09-27T13:41:10.495Z"
+    },
+    "run1_expected_source_sha": {
+      "ok": true,
+      "detail": {
+        "expected": "fb2c9e24ea78a3246466311ee24f72ad9ea40d63",
+        "actual": "fb2c9e24ea78a3246466311ee24f72ad9ea40d63"
+      },
+      "at": "2026-09-27T13:41:10.495Z"
+    },
+    "run1_no_evaluate_challenge": {
+      "ok": true,
+      "detail": {
+        "evaluateChildren": 0,
+        "evalBefore": 0
+      },
+      "at": "2026-09-27T13:41:10.495Z"
+    },
+    "run1_provenance": {
+      "ok": true,
+      "detail": {
+        "provider": "cursor"
+      },
+      "at": "2026-09-27T13:41:10.495Z"
+    },
+    "run1_candidate_controls": {
+      "ok": true,
+      "detail": {
+        "canApply": true,
+        "canDiscard": true,
+        "canResume": false,
+        "canPause": false,
+        "canStop": false,
+        "loopStatus": "awaiting_review"
+      },
+      "at": "2026-09-27T13:41:10.495Z"
+    },
+    "run1_evolved_not_replaced": {
+      "ok": true,
+      "detail": {
+        "files": [
+          "index.html",
+          "styles.css"
+        ]
+      },
+      "at": "2026-09-27T13:41:10.496Z"
+    },
+    "pause_while_candidate": {
+      "ok": true,
+      "detail": {
+        "pauseOk": true,
+        "loopStatus": "awaiting_review",
+        "engineers": 3
+      },
+      "at": "2026-09-27T13:41:10.549Z"
+    },
+    "resume_while_candidate": {
+      "ok": true,
+      "detail": {
+        "resumeBody": {
+          "ok": true,
+          "awaitingReview": true
+        },
+        "pending": "pending",
+        "engineers": 3
+      },
+      "at": "2026-09-27T13:41:10.608Z"
+    },
+    "discard_no_engine": {
+      "ok": true,
+      "detail": {
+        "engBefore": 3,
+        "engAfter": 3,
+        "evalBefore": 0,
+        "evalAfter": 0
+      },
+      "at": "2026-09-27T13:41:11.356Z"
+    },
+    "discard_restores_auth": {
+      "ok": true,
+      "detail": {
+        "authoritativeSha": "a95f0e7db67412f88b9f07e5567efbffee2cb73f",
+        "head": "a95f0e7db67412f88b9f07e5567efbffee2cb73f",
+        "pending": null,
+        "lastDiscarded": {
+          "taskId": "1f7db2f5-ed2e-49a2-af2e-268a1601e5d8",
+          "sourceSha": "fb2c9e24ea78a3246466311ee24f72ad9ea40d63",
+          "at": "2026-09-27T13:41:10.611Z"
+        }
+      },
+      "at": "2026-09-27T13:41:11.356Z"
+    },
+    "preview_safe_after_discard": {
+      "ok": true,
+      "detail": {
+        "preview": "ready",
+        "authoritativeSha": "a95f0e7db67412f88b9f07e5567efbffee2cb73f"
+      },
+      "at": "2026-09-27T13:41:11.961Z"
+    },
+    "run2_one_engineer_turn": {
+      "ok": true,
+      "detail": {
+        "newEngineers": 1,
+        "taskId": "0d4ff76d-4e85-411d-99f9-af9d862c9552",
+        "provider": "cursor",
+        "resume": true
+      },
+      "at": "2026-09-27T13:42:14.193Z"
+    },
+    "run2_objective_preserves_request": {
+      "ok": true,
+      "detail": {
+        "requestInPending": "Add a slim “What’s new” banner under the main header that announces one short product update, with a subtle dismiss control. Keep the existing dark-mode homepage, logo, polish, and CVR footer intact — do not replace the ",
+        "objectiveHasRequest": true
+      },
+      "at": "2026-09-27T13:42:14.193Z"
+    },
+    "run2_no_greenfield_mandate": {
+      "ok": true,
+      "detail": {
+        "prohibited": false,
+        "antiGreenfieldPresent": true,
+        "objectiveSlice": "PATH Build engineer task — follow-up creator change.\nThe current creator request is the controlling engineering objective.\nDo not treat this turn as a greenfield rebuild or as completion of the whole historical product.\nCURRENT CREATOR REQUEST\nAdd a slim “What’s new” banner under the main header that announces one short product update, with a subtle dismiss control. Keep the existing dark-mode homepage, logo, polish, and CVR footer intact — do no"
+      },
+      "at": "2026-09-27T13:42:14.193Z"
+    },
+    "run2_no_path_authored_repair": {
+      "ok": true,
+      "detail": {
+        "objectiveSlice": "PATH Build engineer task — follow-up creator change.\nThe current creator request is the controlling engineering objective.\nDo not treat this turn as a greenfield rebuild or as completion of the whole historical product.\nCURRENT CREATOR REQUEST\nAdd a slim “What’s new” banner under the main header that announces one short product update, with a subtle dismiss control. Keep the existing dark-mode hom"
+      },
+      "at": "2026-09-27T13:42:14.193Z"
+    },
+    "run2_candidate_until_apply": {
+      "ok": true,
+      "detail": {
+        "pending": "pending",
+        "authoritativeSha": "a95f0e7db67412f88b9f07e5567efbffee2cb73f",
+        "sourceSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d"
+      },
+      "at": "2026-09-27T13:42:14.193Z"
+    },
+    "run2_no_evaluate_challenge": {
+      "ok": true,
+      "detail": {
+        "evaluateChildren": 0,
+        "evalBefore": 0
+      },
+      "at": "2026-09-27T13:42:14.193Z"
+    },
+    "run2_provenance": {
+      "ok": true,
+      "detail": {
+        "provider": "cursor"
+      },
+      "at": "2026-09-27T13:42:14.193Z"
+    },
+    "run2_candidate_controls": {
+      "ok": true,
+      "detail": {
+        "canApply": true,
+        "canDiscard": true,
+        "canResume": false,
+        "canPause": false,
+        "canStop": false,
+        "loopStatus": "awaiting_review"
+      },
+      "at": "2026-09-27T13:42:14.193Z"
+    },
+    "run2_evolved_not_replaced": {
+      "ok": true,
+      "detail": {
+        "files": [
+          "index.html",
+          "styles.css"
+        ]
+      },
+      "at": "2026-09-27T13:42:14.193Z"
+    },
+    "run2_candidate_preview_signal": {
+      "ok": true,
+      "detail": {
+        "candidatePreview": true,
+        "pendingSource": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+        "authPreview": "ready"
+      },
+      "at": "2026-09-27T13:42:14.193Z"
+    },
+    "apply_once": {
+      "ok": true,
+      "detail": {
+        "authoritativeSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+        "candidateSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+        "head": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+        "lastApplied": {
+          "taskId": "0d4ff76d-4e85-411d-99f9-af9d862c9552",
+          "adoptedSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+          "at": "2026-09-27T13:42:14.381Z"
+        }
+      },
+      "at": "2026-09-27T13:42:14.466Z"
+    },
+    "apply_adoption_count_one": {
+      "ok": true,
+      "detail": {
+        "before": 1,
+        "after": 2,
+        "last": {
+          "buildId": "351d7275-a6ea-498b-a48d-a32e91f669f4",
+          "taskId": "0d4ff76d-4e85-411d-99f9-af9d862c9552",
+          "actionId": "engineer:ff0db3c69f8a63b99899",
+          "intentRevision": 4,
+          "engine": "cursor",
+          "resultId": "47fb15e8cfc81da237183139",
+          "parentSha": "a95f0e7db67412f88b9f07e5567efbffee2cb73f",
+          "sourceSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+          "adoptedSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+          "projectRoot": "/Users/achahbi/PATH Builds/create-a-dark-mode-homepage-with-a-m-5ae591",
+          "productBranch": "path-build/351d7275",
+          "files": [
+            "index.html",
+            "styles.css"
+          ],
+          "mode": "merge",
+          "adoptedAt": "2026-09-27T13:42:14.381Z",
+          "capability": "web",
+          "capabilitySource": "git-tree",
+          "resultFingerprint": "47fb15e8cfc81da237183139"
+        }
+      },
+      "at": "2026-09-27T13:42:14.466Z"
+    },
+    "no_auto_eng_after_apply": {
+      "ok": true,
+      "detail": {
+        "eng": 4,
+        "eval": 0,
+        "pending": null,
+        "loop": "complete"
+      },
+      "at": "2026-09-27T13:42:22.469Z"
+    },
+    "preview_after_apply_durable": {
+      "ok": true,
+      "detail": {
+        "preview": "ready",
+        "authoritativeSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d"
+      },
+      "at": "2026-09-27T13:42:22.995Z"
+    },
+    "no_remote_push": {
+      "ok": true,
+      "detail": {
+        "before": {
+          "remotes": "",
+          "branchStatus": "## path-build/351d7275",
+          "hasRemote": false,
+          "porcelain": "## path-build/351d7275"
+        },
+        "after": {
+          "remotes": "",
+          "branchStatus": "## path-build/351d7275",
+          "hasRemote": false,
+          "porcelain": "## path-build/351d7275"
+        }
+      },
+      "at": "2026-09-27T13:42:23.034Z"
+    },
+    "ice_untouched": {
+      "ok": true,
+      "detail": {
+        "before": "bb9cb660c8e2a994cc00bd1069dc62dbbd25c9d5",
+        "after": "bb9cb660c8e2a994cc00bd1069dc62dbbd25c9d5",
+        "iceEngineersBefore": 12,
+        "iceEngineersAfter": 12
+      },
+      "at": "2026-09-27T13:42:23.036Z"
+    },
+    "max_two_engineer_turns": {
+      "ok": true,
+      "detail": {
+        "phase7BaselineEngineers": 2,
+        "finalEng": 4,
+        "delta": 2
+      },
+      "at": "2026-09-27T13:42:23.036Z"
+    },
+    "isolated_install": {
+      "ok": true,
+      "detail": {
+        "installRoot": "/var/folders/xf/rj8ydr2j5mdfqw5ndj7brrzc0000gn/T/path-p7-isolated-FroLfH",
+        "helpStatus": 0,
+        "helpHead": "PATH Build — create software from an outcome\n\nUsage:\n  path-build\n  node scripts/path-build.mjs\n\nOpens a local browser surface. Not PATH Code. Not a terminal REPL.\n\nEnv:\n  PATHCODE_PREFERRED_ENGINE=cu",
+        "packageRootIsCheckout": false
+      },
+      "at": "2026-09-27T13:50:41.356Z"
+    }
+  },
+  "failures": [],
+  "ok": true,
+  "surfaceUrl": "http://127.0.0.1:7788/",
+  "servingIdentity": {
+    "version": "1.0.1",
+    "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+    "label": "2ae7540",
+    "processes": [
+      {
+        "role": "surface",
+        "pid": 59113,
+        "version": "1.0.1",
+        "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+        "dirty": false,
+        "label": "2ae7540",
+        "packageRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+        "processStartedAt": "2026-09-27T13:41:07.129Z",
+        "currentSha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+        "stale": false,
+        "exact": true,
+        "reasons": []
+      },
+      {
+        "role": "coordinator",
+        "pid": 59179,
+        "version": "1.0.1",
+        "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+        "dirty": false,
+        "label": "2ae7540",
+        "packageRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+        "processStartedAt": "2026-09-27T13:41:08.414Z",
+        "currentSha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+        "stale": false,
+        "exact": true,
+        "reasons": []
+      },
+      {
+        "role": "gateway",
+        "pid": 59210,
+        "version": "1.0.1",
+        "sha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+        "dirty": false,
+        "label": "2ae7540",
+        "packageRoot": "/Users/achahbi/Projects/path-code-worktrees/cursor-pathcode-antigravity-v1",
+        "processStartedAt": "2026-09-27T13:41:08.600Z",
+        "currentSha": "2ae7540da76e8d311e64465958d5f6ce03a72c25",
+        "stale": false,
+        "exact": true,
+        "reasons": []
+      }
+    ],
+    "stale": false,
+    "exact": true,
+    "warnings": [],
+    "coordinatorReused": false
+  },
+  "iceReadOnly": {
+    "authoritativeSha": "bb9cb660c8e2a994cc00bd1069dc62dbbd25c9d5",
+    "previewStatus": "ready",
+    "loopStatus": "paused",
+    "engineCallsAuthorized": false
+  },
+  "final": {
+    "authoritativeSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+    "head": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+    "provider1": "cursor",
+    "provider2": "cursor",
+    "run1CandidateSha": "fb2c9e24ea78a3246466311ee24f72ad9ea40d63",
+    "run2CandidateSha": "810a63a3b33dc8bdf28c2a14f6aa565126936a4d",
+    "adoptionCountDelta": 1
+  },
+  "endedAt": "2026-09-27T13:50:42.684Z"
+}
