@@ -7,11 +7,24 @@
 
 import {
   buildPathKey,
+  CATALOG_SOURCE,
   createModelIdentity,
   normalizeEngineIdForModelPlane,
   parsePathKey,
   validateModelIdentity,
 } from "./identity.mjs";
+import {
+  CURSOR_DEFAULT_PROVIDER_MODEL_ID,
+  CURSOR_ENGINE_ID,
+  materializeCursorModelIdentity,
+  readLegacyCursorModelFromEnv,
+} from "./adapters/cursor-catalog.mjs";
+
+export const SELECTION_SOURCE = Object.freeze({
+  EXPLICIT_TURN: "explicit_turn",
+  LEGACY_ENV: "legacy_env",
+  PROVIDER_DEFAULT: "provider_default",
+});
 
 export const RESOLVER_CODES = Object.freeze({
   ENGINE_ID_REQUIRED: "ENGINE_ID_REQUIRED",
@@ -34,8 +47,146 @@ function incompatible(engineId, identity) {
 }
 
 /**
- * Resolve a model for a known engineering engine. P6.0: validates engine scope
- * and identity shape only — no provider adapter wiring.
+ * @param {object} identity
+ * @param {string} selectionSource
+ * @param {string} providerModelId
+ */
+function okResolution(identity, selectionSource, providerModelId) {
+  return {
+    ok: true,
+    engineId: CURSOR_ENGINE_ID,
+    identity,
+    providerModelId,
+    selectionSource,
+    model: { id: providerModelId },
+  };
+}
+
+/**
+ * Cursor engineering model resolution (static catalog + legacy env + default).
+ *
+ * @param {{
+ *   toolEnv?: Record<string, string | undefined>,
+ *   env?: Record<string, string | undefined>,
+ *   providerModelId?: string | null,
+ *   modelIdentity?: object | null,
+ *   pathKey?: string | null,
+ * }} input
+ */
+export function resolveCursorEngineModel(input = {}) {
+  const env = input.toolEnv || input.env || process.env;
+
+  if (input.modelIdentity) {
+    const validated = validateModelIdentity(input.modelIdentity);
+    if (!validated.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: validated.message,
+      };
+    }
+    if (validated.identity.engineId !== CURSOR_ENGINE_ID) {
+      return incompatible(CURSOR_ENGINE_ID, validated.identity);
+    }
+    return okResolution(
+      validated.identity,
+      SELECTION_SOURCE.EXPLICIT_TURN,
+      validated.identity.providerModelId,
+    );
+  }
+
+  if (typeof input.pathKey === "string" && input.pathKey.trim()) {
+    const parsed = parsePathKey(input.pathKey);
+    if (!parsed) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: "invalid pathKey",
+      };
+    }
+    if (parsed.engineId !== CURSOR_ENGINE_ID) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.MODEL_INCOMPATIBLE,
+        message: `pathKey engine ${parsed.engineId} is not compatible with cursor`,
+      };
+    }
+    const built = materializeCursorModelIdentity(
+      parsed.providerModelId,
+      CATALOG_SOURCE.STATIC,
+    );
+    if (!built.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: built.message,
+      };
+    }
+    return okResolution(
+      built.identity,
+      SELECTION_SOURCE.EXPLICIT_TURN,
+      built.identity.providerModelId,
+    );
+  }
+
+  const explicit =
+    typeof input.providerModelId === "string" ? input.providerModelId.trim() : "";
+  if (explicit) {
+    const built = materializeCursorModelIdentity(explicit, CATALOG_SOURCE.STATIC);
+    if (!built.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: built.message,
+      };
+    }
+    return okResolution(
+      built.identity,
+      SELECTION_SOURCE.EXPLICIT_TURN,
+      built.identity.providerModelId,
+    );
+  }
+
+  const legacy = readLegacyCursorModelFromEnv(env);
+  if (legacy) {
+    const built = materializeCursorModelIdentity(
+      legacy.providerModelId,
+      CATALOG_SOURCE.LEGACY_ENV,
+    );
+    if (!built.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: built.message,
+      };
+    }
+    return okResolution(
+      built.identity,
+      SELECTION_SOURCE.LEGACY_ENV,
+      built.identity.providerModelId,
+    );
+  }
+
+  const built = materializeCursorModelIdentity(
+    CURSOR_DEFAULT_PROVIDER_MODEL_ID,
+    CATALOG_SOURCE.STATIC,
+  );
+  if (!built.ok) {
+    return {
+      ok: false,
+      code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+      message: built.message,
+    };
+  }
+  return okResolution(
+    built.identity,
+    SELECTION_SOURCE.PROVIDER_DEFAULT,
+    built.identity.providerModelId,
+  );
+}
+
+/**
+ * Resolve a model for a known engineering engine.
  *
  * @param {{
  *   engineId?: string | null,
@@ -43,6 +194,8 @@ function incompatible(engineId, identity) {
  *   provider?: string | null,
  *   modelIdentity?: object | null,
  *   pathKey?: string | null,
+ *   toolEnv?: Record<string, string | undefined>,
+ *   env?: Record<string, string | undefined>,
  * }} input
  * @returns {{
  *   ok: boolean,
@@ -50,6 +203,9 @@ function incompatible(engineId, identity) {
  *   message?: string,
  *   identity?: object,
  *   engineId?: EngineeringEngineId,
+ *   providerModelId?: string,
+ *   selectionSource?: string,
+ *   model?: { id: string },
  * }}
  */
 export function resolveModelForEngine(input = {}) {
@@ -60,6 +216,10 @@ export function resolveModelForEngine(input = {}) {
       code: RESOLVER_CODES.ENGINE_ID_REQUIRED,
       message: "engineId is required before model resolution",
     };
+  }
+
+  if (engineId === CURSOR_ENGINE_ID) {
+    return resolveCursorEngineModel(input);
   }
 
   if (input.modelIdentity) {
@@ -74,7 +234,14 @@ export function resolveModelForEngine(input = {}) {
     if (validated.identity.engineId !== engineId) {
       return incompatible(engineId, validated.identity);
     }
-    return { ok: true, engineId, identity: validated.identity };
+    return {
+      ok: true,
+      engineId,
+      identity: validated.identity,
+      providerModelId: validated.identity.providerModelId,
+      selectionSource: SELECTION_SOURCE.EXPLICIT_TURN,
+      model: { id: validated.identity.providerModelId },
+    };
   }
 
   if (typeof input.pathKey === "string" && input.pathKey.trim()) {
@@ -108,7 +275,14 @@ export function resolveModelForEngine(input = {}) {
         message: built.message,
       };
     }
-    return { ok: true, engineId, identity: built.identity };
+    return {
+      ok: true,
+      engineId,
+      identity: built.identity,
+      providerModelId: built.identity.providerModelId,
+      selectionSource: SELECTION_SOURCE.EXPLICIT_TURN,
+      model: { id: built.identity.providerModelId },
+    };
   }
 
   const providerModelId =
@@ -142,5 +316,12 @@ export function resolveModelForEngine(input = {}) {
     return incompatible(engineId, created.identity);
   }
 
-  return { ok: true, engineId, identity: created.identity };
+  return {
+    ok: true,
+    engineId,
+    identity: created.identity,
+    providerModelId: created.identity.providerModelId,
+    selectionSource: SELECTION_SOURCE.EXPLICIT_TURN,
+    model: { id: created.identity.providerModelId },
+  };
 }

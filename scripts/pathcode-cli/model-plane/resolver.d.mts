@@ -1,5 +1,11 @@
 import type { EngineeringEngineId, ModelIdentityV1 } from "./identity.d.mts";
 
+export const SELECTION_SOURCE: Readonly<{
+  EXPLICIT_TURN: "explicit_turn";
+  LEGACY_ENV: "legacy_env";
+  PROVIDER_DEFAULT: "provider_default";
+}>;
+
 export const RESOLVER_CODES: Readonly<{
   ENGINE_ID_REQUIRED: "ENGINE_ID_REQUIRED";
   MODEL_REF_REQUIRED: "MODEL_REF_REQUIRED";
@@ -7,12 +13,31 @@ export const RESOLVER_CODES: Readonly<{
   INVALID_MODEL_IDENTITY: "INVALID_MODEL_IDENTITY";
 }>;
 
+export type ModelPlaneResolution =
+  | {
+      ok: true;
+      engineId: EngineeringEngineId;
+      identity: ModelIdentityV1;
+      providerModelId: string;
+      selectionSource: string;
+      model: { id: string };
+    }
+  | { ok: false; code: string; message: string };
+
+export function resolveCursorEngineModel(input?: {
+  toolEnv?: Record<string, string | undefined>;
+  env?: Record<string, string | undefined>;
+  providerModelId?: string | null;
+  modelIdentity?: object | null;
+  pathKey?: string | null;
+}): ModelPlaneResolution;
+
 export function resolveModelForEngine(input?: {
   engineId?: string | null;
   providerModelId?: string | null;
   provider?: string | null;
   modelIdentity?: object | null;
   pathKey?: string | null;
-}):
-  | { ok: true; engineId: EngineeringEngineId; identity: ModelIdentityV1 }
-  | { ok: false; code: string; message: string };
+  toolEnv?: Record<string, string | undefined>;
+  env?: Record<string, string | undefined>;
+}): ModelPlaneResolution;

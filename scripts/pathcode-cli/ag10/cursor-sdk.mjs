@@ -17,6 +17,8 @@ import {
   reclaimTtyForeground,
   reassertPathTitle,
 } from "../terminal-title.mjs";
+import { CURSOR_DEFAULT_PROVIDER_MODEL_ID } from "../model-plane/adapters/cursor-catalog.mjs";
+import { resolveCursorEngineModel } from "../model-plane/resolver.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(HERE, "../../..");
@@ -163,12 +165,11 @@ export function resolveCursorApiKey(base = process.env, opts = {}) {
  * @param {Record<string, string | undefined>} [base]
  */
 export function resolveCursorModel(base = process.env) {
-  const id =
-    (typeof base.PATHCODE_CURSOR_MODEL === "string" &&
-      base.PATHCODE_CURSOR_MODEL.trim()) ||
-    (typeof base.CURSOR_MODEL === "string" && base.CURSOR_MODEL.trim()) ||
-    "composer-2.5";
-  return { id };
+  const resolved = resolveCursorEngineModel({ toolEnv: base });
+  if (!resolved.ok) {
+    return { id: CURSOR_DEFAULT_PROVIDER_MODEL_ID };
+  }
+  return { id: resolved.providerModelId };
 }
 
 /**
@@ -352,6 +353,15 @@ export async function createCursorEngine(options) {
       ? options.sessionId.trim()
       : `path-cursor-${options.taskId}`;
 
+  const explicitModelId =
+    typeof options.model?.id === "string" && options.model.id.trim()
+      ? options.model.id.trim()
+      : null;
+  const modelPlaneResolution = resolveCursorEngineModel({
+    toolEnv: options.toolEnv,
+    providerModelId: explicitModelId,
+  });
+
   /** @type {'native_sdk'|'auth_required'|'unavailable'|'none'} */
   let mode = "none";
   /** @type {any} */
@@ -394,7 +404,13 @@ export async function createCursorEngine(options) {
       return { ok: false, reason: loaded.reason };
     }
     AgentCtor = loaded.sdk.Agent;
-    const model = options.model || resolveCursorModel(options.toolEnv || process.env);
+    if (!modelPlaneResolution.ok) {
+      return {
+        ok: false,
+        reason: modelPlaneResolution.code || "model_resolution_failed",
+      };
+    }
+    const model = modelPlaneResolution.model;
     if (!existsSync(cwd)) {
       return { ok: false, reason: `cwd_missing:${cwd}` };
     }
@@ -527,8 +543,19 @@ export async function createCursorEngine(options) {
 
     try {
       // Local SDK requires an explicit model on create and/or send.
-      const model =
-        options.model || resolveCursorModel(options.toolEnv || process.env);
+      if (!modelPlaneResolution.ok) {
+        return withEngineProvenance(
+          {
+            ok: false,
+            mode,
+            code: modelPlaneResolution.code || "MODEL_RESOLUTION_FAILED",
+            detail: modelPlaneResolution.message || "cursor model resolution failed",
+            changedFiles: [],
+          },
+          "cursor",
+        );
+      }
+      const model = modelPlaneResolution.model;
       const run = await agent.send(String(turn.prompt || ""), { model });
       activeRun = run;
       reclaimTitle();
