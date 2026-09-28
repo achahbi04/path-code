@@ -107,6 +107,8 @@ describe("P6.0 resolveModelForEngine", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.engineId).toBe("cursor");
+    expect(result.identity).not.toBeNull();
+    if (!result.identity) return;
     expect(result.identity.pathKey).toBe("cursor:composer-2.5");
     expect(result.identity.availability).toBe(AVAILABILITY.UNKNOWN);
   });

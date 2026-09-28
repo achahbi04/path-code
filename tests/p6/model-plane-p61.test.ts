@@ -72,6 +72,8 @@ describe("P6.1 legacy env absorption", () => {
     if (!resolved.ok) return;
     expect(resolved.providerModelId).toBe("composer-2.5");
     expect(resolved.selectionSource).toBe(SELECTION_SOURCE.PROVIDER_DEFAULT);
+    expect(resolved.identity).not.toBeNull();
+    if (!resolved.identity) return;
     expect(resolved.identity.pathKey).toBe("cursor:composer-2.5");
   });
 });
