@@ -65,7 +65,8 @@ describe("P6.2 path.model.execution.v1 checkpoint persistence", () => {
     });
     writeTaskCheckpoint(root, cp);
     const loaded = readTaskCheckpoint(root, "p62-cursor");
-    const turn = loaded?.engineTurns?.[0] as Record<string, unknown>;
+    const turns = loaded?.engineTurns as Array<Record<string, unknown>> | undefined;
+    const turn = turns?.[0];
     expect(turn?.executionSchema).toBe(MODEL_EXECUTION_SCHEMA);
     expect(turn?.requestedModel).toBe("composer-2.5");
     expect(turn?.actualModel).toBeNull();
@@ -105,7 +106,8 @@ describe("P6.2 path.model.execution.v1 checkpoint persistence", () => {
       ],
     });
     const loaded = readTaskCheckpoint(root, "p62-roundtrip");
-    const turn = loaded?.engineTurns?.[0] as Record<string, unknown>;
+    const turns = loaded?.engineTurns as Array<Record<string, unknown>> | undefined;
+    const turn = turns?.[0];
     expect(turn?.selectionSource).toBe(SELECTION_SOURCE.LEGACY_ENV);
     expect(turn?.pathKey).toBe("cursor:composer-2.5");
     expect(turn?.catalogSource).toBe(CATALOG_SOURCE.LEGACY_ENV);

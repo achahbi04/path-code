@@ -41,6 +41,25 @@ export function extractProviderProvenance(
   provider: string | null;
   engineMode: string | null;
   model: string | null;
+  requestedModel: string | null;
+  actualModel: string | null;
+  actualModelKnown: boolean;
+  pathKey: string | null;
+  selectionSource: string | null;
+  fallbackOccurred: boolean;
+  catalogSource: string | null;
+  autoPolicyVersion: string | null;
+  modelExecution: {
+    executionSchema: string | null;
+    requestedModel: string | null;
+    actualModel: string | null;
+    actualModelKnown: boolean;
+    pathKey: string | null;
+    selectionSource: string | null;
+    fallbackOccurred: boolean;
+    catalogSource: string | null;
+    autoPolicyVersion: string | null;
+  };
   sessionId: string | null;
   executionProvider: string | null;
   turns: Array<{
@@ -51,6 +70,15 @@ export function extractProviderProvenance(
     sessionId?: string | null;
     provider?: string | null;
     state?: string;
+    executionSchema?: string;
+    requestedModel?: string | null;
+    actualModel?: string | null;
+    actualModelKnown?: boolean;
+    pathKey?: string | null;
+    selectionSource?: string | null;
+    fallbackOccurred?: boolean;
+    catalogSource?: string | null;
+    autoPolicyVersion?: string | null;
   }>;
 };
 export function classifyTraceTerminal(lines: object[] | null | undefined): {

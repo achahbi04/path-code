@@ -37,3 +37,8 @@ export function readTaskCheckpoint(
   runtimeRoot: string,
   taskId: string,
 ): TaskCheckpoint | null;
+export function patchTaskCheckpoint(
+  runtimeRoot: string,
+  taskId: string,
+  patch: Partial<TaskCheckpoint>,
+): TaskCheckpoint;
