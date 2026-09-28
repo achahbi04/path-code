@@ -33,7 +33,9 @@ import {
 } from "./guards.mjs";
 import { SteeringQueue } from "./steering.mjs";
 import { createCopilotEngine } from "./copilot-sdk.mjs";
-import { createCursorEngine, resolveCursorApiKey, resolveCursorModel } from "./cursor-sdk.mjs";
+import { createCursorEngine, resolveCursorApiKey } from "./cursor-sdk.mjs";
+import { buildModelExecutionFromResolution } from "../model-plane/execution-provenance.mjs";
+import { resolveCursorEngineModel } from "../model-plane/resolver.mjs";
 import {
   selectEngineForTurn,
   resolvePreferredEngine,
@@ -189,6 +191,10 @@ export async function createG10Fabric(options) {
     const role = /^(primary|repair|handoff)$/.test(String(partial.role || ""))
       ? String(partial.role)
       : "handoff";
+    const executionRow =
+      partial?.modelExecution && typeof partial.modelExecution === "object"
+        ? partial.modelExecution
+        : null;
     const prior = Array.isArray(checkpoint.engineTurns) ? [...checkpoint.engineTurns] : [];
     const last = prior[prior.length - 1];
     const finishing =
@@ -207,12 +213,18 @@ export async function createG10Fabric(options) {
         provider: partial.provider === undefined ? last.provider : partial.provider,
         mode: partial.mode || last.mode,
         sessionId: partial.sessionId || last.sessionId,
+        ...(executionRow ? executionRow : {}),
       };
     } else {
       prior.push({
         engine,
         provider: typeof partial.provider === "string" ? partial.provider : null,
-        model: typeof partial.model === "string" && partial.model.trim() ? partial.model.trim() : null,
+        model:
+          executionRow
+            ? null
+            : typeof partial.model === "string" && partial.model.trim()
+              ? partial.model.trim()
+              : null,
         mode: typeof partial.mode === "string" ? partial.mode : null,
         sessionId: typeof partial.sessionId === "string" ? partial.sessionId : null,
         taskId: options.taskId,
@@ -220,6 +232,7 @@ export async function createG10Fabric(options) {
         startedAt: partial.startedAt || new Date().toISOString(),
         finishedAt: null,
         state: partial.state || "started",
+        ...(executionRow ? executionRow : {}),
       });
     }
     return persist({
@@ -653,15 +666,26 @@ export async function createG10Fabric(options) {
     const cursorRole = /^(primary|repair|handoff)$/.test(String(turn.role || ""))
       ? String(turn.role)
       : "handoff";
-    const cursorModel = resolveCursorModel(options.toolEnv || process.env);
+    const cursorPlane = resolveCursorEngineModel({
+      toolEnv: options.toolEnv || process.env,
+    });
+    const cursorModelExecution = cursorPlane.ok
+      ? buildModelExecutionFromResolution({
+          resolution: cursorPlane,
+          engine: "cursor",
+          engineMode: "native_sdk",
+          provider: null,
+          actualModelKnown: false,
+        })
+      : null;
     noteEngineExecution({
       engine: "cursor",
       role: cursorRole,
       mode: "native_sdk",
       provider: null,
-      model: cursorModel?.id || null,
       sessionId: cursor.getSessionId?.() || null,
       state: "started",
+      modelExecution: cursorModelExecution,
     });
     steering.setMutationActive(true);
     try {
@@ -726,8 +750,8 @@ export async function createG10Fabric(options) {
         role: cursorRole,
         mode: cursor.getMode?.() || "native_sdk",
         sessionId: cursor.getSessionId?.() || null,
-        model: cursorModel?.id || null,
         state: leased?.ok === true ? "finished" : "failed",
+        modelExecution: cursorModelExecution,
       });
       persist({
         latestEngineTurn: "cursor",

@@ -10,6 +10,10 @@ import {
   resolveEngineeringReportPath,
 } from "../engineering-report.mjs";
 import { readTaskTrace } from "../task-trace.mjs";
+import {
+  readModelExecutionFromTurn,
+  projectLegacyModelField,
+} from "../model-plane/execution-provenance.mjs";
 
 /**
  * @param {unknown} value
@@ -102,10 +106,24 @@ export function extractProviderProvenance(cp, snap = null, reportText = "") {
     fromReport ||
     engineNameFromTurn(snap?.engine) ||
     null;
+  const modelExecution = executed
+    ? readModelExecutionFromTurn(executed)
+    : readModelExecutionFromTurn(null);
   return {
     provider,
     engineMode: executed?.mode || null,
-    model: executed?.model || null,
+    model: executed ? projectLegacyModelField(executed) : null,
+    requestedModel: modelExecution.requestedModel,
+    actualModel: modelExecution.actualModelKnown
+      ? modelExecution.actualModel
+      : null,
+    actualModelKnown: modelExecution.actualModelKnown,
+    pathKey: modelExecution.pathKey,
+    selectionSource: modelExecution.selectionSource,
+    fallbackOccurred: modelExecution.fallbackOccurred,
+    catalogSource: modelExecution.catalogSource,
+    autoPolicyVersion: modelExecution.autoPolicyVersion,
+    modelExecution,
     sessionId: executed?.sessionId || null,
     executionProvider: executed?.provider || null,
     turns,

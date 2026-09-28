@@ -14,6 +14,10 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { ensureAg9RuntimeDirs } from "../ag9/layout.mjs";
+import {
+  MODEL_EXECUTION_SCHEMA,
+  sealEngineTurnExecutionFields,
+} from "../model-plane/execution-provenance.mjs";
 
 /**
  * @typedef {object} G10TaskCheckpoint
@@ -240,13 +244,20 @@ function sealEngineTurns(value) {
       const engine = String(turn.engine || "").toLowerCase();
       if (!/^(antigravity|copilot|cursor)$/.test(engine)) return null;
       const role = String(turn.role || "");
+      const execution = sealEngineTurnExecutionFields(turn);
+      const hasExecution = turn.executionSchema === MODEL_EXECUTION_SCHEMA;
+      const legacyModel =
+        typeof turn.model === "string" && turn.model.trim()
+          ? turn.model.trim().slice(0, 80)
+          : null;
       return {
         engine,
         provider: typeof turn.provider === "string" ? turn.provider.slice(0, 80) : null,
-        model:
-          typeof turn.model === "string" && turn.model.trim()
-            ? turn.model.trim().slice(0, 80)
-            : null,
+        model: hasExecution
+          ? execution.actualModelKnown && execution.actualModel
+            ? execution.actualModel
+            : null
+          : legacyModel,
         mode: typeof turn.mode === "string" ? turn.mode.slice(0, 40) : null,
         sessionId:
           typeof turn.sessionId === "string" ? turn.sessionId.slice(0, 120) : null,
@@ -255,6 +266,7 @@ function sealEngineTurns(value) {
         startedAt: typeof turn.startedAt === "string" ? turn.startedAt : null,
         finishedAt: typeof turn.finishedAt === "string" ? turn.finishedAt : null,
         state: typeof turn.state === "string" ? turn.state.slice(0, 40) : null,
+        ...execution,
       };
     })
     .filter(Boolean)
