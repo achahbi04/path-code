@@ -19,6 +19,16 @@ import {
   materializeCursorModelIdentity,
   readLegacyCursorModelFromEnv,
 } from "./adapters/cursor-catalog.mjs";
+import {
+  COPILOT_ENGINE_ID,
+  materializeCopilotModelIdentity,
+} from "./adapters/copilot-catalog.mjs";
+import {
+  ANTIGRAVITY_DEFAULT_PROVIDER_MODEL_ID,
+  ANTIGRAVITY_ENGINE_ID,
+  materializeAntigravityModelIdentity,
+  readLegacyAntigravityModelFromEnv,
+} from "./adapters/antigravity-catalog.mjs";
 
 export const SELECTION_SOURCE = Object.freeze({
   EXPLICIT_TURN: "explicit_turn",
@@ -47,18 +57,21 @@ function incompatible(engineId, identity) {
 }
 
 /**
- * @param {object} identity
+ * @param {EngineeringEngineId} engineId
+ * @param {object | null} identity
  * @param {string} selectionSource
- * @param {string} providerModelId
+ * @param {string | null | undefined} providerModelId
  */
-function okResolution(identity, selectionSource, providerModelId) {
+function okEngineResolution(engineId, identity, selectionSource, providerModelId) {
+  const id =
+    typeof providerModelId === "string" ? providerModelId.trim() : "";
   return {
     ok: true,
-    engineId: CURSOR_ENGINE_ID,
-    identity,
-    providerModelId,
+    engineId,
+    identity: identity ?? null,
+    providerModelId: id || null,
     selectionSource,
-    model: { id: providerModelId },
+    model: id ? { id } : null,
   };
 }
 
@@ -88,7 +101,8 @@ export function resolveCursorEngineModel(input = {}) {
     if (validated.identity.engineId !== CURSOR_ENGINE_ID) {
       return incompatible(CURSOR_ENGINE_ID, validated.identity);
     }
-    return okResolution(
+    return okEngineResolution(
+      CURSOR_ENGINE_ID,
       validated.identity,
       SELECTION_SOURCE.EXPLICIT_TURN,
       validated.identity.providerModelId,
@@ -122,7 +136,8 @@ export function resolveCursorEngineModel(input = {}) {
         message: built.message,
       };
     }
-    return okResolution(
+    return okEngineResolution(
+      CURSOR_ENGINE_ID,
       built.identity,
       SELECTION_SOURCE.EXPLICIT_TURN,
       built.identity.providerModelId,
@@ -140,7 +155,8 @@ export function resolveCursorEngineModel(input = {}) {
         message: built.message,
       };
     }
-    return okResolution(
+    return okEngineResolution(
+      CURSOR_ENGINE_ID,
       built.identity,
       SELECTION_SOURCE.EXPLICIT_TURN,
       built.identity.providerModelId,
@@ -160,7 +176,8 @@ export function resolveCursorEngineModel(input = {}) {
         message: built.message,
       };
     }
-    return okResolution(
+    return okEngineResolution(
+      CURSOR_ENGINE_ID,
       built.identity,
       SELECTION_SOURCE.LEGACY_ENV,
       built.identity.providerModelId,
@@ -178,7 +195,235 @@ export function resolveCursorEngineModel(input = {}) {
       message: built.message,
     };
   }
-  return okResolution(
+  return okEngineResolution(
+    CURSOR_ENGINE_ID,
+    built.identity,
+    SELECTION_SOURCE.PROVIDER_DEFAULT,
+    built.identity.providerModelId,
+  );
+}
+
+/**
+ * Copilot engineering model resolution (provider default + optional explicit id).
+ *
+ * @param {{
+ *   toolEnv?: Record<string, string | undefined>,
+ *   env?: Record<string, string | undefined>,
+ *   providerModelId?: string | null,
+ *   modelIdentity?: object | null,
+ *   pathKey?: string | null,
+ * }} input
+ */
+export function resolveCopilotEngineModel(input = {}) {
+  const env = input.toolEnv || input.env || process.env;
+
+  if (input.modelIdentity) {
+    const validated = validateModelIdentity(input.modelIdentity);
+    if (!validated.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: validated.message,
+      };
+    }
+    if (validated.identity.engineId !== COPILOT_ENGINE_ID) {
+      return incompatible(COPILOT_ENGINE_ID, validated.identity);
+    }
+    return okEngineResolution(
+      COPILOT_ENGINE_ID,
+      validated.identity,
+      SELECTION_SOURCE.EXPLICIT_TURN,
+      validated.identity.providerModelId,
+    );
+  }
+
+  if (typeof input.pathKey === "string" && input.pathKey.trim()) {
+    const parsed = parsePathKey(input.pathKey);
+    if (!parsed) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: "invalid pathKey",
+      };
+    }
+    if (parsed.engineId !== COPILOT_ENGINE_ID) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.MODEL_INCOMPATIBLE,
+        message: `pathKey engine ${parsed.engineId} is not compatible with copilot`,
+      };
+    }
+    const built = materializeCopilotModelIdentity(
+      parsed.providerModelId,
+      CATALOG_SOURCE.STATIC,
+    );
+    if (!built.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: built.message,
+      };
+    }
+    return okEngineResolution(
+      COPILOT_ENGINE_ID,
+      built.identity,
+      SELECTION_SOURCE.EXPLICIT_TURN,
+      built.identity.providerModelId,
+    );
+  }
+
+  const explicit =
+    typeof input.providerModelId === "string" ? input.providerModelId.trim() : "";
+  if (explicit) {
+    const built = materializeCopilotModelIdentity(explicit, CATALOG_SOURCE.STATIC);
+    if (!built.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: built.message,
+      };
+    }
+    return okEngineResolution(
+      COPILOT_ENGINE_ID,
+      built.identity,
+      SELECTION_SOURCE.EXPLICIT_TURN,
+      built.identity.providerModelId,
+    );
+  }
+
+  return okEngineResolution(
+    COPILOT_ENGINE_ID,
+    null,
+    SELECTION_SOURCE.PROVIDER_DEFAULT,
+    null,
+  );
+}
+
+/**
+ * Antigravity engineering model resolution (static catalog + legacy env + default).
+ *
+ * @param {{
+ *   toolEnv?: Record<string, string | undefined>,
+ *   env?: Record<string, string | undefined>,
+ *   providerModelId?: string | null,
+ *   modelIdentity?: object | null,
+ *   pathKey?: string | null,
+ * }} input
+ */
+export function resolveAntigravityEngineModel(input = {}) {
+  const env = input.toolEnv || input.env || process.env;
+
+  if (input.modelIdentity) {
+    const validated = validateModelIdentity(input.modelIdentity);
+    if (!validated.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: validated.message,
+      };
+    }
+    if (validated.identity.engineId !== ANTIGRAVITY_ENGINE_ID) {
+      return incompatible(ANTIGRAVITY_ENGINE_ID, validated.identity);
+    }
+    return okEngineResolution(
+      ANTIGRAVITY_ENGINE_ID,
+      validated.identity,
+      SELECTION_SOURCE.EXPLICIT_TURN,
+      validated.identity.providerModelId,
+    );
+  }
+
+  if (typeof input.pathKey === "string" && input.pathKey.trim()) {
+    const parsed = parsePathKey(input.pathKey);
+    if (!parsed) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: "invalid pathKey",
+      };
+    }
+    if (parsed.engineId !== ANTIGRAVITY_ENGINE_ID) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.MODEL_INCOMPATIBLE,
+        message: `pathKey engine ${parsed.engineId} is not compatible with antigravity`,
+      };
+    }
+    const built = materializeAntigravityModelIdentity(
+      parsed.providerModelId,
+      CATALOG_SOURCE.STATIC,
+    );
+    if (!built.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: built.message,
+      };
+    }
+    return okEngineResolution(
+      ANTIGRAVITY_ENGINE_ID,
+      built.identity,
+      SELECTION_SOURCE.EXPLICIT_TURN,
+      built.identity.providerModelId,
+    );
+  }
+
+  const explicit =
+    typeof input.providerModelId === "string" ? input.providerModelId.trim() : "";
+  if (explicit) {
+    const built = materializeAntigravityModelIdentity(
+      explicit,
+      CATALOG_SOURCE.STATIC,
+    );
+    if (!built.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: built.message,
+      };
+    }
+    return okEngineResolution(
+      ANTIGRAVITY_ENGINE_ID,
+      built.identity,
+      SELECTION_SOURCE.EXPLICIT_TURN,
+      built.identity.providerModelId,
+    );
+  }
+
+  const legacy = readLegacyAntigravityModelFromEnv(env);
+  if (legacy) {
+    const built = materializeAntigravityModelIdentity(
+      legacy.providerModelId,
+      CATALOG_SOURCE.LEGACY_ENV,
+    );
+    if (!built.ok) {
+      return {
+        ok: false,
+        code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+        message: built.message,
+      };
+    }
+    return okEngineResolution(
+      ANTIGRAVITY_ENGINE_ID,
+      built.identity,
+      SELECTION_SOURCE.LEGACY_ENV,
+      built.identity.providerModelId,
+    );
+  }
+
+  const built = materializeAntigravityModelIdentity(
+    ANTIGRAVITY_DEFAULT_PROVIDER_MODEL_ID,
+    CATALOG_SOURCE.STATIC,
+  );
+  if (!built.ok) {
+    return {
+      ok: false,
+      code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+      message: built.message,
+    };
+  }
+  return okEngineResolution(
+    ANTIGRAVITY_ENGINE_ID,
     built.identity,
     SELECTION_SOURCE.PROVIDER_DEFAULT,
     built.identity.providerModelId,
@@ -220,6 +465,12 @@ export function resolveModelForEngine(input = {}) {
 
   if (engineId === CURSOR_ENGINE_ID) {
     return resolveCursorEngineModel(input);
+  }
+  if (engineId === COPILOT_ENGINE_ID) {
+    return resolveCopilotEngineModel(input);
+  }
+  if (engineId === ANTIGRAVITY_ENGINE_ID) {
+    return resolveAntigravityEngineModel(input);
   }
 
   if (input.modelIdentity) {

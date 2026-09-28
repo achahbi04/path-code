@@ -35,7 +35,12 @@ import { SteeringQueue } from "./steering.mjs";
 import { createCopilotEngine } from "./copilot-sdk.mjs";
 import { createCursorEngine, resolveCursorApiKey } from "./cursor-sdk.mjs";
 import { buildModelExecutionFromResolution } from "../model-plane/execution-provenance.mjs";
-import { resolveCursorEngineModel } from "../model-plane/resolver.mjs";
+import {
+  resolveAntigravityEngineModel,
+  resolveCopilotEngineModel,
+  resolveCursorEngineModel,
+} from "../model-plane/resolver.mjs";
+import { resolveAg1ExecutionIdentity } from "../ag1/cloud-env.mjs";
 import {
   selectEngineForTurn,
   resolvePreferredEngine,
@@ -530,14 +535,28 @@ export async function createG10Fabric(options) {
     const copilotRole = /^(primary|repair|handoff)$/.test(String(turn.role || ""))
       ? String(turn.role)
       : "handoff";
+    const copilotPlane = resolveCopilotEngineModel({
+      toolEnv: options.toolEnv || process.env,
+      providerModelId:
+        typeof turn.model === "string" ? turn.model : null,
+    });
+    const copilotModelExecution = copilotPlane.ok
+      ? buildModelExecutionFromResolution({
+          resolution: copilotPlane,
+          engine: "copilot",
+          engineMode: copilot.getMode?.() || "none",
+          provider: null,
+          actualModelKnown: false,
+        })
+      : null;
     noteEngineExecution({
       engine: "copilot",
       role: copilotRole,
       mode: copilot.getMode?.() || "none",
       provider: null,
-      model: typeof turn.model === "string" ? turn.model : null,
       sessionId: copilot.getSessionId?.() || null,
       state: "started",
+      modelExecution: copilotModelExecution,
     });
     steering.setMutationActive(true);
     try {
@@ -602,6 +621,7 @@ export async function createG10Fabric(options) {
         mode: copilot.getMode?.() || null,
         sessionId: copilot.getSessionId?.() || null,
         state: leased?.ok === true ? "finished" : "failed",
+        modelExecution: copilotModelExecution,
       });
       persist({
         latestEngineTurn: "copilot",
@@ -808,6 +828,30 @@ export async function createG10Fabric(options) {
     applySteeringBoundary();
     const before = captureTaskReality(options.worktreePath, options.toolEnv);
     beginEngineTurn("antigravity");
+    const agRole = /^(primary|repair|handoff)$/.test(String(turn.role || ""))
+      ? String(turn.role)
+      : "handoff";
+    const agEnv = options.toolEnv || process.env;
+    const agPlane = resolveAntigravityEngineModel({ toolEnv: agEnv });
+    const agIdentity = resolveAg1ExecutionIdentity(agEnv);
+    const agModelExecution = agPlane.ok
+      ? buildModelExecutionFromResolution({
+          resolution: agPlane,
+          engine: "antigravity",
+          engineMode: "bridge",
+          provider: agIdentity.provider,
+          actualModelKnown: false,
+        })
+      : null;
+    noteEngineExecution({
+      engine: "antigravity",
+      role: agRole,
+      mode: "bridge",
+      provider: agIdentity.provider,
+      sessionId: null,
+      state: "started",
+      modelExecution: agModelExecution,
+    });
     steering.setMutationActive(true);
     try {
       const leased = await withMutationLease(
@@ -848,6 +892,14 @@ export async function createG10Fabric(options) {
           detail: "NO_PROGRESS_COLLABORATION — needs direction",
         });
       }
+      noteEngineExecution({
+        engine: "antigravity",
+        role: agRole,
+        mode: "bridge",
+        provider: agIdentity.provider,
+        state: leased?.ok === true ? "finished" : "failed",
+        modelExecution: agModelExecution,
+      });
       persist({
         latestEngineTurn: "antigravity",
         agSessionMode: agBind?.getMode?.() || "ACTIVE",

@@ -13,6 +13,8 @@ import { ensureAg1Runtime } from "./runtime-bootstrap.mjs";
 import { proveLocalSandboxConfinement } from "./sandbox-proof.mjs";
 import { detectAg1Auth } from "./auth-detect.mjs";
 import { hydrateAg1CloudEnv, resolveAg1ExecutionIdentity } from "./cloud-env.mjs";
+import { buildModelExecutionFromResolution } from "../model-plane/execution-provenance.mjs";
+import { resolveAntigravityEngineModel } from "../model-plane/resolver.mjs";
 import { primaryAdapterFor, selectPrimaryEngine } from "../ag10/engine-contract.mjs";
 import { admitPrimaryCheckout } from "./admission.mjs";
 import { commitTaskWorktree } from "./task-commit.mjs";
@@ -1254,15 +1256,25 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   } else {
     primaryEngine = "antigravity";
     const agIdentity = resolveAg1ExecutionIdentity(process.env);
+    const agPlane = resolveAntigravityEngineModel({ env: process.env });
+    const agModelExecution = agPlane.ok
+      ? buildModelExecutionFromResolution({
+          resolution: agPlane,
+          engine: "antigravity",
+          engineMode: "bridge",
+          provider: agIdentity.provider,
+          actualModelKnown: false,
+        })
+      : null;
     try {
       g10Fabric?.noteEngineExecution?.({
         engine: "antigravity",
         role: "primary",
         mode: "bridge",
         provider: agIdentity.provider,
-        model: agIdentity.model,
         sessionId: taskId,
         state: "started",
+        modelExecution: agModelExecution,
       });
     } catch {
       /* provenance is best-effort; the turn still runs */

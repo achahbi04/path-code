@@ -16,6 +16,7 @@ import {
   reclaimTtyForeground,
   reassertPathTitle,
 } from "../terminal-title.mjs";
+import { resolveCopilotEngineModel } from "../model-plane/resolver.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(HERE, "../../..");
@@ -166,6 +167,11 @@ export async function createCopilotEngine(options) {
     typeof options.sessionId === "string" && options.sessionId.trim()
       ? options.sessionId.trim()
       : `path-${options.taskId}`;
+  const modelPlaneResolution = resolveCopilotEngineModel({
+    toolEnv: { ...process.env, ...(options.toolEnv || {}) },
+    providerModelId:
+      typeof options.model === "string" ? options.model : null,
+  });
 
   /** @type {'native_sdk'|'cli_fallback'|'auth_required'|'none'} */
   let mode = "none";
@@ -265,8 +271,8 @@ export async function createCopilotEngine(options) {
       workingDirectory: options.cwd,
       onPermissionRequest: approveAll,
       clientName: "path-code",
-      ...(typeof options.model === "string" && options.model
-        ? { model: options.model }
+      ...(modelPlaneResolution.ok && modelPlaneResolution.providerModelId
+        ? { model: modelPlaneResolution.providerModelId }
         : {}),
       ...(typeof options.configDirectory === "string" && options.configDirectory
         ? { configDirectory: options.configDirectory }
