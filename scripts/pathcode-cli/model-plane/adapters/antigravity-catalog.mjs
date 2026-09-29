@@ -1,8 +1,8 @@
 /**
  * P6.3 — Antigravity static model catalog (no dynamic discovery).
  *
- * Evidence: ag1/cloud-env.mjs hydrate default AG1_MODEL=gemini-2.5-flash;
- * resolveAg1ExecutionIdentity reads AG1_MODEL then GOOGLE_CLOUD_MODEL.
+ * Evidence: the bridge defaults to gemini-2.5-flash after checking
+ * AG1_MODEL and GOOGLE_CLOUD_MODEL.
  */
 
 import {
@@ -13,7 +13,7 @@ import {
 
 export const ANTIGRAVITY_ENGINE_ID = "antigravity";
 
-/** Hydrated default in cloud-env.mjs when AG1_MODEL unset. */
+/** Bridge provider default when neither model env is set. */
 export const ANTIGRAVITY_DEFAULT_PROVIDER_MODEL_ID = "gemini-2.5-flash";
 
 const ANTIGRAVITY_STATIC_SEED = Object.freeze([

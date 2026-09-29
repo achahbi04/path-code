@@ -40,7 +40,7 @@ import {
   resolveCopilotEngineModel,
   resolveCursorEngineModel,
 } from "../model-plane/resolver.mjs";
-import { resolveAg1ExecutionIdentity } from "../ag1/cloud-env.mjs";
+import { resolveAg1BridgeConfiguration, resolveAg1ExecutionIdentity } from "../ag1/cloud-env.mjs";
 import {
   selectEngineForTurn,
   resolvePreferredEngine,
@@ -70,6 +70,7 @@ import {
  *   wallClockMs?: number,
  *   preferCopilotSdk?: boolean,
  *   toolEnv?: Record<string, string>,
+ *   agModelResolution?: object,
  *   copilotConfigDirectory?: string,
  * }} options
  */
@@ -831,9 +832,17 @@ export async function createG10Fabric(options) {
     const agRole = /^(primary|repair|handoff)$/.test(String(turn.role || ""))
       ? String(turn.role)
       : "handoff";
-    const agEnv = options.toolEnv || process.env;
-    const agPlane = resolveAntigravityEngineModel({ toolEnv: agEnv });
-    const agIdentity = resolveAg1ExecutionIdentity(agEnv);
+    const agConfiguration = resolveAg1BridgeConfiguration({
+      env: { ...process.env, ...(options.toolEnv || {}) },
+      ...(options.agModelResolution?.ok
+        ? { providerModelId: options.agModelResolution.providerModelId }
+        : {}),
+    });
+    const agPlane = options.agModelResolution?.ok
+      ? options.agModelResolution
+      : agConfiguration.resolution;
+    const agEnv = agConfiguration.ok ? agConfiguration.env : null;
+    const agIdentity = resolveAg1ExecutionIdentity(agEnv || process.env);
     const agModelExecution = agPlane.ok
       ? buildModelExecutionFromResolution({
           resolution: agPlane,
@@ -871,7 +880,10 @@ export async function createG10Fabric(options) {
             engine: "antigravity",
             detail: "continuing engineering in the task workspace",
           });
-          return turn.runTurn();
+          return turn.runTurn({
+            providerModelId: agPlane.ok ? agPlane.providerModelId : null,
+            env: agEnv,
+          });
         },
       );
       const after = captureTaskReality(options.worktreePath, options.toolEnv);

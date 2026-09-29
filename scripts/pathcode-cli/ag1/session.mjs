@@ -12,9 +12,8 @@ import { assertAg1VenvReady } from "./venv-guard.mjs";
 import { ensureAg1Runtime } from "./runtime-bootstrap.mjs";
 import { proveLocalSandboxConfinement } from "./sandbox-proof.mjs";
 import { detectAg1Auth } from "./auth-detect.mjs";
-import { hydrateAg1CloudEnv, resolveAg1ExecutionIdentity } from "./cloud-env.mjs";
+import { hydrateAg1CloudEnv, resolveAg1BridgeConfiguration, resolveAg1ExecutionIdentity } from "./cloud-env.mjs";
 import { buildModelExecutionFromResolution } from "../model-plane/execution-provenance.mjs";
-import { resolveAntigravityEngineModel } from "../model-plane/resolver.mjs";
 import { primaryAdapterFor, selectPrimaryEngine } from "../ag10/engine-contract.mjs";
 import { admitPrimaryCheckout } from "./admission.mjs";
 import { commitTaskWorktree } from "./task-commit.mjs";
@@ -233,6 +232,9 @@ export function scrubEngineIdentity(text) {
  *   suppressTaskReceived?: boolean,
  *   resumeTaskId?: string,
  *   taskId?: string,
+ *   providerModelId?: string | null,
+ *   modelIdentity?: object | null,
+ *   pathKey?: string | null,
  * }} options
  */
 export async function runAntigravityEngineeringSession(prompt, options = {}) {
@@ -353,8 +355,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     };
   }
 
-  hydrateAg1CloudEnv(process.env);
-  const auth = detectAg1Auth(process.env);
+  const cloudEnv = hydrateAg1CloudEnv({ ...process.env });
+  const auth = detectAg1Auth(cloudEnv);
   if (!auth.ok) {
     write(`${auth.message}\n`);
     emit("session.terminal", {
@@ -577,6 +579,20 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     });
   }
 
+  const toolEnv =
+    preparedEnv?.toolEnv && typeof preparedEnv.toolEnv === "object"
+      ? /** @type {Record<string, string>} */ (preparedEnv.toolEnv)
+      : null;
+  const agConfiguration = resolveAg1BridgeConfiguration({
+    env: { ...cloudEnv, ...(toolEnv || {}) },
+    providerModelId: options.providerModelId,
+    modelIdentity: options.modelIdentity,
+    pathKey: options.pathKey,
+  });
+  if (!agConfiguration.ok) {
+    throw new Error(agConfiguration.resolution.message);
+  }
+
   try {
     const ag10 = await import("../ag10/index.mjs");
     const resumeObjective =
@@ -596,6 +612,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         preparedEnv?.toolEnv && typeof preparedEnv.toolEnv === "object"
           ? /** @type {Record<string, string>} */ (preparedEnv.toolEnv)
           : undefined,
+      agModelResolution: agConfiguration.resolution,
       preferCopilotSdk: options.preferCopilotSdk !== false,
       emit: (event) => {
         if (event && typeof event.type === "string") {
@@ -677,12 +694,6 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     }
   }
 
-  /** @type {Record<string, string> | null} */
-  const toolEnv =
-    preparedEnv?.toolEnv && typeof preparedEnv.toolEnv === "object"
-      ? /** @type {Record<string, string>} */ (preparedEnv.toolEnv)
-      : null;
-
   const sandbox = proveLocalSandboxConfinement({
     ...(options.checkoutRoot ? { checkoutRoot: options.checkoutRoot } : {}),
   });
@@ -751,6 +762,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
 
   const agent = createAntigravityEngineeringAgent({
     ...(options.checkoutRoot ? { checkoutRoot: options.checkoutRoot } : {}),
+    env: agConfiguration.env,
     onEvent: (msg) => {
       try {
         g10Fabric?.onAntigravityBridgeEvent?.(msg);
@@ -1255,8 +1267,8 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     });
   } else {
     primaryEngine = "antigravity";
-    const agIdentity = resolveAg1ExecutionIdentity(process.env);
-    const agPlane = resolveAntigravityEngineModel({ env: process.env });
+    const agIdentity = resolveAg1ExecutionIdentity(agConfiguration.env);
+    const agPlane = agConfiguration.resolution;
     const agModelExecution = agPlane.ok
       ? buildModelExecutionFromResolution({
           resolution: agPlane,

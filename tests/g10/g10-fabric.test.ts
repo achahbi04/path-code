@@ -247,6 +247,38 @@ describe("G10 fabric guards", () => {
     expect(cp?.latestEngineTurn).toBe("antigravity");
   });
 
+  it("P6.3 collaboration uses the bridge model for callback and provenance", async () => {
+    const { createG10Fabric, readTaskCheckpoint } = await loadAg10();
+    const root = tmp("p63-collab");
+    const wt = tmp("p63-collab-wt");
+    initGitRepo(wt);
+    const fabric = await createG10Fabric({
+      runtimeRoot: root,
+      taskId: "p63-collab",
+      worktreePath: wt,
+      objective: "verify model alignment",
+      toolEnv: { AG1_MODEL: "X", GOOGLE_CLOUD_MODEL: "Z", GOOGLE_CLOUD_PROJECT: "test-project" },
+      preferCopilotSdk: false,
+    });
+    let configuredModel: string | null = null;
+    try {
+      await fabric.runAntigravityCollabTurn({
+        runTurn: ({ providerModelId, env }: { providerModelId: string; env: Record<string, string> }) => {
+          configuredModel = env.AG1_MODEL || null;
+          expect(providerModelId).toBe(env.AG1_MODEL);
+          return { ok: true };
+        },
+      });
+      const turn = readTaskCheckpoint(root, "p63-collab")?.engineTurns?.at(-1);
+      expect(configuredModel).toBe("X");
+      expect(turn?.requestedModel).toBe(configuredModel);
+      expect(turn?.actualModel).toBeNull();
+      expect(turn?.actualModelKnown).toBe(false);
+    } finally {
+      await fabric.shutdown();
+    }
+  });
+
   it("pins a stable host Copilot CLI path for Keychain ACL identity", async () => {
     const sdkPath = join(CHECKOUT_ROOT, "scripts/pathcode-cli/ag10/copilot-sdk.mjs");
     const {

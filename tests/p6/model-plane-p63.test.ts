@@ -1,9 +1,10 @@
 /**
  * P6.3 — Copilot + Antigravity factual static catalogs.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -36,6 +37,8 @@ const CHECKOUT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const COPILOT_SDK = join(CHECKOUT, "scripts/pathcode-cli/ag10/copilot-sdk.mjs");
 const AG10_CONTRACT = join(CHECKOUT, "scripts/pathcode-cli/ag10/engine-contract.mjs");
 const MODEL_PLANE = join(CHECKOUT, "scripts/pathcode-cli/model-plane");
+const CLOUD_ENV = pathToFileURL(join(CHECKOUT, "scripts/pathcode-cli/ag1/cloud-env.mjs")).href;
+const BRIDGE_CLIENT = pathToFileURL(join(CHECKOUT, "scripts/pathcode-cli/ag1/bridge-client.mjs")).href;
 
 describe("P6.3 Copilot catalog and provider default", () => {
   it("A — does not invent static Copilot model IDs", () => {
@@ -88,6 +91,78 @@ describe("P6.3 Copilot catalog and provider default", () => {
 });
 
 describe("P6.3 Antigravity catalog and legacy env", () => {
+  it("resolves each model source once for provenance and bridge child configuration", async () => {
+    const { resolveAg1BridgeConfiguration } = await import(CLOUD_ENV);
+    const { buildBridgeChildEnv } = await import(BRIDGE_CLIENT);
+    const cases = [
+      { env: { AG1_MODEL: "Y", GOOGLE_CLOUD_MODEL: "Z" }, expected: "Y", source: SELECTION_SOURCE.LEGACY_ENV },
+      { env: { GOOGLE_CLOUD_MODEL: "Z" }, expected: "Z", source: SELECTION_SOURCE.LEGACY_ENV },
+      { env: {}, expected: "gemini-2.5-flash", source: SELECTION_SOURCE.PROVIDER_DEFAULT },
+      { env: { AG1_MODEL: "Y", GOOGLE_CLOUD_MODEL: "Z" }, providerModelId: "X", expected: "X", source: SELECTION_SOURCE.EXPLICIT_TURN },
+      { env: { AG1_MODEL: "Y", GOOGLE_CLOUD_MODEL: "Z" }, pathKey: "antigravity:X-path", expected: "X-path", source: SELECTION_SOURCE.EXPLICIT_TURN },
+    ];
+    for (const input of cases) {
+      const configured = resolveAg1BridgeConfiguration(input);
+      expect(configured.ok).toBe(true);
+      if (!configured.ok) continue;
+      const childEnv = buildBridgeChildEnv(configured.env);
+      const provenance = buildModelExecutionFromResolution({
+        resolution: configured.resolution,
+        engine: "antigravity",
+        engineMode: "bridge",
+        actualModelKnown: false,
+      });
+      expect(childEnv.AG1_MODEL).toBe(input.expected);
+      expect(provenance?.requestedModel).toBe(childEnv.AG1_MODEL);
+      expect(provenance?.selectionSource).toBe(input.source);
+      expect(provenance?.actualModel).toBeNull();
+      expect(provenance?.actualModelKnown).toBe(false);
+    }
+  });
+
+  it("hydration preserves GOOGLE_CLOUD_MODEL without manufacturing AG1_MODEL", async () => {
+    const { hydrateAg1CloudEnv } = await import(CLOUD_ENV);
+    const env = hydrateAg1CloudEnv({ GOOGLE_CLOUD_MODEL: "Z", GOOGLE_CLOUD_PROJECT: "test-project" });
+    expect(env.AG1_MODEL).toBeUndefined();
+    expect(env.GOOGLE_CLOUD_MODEL).toBe("Z");
+    const defaultEnv = hydrateAg1CloudEnv({ GOOGLE_CLOUD_PROJECT: "test-project" });
+    expect(defaultEnv.AG1_MODEL).toBeUndefined();
+  });
+
+  it("passes the explicit configured model to an actual bridge child", async () => {
+    const { resolveAg1BridgeConfiguration } = await import(CLOUD_ENV);
+    const { createAntigravityEngineeringAgent } = await import(BRIDGE_CLIENT);
+    const dir = mkdtempSync(join(tmpdir(), "path-p63-bridge-"));
+    try {
+      const script = join(dir, "bridge.cjs");
+      writeFileSync(script, 'process.stdout.write(JSON.stringify({type:"started", model:process.env.AG1_MODEL})+"\\n"); process.stdin.resume();');
+      const configured = resolveAg1BridgeConfiguration({ env: { GOOGLE_CLOUD_PROJECT: "test-project", AG1_MODEL: "Y" }, providerModelId: "X" });
+      expect(configured.ok).toBe(true);
+      if (!configured.ok) return;
+      let resolveStarted: (model: string) => void = () => {};
+      const started = new Promise<string>((resolve) => { resolveStarted = resolve; });
+      const agent = createAntigravityEngineeringAgent({
+        checkoutRoot: CHECKOUT,
+        runtimeRoot: dir,
+        pythonPath: process.execPath,
+        bridgeScript: script,
+        env: configured.env,
+        onEvent: (event: { type?: string; model?: string }) => {
+          if (event.type === "started") resolveStarted(String(event.model));
+        },
+      });
+      try {
+        const result = await agent.startTask({ taskId: "p63", workspace: dir, task: "test" });
+        expect(result.ok).toBe(true);
+        expect(await started).toBe(configured.resolution.providerModelId);
+      } finally {
+        agent.cancel();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("D — defaults to evidence-backed gemini-2.5-flash", () => {
     const plane = resolveAntigravityEngineModel({ toolEnv: {} });
     expect(plane.ok).toBe(true);

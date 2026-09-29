@@ -7,13 +7,12 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { resolveAntigravityEngineModel } from "../model-plane/resolver.mjs";
 
 /**
  * Model and provider the Antigravity bridge will actually use.
  * Null provider when no project and no API key are configured.
- * The model is the resolved AG1_MODEL / GOOGLE_CLOUD_MODEL value, which
- * hydrateAg1CloudEnv sets before the bridge starts. It is not inferred
- * from a catalog.
+ * The model is the configured AG1_MODEL / GOOGLE_CLOUD_MODEL value.
  *
  * @param {NodeJS.ProcessEnv} [env]
  */
@@ -60,9 +59,6 @@ export function hydrateAg1CloudEnv(env = process.env) {
   if (!(typeof out.GOOGLE_CLOUD_LOCATION === "string" && out.GOOGLE_CLOUD_LOCATION.trim())) {
     out.GOOGLE_CLOUD_LOCATION = "us-central1";
   }
-  if (!(typeof out.AG1_MODEL === "string" && out.AG1_MODEL.trim())) {
-    out.AG1_MODEL = "gemini-2.5-flash";
-  }
   // Prefer Vertex when a project is available and ADC exists (or flag already set).
   const project =
     (typeof out.GOOGLE_CLOUD_PROJECT === "string" && out.GOOGLE_CLOUD_PROJECT.trim()) ||
@@ -79,4 +75,19 @@ export function hydrateAg1CloudEnv(env = process.env) {
     }
   }
   return out;
+}
+
+/** Resolve once from the original env, then configure the bridge child from that result. */
+export function resolveAg1BridgeConfiguration(input = {}) {
+  const sourceEnv = { ...(input.env || process.env) };
+  const resolution = resolveAntigravityEngineModel({
+    env: sourceEnv,
+    providerModelId: input.providerModelId,
+    modelIdentity: input.modelIdentity,
+    pathKey: input.pathKey,
+  });
+  if (!resolution.ok) return { ok: false, resolution };
+  const env = hydrateAg1CloudEnv(sourceEnv);
+  env.AG1_MODEL = resolution.providerModelId;
+  return { ok: true, resolution, env };
 }
