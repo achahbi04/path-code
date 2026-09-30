@@ -16,21 +16,25 @@ import {
 import {
   CURSOR_DEFAULT_PROVIDER_MODEL_ID,
   CURSOR_ENGINE_ID,
+  getCursorStaticCatalogIdentities,
   materializeCursorModelIdentity,
   readLegacyCursorModelFromEnv,
 } from "./adapters/cursor-catalog.mjs";
 import {
   COPILOT_ENGINE_ID,
+  getCopilotStaticCatalogIdentities,
   materializeCopilotModelIdentity,
 } from "./adapters/copilot-catalog.mjs";
 import {
   ANTIGRAVITY_DEFAULT_PROVIDER_MODEL_ID,
   ANTIGRAVITY_ENGINE_ID,
+  getAntigravityStaticCatalogIdentities,
   materializeAntigravityModelIdentity,
   readLegacyAntigravityModelFromEnv,
 } from "./adapters/antigravity-catalog.mjs";
 import { readPreferences } from "../preferences.mjs";
 import { readProjectModelPreferences } from "./preference-config.mjs";
+import { resolveAutoModelPolicy } from "./auto-policy.mjs";
 
 export const SELECTION_SOURCE = Object.freeze({
   EXPLICIT_TURN: "explicit_turn",
@@ -38,6 +42,7 @@ export const SELECTION_SOURCE = Object.freeze({
   PROJECT_DEFAULT: "project_default",
   USER_DEFAULT: "user_default",
   LEGACY_ENV: "legacy_env",
+  AUTO: "auto",
   PROVIDER_DEFAULT: "provider_default",
 });
 
@@ -47,14 +52,29 @@ export const RESOLVER_CODES = Object.freeze({
   MODEL_INCOMPATIBLE: "MODEL_INCOMPATIBLE",
   INVALID_MODEL_IDENTITY: "INVALID_MODEL_IDENTITY",
   AUTO_POLICY_PENDING: "AUTO_POLICY_PENDING",
+  MODEL_RESOLUTION_FAILED: "MODEL_RESOLUTION_FAILED",
 });
+
+function resolveAuto(engineId) {
+  const contract = engineId === CURSOR_ENGINE_ID
+    ? { catalog: getCursorStaticCatalogIdentities(), adapterDefaultId: CURSOR_DEFAULT_PROVIDER_MODEL_ID }
+    : engineId === ANTIGRAVITY_ENGINE_ID
+      ? { catalog: getAntigravityStaticCatalogIdentities(), adapterDefaultId: ANTIGRAVITY_DEFAULT_PROVIDER_MODEL_ID }
+      : { catalog: getCopilotStaticCatalogIdentities(), supportsUnnamedProviderDefault: true };
+  const chosen = resolveAutoModelPolicy({ engineId, ...contract });
+  if (!chosen.ok) return chosen;
+  return {
+    ...okEngineResolution(engineId, chosen.identity, SELECTION_SOURCE.AUTO, chosen.providerModelId),
+    autoPolicyVersion: chosen.autoPolicyVersion,
+  };
+}
 
 function resolvePreferenceTier(engineId, input, materialize) {
   const pin = input.taskPin;
   if (pin) {
     if (pin.engineId !== engineId) return incompatible(engineId, { pathKey: `${pin.engineId}:${pin.providerModelId}` });
     if (pin.providerModelId === "auto") {
-      return { ok: false, code: RESOLVER_CODES.AUTO_POLICY_PENDING, message: `Auto model policy is not implemented for ${engineId}` };
+      return resolveAuto(engineId);
     }
     const built = materialize(pin.providerModelId, CATALOG_SOURCE.STATIC);
     if (!built.ok) return { ok: false, code: RESOLVER_CODES.INVALID_MODEL_IDENTITY, message: built.message };
@@ -80,7 +100,7 @@ function resolvePreferenceTier(engineId, input, materialize) {
   ]) {
     if (value === undefined || value === null) continue;
     if (value === "auto") {
-      return { ok: false, code: RESOLVER_CODES.AUTO_POLICY_PENDING, message: `Auto model policy is not implemented for ${engineId}`, diagnostics };
+      return { ...resolveAuto(engineId), diagnostics };
     }
     const built = materialize(value, CATALOG_SOURCE.STATIC);
     if (!built.ok) return { ok: false, code: RESOLVER_CODES.INVALID_MODEL_IDENTITY, message: built.message, diagnostics };
@@ -198,6 +218,7 @@ export function resolveCursorEngineModel(input = {}) {
 
   const explicit =
     typeof input.providerModelId === "string" ? input.providerModelId.trim() : "";
+  if (explicit === "auto") return resolveAuto(CURSOR_ENGINE_ID);
   if (explicit) {
     const built = materializeCursorModelIdentity(explicit, CATALOG_SOURCE.STATIC);
     if (!built.ok) {
@@ -238,23 +259,7 @@ export function resolveCursorEngineModel(input = {}) {
     ), preferred);
   }
 
-  const built = materializeCursorModelIdentity(
-    CURSOR_DEFAULT_PROVIDER_MODEL_ID,
-    CATALOG_SOURCE.STATIC,
-  );
-  if (!built.ok) {
-    return {
-      ok: false,
-      code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
-      message: built.message,
-    };
-  }
-  return withPreferenceDiagnostics(okEngineResolution(
-    CURSOR_ENGINE_ID,
-    built.identity,
-    SELECTION_SOURCE.PROVIDER_DEFAULT,
-    built.identity.providerModelId,
-  ), preferred);
+  return withPreferenceDiagnostics(resolveAuto(CURSOR_ENGINE_ID), preferred);
 }
 
 /**
@@ -328,6 +333,7 @@ export function resolveCopilotEngineModel(input = {}) {
 
   const explicit =
     typeof input.providerModelId === "string" ? input.providerModelId.trim() : "";
+  if (explicit === "auto") return resolveAuto(COPILOT_ENGINE_ID);
   if (explicit) {
     const built = materializeCopilotModelIdentity(explicit, CATALOG_SOURCE.STATIC);
     if (!built.ok) {
@@ -347,12 +353,7 @@ export function resolveCopilotEngineModel(input = {}) {
 
   const preferred = resolvePreferenceTier(COPILOT_ENGINE_ID, input, materializeCopilotModelIdentity);
   if ("ok" in preferred) return preferred;
-  return withPreferenceDiagnostics(okEngineResolution(
-    COPILOT_ENGINE_ID,
-    null,
-    SELECTION_SOURCE.PROVIDER_DEFAULT,
-    null,
-  ), preferred);
+  return withPreferenceDiagnostics(resolveAuto(COPILOT_ENGINE_ID), preferred);
 }
 
 /**
@@ -426,6 +427,7 @@ export function resolveAntigravityEngineModel(input = {}) {
 
   const explicit =
     typeof input.providerModelId === "string" ? input.providerModelId.trim() : "";
+  if (explicit === "auto") return resolveAuto(ANTIGRAVITY_ENGINE_ID);
   if (explicit) {
     const built = materializeAntigravityModelIdentity(
       explicit,
@@ -469,23 +471,7 @@ export function resolveAntigravityEngineModel(input = {}) {
     ), preferred);
   }
 
-  const built = materializeAntigravityModelIdentity(
-    ANTIGRAVITY_DEFAULT_PROVIDER_MODEL_ID,
-    CATALOG_SOURCE.STATIC,
-  );
-  if (!built.ok) {
-    return {
-      ok: false,
-      code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
-      message: built.message,
-    };
-  }
-  return withPreferenceDiagnostics(okEngineResolution(
-    ANTIGRAVITY_ENGINE_ID,
-    built.identity,
-    SELECTION_SOURCE.PROVIDER_DEFAULT,
-    built.identity.providerModelId,
-  ), preferred);
+  return withPreferenceDiagnostics(resolveAuto(ANTIGRAVITY_ENGINE_ID), preferred);
 }
 
 /**

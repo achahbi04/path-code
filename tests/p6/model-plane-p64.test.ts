@@ -55,7 +55,7 @@ describe("P6.4 preferences and resolver hierarchy", () => {
     const copilot = resolveModelForEngine({ ...base, engineId: "copilot" });
     expect(copilot.ok && copilot.providerModelId).toBe("copilot-user");
     const antigravity = resolveModelForEngine({ ...base, engineId: "antigravity", toolEnv: {} });
-    expect(antigravity.ok && antigravity.selectionSource).toBe(SELECTION_SOURCE.PROVIDER_DEFAULT);
+    expect(antigravity.ok && antigravity.selectionSource).toBe(SELECTION_SOURCE.AUTO);
     expect(writeProjectModelPreference({ projectRoot, engineId: "cursor", modelId: "cursor-project" }).ok).toBe(true);
     const project = resolveModelForEngine(base);
     expect(project.ok && project.providerModelId).toBe("cursor-project");
@@ -160,7 +160,6 @@ describe("P6.4 preferences and resolver hierarchy", () => {
     expect(persisted?.selectionSource).toBe(before.selectionSource);
     expect(writeProjectModelPreference({ projectRoot, engineId: "cursor", modelId: "auto" }).ok).toBe(true);
     const auto = resolveModelForEngine({ engineId: "cursor", projectRoot, preferencesEnv: env, toolEnv: {} });
-    expect(auto.ok).toBe(false);
-    if (!auto.ok) expect(auto.code).toBe(RESOLVER_CODES.AUTO_POLICY_PENDING);
+    expect(auto.ok && auto.selectionSource).toBe(SELECTION_SOURCE.AUTO);
   });
 });

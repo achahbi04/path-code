@@ -51,7 +51,7 @@ describe("P6.3 Copilot catalog and provider default", () => {
     if (!plane.ok) return;
     expect(plane.providerModelId).toBeNull();
     expect(plane.model).toBeNull();
-    expect(plane.selectionSource).toBe(SELECTION_SOURCE.PROVIDER_DEFAULT);
+    expect(plane.selectionSource).toBe(SELECTION_SOURCE.AUTO);
     const exec = buildModelExecutionFromResolution({
       resolution: plane,
       engine: "copilot",
@@ -63,7 +63,7 @@ describe("P6.3 Copilot catalog and provider default", () => {
     expect(exec?.requestedModel).toBeNull();
     expect(exec?.actualModel).toBeNull();
     expect(exec?.actualModelKnown).toBe(false);
-    expect(exec?.selectionSource).toBe(SELECTION_SOURCE.PROVIDER_DEFAULT);
+    expect(exec?.selectionSource).toBe(SELECTION_SOURCE.AUTO);
   });
 
   it("C — explicit Copilot model is engine-scoped and passes resolution only to Copilot", () => {
@@ -97,7 +97,7 @@ describe("P6.3 Antigravity catalog and legacy env", () => {
     const cases = [
       { env: { AG1_MODEL: "Y", GOOGLE_CLOUD_MODEL: "Z" }, expected: "Y", source: SELECTION_SOURCE.LEGACY_ENV },
       { env: { GOOGLE_CLOUD_MODEL: "Z" }, expected: "Z", source: SELECTION_SOURCE.LEGACY_ENV },
-      { env: {}, expected: "gemini-2.5-flash", source: SELECTION_SOURCE.PROVIDER_DEFAULT },
+      { env: {}, expected: "gemini-2.5-flash", source: SELECTION_SOURCE.AUTO },
       { env: { AG1_MODEL: "Y", GOOGLE_CLOUD_MODEL: "Z" }, providerModelId: "X", expected: "X", source: SELECTION_SOURCE.EXPLICIT_TURN },
       { env: { AG1_MODEL: "Y", GOOGLE_CLOUD_MODEL: "Z" }, pathKey: "antigravity:X-path", expected: "X-path", source: SELECTION_SOURCE.EXPLICIT_TURN },
     ];
@@ -169,7 +169,7 @@ describe("P6.3 Antigravity catalog and legacy env", () => {
     if (!plane.ok) return;
     expect(plane.providerModelId).toBe(ANTIGRAVITY_DEFAULT_PROVIDER_MODEL_ID);
     expect(plane.identity?.pathKey).toBe("antigravity:gemini-2.5-flash");
-    expect(plane.selectionSource).toBe(SELECTION_SOURCE.PROVIDER_DEFAULT);
+    expect(plane.selectionSource).toBe(SELECTION_SOURCE.AUTO);
   });
 
   it("E — AG1_MODEL wins over GOOGLE_CLOUD_MODEL", () => {

@@ -68,7 +68,7 @@ export function buildModelExecutionFromResolution(input) {
           : resolution.identity?.catalogSource === CATALOG_SOURCE.STATIC
             ? CATALOG_SOURCE.STATIC
             : null,
-    autoPolicyVersion: trimString(input.autoPolicyVersion, 40),
+    autoPolicyVersion: trimString(input.autoPolicyVersion ?? resolution.autoPolicyVersion, 40),
   };
 }
 

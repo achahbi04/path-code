@@ -6,6 +6,7 @@ export const SELECTION_SOURCE: Readonly<{
   PROJECT_DEFAULT: "project_default";
   USER_DEFAULT: "user_default";
   LEGACY_ENV: "legacy_env";
+  AUTO: "auto";
   PROVIDER_DEFAULT: "provider_default";
 }>;
 
@@ -15,6 +16,7 @@ export const RESOLVER_CODES: Readonly<{
   MODEL_INCOMPATIBLE: "MODEL_INCOMPATIBLE";
   INVALID_MODEL_IDENTITY: "INVALID_MODEL_IDENTITY";
   AUTO_POLICY_PENDING: "AUTO_POLICY_PENDING";
+  MODEL_RESOLUTION_FAILED: "MODEL_RESOLUTION_FAILED";
 }>;
 
 export type ModelPlaneResolution =
@@ -25,6 +27,7 @@ export type ModelPlaneResolution =
       providerModelId: string | null;
       selectionSource: string;
       model: { id: string } | null;
+      autoPolicyVersion?: string;
       diagnostics?: Array<{ code: string; message: string; path?: string }>;
     }
   | { ok: false; code: string; message: string; diagnostics?: Array<{ code: string; message: string; path?: string }> };

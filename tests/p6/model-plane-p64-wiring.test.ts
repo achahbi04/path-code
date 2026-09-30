@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { createCheckpointSkeleton, patchTaskCheckpoint, readTaskCheckpoint, writeTaskCheckpoint } from "../../scripts/pathcode-cli/ag10/task-checkpoint.mjs";
 import { buildModelExecutionFromResolution } from "../../scripts/pathcode-cli/model-plane/execution-provenance.mjs";
-import { RESOLVER_CODES, SELECTION_SOURCE } from "../../scripts/pathcode-cli/model-plane/resolver.mjs";
+import { SELECTION_SOURCE } from "../../scripts/pathcode-cli/model-plane/resolver.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const moduleUrl = (relative: string) => pathToFileURL(join(ROOT, relative)).href;
@@ -70,11 +70,10 @@ describe("P6.4 production model context", () => {
     expect(legacy.ok && legacy.selectionSource).toBe(SELECTION_SOURCE.LEGACY_ENV);
     const provider = await entry("copilot", { projectRoot, toolEnv: { PATHCODE_STATE_DIR: state } });
     expect(provider.ok && provider.providerModelId).toBeNull();
-    expect(provider.ok && provider.selectionSource).toBe(SELECTION_SOURCE.PROVIDER_DEFAULT);
+    expect(provider.ok && provider.selectionSource).toBe(SELECTION_SOURCE.AUTO);
     expect(writeProjectModelPreference({ projectRoot, engineId: "cursor", modelId: "auto" }).ok).toBe(true);
     const auto = await entry("cursor", { projectRoot, toolEnv: { PATHCODE_STATE_DIR: state, CURSOR_MODEL: "cursor-legacy" } });
-    expect(auto.ok).toBe(false);
-    if (!auto.ok) expect(auto.code).toBe(RESOLVER_CODES.AUTO_POLICY_PENDING);
+    expect(auto.ok && auto.selectionSource).toBe(SELECTION_SOURCE.AUTO);
   });
 
   it("Antigravity primary configuration consumes its canonical checkpoint pin", async () => {
