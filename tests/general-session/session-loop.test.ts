@@ -5,8 +5,9 @@
  * Zero live providers. Zero credentials on the wire.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { Readable, Writable } from "node:stream";
 import { createHash } from "node:crypto";
 
@@ -194,6 +195,51 @@ describe("R2 living session loop (shell)", { timeout: 20_000 }, () => {
     expect(output).toContain("Model set to gpt-next-model");
     expect(output).toContain("Autonomy set to bounded");
     expect(output).toMatch(/Applies to subsequent tasks/);
+  });
+
+  it("P6.7 keeps General Session model and engineering override in separate session inputs", async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const { output } = await runRepl(
+      ["first task", "/model gpt-next", "/engineering-model auto", "second task", "/engineering-model composer-2.5", "third task", "/exit"],
+      {
+        runAg1Session: async (_p: unknown, options: Record<string, unknown>) => {
+          seen.push(options);
+          return { exitCode: 0, outcome: "VERIFIED", engineActivityCount: 1 };
+        },
+      },
+      ["--model", "gpt-first", "--engineering-model", "gemini-2.5-flash"],
+    );
+    expect(seen.map((turn) => turn.engineeringModelId)).toEqual(["gemini-2.5-flash", "auto", "composer-2.5"]);
+    expect(seen.every((turn) => turn.modelId === undefined)).toBe(true);
+    expect(output).toContain("Model set to gpt-next");
+    expect(output).toContain("Engineering model override set to auto");
+  });
+
+  it("P6.7 /engineering-model does not persist a General Session or engineering default", async () => {
+    const state = mkdtempSync(join(tmpdir(), "path-p67-session-state-"));
+    const prior = process.env.PATHCODE_STATE_DIR;
+    process.env.PATHCODE_STATE_DIR = state;
+    try {
+      const seen: unknown[] = [];
+      await runRepl(["/engineering-model auto", "engineering task", "/exit"], {
+        runAg1Session: async (_p: unknown, options: Record<string, unknown>) => {
+          seen.push(options.engineeringModelId);
+          return { exitCode: 0, outcome: "VERIFIED" };
+        },
+      }, []);
+      await runRepl(["flag task", "/exit"], {
+        runAg1Session: async (_p: unknown, options: Record<string, unknown>) => {
+          seen.push(options.engineeringModelId);
+          return { exitCode: 0, outcome: "VERIFIED" };
+        },
+      }, ["--engineering-model", "composer-2.5"]);
+      expect(seen).toEqual(["auto", "composer-2.5"]);
+      expect(existsSync(join(state, "preferences.json"))).toBe(false);
+    } finally {
+      if (prior === undefined) delete process.env.PATHCODE_STATE_DIR;
+      else process.env.PATHCODE_STATE_DIR = prior;
+      rmSync(state, { recursive: true, force: true });
+    }
   });
 
   it("R2-E: local AG1 path does not require OpenAI credential prompts", async () => {

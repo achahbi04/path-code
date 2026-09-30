@@ -62,7 +62,7 @@ export function renderWelcomeScreen(opts = {}) {
     "  /history [n]        Past tasks for this install (durable)",
     "  /report · /inspect  Open a finished task result",
     "  /merge · /discard · /pr   Result lifecycle",
-    "  /prefs · /model · /autonomy   Preferences",
+    "  /prefs · /model · /engineering-model · /autonomy   Preferences",
     "  /attach [id]        Rejoin a Gateway-owned task still running",
     "  /resume [id]        Continue an interrupted task after restart",
     "  /build …            Debug Build loop (product surface: path-build)",
@@ -97,6 +97,7 @@ checkout untouched.
 Usage:
   pathcode
   pathcode --issue <number>
+  pathcode --engineering-model <model-id|auto>
   pathcode doctor
   pathcode --help
   pathcode --version
@@ -115,7 +116,8 @@ At the prompt:
   /resume [id]   Recover an interrupted task from durable checkpoint/worktree
   /build …       Debug Build loop — product builder is: path-build / node scripts/path-build.mjs
   /log, /task    Show recent structured task trace lines
-  /model <id>    Set model for subsequent tasks (persisted)
+  /model <id>    Set General Session model (persisted)
+  /engineering-model <id|auto>  Engineering override for subsequent turns
   /autonomy …    Set review|bounded for subsequent tasks (persisted)
   /prefs         Show durable model + autonomy and their sources
   /help          Show commands
@@ -131,6 +133,8 @@ While a task is running:
 Flags:
   --issue <n>    Load GitHub issue #n as task context; after VERIFIED,
                  offer one publication approval (push + pull request)
+  --model <id>   General Session model only
+  --engineering-model <id|auto>  Engineering override for the selected engine
   --help, -h     Show this help
   --version      Show version
   doctor         Readiness check (install, platform, Node, Git, runtime,

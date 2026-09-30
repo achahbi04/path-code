@@ -49,6 +49,7 @@ import { admitPrimaryCheckout } from "./pathcode-cli/ag1/admission.mjs";
 import { basename } from "node:path";
 import { recoverPathOwnedStaleWorktrees } from "./pathcode-cli/ag5/orphan-recovery.mjs";
 import { runPathcodeDoctor } from "./pathcode-cli/ag5/doctor.mjs";
+import { validateEngineeringModelCommand } from "./pathcode-cli/model-plane/command-override.mjs";
 import {
   assertSupportedNode,
   assertSupportedPlatform,
@@ -86,6 +87,7 @@ function parseArgs(argv) {
    *   version: boolean,
    *   doctor: boolean,
    *   model: string | null,
+   *   engineeringModel: string | null,
    *   autonomy: "review" | "bounded",
    *   autonomyExplicit: boolean,
    *   events: null | "ndjson",
@@ -99,6 +101,7 @@ function parseArgs(argv) {
     version: false,
     doctor: false,
     model: null,
+    engineeringModel: null,
     autonomy: "review",
     autonomyExplicit: false,
     events: null,
@@ -136,6 +139,16 @@ function parseArgs(argv) {
         return { ok: false, message: "Usage: pathcode --model <id>" };
       }
       out.model = next.trim();
+      i += 1;
+      continue;
+    }
+    if (a === "--engineering-model") {
+      const next = argv[i + 1];
+      const checked = validateEngineeringModelCommand(next);
+      if (!checked.ok || (typeof next === "string" && next.startsWith("-"))) {
+        return { ok: false, message: "Usage: pathcode --engineering-model <model-id|auto>" };
+      }
+      out.engineeringModel = checked.value;
       i += 1;
       continue;
     }
@@ -409,9 +422,14 @@ export async function runPathcodeMain(argv, testIo = {}) {
   }
 
   if (args.doctor) {
-    const report = runPathcodeDoctor({ packageRoot: root, cwd: process.cwd() });
+    const report = runPathcodeDoctor({ packageRoot: root, cwd: process.cwd(), engineeringModelId: args.engineeringModel });
     stdout.write(report.text);
     return report.exitCode;
+  }
+
+  if (args.execution === "cloud" && args.engineeringModel) {
+    stderr.write("--engineering-model applies to local engineering turns; --execution cloud uses General Session --model.\n");
+    return 2;
   }
 
   if (args.rest.length > 0) {
@@ -538,6 +556,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
     prefsAtLaunch.modelId ??
     process.env.PATHCODE_OPENAI_MODEL ??
     null;
+  let engineeringModelId = args.engineeringModel;
   let autonomyMode = args.autonomyExplicit
     ? args.autonomy
     : prefsAtLaunch.autonomy ?? args.autonomy;
@@ -1136,6 +1155,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
             const started = await gatewayClient.startTask(taskText, {
               sessionId,
               sessionBaseCommit: sessionStats.sessionBaseCommit,
+              ...(engineeringModelId ? { engineeringModelId } : {}),
             });
             if (!started?.taskId) {
               throw new Error(started?.message || "gateway task start failed");
@@ -1173,6 +1193,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
               objective: taskText,
               sessionId,
               sessionBaseCommit: sessionStats.sessionBaseCommit,
+              ...(engineeringModelId ? { engineeringModelId } : {}),
             });
             if (!started.ok) {
               throw new Error(started.message || "gateway task start failed");
@@ -1208,6 +1229,7 @@ export async function runPathcodeMain(argv, testIo = {}) {
             sessionEventEmit: eventSink.emit,
             cardsOwnProgress: ttyInline,
             sessionBaseCommit: sessionStats.sessionBaseCommit,
+            ...(engineeringModelId ? { engineeringModelId } : {}),
             signal,
           });
         }
@@ -2801,7 +2823,28 @@ export async function runPathcodeMain(argv, testIo = {}) {
         continue;
       }
 
-      // Session settings — affect SUBSEQUENT tasks; persist to preferences.json.
+      // Session engineering override affects subsequent turns; no preference write.
+      if (cmd.startsWith("/engineering-model")) {
+        if (args.execution === "cloud") {
+          showOperatorReply(prompt, ttyInline ? inlineStudio : null,
+            "/engineering-model applies to local engineering turns; this session uses General Session /model.");
+          redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+          continue;
+        }
+        const parts = cmd.split(/\s+/);
+        const checked = parts.length === 2 ? validateEngineeringModelCommand(parts[1]) : { ok: false };
+        if (!checked.ok || parts[1]?.startsWith("-")) {
+          showOperatorReply(prompt, ttyInline ? inlineStudio : null, "Usage: /engineering-model <model-id|auto>");
+        } else {
+          engineeringModelId = checked.value;
+          showOperatorReply(prompt, ttyInline ? inlineStudio : null,
+            `Engineering model override set to ${engineeringModelId} for subsequent turns in this session.`);
+        }
+        redrawPrompt(prompt, unicode, plain, sessionStats, ttyInline ? inlineStudio : null);
+        continue;
+      }
+
+      // General Session settings — affect SUBSEQUENT tasks; persist to preferences.json.
       if (cmd.startsWith("/model")) {
         const parts = cmd.split(/\s+/);
         const next = parts[1];

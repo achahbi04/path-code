@@ -37,6 +37,7 @@ import { createCursorEngine, resolveCursorApiKey } from "./cursor-sdk.mjs";
 import { buildModelExecutionFromResolution } from "../model-plane/execution-provenance.mjs";
 import { resolveAg1BridgeConfiguration, resolveAg1ExecutionIdentity } from "../ag1/cloud-env.mjs";
 import { resolveProductionEngineModel } from "../model-plane/production-context.mjs";
+import { resolveEngineeringModelCommand } from "../model-plane/command-override.mjs";
 import {
   selectEngineForTurn,
   resolvePreferredEngine,
@@ -67,6 +68,7 @@ import {
  *   preferCopilotSdk?: boolean,
  *   toolEnv?: Record<string, string>,
  *   agModelResolution?: object,
+ *   engineeringModelId?: string | null,
  *   copilotConfigDirectory?: string,
  * }} options
  */
@@ -140,15 +142,18 @@ export async function createG10Fabric(options) {
   /** @type {ReturnType<typeof bindAntigravitySession> | null} */
   let agBind = null;
 
-  function resolveSelectedModel(engineId, providerModelId = null) {
-    return resolveProductionEngineModel({
+  function resolveSelectedModel(engineId, providerModelId = null, includeCommand = true) {
+    const context = {
       engineId,
       env: { ...process.env, ...(options.toolEnv || {}) },
       projectRoot: options.repoRoot || checkpoint.repoRoot,
       readUserPreferences: true,
       checkpoint,
-      providerModelId,
-    });
+    };
+    if (includeCommand && !providerModelId && options.engineeringModelId) {
+      return resolveEngineeringModelCommand({ ...context, modelId: options.engineeringModelId });
+    }
+    return resolveProductionEngineModel({ ...context, providerModelId });
   }
 
   function persist(patch = {}) {
@@ -335,7 +340,10 @@ export async function createG10Fabric(options) {
     });
   }
 
-  async function attachCopilot(modelResolution = resolveSelectedModel("copilot")) {
+  async function attachCopilot(modelResolution = options.engineeringModelId
+    ? resolveProductionEngineModel({ engineId: "copilot", env: {} })
+    : resolveSelectedModel("copilot", null, false)) {
+    if (!modelResolution.ok) return modelResolution;
     // Prefer default Copilot auth discovery (~/.copilot). Only use an explicit
     // PATH-owned configDirectory when the caller opts in — isolating config
     // without forwarding OAuth makes every turn AUTH_REQUIRED.
@@ -397,7 +405,10 @@ export async function createG10Fabric(options) {
     return connected;
   }
 
-  async function attachCursor(modelResolution = resolveSelectedModel("cursor")) {
+  async function attachCursor(modelResolution = options.engineeringModelId
+    ? resolveProductionEngineModel({ engineId: "cursor", env: {} })
+    : resolveSelectedModel("cursor", null, false)) {
+    if (!modelResolution.ok) return modelResolution;
     cursor = await createCursorEngine({
       taskId: options.taskId,
       cwd: options.worktreePath,
@@ -513,6 +524,7 @@ export async function createG10Fabric(options) {
    */
   async function runCopilotCollabTurn(turn) {
     const copilotPlane = resolveSelectedModel("copilot", typeof turn.model === "string" ? turn.model : null);
+    if (!copilotPlane.ok) return { ok: false, code: copilotPlane.code, detail: copilotPlane.message, changedFiles: [] };
     if (!copilot) await attachCopilot(copilotPlane);
     const budget = resources.evaluate();
     if (budget.state === "hard") {
@@ -661,6 +673,7 @@ export async function createG10Fabric(options) {
    */
   async function runCursorCollabTurn(turn) {
     const cursorPlane = resolveSelectedModel("cursor", typeof turn.model === "string" ? turn.model : null);
+    if (!cursorPlane.ok) return { ok: false, code: cursorPlane.code, detail: cursorPlane.message, changedFiles: [] };
     if (!cursor) await attachCursor(cursorPlane);
     const budget = resources.evaluate();
     if (budget.state === "hard") {
@@ -815,6 +828,10 @@ export async function createG10Fabric(options) {
    * }} turn
    */
   async function runAntigravityCollabTurn(turn) {
+    const selectedPlane = options.engineeringModelId
+      ? resolveSelectedModel("antigravity")
+      : options.agModelResolution?.ok ? options.agModelResolution : resolveSelectedModel("antigravity");
+    if (!selectedPlane.ok) return { ok: false, code: selectedPlane.code, detail: selectedPlane.message, changedFiles: [] };
     const budget = resources.evaluate();
     if (budget.state === "hard") {
       emitG10({
@@ -843,9 +860,7 @@ export async function createG10Fabric(options) {
       : "handoff";
     const agConfiguration = resolveAg1BridgeConfiguration({
       env: { ...process.env, ...(options.toolEnv || {}) },
-      modelResolution: options.agModelResolution?.ok
-        ? options.agModelResolution
-        : resolveSelectedModel("antigravity"),
+      modelResolution: selectedPlane,
     });
     const agPlane = agConfiguration.resolution;
     const agEnv = agConfiguration.ok ? agConfiguration.env : null;

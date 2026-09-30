@@ -23,9 +23,11 @@ import {
   probeCopilotReadiness,
 } from "../ag10/engine-readiness.mjs";
 import { probeCursorDispatchReadiness } from "../ag10/cursor-sdk.mjs";
+import { readPreferences } from "../preferences.mjs";
+import { MODEL_PREFERENCE_ENGINES, readProjectModelPreferences, validateModelPreference } from "../model-plane/preference-config.mjs";
 
 /**
- * @param {{ cwd?: string, env?: NodeJS.ProcessEnv, packageRoot?: string }} [opts]
+ * @param {{ cwd?: string, env?: NodeJS.ProcessEnv, packageRoot?: string, checkpoint?: object | null, engineeringModelId?: string | null }} [opts]
  */
 export function runPathcodeDoctor(opts = {}) {
   const env = opts.env ?? process.env;
@@ -169,6 +171,79 @@ export function runPathcodeDoctor(opts = {}) {
       detail: "Skipped (not in a Git repository)",
     });
   }
+
+  // Configuration sources only. Doctor never resolves an executing engine/model.
+  rows.push({
+    name: "Explicit model",
+    ok: true,
+    detail: opts.engineeringModelId || "not set (engineering CLI override)",
+  });
+  const prefs = readPreferences({ env });
+  rows.push({
+    name: "GS model pref",
+    ok: prefs.ok,
+    optional: true,
+    detail: prefs.ok ? (prefs.generalSession.modelId || "not set") : `invalid: ${prefs.message}`,
+  });
+  rows.push({
+    name: "GS model env",
+    ok: true,
+    detail: env.PATHCODE_OPENAI_MODEL?.trim() || "not set",
+  });
+  for (const engine of ["cursor", "copilot", "antigravity"]) {
+    rows.push({
+      name: `User ${engine}`,
+      ok: prefs.ok,
+      optional: true,
+      detail: prefs.ok ? (prefs.engineering.byEngine[engine] || "not set") : `invalid: ${prefs.message}`,
+    });
+  }
+  if (project.ok) {
+    const configured = readProjectModelPreferences(project.projectRoot);
+    rows.push({
+      name: "Project models",
+      ok: configured.ok,
+      optional: true,
+      detail: configured.ok
+        ? `${configured.path} (${configured.source}; ${["cursor", "copilot", "antigravity"]
+            .filter((engine) => configured.byEngine[engine])
+            .map((engine) => `${engine}=${configured.byEngine[engine]}`).join(", ") || "no defaults"})`
+        : `${configured.path} (invalid: ${configured.message})`,
+    });
+  }
+  const pins = opts.checkpoint && typeof opts.checkpoint === "object"
+    ? opts.checkpoint.modelPreferences || {}
+    : null;
+  const pinDetails = pins && typeof pins === "object"
+    ? Object.entries(pins)
+        .filter(([engine, value]) => MODEL_PREFERENCE_ENGINES.includes(engine) && validateModelPreference(value).ok)
+        .map(([engine, value]) => `${engine}=${value}`).join(", ")
+    : "";
+  rows.push({
+    name: "Task model pin",
+    ok: true,
+    detail: pins ? pinDetails || "not set" : "no current task context",
+  });
+  for (const [key, engine] of [
+    ["PATHCODE_CURSOR_MODEL", "Cursor"],
+    ["CURSOR_MODEL", "Cursor"],
+    ["AG1_MODEL", "Antigravity"],
+    ["GOOGLE_CLOUD_MODEL", "Antigravity"],
+  ]) {
+    const value = env[key]?.trim();
+    rows.push({
+      name: key,
+      ok: true,
+      detail: value
+        ? `${engine} compatibility input: ${value}; deprecated in favor of durable model preferences`
+        : "not set",
+    });
+  }
+  rows.push({
+    name: "Model defaults",
+    ok: true,
+    detail: "Adapter/provider defaults apply after preferences and legacy env; no execution model inferred",
+  });
 
   const agReady = probeAntigravityReadiness({ env });
   rows.push({

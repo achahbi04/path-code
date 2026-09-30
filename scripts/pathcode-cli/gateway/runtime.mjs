@@ -27,6 +27,7 @@ import { admitPrimaryCheckout } from "../ag1/admission.mjs";
 import { ensureAg1Runtime } from "../ag1/runtime-bootstrap.mjs";
 import { recoverPathOwnedStaleWorktrees } from "../ag5/orphan-recovery.mjs";
 import { normalizeObjectiveText } from "../normalize-text.mjs";
+import { validateEngineeringModelCommand } from "../model-plane/command-override.mjs";
 import {
   cancelTaskProcesses,
   runWithTaskContext,
@@ -408,6 +409,10 @@ export function createGatewayRuntime(options = {}) {
     if (!objective) {
       return { ok: false, code: "OBJECTIVE_REQUIRED", message: "objective required" };
     }
+    if (params.engineeringModelId !== undefined) {
+      const checked = validateEngineeringModelCommand(params.engineeringModelId);
+      if (!checked.ok) return checked;
+    }
 
     const taskId =
       typeof params.taskId === "string" && params.taskId.trim()
@@ -705,6 +710,9 @@ export function createGatewayRuntime(options = {}) {
             typeof params.sessionBaseCommit === "string"
               ? params.sessionBaseCommit
               : null,
+          ...(typeof params.engineeringModelId === "string"
+            ? { engineeringModelId: params.engineeringModelId }
+            : {}),
           signal: abort.signal,
           runtimeRoot,
           ...(preferredEngine ? { preferredEngine } : {}),

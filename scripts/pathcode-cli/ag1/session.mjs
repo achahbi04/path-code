@@ -14,6 +14,7 @@ import { proveLocalSandboxConfinement } from "./sandbox-proof.mjs";
 import { detectAg1Auth } from "./auth-detect.mjs";
 import { hydrateAg1CloudEnv, resolveAg1BridgeConfiguration, resolveAg1ExecutionIdentity } from "./cloud-env.mjs";
 import { buildModelExecutionFromResolution } from "../model-plane/execution-provenance.mjs";
+import { resolveEngineeringModelCommand } from "../model-plane/command-override.mjs";
 import { primaryAdapterFor, selectPrimaryEngine } from "../ag10/engine-contract.mjs";
 import { admitPrimaryCheckout } from "./admission.mjs";
 import { commitTaskWorktree } from "./task-commit.mjs";
@@ -233,6 +234,7 @@ export function scrubEngineIdentity(text) {
  *   resumeTaskId?: string,
  *   taskId?: string,
  *   providerModelId?: string | null,
+ *   engineeringModelId?: string | null,
  *   modelIdentity?: object | null,
  *   pathKey?: string | null,
  * }} options
@@ -583,6 +585,15 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     preparedEnv?.toolEnv && typeof preparedEnv.toolEnv === "object"
       ? /** @type {Record<string, string>} */ (preparedEnv.toolEnv)
       : null;
+  const commandResolution = options.engineeringModelId
+    ? resolveEngineeringModelCommand({
+        engineId: "antigravity",
+        modelId: options.engineeringModelId,
+        env: { ...cloudEnv, ...(toolEnv || {}) },
+        projectRoot,
+        checkpoint: readTaskCheckpoint(runtimeRoot, worktree.taskId),
+      })
+    : null;
   const agConfiguration = resolveAg1BridgeConfiguration({
     env: { ...cloudEnv, ...(toolEnv || {}) },
     projectRoot,
@@ -590,6 +601,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
     providerModelId: options.providerModelId,
     modelIdentity: options.modelIdentity,
     pathKey: options.pathKey,
+    ...(commandResolution?.ok ? { modelResolution: commandResolution } : {}),
   });
   if (!agConfiguration.ok) {
     throw new Error(agConfiguration.resolution.message);
@@ -615,6 +627,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
           ? /** @type {Record<string, string>} */ (preparedEnv.toolEnv)
           : undefined,
       agModelResolution: agConfiguration.resolution,
+      engineeringModelId: options.engineeringModelId,
       preferCopilotSdk: options.preferCopilotSdk !== false,
       emit: (event) => {
         if (event && typeof event.type === "string") {
@@ -1171,6 +1184,9 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       "ENGINE_NOT_READY",
       primarySelection.reason || "Selected engine is not ready",
     );
+  }
+  if (primaryAdapter === "antigravity" && commandResolution && !commandResolution.ok) {
+    return endCursorAttempt(commandResolution.code, commandResolution.message);
   }
 
   if (primaryAdapter === "cursor" || primaryAdapter === "copilot") {

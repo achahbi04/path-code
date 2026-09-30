@@ -279,6 +279,33 @@ describe("G10 fabric guards", () => {
     }
   });
 
+  it("P6.7 engineering command reaches selected AG bridge and retains explicit or Auto provenance", async () => {
+    const { createG10Fabric, readTaskCheckpoint, createCheckpointSkeleton, writeTaskCheckpoint } = await loadAg10();
+    for (const [modelId, expectedModel, source] of [
+      ["gemini-2.5-flash", "gemini-2.5-flash", "explicit_turn"],
+      ["auto", "gemini-2.5-flash", "auto"],
+    ]) {
+      const root = tmp("p67-command");
+      const wt = tmp("p67-command-wt");
+      initGitRepo(wt);
+      writeTaskCheckpoint(root, createCheckpointSkeleton({ taskId: "p67-command", worktreePath: wt, modelPreferences: { antigravity: "task-pin" } }));
+      const fabric = await createG10Fabric({ runtimeRoot: root, taskId: "p67-command", worktreePath: wt, repoRoot: wt, engineeringModelId: modelId, toolEnv: { AG1_MODEL: "legacy-env", GOOGLE_CLOUD_PROJECT: "test-project" } });
+      try {
+        await fabric.runAntigravityCollabTurn({ runTurn: ({ providerModelId, env }: { providerModelId: string; env: Record<string, string> }) => {
+          expect(providerModelId).toBe(expectedModel);
+          expect(env.AG1_MODEL).toBe(expectedModel);
+          return { ok: true };
+        } });
+        const turn = (readTaskCheckpoint(root, "p67-command")?.engineTurns as Array<Record<string, unknown>>)?.at(-1);
+        expect(turn?.requestedModel).toBe(expectedModel);
+        expect(turn?.selectionSource).toBe(source);
+        expect(turn?.actualModelKnown).toBe(false);
+      } finally {
+        await fabric.shutdown();
+      }
+    }
+  });
+
   it("P6.4 standalone Antigravity callback uses project context and checkpoint pin", async () => {
     const { createG10Fabric, createCheckpointSkeleton, writeTaskCheckpoint, readTaskCheckpoint } = await loadAg10();
     const { writeProjectModelPreference } = await import(pathToFileURL(join(CHECKOUT_ROOT, "scripts/pathcode-cli/model-plane/preference-config.mjs")).href);
