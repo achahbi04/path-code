@@ -55,7 +55,7 @@ describe("P6.4 preferences and resolver hierarchy", () => {
     const copilot = resolveModelForEngine({ ...base, engineId: "copilot" });
     expect(copilot.ok && copilot.providerModelId).toBe("copilot-user");
     const antigravity = resolveModelForEngine({ ...base, engineId: "antigravity", toolEnv: {} });
-    expect(antigravity.ok && antigravity.selectionSource).toBe(SELECTION_SOURCE.AUTO);
+    expect(antigravity.ok && antigravity.selectionSource).toBe(SELECTION_SOURCE.PROVIDER_DEFAULT);
     expect(writeProjectModelPreference({ projectRoot, engineId: "cursor", modelId: "cursor-project" }).ok).toBe(true);
     const project = resolveModelForEngine(base);
     expect(project.ok && project.providerModelId).toBe("cursor-project");

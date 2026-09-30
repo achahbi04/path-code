@@ -259,7 +259,23 @@ export function resolveCursorEngineModel(input = {}) {
     ), preferred);
   }
 
-  return withPreferenceDiagnostics(resolveAuto(CURSOR_ENGINE_ID), preferred);
+  const built = materializeCursorModelIdentity(
+    CURSOR_DEFAULT_PROVIDER_MODEL_ID,
+    CATALOG_SOURCE.STATIC,
+  );
+  if (!built.ok) {
+    return {
+      ok: false,
+      code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+      message: built.message,
+    };
+  }
+  return withPreferenceDiagnostics(okEngineResolution(
+    CURSOR_ENGINE_ID,
+    built.identity,
+    SELECTION_SOURCE.PROVIDER_DEFAULT,
+    built.identity.providerModelId,
+  ), preferred);
 }
 
 /**
@@ -353,7 +369,12 @@ export function resolveCopilotEngineModel(input = {}) {
 
   const preferred = resolvePreferenceTier(COPILOT_ENGINE_ID, input, materializeCopilotModelIdentity);
   if ("ok" in preferred) return preferred;
-  return withPreferenceDiagnostics(resolveAuto(COPILOT_ENGINE_ID), preferred);
+  return withPreferenceDiagnostics(okEngineResolution(
+    COPILOT_ENGINE_ID,
+    null,
+    SELECTION_SOURCE.PROVIDER_DEFAULT,
+    null,
+  ), preferred);
 }
 
 /**
@@ -471,7 +492,23 @@ export function resolveAntigravityEngineModel(input = {}) {
     ), preferred);
   }
 
-  return withPreferenceDiagnostics(resolveAuto(ANTIGRAVITY_ENGINE_ID), preferred);
+  const built = materializeAntigravityModelIdentity(
+    ANTIGRAVITY_DEFAULT_PROVIDER_MODEL_ID,
+    CATALOG_SOURCE.STATIC,
+  );
+  if (!built.ok) {
+    return {
+      ok: false,
+      code: RESOLVER_CODES.INVALID_MODEL_IDENTITY,
+      message: built.message,
+    };
+  }
+  return withPreferenceDiagnostics(okEngineResolution(
+    ANTIGRAVITY_ENGINE_ID,
+    built.identity,
+    SELECTION_SOURCE.PROVIDER_DEFAULT,
+    built.identity.providerModelId,
+  ), preferred);
 }
 
 /**

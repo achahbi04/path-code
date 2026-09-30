@@ -70,7 +70,7 @@ describe("P6.4 production model context", () => {
     expect(legacy.ok && legacy.selectionSource).toBe(SELECTION_SOURCE.LEGACY_ENV);
     const provider = await entry("copilot", { projectRoot, toolEnv: { PATHCODE_STATE_DIR: state } });
     expect(provider.ok && provider.providerModelId).toBeNull();
-    expect(provider.ok && provider.selectionSource).toBe(SELECTION_SOURCE.AUTO);
+    expect(provider.ok && provider.selectionSource).toBe(SELECTION_SOURCE.PROVIDER_DEFAULT);
     expect(writeProjectModelPreference({ projectRoot, engineId: "cursor", modelId: "auto" }).ok).toBe(true);
     const auto = await entry("cursor", { projectRoot, toolEnv: { PATHCODE_STATE_DIR: state, CURSOR_MODEL: "cursor-legacy" } });
     expect(auto.ok && auto.selectionSource).toBe(SELECTION_SOURCE.AUTO);

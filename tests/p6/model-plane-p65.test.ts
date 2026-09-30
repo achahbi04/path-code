@@ -10,6 +10,38 @@ import { resolveProductionEngineModel } from "../../scripts/pathcode-cli/model-p
 const auto = (engineId: string, more = {}) => resolveModelForEngine({ engineId, env: {}, projectDefault: "auto", ...more });
 
 describe("P6.5 selected-engine Auto v1", () => {
+  it("keeps no selection on ordinary provider defaults without an Auto version", () => {
+    const cases = [
+      { engineId: "cursor", requestedModel: "composer-2.5", pathKey: "cursor:composer-2.5" },
+      { engineId: "copilot", requestedModel: null, pathKey: null },
+      { engineId: "antigravity", requestedModel: "gemini-2.5-flash", pathKey: "antigravity:gemini-2.5-flash" },
+    ];
+    for (const { engineId, requestedModel, pathKey } of cases) {
+      const resolved = resolveModelForEngine({ engineId, env: {} });
+      expect(resolved.ok).toBe(true);
+      if (!resolved.ok) continue;
+      expect(resolved.selectionSource).toBe(SELECTION_SOURCE.PROVIDER_DEFAULT);
+      expect(resolved.providerModelId).toBe(requestedModel);
+      expect(resolved.identity?.pathKey ?? null).toBe(pathKey);
+      expect(resolved.autoPolicyVersion).toBeUndefined();
+      const execution = buildModelExecutionFromResolution({ resolution: resolved, engine: engineId });
+      expect(execution).toMatchObject({ requestedModel, pathKey, selectionSource: "provider_default", autoPolicyVersion: null, actualModel: null, actualModelKnown: false });
+    }
+  });
+
+  it("invokes Auto only for an explicit Auto selection on each engine", () => {
+    for (const [engineId, requestedModel] of [["cursor", "composer-2.5"], ["copilot", null], ["antigravity", "gemini-2.5-flash"]] as const) {
+      const resolved = resolveModelForEngine({ engineId, env: {}, providerModelId: "auto" });
+      expect(resolved.ok).toBe(true);
+      if (!resolved.ok) continue;
+      expect(resolved.providerModelId).toBe(requestedModel);
+      expect(resolved.selectionSource).toBe(SELECTION_SOURCE.AUTO);
+      expect(resolved.autoPolicyVersion).toBe(AUTO_POLICY_VERSION);
+      const execution = buildModelExecutionFromResolution({ resolution: resolved, engine: engineId });
+      expect(execution).toMatchObject({ requestedModel, selectionSource: "auto", autoPolicyVersion: AUTO_POLICY_VERSION, actualModel: null, actualModelKnown: false });
+    }
+  });
+
   it("requires a selected engine and contains no engine-routing or scoring authority", () => {
     const missingEngine = resolveModelForEngine({ projectDefault: "auto" });
     expect(!missingEngine.ok && missingEngine.code).toBe(RESOLVER_CODES.ENGINE_ID_REQUIRED);
@@ -78,8 +110,8 @@ describe("P6.5 selected-engine Auto v1", () => {
     const legacy = resolveModelForEngine({ engineId: "cursor", env: common.env });
     expect(legacy.ok && legacy.providerModelId).toBe("legacy-id");
     expect(legacy.ok && legacy.selectionSource).toBe(SELECTION_SOURCE.LEGACY_ENV);
-    const implicitAuto = resolveModelForEngine({ engineId: "cursor", env: {} });
-    expect(implicitAuto.ok && implicitAuto.selectionSource).toBe(SELECTION_SOURCE.AUTO);
+    const providerDefault = resolveModelForEngine({ engineId: "cursor", env: {} });
+    expect(providerDefault.ok && providerDefault.selectionSource).toBe(SELECTION_SOURCE.PROVIDER_DEFAULT);
   });
 
   it("runs Auto for task, project, user, and explicit auto values", () => {
