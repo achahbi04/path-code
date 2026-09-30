@@ -94,7 +94,11 @@ body {
 .chat-composer textarea:focus {
   border-color: rgba(182, 242, 109, 0.55);
 }
-.composer-actions { display: flex; justify-content: flex-end; margin-top: 0.75rem; }
+.composer-actions { display: flex; justify-content: space-between; align-items: end; gap: 0.75rem; margin-top: 0.75rem; }
+.model-choice { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; font-size: 0.78rem; color: var(--muted); }
+.model-choice select { font: inherit; color: var(--ink); background: #0b1612; border: 1px solid var(--line); border-radius: 8px; padding: 0.38rem 0.55rem; max-width: 14rem; }
+.model-preference-hint { color: var(--muted); font-size: 0.72rem; }
+.workspace-model-choice { justify-content: flex-end; }
 .hint { margin: 0.75rem 0 0; color: var(--muted); font-size: 0.85rem; }
 .error { color: var(--danger); text-align: center; }
 
@@ -764,6 +768,7 @@ body {
 }
 .worklog-diagnostics { color: var(--muted); font-size: 0.72rem; margin: 0 0.75rem 0.35rem; }
 @media (max-width: 900px) {
+  .topbar { flex-wrap: wrap; }
   .app-shell { grid-template-columns: minmax(0, 1fr); }
   .library {
     position: fixed;

@@ -7,6 +7,11 @@ const els = {
   workspace: document.getElementById("workspace"),
   outcome: document.getElementById("outcome"),
   buildBtn: document.getElementById("buildBtn"),
+  landingModel: document.getElementById("landingModel"),
+  landingPreferredEngine: document.getElementById("landingPreferredEngine"),
+  workspaceModel: document.getElementById("workspaceModel"),
+  workspacePreferredEngine: document.getElementById("workspacePreferredEngine"),
+  workspaceModelHint: document.getElementById("workspaceModelHint"),
   landingError: document.getElementById("landingError"),
   statusPill: document.getElementById("statusPill"),
   criteriaLine: document.getElementById("criteriaLine"),
@@ -102,6 +107,8 @@ let lastView = null;
 /** @type {{ buildId: string, src: string } | null} */
 let heldPreview = null;
 let projectListScroll = 0;
+let landingModelTouched = false;
+let landingModelControl = null;
 /** @type {HTMLIFrameElement | null} */
 let visibleFrame = els.previewFrame;
 /** @type {HTMLIFrameElement | null} */
@@ -128,6 +135,35 @@ function escapeHtml(s) {
 function setWorkspaceVisible(on) {
   els.landing.hidden = on;
   els.workspace.hidden = !on;
+}
+
+function renderModelSelect(select, hint, preferred, control, allowBeforeProject = false) {
+  if (!select || !control) return;
+  const options = Array.isArray(control.options) ? control.options : [{ value: "auto", label: "Auto" }];
+  const displayedOptions = control.value === null
+    ? [{ value: "", label: "Saved model not listed", disabled: true }, ...options]
+    : options;
+  const key = displayedOptions.map((option) => `${option.value}:${option.label}`).join("|");
+  if (select.dataset.optionsKey !== key) {
+    select.replaceChildren(...displayedOptions.map((option) => {
+      const choice = new Option(option.label, option.value);
+      choice.disabled = option.disabled === true;
+      return choice;
+    }));
+    select.dataset.optionsKey = key;
+  }
+  select.value = control.value ?? "";
+  select.disabled = !control.preferredEngine || (!allowBeforeProject && !control.editable);
+  if (preferred) {
+    preferred.hidden = !control.preferredEngine;
+    preferred.textContent = control.preferredEngine
+      ? `Preferred engine: ${control.preferredEngine[0].toUpperCase()}${control.preferredEngine.slice(1)}`
+      : "";
+  }
+  if (hint) {
+    hint.hidden = !control.diagnostic;
+    hint.textContent = control.diagnostic || "";
+  }
 }
 
 function renderChat(view) {
@@ -535,6 +571,9 @@ function renderCandidateReview(view) {
 function render(view) {
   lastView = view;
   if (view?.serving) renderServingIdentity(view.serving);
+  if (view?.modelControl) {
+    renderModelSelect(els.workspaceModel, els.workspaceModelHint, els.workspacePreferredEngine, view.modelControl);
+  }
   if (!view || (view.phase === "idle" && !activeBuildId) || (!view.buildId && !activeBuildId)) {
     setWorkspaceVisible(false);
     return;
@@ -728,7 +767,7 @@ async function startBuild() {
     const res = await fetch("/api/builds", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ outcome, originKind: "build-created" }),
+      body: JSON.stringify({ outcome, originKind: "build-created", ...(landingModelTouched ? { modelId: els.landingModel.value } : {}) }),
     });
     let body = null;
     try {
@@ -908,6 +947,28 @@ async function controlBuild(action) {
 }
 
 els.buildBtn.addEventListener("click", () => void startBuild());
+els.landingModel?.addEventListener("change", () => { landingModelTouched = true; });
+els.workspaceModel?.addEventListener("change", async () => {
+  if (!activeBuildId || !lastView?.modelControl?.editable) return;
+  const modelId = els.workspaceModel.value;
+  try {
+    const res = await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/model-preference`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ modelId }),
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body?.ok) {
+      renderModelSelect(els.workspaceModel, els.workspaceModelHint, els.workspacePreferredEngine, lastView.modelControl);
+      showHandoffResult("Model preference", body || { ok: false, message: `HTTP ${res.status}` });
+      return;
+    }
+    if (body.view) render(body.view);
+  } catch (error) {
+    renderModelSelect(els.workspaceModel, els.workspaceModelHint, els.workspacePreferredEngine, lastView.modelControl);
+    showHandoffResult("Model preference", { ok: false, message: error instanceof Error ? error.message : "Request failed" });
+  }
+});
 els.outcome.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
     e.preventDefault();
@@ -947,6 +1008,8 @@ function showComposer(pushHistory) {
   heldPreview = null;
   selectedElement = null;
   lastView = null;
+  landingModelTouched = false;
+  renderModelSelect(els.landingModel, null, els.landingPreferredEngine, landingModelControl, true);
   if (visibleFrame) {
     visibleFrame.removeAttribute("src");
     visibleFrame.hidden = true;
@@ -1512,6 +1575,13 @@ bindRailRows();
 
 (async () => {
   try {
+    try {
+      const health = await fetch("/api/health").then((response) => response.json());
+      landingModelControl = health?.modelControl || null;
+      renderModelSelect(els.landingModel, null, els.landingPreferredEngine, landingModelControl, true);
+    } catch {
+      /* The static Auto control remains available while the surface reconnects. */
+    }
     await loadProjects();
     const fromUrl = new URLSearchParams(location.search).get("buildId");
     if (fromUrl) await openProject(fromUrl, "replace");

@@ -21,6 +21,6 @@ export function projectEngineeringActivity(
   phase: string;
   label: string | null;
   adoptedSha: string | null;
-  currentTask: { taskId: string | null; files: string[]; adoptedSha: string | null };
+  currentTask: { taskId: string | null; files: string[]; adoptedSha: string | null; engine: string | null; model: string };
   latestRevision: { taskId: string | null; sha: string | null; files: string[] } | null;
 };

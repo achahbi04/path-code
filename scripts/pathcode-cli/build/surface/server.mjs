@@ -28,6 +28,7 @@ import {
 } from "../index.mjs";
 import { syncConversationLifecycle } from "../controller.mjs";
 import { projectBuildForSurface } from "./product-view.mjs";
+import { projectBuilderModelControl, writeBuilderModelPreference } from "./model-control.mjs";
 import { displayTitleFor, isCreatorProject, libraryRow } from "./project-library.mjs";
 import {
   exportAuthoritativeProject,
@@ -371,6 +372,7 @@ export async function startPathBuildSurface(options) {
       ),
       fakeMode,
       preferredEngine: preferredEngine || null,
+      modelControl: projectBuilderModelControl({ preferredEngine, projectRoot: root }),
       serving,
     };
   }
@@ -511,6 +513,7 @@ export async function startPathBuildSurface(options) {
           product: "path-build",
           fakeMode,
           preferredEngine,
+          modelControl: projectBuilderModelControl({ preferredEngine }),
           runtimeRoot,
         });
         return;
@@ -613,6 +616,22 @@ export async function startPathBuildSurface(options) {
           build.displayTitle = title;
           writeBuildRecord(runtimeRoot, build);
           sendJson(res, 200, { ok: true, displayTitle: title, view: await viewFor(buildId) });
+          return;
+        }
+
+        if (method === "POST" && action === "model-preference") {
+          const rooted = assertBuildRoot(buildId);
+          if (!rooted.ok) {
+            sendJson(res, 404, rooted);
+            return;
+          }
+          const body = await readJsonBody(req);
+          const saved = writeBuilderModelPreference({
+            preferredEngine,
+            projectRoot: rooted.projectRoot,
+            modelId: body.modelId,
+          });
+          sendJson(res, saved.ok ? 200 : 400, { ...saved, ...(saved.ok ? { view: await viewFor(buildId) } : {}) });
           return;
         }
 
@@ -1054,6 +1073,14 @@ export async function startPathBuildSurface(options) {
             ? "existing-project"
             : "build-created";
 
+        if (body.modelId !== undefined) {
+          const control = projectBuilderModelControl({ preferredEngine });
+          if (!control.preferredEngine || !control.options.some((option) => option.value === body.modelId)) {
+            sendJson(res, 400, { ok: false, code: "MODEL_NOT_LISTED", message: "This model is not listed for a preferred engine." });
+            return;
+          }
+        }
+
         let targetDir =
           typeof body.targetDir === "string" && body.targetDir.trim()
             ? resolve(body.targetDir.trim())
@@ -1067,6 +1094,14 @@ export async function startPathBuildSurface(options) {
           );
         }
         mkdirSync(targetDir, { recursive: true });
+
+        if (body.modelId !== undefined) {
+          const saved = writeBuilderModelPreference({ preferredEngine, projectRoot: targetDir, modelId: body.modelId });
+          if (!saved.ok) {
+            sendJson(res, 400, saved);
+            return;
+          }
+        }
 
         const started = await coordinator.startBuild(outcome, {
           targetDir,

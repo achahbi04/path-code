@@ -108,6 +108,11 @@
           autocomplete="off"
         ></textarea>
         <div class="composer-actions">
+          <div class="model-choice">
+            <span class="model-preference-hint" id="landingPreferredEngine" hidden></span>
+            <label for="landingModel">Model</label>
+            <select id="landingModel"><option value="auto">Auto</option></select>
+          </div>
           <button type="button" class="cta" id="buildBtn">Build</button>
         </div>
         <p class="hint">Fresh project under ~/PATH Builds.</p>
@@ -124,6 +129,12 @@
           <input id="titleEditor" class="title-editor" hidden autocomplete="off" />
           <span class="status-pill" id="statusPill">Building…</span>
           <span class="criteria-line" id="criteriaLine"></span>
+        </div>
+        <div class="model-choice workspace-model-choice">
+          <span class="model-preference-hint" id="workspacePreferredEngine" hidden></span>
+          <label for="workspaceModel">Model</label>
+          <select id="workspaceModel"><option value="auto">Auto</option></select>
+          <span class="model-preference-hint" id="workspaceModelHint" hidden></span>
         </div>
       </header>
 

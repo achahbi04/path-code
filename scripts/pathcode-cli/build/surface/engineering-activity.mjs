@@ -3,6 +3,8 @@
  * Sourced from durable children, events, checkpoints, and adoption history.
  */
 
+import { readModelExecutionFromTurn, MODEL_EXECUTION_SCHEMA } from "../../model-plane/execution-provenance.mjs";
+
 const ENGINE_NAMES = new Set(["cursor", "copilot", "antigravity"]);
 const SECRET_TEXT =
   /\b(api[_-]?key|token|secret|password|authorization|bearer)\b|[A-Za-z0-9+/]{32,}={0,2}|sk-[A-Za-z0-9]{8,}|ghp_[A-Za-z0-9]+|AKIA[0-9A-Z]{16}/i;
@@ -231,6 +233,16 @@ export function projectEngineeringActivity(build, extras = {}) {
       null
     );
   })();
+  const modelExecution = readModelExecutionFromTurn(executedTurn);
+  const modelDisplay = modelExecution.executionSchema !== MODEL_EXECUTION_SCHEMA
+    ? "Unknown"
+    : modelExecution.actualModelKnown && modelExecution.actualModel
+      ? modelExecution.actualModel
+      : modelExecution.requestedModel
+        ? `${modelExecution.requestedModel} (requested)`
+        : modelExecution.selectionSource === "provider_default" || modelExecution.selectionSource === "auto"
+          ? "Provider default"
+          : "Unknown";
   const traceEngine = [...(Array.isArray(extras.traceLines) ? extras.traceLines : [])]
     .reverse()
     .map((line) =>
@@ -278,7 +290,7 @@ export function projectEngineeringActivity(build, extras = {}) {
   );
   const currentTask = {
     engine: currentOwnsCheckpoint ? engine : engineName(last?.provider),
-    model: currentOwnsCheckpoint ? executedTurn?.model || null : null,
+    model: currentOwnsCheckpoint ? modelDisplay : "Unknown",
     mode: currentOwnsCheckpoint ? executedTurn?.mode || null : null,
     executionProvider: currentOwnsCheckpoint ? executedTurn?.provider || null : null,
     sessionId: currentOwnsCheckpoint ? executedTurn?.sessionId || null : null,

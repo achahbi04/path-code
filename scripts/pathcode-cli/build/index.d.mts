@@ -602,6 +602,7 @@ export interface BuildSurface {
 export function startPathBuildSurface(options: {
   packageRoot: string;
   runtimeRoot: string;
+  preferredEngine?: string | null;
   openBrowser?: boolean;
   fakeMode?: boolean;
   autoLoop?: boolean;
