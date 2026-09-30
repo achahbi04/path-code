@@ -86,6 +86,18 @@ Options:
     ).toBeGreaterThan(0);
   });
 
+  it("P6.4 configures a selected CLI model only when the flag is supported", async () => {
+    const { buildCopilotEngineeringArgs } = await loadAg9();
+    const help = "Options:\n  -p, --prompt <text>\n  --allow-all-tools\n  --model <id>\n";
+    const configured = buildCopilotEngineeringArgs({ helpText: help, prompt: "fix", cwd: "/tmp/wt", modelId: "copilot-project" });
+    expect(configured.ok).toBe(true);
+    expect(configured.args).toContain("--model");
+    expect(configured.args[configured.args.indexOf("--model") + 1]).toBe("copilot-project");
+    const unsupported = buildCopilotEngineeringArgs({ helpText: "Options:\n  -p, --prompt <text>\n  --allow-all-tools\n", prompt: "fix", cwd: "/tmp/wt", modelId: "copilot-project" });
+    expect(unsupported.ok).toBe(false);
+    expect(unsupported.reason).toMatch(/model flag/);
+  });
+
   it("withCollabTurn journals and serializes exclusive turns", async () => {
     const {
       ensureAg9RuntimeDirs,

@@ -85,7 +85,7 @@ describe("P6.3 Copilot catalog and provider default", () => {
     expect(cursorReject.code).toBe(RESOLVER_CODES.MODEL_INCOMPATIBLE);
 
     const sdk = readFileSync(COPILOT_SDK, "utf8");
-    expect(sdk).toContain("resolveCopilotEngineModel");
+    expect(sdk).toContain("resolveProductionEngineModel");
     expect(sdk).toContain("modelPlaneResolution.providerModelId");
   });
 });

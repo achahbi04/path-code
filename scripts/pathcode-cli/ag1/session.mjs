@@ -39,7 +39,7 @@ import {
 import { resolveEngineeringCwd, resolvePathRuntimeRoot } from "../paths.mjs";
 import { detectBuildArtifact } from "../build/runtime/artifact.mjs";
 import { normalizeObjectiveText } from "../normalize-text.mjs";
-import { markTaskInterrupted } from "../ag10/task-checkpoint.mjs";
+import { markTaskInterrupted, readTaskCheckpoint } from "../ag10/task-checkpoint.mjs";
 import {
   buildEngineeringReportModel,
   formatEngineeringReportPlain,
@@ -586,6 +586,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   const agConfiguration = resolveAg1BridgeConfiguration({
     env: { ...cloudEnv, ...(toolEnv || {}) },
     projectRoot,
+    checkpoint: readTaskCheckpoint(runtimeRoot, worktree.taskId),
     providerModelId: options.providerModelId,
     modelIdentity: options.modelIdentity,
     pathKey: options.pathKey,

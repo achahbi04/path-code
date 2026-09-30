@@ -279,6 +279,68 @@ describe("G10 fabric guards", () => {
     }
   });
 
+  it("P6.4 standalone Antigravity callback uses project context and checkpoint pin", async () => {
+    const { createG10Fabric, createCheckpointSkeleton, writeTaskCheckpoint, readTaskCheckpoint } = await loadAg10();
+    const { writeProjectModelPreference } = await import(pathToFileURL(join(CHECKOUT_ROOT, "scripts/pathcode-cli/model-plane/preference-config.mjs")).href);
+    const root = tmp("p64-context");
+    const wt = tmp("p64-context-wt");
+    const project = tmp("p64-project");
+    initGitRepo(wt);
+    expect(writeProjectModelPreference({ projectRoot: project, engineId: "antigravity", modelId: "ag-project" }).ok).toBe(true);
+    writeTaskCheckpoint(root, createCheckpointSkeleton({ taskId: "p64-context", worktreePath: wt, repoRoot: project, modelPreferences: { antigravity: "ag-pin" } }));
+    const fabric = await createG10Fabric({ runtimeRoot: root, taskId: "p64-context", worktreePath: wt, repoRoot: project, toolEnv: { AG1_MODEL: "ag-env", GOOGLE_CLOUD_PROJECT: "test-project" }, preferCopilotSdk: false });
+    try {
+      let handedModel: string | null = null;
+      await fabric.runAntigravityCollabTurn({ runTurn: ({ providerModelId, env }: { providerModelId: string; env: Record<string, string> }) => {
+        handedModel = env.AG1_MODEL || null;
+        expect(providerModelId).toBe(handedModel);
+        return { ok: true };
+      } });
+      const turn = (readTaskCheckpoint(root, "p64-context")?.engineTurns as Array<Record<string, unknown>>)?.at(-1);
+      expect(handedModel).toBe("ag-pin");
+      expect(turn?.requestedModel).toBe("ag-pin");
+      expect(turn?.selectionSource).toBe("task_pin");
+      expect(turn?.actualModel).toBeNull();
+    } finally {
+      await fabric.shutdown();
+    }
+  });
+
+  it("P6.4 G10 selected-engine context reaches peer defaults and task pins", async () => {
+    const { createG10Fabric } = await loadAg10();
+    const { writeProjectModelPreference } = await import(pathToFileURL(join(CHECKOUT_ROOT, "scripts/pathcode-cli/model-plane/preference-config.mjs")).href);
+    const { writeEngineeringUserDefault } = await import(pathToFileURL(join(CHECKOUT_ROOT, "scripts/pathcode-cli/preferences.mjs")).href);
+    const root = tmp("p64-peers");
+    const wt = tmp("p64-peers-wt");
+    const project = tmp("p64-peers-project");
+    const state = tmp("p64-peers-state");
+    initGitRepo(wt);
+    const toolEnv = { PATHCODE_STATE_DIR: state, CURSOR_MODEL: "cursor-legacy" };
+    for (const engineId of ["cursor", "copilot"] as const) {
+      writeEngineeringUserDefault({ env: toolEnv, engineId, modelId: `${engineId}-user` });
+      writeProjectModelPreference({ projectRoot: project, engineId, modelId: `${engineId}-project` });
+    }
+    const fabric = await createG10Fabric({ runtimeRoot: root, taskId: "p64-peers", worktreePath: wt, repoRoot: project, toolEnv, preferCopilotSdk: false });
+    try {
+      for (const engineId of ["cursor", "copilot"] as const) {
+        const projectResolution = fabric.resolveSelectedModel(engineId);
+        expect(projectResolution.ok && projectResolution.providerModelId).toBe(`${engineId}-project`);
+        expect(projectResolution.ok && projectResolution.selectionSource).toBe("project_default");
+      }
+      fabric.persist({ modelPreferences: { cursor: "cursor-pin", copilot: "copilot-pin" } });
+      for (const engineId of ["cursor", "copilot"] as const) {
+        const pinned = fabric.resolveSelectedModel(engineId);
+        expect(pinned.ok && pinned.providerModelId).toBe(`${engineId}-pin`);
+        expect(pinned.ok && pinned.selectionSource).toBe("task_pin");
+        const explicit = fabric.resolveSelectedModel(engineId, `${engineId}-explicit`);
+        expect(explicit.ok && explicit.providerModelId).toBe(`${engineId}-explicit`);
+        expect(explicit.ok && explicit.selectionSource).toBe("explicit_turn");
+      }
+    } finally {
+      await fabric.shutdown();
+    }
+  });
+
   it("pins a stable host Copilot CLI path for Keychain ACL identity", async () => {
     const sdkPath = join(CHECKOUT_ROOT, "scripts/pathcode-cli/ag10/copilot-sdk.mjs");
     const {

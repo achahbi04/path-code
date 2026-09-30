@@ -18,6 +18,7 @@ import {
   MODEL_EXECUTION_SCHEMA,
   sealEngineTurnExecutionFields,
 } from "../model-plane/execution-provenance.mjs";
+import { MODEL_PREFERENCE_ENGINES, validateModelPreference } from "../model-plane/preference-config.mjs";
 
 /**
  * @typedef {object} G10TaskCheckpoint
@@ -49,6 +50,7 @@ import {
  * @property {string[]} [changedFiles] Authoritative result file list
  * @property {object} [productEvidence] Sealed product capability captured before worktree disposal
  * @property {string} [preferredEngine]
+ * @property {Record<string, string>} [modelPreferences] Engine-scoped task model pins, not execution provenance.
  * @property {string} [continuityDisposition] interrupted | resumable | …
  * @property {string} [interruptedAt] ISO timestamp when Gateway/process loss was recorded
  * @property {string} [continuityReason]
@@ -207,6 +209,7 @@ export function createCheckpointSkeleton(partial) {
       typeof partial.preferredEngine === "string"
         ? partial.preferredEngine
         : undefined,
+    modelPreferences: sealModelPreferences(partial.modelPreferences),
     continuityDisposition:
       typeof partial.continuityDisposition === "string"
         ? partial.continuityDisposition
@@ -231,6 +234,16 @@ export function createCheckpointSkeleton(partial) {
     engineSelection: sealEngineSelection(partial.engineSelection),
     updatedAt: new Date().toISOString(),
   };
+}
+
+function sealModelPreferences(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const sealed = {};
+  for (const engine of MODEL_PREFERENCE_ENGINES) {
+    const checked = validateModelPreference(value[engine]);
+    if (checked.ok) sealed[engine] = checked.value;
+  }
+  return sealed;
 }
 
 /**
@@ -348,6 +361,7 @@ export function readTaskCheckpoint(runtimeRoot, taskId) {
     if (typeof raw.taskId !== "string" || typeof raw.worktreePath !== "string") {
       return null;
     }
+    raw.modelPreferences = sealModelPreferences(raw.modelPreferences);
     return /** @type {G10TaskCheckpoint} */ (raw);
   } catch {
     return null;

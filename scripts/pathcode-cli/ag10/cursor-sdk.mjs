@@ -19,6 +19,7 @@ import {
 } from "../terminal-title.mjs";
 import { CURSOR_DEFAULT_PROVIDER_MODEL_ID } from "../model-plane/adapters/cursor-catalog.mjs";
 import { resolveCursorEngineModel } from "../model-plane/resolver.mjs";
+import { resolveProductionEngineModel } from "../model-plane/production-context.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(HERE, "../../..");
@@ -340,6 +341,9 @@ function listChangedFiles(cwd, env) {
  *   toolEnv?: Record<string, string>,
  *   emit?: (event: object) => void,
  *   model?: { id: string },
+ *   projectRoot?: string,
+ *   checkpoint?: object | null,
+ *   modelResolution?: object,
  *   apiKey?: string,
  *   signal?: AbortSignal,
  * }} options
@@ -357,8 +361,12 @@ export async function createCursorEngine(options) {
     typeof options.model?.id === "string" && options.model.id.trim()
       ? options.model.id.trim()
       : null;
-  const modelPlaneResolution = resolveCursorEngineModel({
-    toolEnv: options.toolEnv,
+  const modelPlaneResolution = options.modelResolution || resolveProductionEngineModel({
+    engineId: "cursor",
+    env: { ...process.env, ...(options.toolEnv || {}) },
+    projectRoot: options.projectRoot,
+    readUserPreferences: true,
+    checkpoint: options.checkpoint,
     providerModelId: explicitModelId,
   });
 
@@ -516,9 +524,10 @@ export async function createCursorEngine(options) {
   }
 
   /**
-   * @param {{ prompt: string, timeoutMs?: number, signal?: AbortSignal }} turn
+   * @param {{ prompt: string, timeoutMs?: number, signal?: AbortSignal, modelResolution?: object }} turn
    */
   async function runEngineeringTurn(turn) {
+    const turnResolution = turn.modelResolution || modelPlaneResolution;
     const ensured = await ensureConnected({
       resumeSessionId: activeAgentId || undefined,
     });
@@ -543,19 +552,19 @@ export async function createCursorEngine(options) {
 
     try {
       // Local SDK requires an explicit model on create and/or send.
-      if (!modelPlaneResolution.ok) {
+      if (!turnResolution.ok) {
         return withEngineProvenance(
           {
             ok: false,
             mode,
-            code: modelPlaneResolution.code || "MODEL_RESOLUTION_FAILED",
-            detail: modelPlaneResolution.message || "cursor model resolution failed",
+            code: turnResolution.code || "MODEL_RESOLUTION_FAILED",
+            detail: turnResolution.message || "cursor model resolution failed",
             changedFiles: [],
           },
           "cursor",
         );
       }
-      const model = modelPlaneResolution.model;
+      const model = turnResolution.model;
       const run = await agent.send(String(turn.prompt || ""), { model });
       activeRun = run;
       reclaimTitle();
@@ -767,6 +776,7 @@ export async function createCursorEngine(options) {
   }
 
   return {
+    getModelResolution: () => modelPlaneResolution,
     getMode: () => mode,
     getSessionId: () => activeAgentId,
     getDegradeReason: () => degradeReason,

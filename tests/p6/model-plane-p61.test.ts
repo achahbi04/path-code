@@ -122,7 +122,7 @@ describe("P6.1 cursor-sdk single resolver path", () => {
     expect(tryStartBlock).not.toMatch(/resolveCursorModel\(/);
     expect(runTurnBlock).not.toMatch(/resolveCursorModel\(/);
     expect(tryStartBlock).toContain("modelPlaneResolution.model");
-    expect(runTurnBlock).toContain("modelPlaneResolution.model");
+    expect(runTurnBlock).toContain("turnResolution.model");
   });
 
   it("resolveCursorModel delegates to Model Plane", () => {

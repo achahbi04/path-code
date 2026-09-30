@@ -16,7 +16,7 @@ import {
   reclaimTtyForeground,
   reassertPathTitle,
 } from "../terminal-title.mjs";
-import { resolveCopilotEngineModel } from "../model-plane/resolver.mjs";
+import { resolveProductionEngineModel } from "../model-plane/production-context.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(HERE, "../../..");
@@ -155,6 +155,9 @@ export function classifyCopilotFailure(err) {
  *   emit?: (event: object) => void,
  *   preferSdk?: boolean,
  *   model?: string,
+ *   projectRoot?: string,
+ *   checkpoint?: object | null,
+ *   modelResolution?: object,
  *   configDirectory?: string,
  *   runtimeRoot?: string,
  * }} options
@@ -167,8 +170,12 @@ export async function createCopilotEngine(options) {
     typeof options.sessionId === "string" && options.sessionId.trim()
       ? options.sessionId.trim()
       : `path-${options.taskId}`;
-  const modelPlaneResolution = resolveCopilotEngineModel({
-    toolEnv: { ...process.env, ...(options.toolEnv || {}) },
+  const modelPlaneResolution = options.modelResolution || resolveProductionEngineModel({
+    engineId: "copilot",
+    env: { ...process.env, ...(options.toolEnv || {}) },
+    projectRoot: options.projectRoot,
+    readUserPreferences: true,
+    checkpoint: options.checkpoint,
     providerModelId:
       typeof options.model === "string" ? options.model : null,
   });
@@ -183,6 +190,7 @@ export async function createCopilotEngine(options) {
   let activeSessionId = null;
   /** @type {string | null} */
   let degradeReason = null;
+  let configuredModelId = null;
 
   const cliModule = await import("../ag9/copilot-engine.mjs");
 
@@ -308,6 +316,7 @@ export async function createCopilotEngine(options) {
 
       client = nextClient;
       session = nextSession;
+      configuredModelId = resumed ? null : modelPlaneResolution.providerModelId;
       activeSessionId = nextSession.sessionId || baseConfig.sessionId;
       mode = "native_sdk";
       try {
@@ -332,6 +341,9 @@ export async function createCopilotEngine(options) {
    * @param {{ resumeSessionId?: string, attempts?: number }} [opts]
    */
   async function ensureConnected(opts = {}) {
+    if (!modelPlaneResolution.ok) {
+      return { ok: false, mode, code: modelPlaneResolution.code, detail: modelPlaneResolution.message };
+    }
     if (!preferSdk) {
       mode = "cli_fallback";
       degradeReason = "prefer_sdk_false";
@@ -440,9 +452,13 @@ export async function createCopilotEngine(options) {
 
   /**
    * Run one engineering turn against the shared worktree.
-   * @param {{ prompt: string, timeoutMs?: number }} turn
+   * @param {{ prompt: string, timeoutMs?: number, modelResolution?: object }} turn
    */
   async function runEngineeringTurn(turn) {
+    const turnResolution = turn.modelResolution || modelPlaneResolution;
+    if (!turnResolution.ok) {
+      return { ok: false, mode, code: turnResolution.code, detail: turnResolution.message, changedFiles: [] };
+    }
     const ensured = await ensureConnected({
       resumeSessionId: activeSessionId || sessionId,
     });
@@ -458,6 +474,16 @@ export async function createCopilotEngine(options) {
 
     if (mode === "native_sdk" && session) {
       try {
+        const requestedModel = turnResolution.providerModelId;
+        if (requestedModel && configuredModelId !== requestedModel) {
+          if (typeof session.setModel !== "function") {
+            return { ok: false, mode, code: "MODEL_CONFIG_UNSUPPORTED", detail: "Copilot session cannot configure the requested model", changedFiles: [] };
+          }
+          await session.setModel(requestedModel);
+          configuredModelId = requestedModel;
+        } else if (!requestedModel && configuredModelId) {
+          return { ok: false, mode, code: "MODEL_CONFIG_UNSUPPORTED", detail: "Copilot session cannot clear its configured model", changedFiles: [] };
+        }
         const response = await session.sendAndWait(
           { prompt: turn.prompt },
           typeof turn.timeoutMs === "number" ? turn.timeoutMs : 300_000,
@@ -514,6 +540,7 @@ export async function createCopilotEngine(options) {
       prompt: turn.prompt,
       cwd: options.cwd,
       toolEnv: options.toolEnv,
+      modelId: turnResolution.providerModelId,
       timeoutMs: turn.timeoutMs,
       taskId: options.taskId,
       runtimeRoot: options.runtimeRoot,
@@ -547,6 +574,7 @@ export async function createCopilotEngine(options) {
   }
 
   return {
+    getModelResolution: () => modelPlaneResolution,
     getMode: () => mode,
     getSessionId: () => activeSessionId,
     getDegradeReason: () => degradeReason,

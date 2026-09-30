@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { resolveAntigravityEngineModel } from "../model-plane/resolver.mjs";
+import { resolveProductionEngineModel } from "../model-plane/production-context.mjs";
 
 /**
  * Model and provider the Antigravity bridge will actually use.
@@ -80,12 +80,14 @@ export function hydrateAg1CloudEnv(env = process.env) {
 /** Resolve once from the original env, then configure the bridge child from that result. */
 export function resolveAg1BridgeConfiguration(input = {}) {
   const sourceEnv = { ...(input.env || process.env) };
-  const resolution = resolveAntigravityEngineModel({
+  const resolution = input.modelResolution || resolveProductionEngineModel({
+    engineId: "antigravity",
     env: sourceEnv,
     providerModelId: input.providerModelId,
     modelIdentity: input.modelIdentity,
     pathKey: input.pathKey,
     projectRoot: input.projectRoot,
+    checkpoint: input.checkpoint,
     preferencesEnv: input.preferencesEnv,
   });
   if (!resolution.ok) return { ok: false, resolution };

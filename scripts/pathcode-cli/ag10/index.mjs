@@ -35,12 +35,8 @@ import { SteeringQueue } from "./steering.mjs";
 import { createCopilotEngine } from "./copilot-sdk.mjs";
 import { createCursorEngine, resolveCursorApiKey } from "./cursor-sdk.mjs";
 import { buildModelExecutionFromResolution } from "../model-plane/execution-provenance.mjs";
-import {
-  resolveAntigravityEngineModel,
-  resolveCopilotEngineModel,
-  resolveCursorEngineModel,
-} from "../model-plane/resolver.mjs";
 import { resolveAg1BridgeConfiguration, resolveAg1ExecutionIdentity } from "../ag1/cloud-env.mjs";
+import { resolveProductionEngineModel } from "../model-plane/production-context.mjs";
 import {
   selectEngineForTurn,
   resolvePreferredEngine,
@@ -143,6 +139,17 @@ export async function createG10Fabric(options) {
   let cursor = null;
   /** @type {ReturnType<typeof bindAntigravitySession> | null} */
   let agBind = null;
+
+  function resolveSelectedModel(engineId, providerModelId = null) {
+    return resolveProductionEngineModel({
+      engineId,
+      env: { ...process.env, ...(options.toolEnv || {}) },
+      projectRoot: options.repoRoot || checkpoint.repoRoot,
+      readUserPreferences: true,
+      checkpoint,
+      providerModelId,
+    });
+  }
 
   function persist(patch = {}) {
     const reality = captureTaskReality(options.worktreePath, options.toolEnv);
@@ -328,7 +335,7 @@ export async function createG10Fabric(options) {
     });
   }
 
-  async function attachCopilot() {
+  async function attachCopilot(modelResolution = resolveSelectedModel("copilot")) {
     // Prefer default Copilot auth discovery (~/.copilot). Only use an explicit
     // PATH-owned configDirectory when the caller opts in — isolating config
     // without forwarding OAuth makes every turn AUTH_REQUIRED.
@@ -338,6 +345,9 @@ export async function createG10Fabric(options) {
       cwd: options.worktreePath,
       sessionId: checkpoint.copilotSessionId || `path-${options.taskId}`,
       toolEnv: options.toolEnv,
+      projectRoot: options.repoRoot || checkpoint.repoRoot,
+      checkpoint,
+      modelResolution,
       preferSdk: options.preferCopilotSdk !== false,
       runtimeRoot: options.runtimeRoot,
       ...(configDirectory ? { configDirectory } : {}),
@@ -387,12 +397,15 @@ export async function createG10Fabric(options) {
     return connected;
   }
 
-  async function attachCursor() {
+  async function attachCursor(modelResolution = resolveSelectedModel("cursor")) {
     cursor = await createCursorEngine({
       taskId: options.taskId,
       cwd: options.worktreePath,
       sessionId: checkpoint.cursorSessionId || `path-cursor-${options.taskId}`,
       toolEnv: options.toolEnv,
+      projectRoot: options.repoRoot || checkpoint.repoRoot,
+      checkpoint,
+      modelResolution,
       emit: emitSession,
     });
     const connected = await cursor.ensureConnected({
@@ -496,10 +509,11 @@ export async function createG10Fabric(options) {
 
   /**
    * Collaborative Copilot turn under mutation lease.
-   * @param {{ prompt: string, timeoutMs?: number, expectedFingerprint?: string }} turn
+   * @param {{ prompt: string, model?: string, timeoutMs?: number, expectedFingerprint?: string }} turn
    */
   async function runCopilotCollabTurn(turn) {
-    if (!copilot) await attachCopilot();
+    const copilotPlane = resolveSelectedModel("copilot", typeof turn.model === "string" ? turn.model : null);
+    if (!copilot) await attachCopilot(copilotPlane);
     const budget = resources.evaluate();
     if (budget.state === "hard") {
       emitG10({
@@ -536,11 +550,6 @@ export async function createG10Fabric(options) {
     const copilotRole = /^(primary|repair|handoff)$/.test(String(turn.role || ""))
       ? String(turn.role)
       : "handoff";
-    const copilotPlane = resolveCopilotEngineModel({
-      toolEnv: options.toolEnv || process.env,
-      providerModelId:
-        typeof turn.model === "string" ? turn.model : null,
-    });
     const copilotModelExecution = copilotPlane.ok
       ? buildModelExecutionFromResolution({
           resolution: copilotPlane,
@@ -581,6 +590,7 @@ export async function createG10Fabric(options) {
           const result = await copilot.runEngineeringTurn({
             prompt,
             timeoutMs: turn.timeoutMs,
+            modelResolution: copilotPlane,
           });
           return result;
         },
@@ -647,10 +657,11 @@ export async function createG10Fabric(options) {
 
   /**
    * Collaborative Cursor turn under mutation lease.
-   * @param {{ prompt: string, timeoutMs?: number, expectedFingerprint?: string, signal?: AbortSignal }} turn
+   * @param {{ prompt: string, model?: string, timeoutMs?: number, expectedFingerprint?: string, signal?: AbortSignal }} turn
    */
   async function runCursorCollabTurn(turn) {
-    if (!cursor) await attachCursor();
+    const cursorPlane = resolveSelectedModel("cursor", typeof turn.model === "string" ? turn.model : null);
+    if (!cursor) await attachCursor(cursorPlane);
     const budget = resources.evaluate();
     if (budget.state === "hard") {
       emitG10({
@@ -687,9 +698,6 @@ export async function createG10Fabric(options) {
     const cursorRole = /^(primary|repair|handoff)$/.test(String(turn.role || ""))
       ? String(turn.role)
       : "handoff";
-    const cursorPlane = resolveCursorEngineModel({
-      toolEnv: options.toolEnv || process.env,
-    });
     const cursorModelExecution = cursorPlane.ok
       ? buildModelExecutionFromResolution({
           resolution: cursorPlane,
@@ -731,6 +739,7 @@ export async function createG10Fabric(options) {
             prompt,
             timeoutMs: turn.timeoutMs,
             signal: turn.signal,
+            modelResolution: cursorPlane,
           });
           return result;
         },
@@ -834,13 +843,11 @@ export async function createG10Fabric(options) {
       : "handoff";
     const agConfiguration = resolveAg1BridgeConfiguration({
       env: { ...process.env, ...(options.toolEnv || {}) },
-      ...(options.agModelResolution?.ok
-        ? { providerModelId: options.agModelResolution.providerModelId }
-        : {}),
+      modelResolution: options.agModelResolution?.ok
+        ? options.agModelResolution
+        : resolveSelectedModel("antigravity"),
     });
-    const agPlane = options.agModelResolution?.ok
-      ? options.agModelResolution
-      : agConfiguration.resolution;
+    const agPlane = agConfiguration.resolution;
     const agEnv = agConfiguration.ok ? agConfiguration.env : null;
     const agIdentity = resolveAg1ExecutionIdentity(agEnv || process.env);
     const agModelExecution = agPlane.ok
@@ -1122,6 +1129,7 @@ export async function createG10Fabric(options) {
     getCopilot: () => copilot,
     getCursor: () => cursor,
     getAgBind: () => agBind,
+    resolveSelectedModel,
   };
 }
 

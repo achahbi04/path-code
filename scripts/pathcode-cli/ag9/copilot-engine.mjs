@@ -32,10 +32,11 @@ const DENIED_TOOL_SPECS = Object.freeze([
  *   helpText: string,
  *   prompt: string,
  *   cwd: string,
+ *   modelId?: string | null,
  * }} input
  * @returns {{ ok: boolean, args: string[], reason?: string }}
  */
-export function buildCopilotEngineeringArgs({ helpText, prompt, cwd }) {
+export function buildCopilotEngineeringArgs({ helpText, prompt, cwd, modelId }) {
   const flags = parseCopilotHelpFlags(helpText);
   if (!flags.promptFlag) {
     return {
@@ -47,6 +48,12 @@ export function buildCopilotEngineeringArgs({ helpText, prompt, cwd }) {
 
   /** @type {string[]} */
   const args = [flags.promptFlag, prompt];
+  if (modelId) {
+    if (!/(?:^|\s)--model(?:[\s=,]|$)/m.test(helpText)) {
+      return { ok: false, args: [], reason: "copilot help lacks a model flag" };
+    }
+    args.push("--model", modelId);
+  }
 
   // Prefer --silent when present.
   if (flags.silentFlags.includes("--silent")) args.push("--silent");
@@ -122,6 +129,7 @@ function listChangedFiles(cwd, env) {
  *   toolEnv?: Record<string, string>,
  *   timeoutMs?: number,
  *   executable?: string | null,
+ *   modelId?: string | null,
  * }} input
  * @returns {Promise<{
  *   ok: boolean,
@@ -186,7 +194,7 @@ export async function runCopilotEngineeringTurn(input) {
     cwd,
   });
   const helpText = `${help.stdout || ""}\n${help.stderr || ""}`;
-  const built = buildCopilotEngineeringArgs({ helpText, prompt, cwd });
+  const built = buildCopilotEngineeringArgs({ helpText, prompt, cwd, modelId: input.modelId });
   if (!built.ok) {
     return {
       ok: false,

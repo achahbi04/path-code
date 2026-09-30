@@ -53,6 +53,9 @@ function resolvePreferenceTier(engineId, input, materialize) {
   const pin = input.taskPin;
   if (pin) {
     if (pin.engineId !== engineId) return incompatible(engineId, { pathKey: `${pin.engineId}:${pin.providerModelId}` });
+    if (pin.providerModelId === "auto") {
+      return { ok: false, code: RESOLVER_CODES.AUTO_POLICY_PENDING, message: `Auto model policy is not implemented for ${engineId}` };
+    }
     const built = materialize(pin.providerModelId, CATALOG_SOURCE.STATIC);
     if (!built.ok) return { ok: false, code: RESOLVER_CODES.INVALID_MODEL_IDENTITY, message: built.message };
     return okEngineResolution(engineId, built.identity, SELECTION_SOURCE.TASK_PIN, built.identity.providerModelId);

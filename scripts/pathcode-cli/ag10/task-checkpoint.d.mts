@@ -11,6 +11,7 @@ export interface TaskCheckpoint {
   sha?: string;
   baseline?: string;
   changedFiles?: string[];
+  modelPreferences?: Partial<Record<"cursor" | "copilot" | "antigravity", string>>;
   resultLifecycle?: {
     status?: string;
     discardedAt?: string | null;
