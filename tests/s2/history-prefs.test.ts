@@ -232,7 +232,9 @@ describe("S2 preferences", () => {
     const raw = JSON.parse(
       readFileSync(join(stateDir, "preferences.json"), "utf8"),
     );
-    expect(raw.schema).toBe("pathcode.prefs.v1");
+    expect(raw.schema).toBe("pathcode.prefs.v2");
+    expect(raw.generalSession.modelId).toBe("gpt-test");
+    expect(raw.engineering.byEngine).toEqual({});
   });
 
   it("formats an unmistakable prefs panel", async () => {

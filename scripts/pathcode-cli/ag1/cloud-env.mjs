@@ -85,6 +85,8 @@ export function resolveAg1BridgeConfiguration(input = {}) {
     providerModelId: input.providerModelId,
     modelIdentity: input.modelIdentity,
     pathKey: input.pathKey,
+    projectRoot: input.projectRoot,
+    preferencesEnv: input.preferencesEnv,
   });
   if (!resolution.ok) return { ok: false, resolution };
   const env = hydrateAg1CloudEnv(sourceEnv);

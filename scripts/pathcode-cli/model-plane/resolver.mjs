@@ -29,9 +29,14 @@ import {
   materializeAntigravityModelIdentity,
   readLegacyAntigravityModelFromEnv,
 } from "./adapters/antigravity-catalog.mjs";
+import { readPreferences } from "../preferences.mjs";
+import { readProjectModelPreferences } from "./preference-config.mjs";
 
 export const SELECTION_SOURCE = Object.freeze({
   EXPLICIT_TURN: "explicit_turn",
+  TASK_PIN: "task_pin",
+  PROJECT_DEFAULT: "project_default",
+  USER_DEFAULT: "user_default",
   LEGACY_ENV: "legacy_env",
   PROVIDER_DEFAULT: "provider_default",
 });
@@ -41,7 +46,51 @@ export const RESOLVER_CODES = Object.freeze({
   MODEL_REF_REQUIRED: "MODEL_REF_REQUIRED",
   MODEL_INCOMPATIBLE: "MODEL_INCOMPATIBLE",
   INVALID_MODEL_IDENTITY: "INVALID_MODEL_IDENTITY",
+  AUTO_POLICY_PENDING: "AUTO_POLICY_PENDING",
 });
+
+function resolvePreferenceTier(engineId, input, materialize) {
+  const pin = input.taskPin;
+  if (pin) {
+    if (pin.engineId !== engineId) return incompatible(engineId, { pathKey: `${pin.engineId}:${pin.providerModelId}` });
+    const built = materialize(pin.providerModelId, CATALOG_SOURCE.STATIC);
+    if (!built.ok) return { ok: false, code: RESOLVER_CODES.INVALID_MODEL_IDENTITY, message: built.message };
+    return okEngineResolution(engineId, built.identity, SELECTION_SOURCE.TASK_PIN, built.identity.providerModelId);
+  }
+
+  const diagnostics = [];
+  let projectDefault = input.projectDefault;
+  if (projectDefault === undefined && input.projectRoot) {
+    const project = readProjectModelPreferences(input.projectRoot);
+    if (project.ok) projectDefault = project.byEngine[engineId];
+    else diagnostics.push({ code: project.code, message: project.message, path: project.path });
+  }
+  let userDefault = input.userDefault;
+  if (userDefault === undefined && (input.projectRoot || input.readUserPreferences)) {
+    const user = readPreferences({ env: input.preferencesEnv || process.env });
+    if (user.ok) userDefault = user.engineering.byEngine[engineId];
+    else diagnostics.push({ code: "INVALID_USER_PREFERENCES", message: user.message, path: user.path });
+  }
+  for (const [value, source] of [
+    [projectDefault, SELECTION_SOURCE.PROJECT_DEFAULT],
+    [userDefault, SELECTION_SOURCE.USER_DEFAULT],
+  ]) {
+    if (value === undefined || value === null) continue;
+    if (value === "auto") {
+      return { ok: false, code: RESOLVER_CODES.AUTO_POLICY_PENDING, message: `Auto model policy is not implemented for ${engineId}`, diagnostics };
+    }
+    const built = materialize(value, CATALOG_SOURCE.STATIC);
+    if (!built.ok) return { ok: false, code: RESOLVER_CODES.INVALID_MODEL_IDENTITY, message: built.message, diagnostics };
+    return { ...okEngineResolution(engineId, built.identity, source, built.identity.providerModelId), diagnostics };
+  }
+  return { diagnostics };
+}
+
+function withPreferenceDiagnostics(resolution, preferred) {
+  return preferred.diagnostics?.length
+    ? { ...resolution, diagnostics: preferred.diagnostics }
+    : resolution;
+}
 
 /**
  * @param {EngineeringEngineId} engineId
@@ -163,6 +212,8 @@ export function resolveCursorEngineModel(input = {}) {
     );
   }
 
+  const preferred = resolvePreferenceTier(CURSOR_ENGINE_ID, input, materializeCursorModelIdentity);
+  if ("ok" in preferred) return preferred;
   const legacy = readLegacyCursorModelFromEnv(env);
   if (legacy) {
     const built = materializeCursorModelIdentity(
@@ -176,12 +227,12 @@ export function resolveCursorEngineModel(input = {}) {
         message: built.message,
       };
     }
-    return okEngineResolution(
+    return withPreferenceDiagnostics(okEngineResolution(
       CURSOR_ENGINE_ID,
       built.identity,
       SELECTION_SOURCE.LEGACY_ENV,
       built.identity.providerModelId,
-    );
+    ), preferred);
   }
 
   const built = materializeCursorModelIdentity(
@@ -195,12 +246,12 @@ export function resolveCursorEngineModel(input = {}) {
       message: built.message,
     };
   }
-  return okEngineResolution(
+  return withPreferenceDiagnostics(okEngineResolution(
     CURSOR_ENGINE_ID,
     built.identity,
     SELECTION_SOURCE.PROVIDER_DEFAULT,
     built.identity.providerModelId,
-  );
+  ), preferred);
 }
 
 /**
@@ -291,12 +342,14 @@ export function resolveCopilotEngineModel(input = {}) {
     );
   }
 
-  return okEngineResolution(
+  const preferred = resolvePreferenceTier(COPILOT_ENGINE_ID, input, materializeCopilotModelIdentity);
+  if ("ok" in preferred) return preferred;
+  return withPreferenceDiagnostics(okEngineResolution(
     COPILOT_ENGINE_ID,
     null,
     SELECTION_SOURCE.PROVIDER_DEFAULT,
     null,
-  );
+  ), preferred);
 }
 
 /**
@@ -390,6 +443,8 @@ export function resolveAntigravityEngineModel(input = {}) {
     );
   }
 
+  const preferred = resolvePreferenceTier(ANTIGRAVITY_ENGINE_ID, input, materializeAntigravityModelIdentity);
+  if ("ok" in preferred) return preferred;
   const legacy = readLegacyAntigravityModelFromEnv(env);
   if (legacy) {
     const built = materializeAntigravityModelIdentity(
@@ -403,12 +458,12 @@ export function resolveAntigravityEngineModel(input = {}) {
         message: built.message,
       };
     }
-    return okEngineResolution(
+    return withPreferenceDiagnostics(okEngineResolution(
       ANTIGRAVITY_ENGINE_ID,
       built.identity,
       SELECTION_SOURCE.LEGACY_ENV,
       built.identity.providerModelId,
-    );
+    ), preferred);
   }
 
   const built = materializeAntigravityModelIdentity(
@@ -422,12 +477,12 @@ export function resolveAntigravityEngineModel(input = {}) {
       message: built.message,
     };
   }
-  return okEngineResolution(
+  return withPreferenceDiagnostics(okEngineResolution(
     ANTIGRAVITY_ENGINE_ID,
     built.identity,
     SELECTION_SOURCE.PROVIDER_DEFAULT,
     built.identity.providerModelId,
-  );
+  ), preferred);
 }
 
 /**

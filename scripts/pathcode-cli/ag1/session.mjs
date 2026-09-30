@@ -585,6 +585,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       : null;
   const agConfiguration = resolveAg1BridgeConfiguration({
     env: { ...cloudEnv, ...(toolEnv || {}) },
+    projectRoot,
     providerModelId: options.providerModelId,
     modelIdentity: options.modelIdentity,
     pathKey: options.pathKey,
