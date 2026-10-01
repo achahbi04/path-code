@@ -33,6 +33,7 @@ import {
   readExportBytes,
 } from "./project-export.mjs";
 import { inspectRepository } from "./repository.mjs";
+import { listProductVersions, readProductVersion, compareProductVersions } from "../versions.mjs";
 import { classifyConversationMessage } from "../conversation.mjs";
 import {
   createLinkedCreatorReference,
@@ -165,6 +166,22 @@ function referenceStatus(result) {
   if (["BUILD_NOT_FOUND", "REFERENCE_NOT_FOUND"].includes(result.code)) return 404;
   if (result.code === "REFERENCE_STORAGE_UNAVAILABLE" || result.code === "REFERENCE_READ_FAILED" || result.code === "REFERENCE_WRITE_FAILED") return 500;
   return 400;
+}
+
+function versionStatus(result) {
+  if (result.ok) return 200;
+  if (["BUILD_NOT_FOUND", "VERSION_NOT_FOUND"].includes(result.code)) return 404;
+  if (["STALE_AUTHORITY", "RESTORE_PENDING", "VERSION_UNRESOLVED", "RESTORE_BLOCKED"].includes(result.code)) return 409;
+  if (["INVALID_BUILD_ID", "INVALID_VERSION_INDEX", "INVALID_VERSION_SELECTOR", "INVALID_RESTORE_REQUEST"].includes(result.code)) return 400;
+  return 422;
+}
+
+function versionSelector(value) {
+  if (value === "current") return { kind: "current" };
+  const match = /^adoption:(0|[1-9][0-9]*)$/.exec(value || "");
+  if (!match) return null;
+  const adoptionIndex = Number(match[1]);
+  return Number.isSafeInteger(adoptionIndex) ? { kind: "adoption", adoptionIndex } : null;
 }
 
 /**
@@ -611,6 +628,46 @@ export async function startPathBuildSurface(options) {
         }
         const action = buildMatch[2] || "";
         const sub = buildMatch[3] || "";
+
+        if (action === "versions") {
+          if (method === "GET" && !sub) {
+            const listed = listProductVersions({ runtimeRoot, buildId });
+            sendJson(res, versionStatus(listed), listed.ok
+              ? { ...listed, restorePending: Boolean(readBuildRecord(runtimeRoot, buildId)?.pendingRestore) }
+              : listed);
+            return;
+          }
+          if (method === "GET" && sub === "compare") {
+            const base = versionSelector(url.searchParams.get("base"));
+            const target = versionSelector(url.searchParams.get("target"));
+            const result = base && target
+              ? compareProductVersions({ runtimeRoot, buildId, base, target })
+              : { ok: false, code: "INVALID_VERSION_SELECTOR", message: "Choose two versions from this Build" };
+            sendJson(res, versionStatus(result), result);
+            return;
+          }
+          if (method === "GET" && /^(0|[1-9][0-9]*)$/.test(sub)) {
+            const result = readProductVersion({ runtimeRoot, buildId, adoptionIndex: Number(sub) });
+            sendJson(res, versionStatus(result), result);
+            return;
+          }
+          if (method === "POST" && sub === "restore") {
+            let body;
+            try { body = await readJsonBody(req); }
+            catch { body = null; }
+            if (!body || typeof body !== "object" || Array.isArray(body) ||
+                Object.keys(body).length !== 2 || !Object.hasOwn(body, "adoptionIndex") ||
+                !Object.hasOwn(body, "expectedAuthoritativeSha") ||
+                !Number.isSafeInteger(body.adoptionIndex) || body.adoptionIndex < 0 ||
+                typeof body.expectedAuthoritativeSha !== "string") {
+              sendJson(res, 400, { ok: false, code: "INVALID_RESTORE_REQUEST", message: "Choose a historical version and current state" });
+              return;
+            }
+            const result = await coordinator.restoreHistoricalVersion(buildId, body.adoptionIndex, body.expectedAuthoritativeSha);
+            sendJson(res, versionStatus(result), result);
+            return;
+          }
+        }
 
         if (action === "references") {
           if (method === "GET" && !sub) {

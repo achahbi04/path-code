@@ -54,6 +54,16 @@
                 <button type="button" class="ghost rail-action" id="repositoryBtn">Manage repository…</button>
               </div>
             </section>
+            <section class="rail-row" data-rail="versions">
+              <button type="button" class="rail-row-head" id="versionsRowHead" aria-expanded="false" aria-controls="versionsRowBody">
+                <span class="rail-chevron" aria-hidden="true"></span>
+                <span class="rail-row-label">Versions</span>
+                <span class="rail-row-value" aria-hidden="true"></span>
+              </button>
+              <div class="rail-row-body" id="versionsRowBody" hidden>
+                <button type="button" class="ghost rail-action" id="openVersionsBtn">View versions…</button>
+              </div>
+            </section>
             <section class="rail-row" data-rail="details">
               <button type="button" class="rail-row-head" id="detailsRowHead" aria-expanded="false" aria-controls="detailsRowBody">
                 <span class="rail-chevron" aria-hidden="true"></span>
@@ -279,6 +289,36 @@
           <button type="button" class="ghost" id="repositoryDisconnectBtn" hidden>Disconnect</button>
           <button type="button" class="ghost" id="repositoryPushBtn" hidden>Sync now</button>
           <button type="button" class="cta" id="repositoryConnectBtn">Connect GitHub</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="choice-dialog versions-dialog" id="versionsDialog" aria-labelledby="versionsTitle">
+      <h2 id="versionsTitle">Versions</h2>
+      <p class="hint">Adopted product states for this project.</p>
+      <p id="versionsStatus" class="versions-status" role="status"></p>
+      <div id="versionsList" class="versions-list"></div>
+      <div id="versionDetails" class="version-details"></div>
+      <section class="versions-compare" aria-label="Compare versions">
+        <h3>Compare</h3>
+        <div class="versions-compare-controls">
+          <label>From <select id="versionBase"></select></label>
+          <label>To <select id="versionTarget"></select></label>
+          <button type="button" class="ghost" id="compareVersionsBtn">Compare</button>
+        </div>
+        <div id="versionComparison" class="versions-comparison"></div>
+      </section>
+      <div class="dialog-actions"><button type="button" class="ghost" id="closeVersionsBtn">Close</button></div>
+    </dialog>
+
+    <dialog class="choice-dialog" id="confirmVersionRestoreDialog" aria-labelledby="confirmVersionRestoreTitle">
+      <form method="dialog">
+        <h2 id="confirmVersionRestoreTitle">Restore this version?</h2>
+        <p id="confirmVersionRestoreCopy"></p>
+        <p>It will become the current product state. Your later versions remain in history.</p>
+        <div class="dialog-actions">
+          <button type="submit" class="ghost" value="cancel">Cancel</button>
+          <button type="submit" class="cta" value="confirm">Confirm restore</button>
         </div>
       </form>
     </dialog>

@@ -774,6 +774,23 @@ body {
 }
 .choice-dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .dialog-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: flex-end; }
+.versions-dialog { width: min(680px, calc(100vw - 2rem)); max-width: none; max-height: min(85dvh, 800px); overflow: auto; }
+.versions-dialog h2, .versions-dialog h3 { margin: 0 0 0.5rem; }
+.versions-dialog h3 { font-size: 0.95rem; }
+.versions-status { min-height: 1.25rem; color: var(--muted); font-size: 0.84rem; }
+.versions-status[data-error="true"] { color: var(--danger); }
+.versions-list { display: grid; gap: 0.4rem; max-height: 34vh; overflow: auto; }
+.version-item { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.55rem 0.65rem; border: 1px solid var(--line); border-radius: 10px; }
+.version-item strong { display: block; font-size: 0.88rem; }
+.version-item span, .version-details { color: var(--muted); font-size: 0.78rem; }
+.version-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; }
+.version-details { min-height: 1.2rem; margin-top: 0.4rem; }
+.versions-compare { border-top: 1px solid var(--line); margin: 0.8rem 0; padding-top: 0.8rem; }
+.versions-compare-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 0.5rem; }
+.versions-compare-controls label { display: grid; gap: 0.2rem; color: var(--muted); font-size: 0.78rem; }
+.versions-compare-controls select { min-width: 9rem; padding: 0.4rem; color: var(--ink); background: #0b1612; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.versions-comparison { max-height: 20vh; overflow: auto; color: var(--muted); font-size: 0.82rem; }
+.versions-comparison ul { padding-left: 1.2rem; overflow-wrap: anywhere; }
 .repo-field, .repo-sync { display: flex; flex-direction: column; gap: 0.25rem; margin: 0.5rem 0; font-size: 0.85rem; }
 .repo-field input, .repo-field select {
   font: inherit;

@@ -67,6 +67,18 @@ const els = {
   projectDetails: document.getElementById("projectDetails"),
   archiveBtn: document.getElementById("archiveBtn"),
   restoreBtn: document.getElementById("restoreBtn"),
+  openVersionsBtn: document.getElementById("openVersionsBtn"),
+  versionsDialog: document.getElementById("versionsDialog"),
+  versionsList: document.getElementById("versionsList"),
+  versionsStatus: document.getElementById("versionsStatus"),
+  versionDetails: document.getElementById("versionDetails"),
+  versionBase: document.getElementById("versionBase"),
+  versionTarget: document.getElementById("versionTarget"),
+  compareVersionsBtn: document.getElementById("compareVersionsBtn"),
+  versionComparison: document.getElementById("versionComparison"),
+  closeVersionsBtn: document.getElementById("closeVersionsBtn"),
+  confirmVersionRestoreDialog: document.getElementById("confirmVersionRestoreDialog"),
+  confirmVersionRestoreCopy: document.getElementById("confirmVersionRestoreCopy"),
   archivedToggle: document.getElementById("archivedToggle"),
   archivedList: document.getElementById("archivedList"),
   archivedCount: document.getElementById("archivedCount"),
@@ -119,6 +131,8 @@ let projectListScroll = 0;
 let landingModelTouched = false;
 let landingModelControl = null;
 let referenceBuildId = null;
+let versionsBuildId = null;
+let restoreIntent = null;
 /** @type {HTMLIFrameElement | null} */
 let visibleFrame = els.previewFrame;
 /** @type {HTMLIFrameElement | null} */
@@ -191,6 +205,203 @@ async function refreshReferences(buildId) {
     return false;
   }
 }
+
+function versionLabel(version) {
+  return `Version ${version.adoptionIndex + 1}`;
+}
+
+function versionStatus(message, error = false) {
+  els.versionsStatus.textContent = message || "";
+  els.versionsStatus.dataset.error = String(error);
+}
+
+function renderVersions(listing) {
+  els.versionDetails.replaceChildren();
+  els.versionComparison.replaceChildren();
+  const versions = [...listing.versions].reverse();
+  const current = listing.current;
+  const pending = listing.restorePending;
+  const currentLabel = current?.adoptionIndex == null
+    ? "Current product state"
+    : `Current · Version ${current.adoptionIndex + 1}`;
+  els.versionsList.innerHTML = `${current && current.adoptionIndex === null
+    ? `<div class="version-item"><strong>Current product state</strong><span>${current.git.resolvable ? "Resolvable" : "Unavailable"}</span></div>`
+    : ""}${versions.length ? versions.map((version) => {
+    const eligible = !pending && !version.current && version.git.resolvable &&
+      version.recordedBuildMatches !== false && version.recordedBindingMatches !== false && Boolean(current?.sha);
+    const date = version.adoptedAt ? ` · ${escapeHtml(version.adoptedAt.slice(0, 10))}` : "";
+    const state = version.current ? "Current" : version.git.resolvable ? "Adopted" : "Unavailable";
+    return `<div class="version-item" data-version-index="${version.adoptionIndex}">
+      <div><strong>${escapeHtml(versionLabel(version))}</strong><span>${state}${date}</span></div>
+      <div class="version-actions"><button type="button" class="ghost tiny" data-version-detail="${version.adoptionIndex}">Details</button>
+      ${eligible ? `<button type="button" class="ghost tiny" data-version-restore="${version.adoptionIndex}">Restore…</button>` : ""}</div>
+    </div>`;
+  }).join("") : '<p class="hint">No adopted versions yet.</p>'}`;
+  const selectors = [
+    ...listing.versions.map((version) => ({ value: `adoption:${version.adoptionIndex}`, label: `${versionLabel(version)}${version.current ? " · Current" : ""}` })),
+    ...(current ? [{ value: "current", label: currentLabel }] : []),
+  ];
+  for (const select of [els.versionBase, els.versionTarget]) {
+    select.replaceChildren(...selectors.map(({ value, label }) => new Option(label, value)));
+  }
+  if (selectors.length) {
+    els.versionBase.value = selectors[0].value;
+    els.versionTarget.value = current ? "current" : selectors[selectors.length - 1].value;
+  }
+  els.compareVersionsBtn.disabled = selectors.length < 2;
+  if (pending) versionStatus("A restore is being reconciled. Another restore is unavailable until it finishes.", true);
+  else versionStatus(versions.length ? "" : "There are no adopted versions to compare yet.");
+}
+
+async function refreshVersions(buildId) {
+  try {
+    const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/versions`);
+    const body = await response.json();
+    if (activeBuildId !== buildId || versionsBuildId !== buildId) return null;
+    if (!response.ok || !body?.ok) {
+      els.versionsList.replaceChildren();
+      versionStatus(body?.message || body?.code || "Could not load versions", true);
+      return null;
+    }
+    renderVersions(body);
+    return body;
+  } catch (error) {
+    if (activeBuildId === buildId && versionsBuildId === buildId) {
+      versionStatus(error instanceof Error ? error.message : "Could not load versions", true);
+    }
+    return null;
+  }
+}
+
+async function showVersionDetails(adoptionIndex) {
+  const buildId = versionsBuildId;
+  if (!buildId) return;
+  try {
+    const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/versions/${adoptionIndex}`);
+    const body = await response.json();
+    if (activeBuildId !== buildId || versionsBuildId !== buildId) return;
+    if (!response.ok || !body?.ok) {
+      versionStatus(body?.message || body?.code || "Could not read this version", true);
+      return;
+    }
+    const version = body.version;
+    els.versionDetails.textContent = `${versionLabel(version)} · ${version.git.resolvable ? "Resolvable" : "Unavailable"}${version.adoptedAt ? ` · Adopted ${version.adoptedAt.slice(0, 10)}` : ""}${version.files.length ? ` · ${version.files.length} recorded file${version.files.length === 1 ? "" : "s"}` : ""}`;
+  } catch (error) {
+    if (activeBuildId === buildId) versionStatus(error instanceof Error ? error.message : "Could not read this version", true);
+  }
+}
+
+async function compareVersions() {
+  const buildId = versionsBuildId;
+  if (!buildId) return;
+  try {
+    const params = new URLSearchParams({ base: els.versionBase.value, target: els.versionTarget.value });
+    const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/versions/compare?${params}`);
+    const body = await response.json();
+    if (activeBuildId !== buildId || versionsBuildId !== buildId) return;
+    if (!response.ok || !body?.ok) {
+      els.versionComparison.replaceChildren();
+      versionStatus(body?.message || body?.code || "Could not compare versions", true);
+      return;
+    }
+    const status = { A: "Added", M: "Modified", D: "Deleted", R: "Renamed", C: "Copied", T: "Type changed" };
+    els.versionComparison.innerHTML = body.files.length
+      ? `<p>${body.summary.changedFiles} changed file${body.summary.changedFiles === 1 ? "" : "s"}</p><ul>${body.files.map((file) => {
+        const label = status[file.status[0]] || file.status;
+        const counts = file.statsKnown && !file.binary ? ` · +${file.additions} / −${file.deletions}` : file.binary ? " · Binary" : "";
+        return `<li>${escapeHtml(label)} · ${escapeHtml(file.previousPath ? `${file.previousPath} → ${file.path}` : file.path)}${counts}</li>`;
+      }).join("")}</ul>`
+      : "<p>These versions have the same committed file tree.</p>";
+    versionStatus("");
+  } catch (error) {
+    if (activeBuildId === buildId) versionStatus(error instanceof Error ? error.message : "Could not compare versions", true);
+  }
+}
+
+async function beginVersionRestore(adoptionIndex) {
+  const buildId = versionsBuildId;
+  if (!buildId) return;
+  // Re-read P8.0 immediately before showing confirmation. S2 revalidates again.
+  const listed = await refreshVersions(buildId);
+  const version = listed?.versions?.[adoptionIndex];
+  if (!listed || listed.restorePending || !listed.current?.sha || !version || version.current ||
+      !version.git.resolvable || version.recordedBuildMatches === false || version.recordedBindingMatches === false) {
+    if (listed && !listed.restorePending) versionStatus("This version is not eligible for restore. Review the refreshed list.", true);
+    return;
+  }
+  restoreIntent = { buildId, adoptionIndex, expectedAuthoritativeSha: listed.current.sha };
+  const currentLabel = listed.current.adoptionIndex == null ? "the current product state" : `current Version ${listed.current.adoptionIndex + 1}`;
+  els.confirmVersionRestoreCopy.textContent = `${versionLabel(version)} will replace ${currentLabel} as the current product state.`;
+  els.confirmVersionRestoreDialog.showModal();
+}
+
+async function submitVersionRestore(intent) {
+  if (activeBuildId !== intent.buildId || versionsBuildId !== intent.buildId) return;
+  versionStatus("Restoring version…");
+  try {
+    const response = await fetch(`/api/builds/${encodeURIComponent(intent.buildId)}/versions/restore`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adoptionIndex: intent.adoptionIndex, expectedAuthoritativeSha: intent.expectedAuthoritativeSha }),
+    });
+    const body = await response.json();
+    if (activeBuildId !== intent.buildId || versionsBuildId !== intent.buildId) return;
+    if (body?.code === "STALE_AUTHORITY") {
+      await refreshVersions(intent.buildId);
+      versionStatus("The product changed. Review the refreshed versions before requesting restore again.", true);
+      return;
+    }
+    if (!response.ok || !body?.ok) {
+      await refreshVersions(intent.buildId);
+      versionStatus(body?.message || body?.code || "Restore failed", true);
+      return;
+    }
+    const refreshed = await refreshVersions(intent.buildId);
+    if (!refreshed) {
+      versionStatus("Restore completed, but versions could not be refreshed. Reopen Versions to check the current state.", true);
+      return;
+    }
+    if (body.noOp) versionStatus("This version already matches the current product state. No new version was created.");
+    else versionStatus("Version restored. The earlier versions remain in history.");
+    const viewResponse = await fetch(`/api/builds/${encodeURIComponent(intent.buildId)}`);
+    if (viewResponse.ok && activeBuildId === intent.buildId) acceptView(await viewResponse.json());
+  } catch (error) {
+    versionStatus(error instanceof Error ? error.message : "Restore failed", true);
+  }
+}
+
+function clearVersionsUi() {
+  if (els.confirmVersionRestoreDialog.open) els.confirmVersionRestoreDialog.close("cancel");
+  if (els.versionsDialog.open) els.versionsDialog.close();
+  versionsBuildId = null;
+  restoreIntent = null;
+  els.versionsList.replaceChildren();
+  els.versionDetails.replaceChildren();
+  els.versionComparison.replaceChildren();
+  versionStatus("");
+}
+
+els.openVersionsBtn?.addEventListener("click", () => {
+  if (!activeBuildId || activeBuildId === "pending") return;
+  clearVersionsUi();
+  versionsBuildId = activeBuildId;
+  els.versionsDialog.showModal();
+  versionStatus("Loading versions…");
+  void refreshVersions(activeBuildId);
+});
+els.closeVersionsBtn?.addEventListener("click", () => clearVersionsUi());
+els.versionsDialog?.addEventListener("close", () => clearVersionsUi());
+els.versionsList?.addEventListener("click", (event) => {
+  const detail = event.target.closest("[data-version-detail]");
+  const restore = event.target.closest("[data-version-restore]");
+  if (detail) void showVersionDetails(Number(detail.dataset.versionDetail));
+  if (restore) void beginVersionRestore(Number(restore.dataset.versionRestore));
+});
+els.compareVersionsBtn?.addEventListener("click", () => void compareVersions());
+els.confirmVersionRestoreDialog?.addEventListener("close", () => {
+  const intent = restoreIntent;
+  restoreIntent = null;
+  if (els.confirmVersionRestoreDialog.returnValue === "confirm" && intent) void submitVersionRestore(intent);
+});
 
 function setWorkspaceVisible(on) {
   els.landing.hidden = on;
@@ -1154,6 +1365,7 @@ function showComposer(pushHistory) {
   selectedElement = null;
   lastView = null;
   clearReferenceUi();
+  clearVersionsUi();
   landingModelTouched = false;
   renderModelSelect(els.landingModel, null, els.landingPreferredEngine, landingModelControl, true);
   if (visibleFrame) {
@@ -1466,6 +1678,7 @@ async function openProject(buildId, mode, title) {
   else if (mode === "replace") history.replaceState({ buildId }, "", url);
   activeBuildId = buildId;
   clearReferenceUi();
+  clearVersionsUi();
   worklogFollow = true;
   chatStick = true;
   heldPreview = null;
