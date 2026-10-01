@@ -31,6 +31,15 @@ const els = {
   chatForm: document.getElementById("chatForm"),
   chatInput: document.getElementById("chatInput"),
   sendBtn: document.getElementById("sendBtn"),
+  referenceList: document.getElementById("referenceList"),
+  referenceStatus: document.getElementById("referenceStatus"),
+  referenceUploadBtn: document.getElementById("referenceUploadBtn"),
+  referenceFile: document.getElementById("referenceFile"),
+  referenceLinkBtn: document.getElementById("referenceLinkBtn"),
+  referenceLinkForm: document.getElementById("referenceLinkForm"),
+  referenceUrl: document.getElementById("referenceUrl"),
+  referenceLinkSave: document.getElementById("referenceLinkSave"),
+  referenceLinkCancel: document.getElementById("referenceLinkCancel"),
   selectionChip: document.getElementById("selectionChip"),
   previewStage: document.getElementById("previewStage"),
   previewEmpty: document.getElementById("previewEmpty"),
@@ -109,6 +118,7 @@ let heldPreview = null;
 let projectListScroll = 0;
 let landingModelTouched = false;
 let landingModelControl = null;
+let referenceBuildId = null;
 /** @type {HTMLIFrameElement | null} */
 let visibleFrame = els.previewFrame;
 /** @type {HTMLIFrameElement | null} */
@@ -130,6 +140,56 @@ function escapeHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function showReferenceStatus(message, error = false) {
+  els.referenceStatus.hidden = !message;
+  els.referenceStatus.textContent = message || "";
+  els.referenceStatus.dataset.error = String(error);
+}
+
+function clearReferenceUi() {
+  referenceBuildId = null;
+  els.referenceList.replaceChildren();
+  els.referenceFile.value = "";
+  els.referenceUrl.value = "";
+  els.referenceLinkForm.hidden = true;
+  showReferenceStatus("");
+}
+
+function renderReferences(references) {
+  if (!references.length) {
+    els.referenceList.innerHTML = '<span class="reference-empty">No references yet.</span>';
+    return;
+  }
+  els.referenceList.innerHTML = references.map((reference) => {
+    if (reference.kind === "uploaded") {
+      return `<div class="reference-item">${escapeHtml(reference.filename)} <span>· ${escapeHtml(reference.mediaType)} · ${Number(reference.byteLength).toLocaleString()} bytes</span></div>`;
+    }
+    const url = escapeHtml(reference.url);
+    return `<div class="reference-item"><a href="${url}" target="_blank" rel="noopener noreferrer">${escapeHtml(reference.label || reference.url)}</a>${reference.label ? ` <span>· ${url}</span>` : ""}</div>`;
+  }).join("");
+}
+
+async function refreshReferences(buildId) {
+  try {
+    const res = await fetch(`/api/builds/${encodeURIComponent(buildId)}/references`);
+    const body = await res.json();
+    if (activeBuildId !== buildId || referenceBuildId !== buildId) return false;
+    if (!res.ok || !body?.ok) {
+      els.referenceList.replaceChildren();
+      showReferenceStatus(body?.message || body?.code || `Could not load references (HTTP ${res.status})`, true);
+      return false;
+    }
+    renderReferences(body.references || []);
+    return true;
+  } catch (error) {
+    if (activeBuildId === buildId && referenceBuildId === buildId) {
+      els.referenceList.replaceChildren();
+      showReferenceStatus(error instanceof Error ? error.message : "Could not load references", true);
+    }
+    return false;
+  }
 }
 
 function setWorkspaceVisible(on) {
@@ -582,6 +642,16 @@ function render(view) {
   setWorkspaceVisible(true);
   activeBuildId = view.buildId;
   projectRoot = view.projectRoot || null;
+  const canAttach = Boolean(view.buildId && view.buildId !== "pending" && projectRoot);
+  els.referenceUploadBtn.disabled = !canAttach;
+  els.referenceLinkBtn.disabled = !canAttach;
+  if (!canAttach) {
+    clearReferenceUi();
+  } else if (referenceBuildId !== view.buildId) {
+    clearReferenceUi();
+    referenceBuildId = view.buildId;
+    void refreshReferences(view.buildId);
+  }
   if (els.buildIdentity) {
     els.buildIdentity.textContent = view.displayTitle || "Project";
   }
@@ -695,6 +765,8 @@ function render(view) {
 
 function acceptView(view) {
   if (!view) return;
+  // A late response from a previously open Build cannot restore its UI or references.
+  if (activeBuildId && view.buildId && view.buildId !== activeBuildId) return;
   const revision = Number(view.viewRevision);
   if (
     !shouldAcceptBuildView({
@@ -969,6 +1041,79 @@ els.workspaceModel?.addEventListener("change", async () => {
     showHandoffResult("Model preference", { ok: false, message: error instanceof Error ? error.message : "Request failed" });
   }
 });
+els.referenceUploadBtn?.addEventListener("click", () => {
+  if (activeBuildId && referenceBuildId === activeBuildId) els.referenceFile.click();
+});
+els.referenceFile?.addEventListener("change", async () => {
+  const file = els.referenceFile.files?.[0];
+  const buildId = activeBuildId;
+  if (!file || !buildId || referenceBuildId !== buildId) return;
+  els.referenceUploadBtn.disabled = true;
+  showReferenceStatus(`Attaching ${file.name}…`);
+  try {
+    const res = await fetch(`/api/builds/${encodeURIComponent(buildId)}/references/upload`, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+        "X-Reference-Filename": encodeURIComponent(file.name),
+      },
+      body: file,
+    });
+    const body = await res.json();
+    if (activeBuildId !== buildId || referenceBuildId !== buildId) return;
+    if (!res.ok || !body?.ok) {
+      showReferenceStatus(body?.message || body?.code || `Upload failed (HTTP ${res.status})`, true);
+      return;
+    }
+    if (await refreshReferences(buildId) && activeBuildId === buildId) showReferenceStatus(`Attached ${file.name}.`);
+  } catch (error) {
+    if (activeBuildId === buildId && referenceBuildId === buildId) {
+      showReferenceStatus(error instanceof Error ? error.message : "Upload failed", true);
+    }
+  } finally {
+    els.referenceFile.value = "";
+    els.referenceUploadBtn.disabled = !activeBuildId || referenceBuildId !== activeBuildId;
+  }
+});
+els.referenceLinkBtn?.addEventListener("click", () => {
+  if (!activeBuildId || referenceBuildId !== activeBuildId) return;
+  els.referenceLinkForm.hidden = false;
+  els.referenceUrl.focus();
+});
+els.referenceLinkCancel?.addEventListener("click", () => {
+  els.referenceUrl.value = "";
+  els.referenceLinkForm.hidden = true;
+  showReferenceStatus("");
+});
+els.referenceLinkForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const buildId = activeBuildId;
+  if (!buildId || referenceBuildId !== buildId) return;
+  els.referenceLinkSave.disabled = true;
+  showReferenceStatus("Saving link…");
+  try {
+    const res = await fetch(`/api/builds/${encodeURIComponent(buildId)}/references/link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: els.referenceUrl.value.trim() }),
+    });
+    const body = await res.json();
+    if (activeBuildId !== buildId || referenceBuildId !== buildId) return;
+    if (!res.ok || !body?.ok) {
+      showReferenceStatus(body?.message || body?.code || `Link failed (HTTP ${res.status})`, true);
+      return;
+    }
+    els.referenceUrl.value = "";
+    els.referenceLinkForm.hidden = true;
+    if (await refreshReferences(buildId) && activeBuildId === buildId) showReferenceStatus("Link saved.");
+  } catch (error) {
+    if (activeBuildId === buildId && referenceBuildId === buildId) {
+      showReferenceStatus(error instanceof Error ? error.message : "Link failed", true);
+    }
+  } finally {
+    els.referenceLinkSave.disabled = false;
+  }
+});
 els.outcome.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
     e.preventDefault();
@@ -1008,6 +1153,7 @@ function showComposer(pushHistory) {
   heldPreview = null;
   selectedElement = null;
   lastView = null;
+  clearReferenceUi();
   landingModelTouched = false;
   renderModelSelect(els.landingModel, null, els.landingPreferredEngine, landingModelControl, true);
   if (visibleFrame) {
@@ -1319,6 +1465,7 @@ async function openProject(buildId, mode, title) {
   if (mode === "push") history.pushState({ buildId }, "", url);
   else if (mode === "replace") history.replaceState({ buildId }, "", url);
   activeBuildId = buildId;
+  clearReferenceUi();
   worklogFollow = true;
   chatStick = true;
   heldPreview = null;

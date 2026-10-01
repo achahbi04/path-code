@@ -156,6 +156,21 @@
             <div class="selection-chip" id="selectionChip" hidden></div>
             <p class="creator-status" id="creatorStatus" hidden>Understanding your request<span class="ellipsis" aria-hidden="true"></span></p>
             <p class="queue-notice" id="queueNotice" hidden>QUEUED — project is paused</p>
+            <section class="creator-references" aria-label="Project references">
+              <div class="reference-heading">References <span class="reference-note">Saved for this project; not yet used in engineering turns.</span></div>
+              <div id="referenceList" class="reference-list"></div>
+              <div class="reference-actions">
+                <button type="button" class="ghost tiny" id="referenceUploadBtn">Attach file</button>
+                <input type="file" id="referenceFile" aria-label="Choose reference file" hidden />
+                <button type="button" class="ghost tiny" id="referenceLinkBtn">Add link</button>
+              </div>
+              <form id="referenceLinkForm" class="reference-link-form" hidden>
+                <input id="referenceUrl" type="text" inputmode="url" placeholder="https://example.com/reference" aria-label="Reference URL" />
+                <button type="submit" class="ghost tiny" id="referenceLinkSave">Save link</button>
+                <button type="button" class="ghost tiny" id="referenceLinkCancel">Cancel</button>
+              </form>
+              <p id="referenceStatus" class="reference-status" role="status" hidden></p>
+            </section>
             <form class="chat-composer" id="chatForm">
               <textarea
                 id="chatInput"

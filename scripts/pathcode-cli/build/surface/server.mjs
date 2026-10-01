@@ -43,6 +43,12 @@ import {
   setAdoptedSync,
 } from "./repository.mjs";
 import { classifyConversationMessage } from "../conversation.mjs";
+import {
+  createLinkedCreatorReference,
+  listCreatorReferences,
+  readCreatorReference,
+  storeUploadedCreatorReference,
+} from "../references.mjs";
 import { detectBuildArtifact } from "../runtime/artifact.mjs";
 import {
   proxyPreviewHttp,
@@ -130,6 +136,44 @@ function readJsonBody(req) {
     });
     req.on("error", reject);
   });
+}
+
+// Bound the HTTP transport before handing bytes to the P7.0 storage authority.
+// P7.0 applies its own upload validation and storage limit.
+function readReferenceUploadBody(req) {
+  return new Promise((resolveBody, reject) => {
+    const chunks = [];
+    let length = 0;
+    let tooLarge = false;
+    req.on("data", (chunk) => {
+      length += chunk.length;
+      if (length > 26 * 1024 * 1024) {
+        tooLarge = true;
+        chunks.length = 0;
+      } else if (!tooLarge) {
+        chunks.push(chunk);
+      }
+    });
+    req.on("end", () => {
+      if (tooLarge) reject(Object.assign(new Error("Upload exceeds the request limit"), { code: "REFERENCE_UPLOAD_TOO_LARGE" }));
+      else resolveBody(Buffer.concat(chunks));
+    });
+    req.on("error", reject);
+  });
+}
+
+function projectCreatorReference(reference) {
+  const base = { referenceId: reference.referenceId, kind: reference.kind, createdAt: reference.createdAt };
+  return reference.kind === "uploaded"
+    ? { ...base, filename: reference.source.filename, mediaType: reference.source.mediaType, byteLength: reference.blob.byteLength }
+    : { ...base, url: reference.source.url, label: reference.source.label };
+}
+
+function referenceStatus(result) {
+  if (result.ok) return 200;
+  if (["BUILD_NOT_FOUND", "REFERENCE_NOT_FOUND"].includes(result.code)) return 404;
+  if (result.code === "REFERENCE_STORAGE_UNAVAILABLE" || result.code === "REFERENCE_READ_FAILED" || result.code === "REFERENCE_WRITE_FAILED") return 500;
+  return 400;
 }
 
 /**
@@ -563,9 +607,76 @@ export async function startPathBuildSurface(options) {
 
       const buildMatch = path.match(/^\/api\/builds\/([^/]+)(?:\/([^/]+)(?:\/([^/]+))?)?$/);
       if (buildMatch) {
-        const buildId = decodeURIComponent(buildMatch[1]);
+        let buildId;
+        try { buildId = decodeURIComponent(buildMatch[1]); }
+        catch {
+          sendJson(res, 400, { ok: false, code: "INVALID_BUILD_ID", message: "Invalid Build identity" });
+          return;
+        }
         const action = buildMatch[2] || "";
         const sub = buildMatch[3] || "";
+
+        if (action === "references") {
+          if (method === "GET" && !sub) {
+            const listed = listCreatorReferences({ runtimeRoot, buildId });
+            sendJson(res, referenceStatus(listed), listed.ok
+              ? { ok: true, references: listed.references.map(projectCreatorReference) }
+              : listed);
+            return;
+          }
+          if (method === "GET" && sub) {
+            let referenceId;
+            try { referenceId = decodeURIComponent(sub); }
+            catch {
+              sendJson(res, 400, { ok: false, code: "INVALID_REFERENCE_ID", message: "Invalid reference identity" });
+              return;
+            }
+            const read = readCreatorReference({ runtimeRoot, buildId, referenceId });
+            sendJson(res, referenceStatus(read), read.ok
+              ? { ok: true, reference: projectCreatorReference(read.reference) }
+              : read);
+            return;
+          }
+          if (method === "POST" && sub === "upload") {
+            let filename;
+            try { filename = decodeURIComponent(String(req.headers["x-reference-filename"] || "")); }
+            catch {
+              sendJson(res, 400, { ok: false, code: "INVALID_REFERENCE_FILENAME", message: "Invalid filename" });
+              return;
+            }
+            let bytes;
+            try { bytes = await readReferenceUploadBody(req); }
+            catch (error) {
+              sendJson(res, error?.code === "REFERENCE_UPLOAD_TOO_LARGE" ? 413 : 400, {
+                ok: false,
+                code: error?.code || "REFERENCE_UPLOAD_FAILED",
+                message: error instanceof Error ? error.message : "Upload failed",
+              });
+              return;
+            }
+            const stored = storeUploadedCreatorReference({
+              runtimeRoot, buildId, bytes, filename,
+              mediaType: String(req.headers["content-type"] || "application/octet-stream"),
+            });
+            sendJson(res, referenceStatus(stored), stored.ok
+              ? { ok: true, reference: projectCreatorReference(stored.reference) }
+              : stored);
+            return;
+          }
+          if (method === "POST" && sub === "link") {
+            let body;
+            try { body = await readJsonBody(req); }
+            catch {
+              sendJson(res, 400, { ok: false, code: "INVALID_REFERENCE_REQUEST", message: "Invalid link request" });
+              return;
+            }
+            const stored = createLinkedCreatorReference({ runtimeRoot, buildId, url: body?.url, label: body?.label });
+            sendJson(res, referenceStatus(stored), stored.ok
+              ? { ok: true, reference: projectCreatorReference(stored.reference) }
+              : stored);
+            return;
+          }
+        }
 
         if (method === "GET" && !action) {
           const build = readBuildRecord(runtimeRoot, buildId);

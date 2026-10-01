@@ -305,6 +305,23 @@ body {
   color: var(--accent);
   font-size: 0.8rem;
 }
+.creator-references {
+  padding: 0.65rem 1rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.8rem;
+}
+.reference-heading { font-weight: 650; }
+.reference-note { color: var(--muted); font-weight: 400; }
+.reference-list { display: grid; gap: 0.25rem; max-height: 7rem; overflow: auto; margin: 0.35rem 0; }
+.reference-item { overflow-wrap: anywhere; color: #d7e6dc; }
+.reference-item span, .reference-empty { color: var(--muted); }
+.reference-item a { color: var(--accent); }
+.reference-actions, .reference-link-form { display: flex; gap: 0.4rem; align-items: center; }
+.reference-link-form { margin-top: 0.4rem; }
+.reference-link-form[hidden] { display: none; }
+.reference-link-form input { min-width: 0; flex: 1; }
+.reference-status { margin: 0.35rem 0 0; color: var(--muted); }
+.reference-status[data-error="true"] { color: var(--danger); }
 .chat-composer {
   display: grid;
   gap: 0.45rem;
