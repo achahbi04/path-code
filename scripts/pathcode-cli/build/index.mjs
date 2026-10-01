@@ -95,7 +95,7 @@ export {
 } from "./objectives.mjs";
 
 export { createBuildController } from "./controller.mjs";
-export { listProductVersions, readProductVersion } from "./versions.mjs";
+export { listProductVersions, readProductVersion, compareProductVersions } from "./versions.mjs";
 export { createBuildRuntimeSync } from "./runtime/sync.mjs";
 export { createBuildCoordinatorService } from "./coordinator/service.mjs";
 export {

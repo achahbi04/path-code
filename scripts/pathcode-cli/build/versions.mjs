@@ -25,6 +25,7 @@ function git(root, args) {
     cwd: root,
     encoding: "utf8",
     timeout: 15_000,
+    maxBuffer: 16 * 1024 * 1024,
     env: gitEnvironment(),
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -141,4 +142,117 @@ export function readProductVersion({ runtimeRoot, buildId, adoptionIndex }) {
   return version
     ? { ok: true, buildId, bindingId: listed.bindingId, current: listed.current, version }
     : failure("VERSION_NOT_FOUND", "Adopted version not found");
+}
+
+function selectCompareVersion(listed, selector, side) {
+  if (!selector || typeof selector !== "object" || Array.isArray(selector)) {
+    return { ...failure("INVALID_VERSION_SELECTOR", "Version selector must be current or an adoption position"), side };
+  }
+  const keys = Object.keys(selector);
+  if (selector.kind === "current" && keys.length === 1 && keys[0] === "kind") {
+    return listed.current
+      ? { ok: true, version: { kind: "current", adoptionIndex: listed.current.adoptionIndex, sha: listed.current.sha, git: listed.current.git } }
+      : { ...failure("VERSION_NOT_FOUND", "Build has no current authoritative SHA"), side };
+  }
+  if (selector.kind === "adoption" && keys.length === 2 && keys.includes("kind") && keys.includes("adoptionIndex") &&
+      Number.isSafeInteger(selector.adoptionIndex) && selector.adoptionIndex >= 0) {
+    const adopted = listed.versions[selector.adoptionIndex];
+    return adopted
+      ? { ok: true, version: { kind: "adoption", adoptionIndex: adopted.adoptionIndex, sha: adopted.sha, git: adopted.git } }
+      : { ...failure("VERSION_NOT_FOUND", "Adopted version not found"), side };
+  }
+  return { ...failure("INVALID_VERSION_SELECTOR", "Version selector must be current or an adoption position"), side };
+}
+
+function parseNameStatus(output) {
+  const parts = output.split("\0");
+  const files = [];
+  for (let i = 0; i < parts.length && parts[i] !== "";) {
+    const status = parts[i++];
+    if (!/^[A-Z][0-9]{0,3}$/.test(status)) return null;
+    const renamed = status[0] === "R" || status[0] === "C";
+    const previousPath = renamed ? parts[i++] : null;
+    const path = parts[i++];
+    if (!path || (renamed && !previousPath)) return null;
+    files.push({ path, previousPath, status });
+  }
+  return files;
+}
+
+function parseNumstat(output) {
+  const parts = output.split("\0");
+  const stats = new Map();
+  for (let i = 0; i < parts.length && parts[i] !== "";) {
+    const line = parts[i++];
+    const match = /^([0-9]+|-)\t([0-9]+|-)\t([\s\S]*)$/.exec(line);
+    if (!match) return null;
+    let path = match[3];
+    if (!path) {
+      i += 1; // Rename: the next two NUL fields are old path, then new path.
+      path = parts[i++];
+    }
+    if (!path) return null;
+    const binary = match[1] === "-" && match[2] === "-";
+    const additions = binary ? null : Number(match[1]);
+    const deletions = binary ? null : Number(match[2]);
+    if (!binary && (!Number.isSafeInteger(additions) || !Number.isSafeInteger(deletions))) return null;
+    stats.set(path, {
+      additions,
+      deletions,
+      binary,
+    });
+  }
+  return stats;
+}
+
+/** Compare only two P8.0 members. Git reads commit trees, never the worktree. */
+export function compareProductVersions({ runtimeRoot, buildId, base, target }) {
+  const listed = listProductVersions({ runtimeRoot, buildId });
+  if (!listed.ok) return listed;
+  const baseSelection = selectCompareVersion(listed, base, "base");
+  if (!baseSelection.ok) return baseSelection;
+  const targetSelection = selectCompareVersion(listed, target, "target");
+  if (!targetSelection.ok) return targetSelection;
+  const baseVersion = baseSelection.version;
+  const targetVersion = targetSelection.version;
+  for (const [side, version] of [["base", baseVersion], ["target", targetVersion]]) {
+    if (!version.git.resolvable) {
+      return { ...failure("VERSION_UNRESOLVED", `${side} version cannot be resolved in the bound Git repository`), side, sha: version.sha, reason: version.git.reason };
+    }
+  }
+  const args = ["diff", "--no-ext-diff", "--no-textconv", "--find-renames", "-z"];
+  const names = git(listed.projectRoot, [...args, "--name-status", baseVersion.sha, targetVersion.sha, "--"]);
+  const counts = git(listed.projectRoot, [...args, "--numstat", baseVersion.sha, targetVersion.sha, "--"]);
+  if (names.status !== 0 || counts.status !== 0 || names.error || counts.error) {
+    return failure("VERSION_COMPARE_FAILED", "Git could not compare the selected committed versions");
+  }
+  const changed = parseNameStatus(names.stdout);
+  const stats = parseNumstat(counts.stdout);
+  if (!changed || !stats) return failure("VERSION_COMPARE_FAILED", "Git returned an unreadable structural diff");
+  const files = changed.map((entry) => {
+    const stat = stats.get(entry.path);
+    return {
+      ...entry,
+      additions: stat?.additions ?? null,
+      deletions: stat?.deletions ?? null,
+      binary: stat?.binary ?? false,
+      statsKnown: Boolean(stat),
+    };
+  });
+  const statsComplete = files.every((file) => file.statsKnown && !file.binary);
+  return {
+    ok: true,
+    buildId,
+    bindingId: listed.bindingId,
+    base: baseVersion,
+    target: targetVersion,
+    files,
+    summary: {
+      changedFiles: files.length,
+      additions: statsComplete ? files.reduce((sum, file) => sum + (file.additions ?? 0), 0) : null,
+      deletions: statsComplete ? files.reduce((sum, file) => sum + (file.deletions ?? 0), 0) : null,
+      binaryFiles: files.filter((file) => file.binary).length,
+      statsComplete,
+    },
+  };
 }
