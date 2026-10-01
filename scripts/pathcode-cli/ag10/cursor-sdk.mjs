@@ -565,7 +565,14 @@ export async function createCursorEngine(options) {
         );
       }
       const model = turnResolution.model;
-      const run = await agent.send(String(turn.prompt || ""), { model });
+      const attachments = Array.isArray(turn.attachments) ? turn.attachments : [];
+      if (attachments.some((attachment) => attachment.type !== "image" || typeof attachment.data !== "string" || typeof attachment.mimeType !== "string")) {
+        return { ok: false, code: "REFERENCE_INPUT_UNSUPPORTED", detail: "Cursor accepts image reference attachments only", changedFiles: [] };
+      }
+      const message = attachments.length
+        ? { text: String(turn.prompt || ""), images: attachments.map(({ data, mimeType }) => ({ data, mimeType })) }
+        : String(turn.prompt || "");
+      const run = await agent.send(message, { model });
       activeRun = run;
       reclaimTitle();
 

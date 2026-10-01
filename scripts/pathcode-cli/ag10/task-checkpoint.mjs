@@ -28,6 +28,8 @@ import { MODEL_PREFERENCE_ENGINES, validateModelPreference } from "../model-plan
  * @property {string} [repoRoot]
  * @property {string} worktreePath
  * @property {string} [objective]
+ * @property {string} [creatorReferenceBuildId]
+ * @property {object[]} [referenceInputs] Factual input snapshot; no bytes or blob paths.
  * @property {string} [headSha]
  * @property {string} [diffFingerprint]
  * @property {string} [agSessionMode] NATIVE_RESUME | REHYDRATED_SESSION | ACTIVE | NONE
@@ -133,6 +135,9 @@ export function createCheckpointSkeleton(partial) {
       typeof partial.objective === "string"
         ? partial.objective.slice(0, 4_000)
         : undefined,
+    creatorReferenceBuildId: typeof partial.creatorReferenceBuildId === "string"
+      ? partial.creatorReferenceBuildId : undefined,
+    referenceInputs: Array.isArray(partial.referenceInputs) ? partial.referenceInputs : undefined,
     headSha: typeof partial.headSha === "string" ? partial.headSha : undefined,
     diffFingerprint:
       typeof partial.diffFingerprint === "string"

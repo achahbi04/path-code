@@ -58,6 +58,7 @@ import { resolveMutatingEngineAttempt, resolvePreferredEngine } from "../ag10/en
 import { formatBuildStatus } from "./format.mjs";
 import { detectBuildArtifact } from "./runtime/artifact.mjs";
 import { appendBuildEvent } from "./events.mjs";
+import { snapshotCreatorReferenceInput } from "./reference-input.mjs";
 import { mechanicalProbeBinding } from "./mechanical-probe.mjs";
 import {
   deriveProductBrief,
@@ -1044,6 +1045,10 @@ export function createBuildController(opts) {
       }
     }
 
+    const referenceSnapshot = kind === "engineer" && !existing
+      ? snapshotCreatorReferenceInput({ runtimeRoot, buildId, bindingId: binding.bindingId, projectRoot: binding.projectRoot })
+      : null;
+    if (referenceSnapshot && !referenceSnapshot.ok) return referenceSnapshot;
     const taskId = existing?.taskId || randomUUID();
     const now = new Date().toISOString();
     if (!existing) {
@@ -1054,6 +1059,7 @@ export function createBuildController(opts) {
         actionId,
         dispatchState: "selected",
         objective: objective.slice(0, 4_000),
+        ...(referenceSnapshot ? { referenceInputs: referenceSnapshot.references } : {}),
         intentRevision: record.intent.outcomeRevision,
         authoritativeSha: record.authoritativeSha || null,
         selectedAt: now,
@@ -1068,6 +1074,10 @@ export function createBuildController(opts) {
     const startExtra = {
       taskId,
       cwd: binding.projectRoot,
+      ...(kind === "engineer" ? {
+        creatorReferenceBuildId: buildId,
+        creatorReferenceInputs: existing?.referenceInputs || referenceSnapshot?.references || [],
+      } : {}),
       ...(preferredEngine ? { preferredEngine } : {}),
     };
 

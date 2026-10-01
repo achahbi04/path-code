@@ -118,6 +118,8 @@ export async function createG10Fabric(options) {
       worktreePath: options.worktreePath,
       repoRoot: options.repoRoot,
       objective: options.objective,
+      creatorReferenceBuildId: options.creatorReferenceBuildId,
+      referenceInputs: options.referenceInputs,
       headSha: reality0.headSha || undefined,
       diffFingerprint: reality0.diffFingerprint,
       preparedCapabilities: [],
@@ -601,6 +603,7 @@ export async function createG10Fabric(options) {
           });
           const result = await copilot.runEngineeringTurn({
             prompt,
+            attachments: turn.attachments,
             timeoutMs: turn.timeoutMs,
             modelResolution: copilotPlane,
           });
@@ -750,6 +753,7 @@ export async function createG10Fabric(options) {
           });
           const result = await cursor.runEngineeringTurn({
             prompt,
+            attachments: turn.attachments,
             timeoutMs: turn.timeoutMs,
             signal: turn.signal,
             modelResolution: cursorPlane,

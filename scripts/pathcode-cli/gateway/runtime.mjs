@@ -40,6 +40,7 @@ import {
 import { resolveCursorApiKey } from "../ag10/cursor-sdk.mjs";
 import { probeCopilotReadiness } from "../ag10/engine-readiness.mjs";
 import { loadedCodeIdentity } from "../build/identity.mjs";
+import { validateCreatorReferenceInput } from "../build/reference-input.mjs";
 import {
   findLatestResumableCheckpoint,
   markTaskInterrupted,
@@ -413,6 +414,18 @@ export function createGatewayRuntime(options = {}) {
       const checked = validateEngineeringModelCommand(params.engineeringModelId);
       if (!checked.ok) return checked;
     }
+    if (params.creatorReferenceBuildId !== undefined || params.creatorReferenceInputs !== undefined) {
+      if (typeof params.creatorReferenceBuildId !== "string") {
+        return { ok: false, code: "INVALID_REFERENCE_INPUT", message: "Build reference identity required" };
+      }
+      const checked = validateCreatorReferenceInput({
+        runtimeRoot,
+        buildId: params.creatorReferenceBuildId,
+        projectRoot: project.projectRoot,
+        references: params.creatorReferenceInputs,
+      });
+      if (!checked.ok) return checked;
+    }
 
     const taskId =
       typeof params.taskId === "string" && params.taskId.trim()
@@ -501,6 +514,10 @@ export function createGatewayRuntime(options = {}) {
               repoRoot: task.projectRoot,
               worktreePath: task.projectRoot,
               objective,
+              ...(typeof params.creatorReferenceBuildId === "string" ? {
+                creatorReferenceBuildId: params.creatorReferenceBuildId,
+                referenceInputs: params.creatorReferenceInputs,
+              } : {}),
               preferredEngine: preferredEngine || undefined,
               updatedAt: new Date().toISOString(),
             });
@@ -686,6 +703,10 @@ export function createGatewayRuntime(options = {}) {
             stderr: { write: () => true, isTTY: false },
           },
           taskText: objective,
+          ...(typeof params.creatorReferenceBuildId === "string" ? {
+            creatorReferenceBuildId: params.creatorReferenceBuildId,
+            creatorReferenceInputs: params.creatorReferenceInputs,
+          } : {}),
           projectRoot: task.projectRoot,
           workingSubdir: task.workingSubdir,
           unicode: true,
@@ -998,6 +1019,8 @@ export function createGatewayRuntime(options = {}) {
 
     const started = await startTask({
       ...params,
+      creatorReferenceBuildId: params.creatorReferenceBuildId ?? cp.creatorReferenceBuildId,
+      creatorReferenceInputs: params.creatorReferenceInputs ?? cp.referenceInputs,
       taskId,
       objective,
       taskText: objective,

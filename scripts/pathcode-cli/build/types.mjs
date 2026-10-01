@@ -78,6 +78,7 @@
  * @property {string} actionId
  * @property {ChildDispatchState} dispatchState
  * @property {string} [objective]
+ * @property {object[]} [referenceInputs] Factual P7 reference identities selected for this child.
  * @property {string} [resultFingerprint]
  * @property {string} [terminalAt]
  * @property {string} [classification]

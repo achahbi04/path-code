@@ -5,6 +5,8 @@ export interface TaskCheckpoint {
   repoRoot?: string;
   worktreePath?: string;
   objective?: string;
+  creatorReferenceBuildId?: string;
+  referenceInputs?: object[];
   finalState?: string;
   validation?: { classification?: string; [key: string]: unknown };
   branch?: string;

@@ -14,6 +14,7 @@ import { proveLocalSandboxConfinement } from "./sandbox-proof.mjs";
 import { detectAg1Auth } from "./auth-detect.mjs";
 import { hydrateAg1CloudEnv, resolveAg1BridgeConfiguration, resolveAg1ExecutionIdentity } from "./cloud-env.mjs";
 import { buildModelExecutionFromResolution } from "../model-plane/execution-provenance.mjs";
+import { prepareCreatorReferencesForEngine } from "../build/reference-input.mjs";
 import { resolveEngineeringModelCommand } from "../model-plane/command-override.mjs";
 import { primaryAdapterFor, selectPrimaryEngine } from "../ag10/engine-contract.mjs";
 import { admitPrimaryCheckout } from "./admission.mjs";
@@ -621,6 +622,10 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       worktreePath: worktree.worktreePath,
       repoRoot: projectRoot,
       objective: resumeObjective || taskText,
+      ...(typeof options.creatorReferenceBuildId === "string" ? {
+        creatorReferenceBuildId: options.creatorReferenceBuildId,
+        referenceInputs: options.creatorReferenceInputs,
+      } : {}),
       wallClockMs: options.wallClockMs ?? AG1_DEFAULT_WALL_CLOCK_MS,
       toolEnv:
         preparedEnv?.toolEnv && typeof preparedEnv.toolEnv === "object"
@@ -1188,6 +1193,20 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
   if (primaryAdapter === "antigravity" && commandResolution && !commandResolution.ok) {
     return endCursorAttempt(commandResolution.code, commandResolution.message);
   }
+  const referenceBuildId = options.creatorReferenceBuildId || g10Fabric?.getCheckpoint?.()?.creatorReferenceBuildId;
+  const referenceInputs = options.creatorReferenceInputs ?? g10Fabric?.getCheckpoint?.()?.referenceInputs;
+  const referenceTurn = typeof referenceBuildId === "string"
+    ? prepareCreatorReferencesForEngine({
+        runtimeRoot,
+        buildId: referenceBuildId,
+        projectRoot,
+        references: referenceInputs,
+        engineId: primaryAdapter,
+        engineMode: primaryAdapter === "copilot" ? copilotModeAtStart : "native_sdk",
+      })
+    : { ok: true, contextText: "", attachments: [] };
+  if (!referenceTurn.ok) return endCursorAttempt(referenceTurn.code, referenceTurn.message);
+  if (referenceTurn.contextText) startPayload.task += `\n\n${referenceTurn.contextText}`;
 
   if (primaryAdapter === "cursor" || primaryAdapter === "copilot") {
     emit("session.capability.collaborate", {
@@ -1205,6 +1224,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
         "Do not push, open PRs, deploy, or leave the worktree.",
         "",
         effectiveTaskText,
+        referenceTurn.contextText,
         capabilityBrief ? `\nCapability brief:\n${capabilityBrief}` : "",
       ]
         .filter(Boolean)
@@ -1217,6 +1237,7 @@ export async function runAntigravityEngineeringSession(prompt, options = {}) {
       const turn = runTurn
         ? await runTurn({
             prompt: primaryPrompt,
+            attachments: referenceTurn.attachments,
             role: "primary",
             timeoutMs: Math.max(45_000, turnBudgetMs),
             signal: ac.signal,

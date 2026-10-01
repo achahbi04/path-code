@@ -455,6 +455,10 @@ export async function createCopilotEngine(options) {
    * @param {{ prompt: string, timeoutMs?: number, modelResolution?: object }} turn
    */
   async function runEngineeringTurn(turn) {
+    const attachments = Array.isArray(turn.attachments) ? turn.attachments : [];
+    if (attachments.some((attachment) => attachment.type !== "blob" || typeof attachment.data !== "string" || typeof attachment.mimeType !== "string")) {
+      return { ok: false, mode, code: "REFERENCE_INPUT_UNSUPPORTED", detail: "Copilot reference attachments must be blobs", changedFiles: [] };
+    }
     const turnResolution = turn.modelResolution || modelPlaneResolution;
     if (!turnResolution.ok) {
       return { ok: false, mode, code: turnResolution.code, detail: turnResolution.message, changedFiles: [] };
@@ -485,7 +489,7 @@ export async function createCopilotEngine(options) {
           return { ok: false, mode, code: "MODEL_CONFIG_UNSUPPORTED", detail: "Copilot session cannot clear its configured model", changedFiles: [] };
         }
         const response = await session.sendAndWait(
-          { prompt: turn.prompt },
+          { prompt: turn.prompt, ...(attachments.length ? { attachments: attachments.map(({ data, mimeType, displayName }) => ({ type: "blob", data, mimeType, displayName })) } : {}) },
           typeof turn.timeoutMs === "number" ? turn.timeoutMs : 300_000,
         );
         try {
@@ -514,6 +518,9 @@ export async function createCopilotEngine(options) {
           /* ignore */
         }
         const classified = classifyCopilotFailure(err);
+        if (attachments.length) {
+          return { ok: false, mode, code: "REFERENCE_INPUT_UNSUPPORTED", detail: `Copilot SDK could not supply the reference attachment: ${classified.message}`, changedFiles: [] };
+        }
         // Attempt CLI fallback for this turn without destroying task.
         if (classified.code === "AUTH_REQUIRED") {
           mode = "auth_required";
@@ -536,6 +543,9 @@ export async function createCopilotEngine(options) {
     }
 
     // CLI harness path (preferred fallback / forced).
+    if (attachments.length) {
+      return { ok: false, mode, code: "REFERENCE_INPUT_UNSUPPORTED", detail: "Copilot CLI cannot receive uploaded reference bytes", changedFiles: [] };
+    }
     const cliTurn = await cliModule.runCopilotEngineeringTurn({
       prompt: turn.prompt,
       cwd: options.cwd,

@@ -51,6 +51,7 @@ export interface BuildChild {
   actionId: string;
   dispatchState: "selected" | "dispatched" | "terminal_seen" | "consumed";
   objective?: string;
+  referenceInputs?: import("./reference-input.mjs").CreatorReferenceInput[];
   resultFingerprint?: string;
   terminalAt?: string;
   classification?: string;
