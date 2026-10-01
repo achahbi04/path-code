@@ -131,6 +131,10 @@ export function createBuildCoordinatorClient(options) {
       request(BuildCoordinatorMethods.BUILD_APPLY, { buildId }),
     discardCandidate: (buildId) =>
       request(BuildCoordinatorMethods.BUILD_DISCARD, { buildId }),
+    restoreHistoricalVersion: (buildId, adoptionIndex, expectedAuthoritativeSha) =>
+      request(BuildCoordinatorMethods.BUILD_RESTORE_HISTORICAL, { buildId, adoptionIndex, expectedAuthoritativeSha }),
+    editSurfaceBuild: (buildId, action, input = {}) =>
+      request(BuildCoordinatorMethods.BUILD_SURFACE_EDIT, { buildId, action, input }),
     tickBuild: (buildId) =>
       request(BuildCoordinatorMethods.BUILD_TICK, { buildId }),
     runBuild: (buildId, options = {}) =>

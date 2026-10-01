@@ -27,6 +27,7 @@ export function createBuildRuntimeSync(options) {
   function requireBinding(buildId) {
     const build = readBuildRecord(runtimeRoot, buildId);
     if (!build) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (build.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     const binding = build.projectBindings?.[0];
     if (!binding?.projectRoot || !existsSync(binding.projectRoot)) {
       return { ok: false, code: "NO_PROJECT_ROOT", build };

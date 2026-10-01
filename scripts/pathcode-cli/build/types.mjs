@@ -133,6 +133,7 @@
  * @property {string} [archivedAt]
  * @property {{ syncAdopted?: boolean, lastSyncedSha?: string | null, lastSyncError?: string | null, lastSyncedAt?: string | null, remoteUrl?: string | null, kind?: string, validated?: boolean }} [repository]
  * @property {object} [pendingCandidate]
+ * @property {{ operationId: string, expectedAuthoritativeSha: string, targetAdoptionIndex: number, targetSha: string, targetTreeSha: string, candidateSha: string|null, createdAt: string }} [pendingRestore]
  * @property {object} [lastAppliedCandidate]
  * @property {object} [lastDiscardedCandidate]
  * @property {{ embedPath: string, sha: string, at?: string }} [lastGoodPreview]

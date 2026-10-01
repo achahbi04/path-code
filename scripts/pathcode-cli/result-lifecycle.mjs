@@ -6,6 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { adoptProductCommit } from "./product-adoption.mjs";
 
 import {
   createCheckpointSkeleton,
@@ -531,34 +532,10 @@ export function adoptTaskResult(opts) {
     };
   }
 
-  const dirty = git(opts.projectRoot, ["status", "--porcelain=v1", "-uall"]);
-  if (dirty.status !== 0) {
-    return {
-      ok: false,
-      code: "GIT_STATUS_FAILED",
-      message: dirty.stderr || dirty.stdout || "git status failed",
-    };
-  }
-  if (dirty.stdout) {
-    return {
-      ok: false,
-      code: "PRIMARY_DIRTY",
-      message: "Cannot adopt into a dirty primary checkout.",
-    };
-  }
-
-  const before = git(opts.projectRoot, ["rev-parse", "HEAD"]);
-  const merged = git(opts.projectRoot, ["merge", "--no-edit", sourceRef]);
-  if (merged.status !== 0) {
-    git(opts.projectRoot, ["merge", "--abort"]);
-    return {
-      ok: false,
-      code: "MERGE_FAILED",
-      message: merged.stderr || merged.stdout || "task-branch merge failed",
-      beforeSha: before.status === 0 ? before.stdout : null,
-    };
-  }
-  const after = git(opts.projectRoot, ["rev-parse", "HEAD"]);
+  const adopted = adoptProductCommit({ projectRoot: opts.projectRoot, sourceRef });
+  if (!adopted.ok) return adopted;
+  const before = { status: 0, stdout: adopted.beforeSha };
+  const after = { status: 0, stdout: adopted.adoptedSha };
   if (typeof opts.validateResult === "function") {
     const validation = opts.validateResult({
       beforeSha: before.status === 0 ? before.stdout : null,

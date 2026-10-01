@@ -19,14 +19,12 @@ import { spawn, spawnSync } from "node:child_process";
 
 import {
   readBuildRecord,
-  writeBuildRecord,
   listBuildRecords,
   selectSurfaceBuildId,
   appendPendingConversation,
   readPendingConversations,
   appendBuildEvent,
 } from "../index.mjs";
-import { syncConversationLifecycle } from "../controller.mjs";
 import { projectBuildForSurface } from "./product-view.mjs";
 import { projectBuilderModelControl, writeBuilderModelPreference } from "./model-control.mjs";
 import { displayTitleFor, isCreatorProject, libraryRow } from "./project-library.mjs";
@@ -34,14 +32,7 @@ import {
   exportAuthoritativeProject,
   readExportBytes,
 } from "./project-export.mjs";
-import {
-  connectGitHubRepository,
-  connectLocalRemote,
-  disconnectRepository,
-  inspectRepository,
-  pushAdoptedRevision,
-  setAdoptedSync,
-} from "./repository.mjs";
+import { inspectRepository } from "./repository.mjs";
 import { classifyConversationMessage } from "../conversation.mjs";
 import {
   createLinkedCreatorReference,
@@ -257,20 +248,11 @@ export async function startPathBuildSurface(options) {
     // Heal durable conversation truth on every surface read so orphan QUEUED
     // cards (corrected re-sends) become superseded without requiring a recover.
     if (stored) {
-      const before = (stored.conversation || [])
-        .map((message) => `${message.id}:${message.status}`)
-        .join("|");
-      syncConversationLifecycle(stored);
-      const after = (stored.conversation || [])
-        .map((message) => `${message.id}:${message.status}`)
-        .join("|");
-      if (before !== after) {
-        writeBuildRecord(runtimeRoot, stored);
-        stored = readBuildRecord(runtimeRoot, id) || stored;
-      }
+      await coordinator.editSurfaceBuild(id, "heal_conversation");
+      stored = readBuildRecord(runtimeRoot, id) || stored;
     }
     const pending = id ? readPendingConversations(runtimeRoot, id) : [];
-    const build =
+    let build =
       stored && pending.length
         ? {
             ...stored,
@@ -386,6 +368,8 @@ export async function startPathBuildSurface(options) {
           .slice(0, 24);
       }
     }
+    const latest = id ? readBuildRecord(runtimeRoot, id) : null;
+    if (latest && (latest.pendingRestore || latest.authoritativeSha !== build?.authoritativeSha)) build = latest;
     const view = projectBuildForSurface(build, {
       preview: state.preview,
       runtime: state.runtime,
@@ -466,6 +450,10 @@ export async function startPathBuildSurface(options) {
       if (candidateMatch && (method === "GET" || method === "HEAD")) {
         const buildId = decodeURIComponent(candidateMatch[1]);
         const build = readBuildRecord(runtimeRoot, buildId);
+        if (build?.pendingRestore) {
+          sendJson(res, 409, { ok: false, code: "RESTORE_PENDING" });
+          return;
+        }
         const candidate = build?.pendingCandidate;
         if (!build || candidate?.status !== "pending") {
           sendJson(res, 404, { ok: false, code: "NO_PENDING_CANDIDATE" });
@@ -497,6 +485,10 @@ export async function startPathBuildSurface(options) {
       const previewMatch = path.match(/^\/preview\/([^/]+)(?:\/(.*))?$/);
       if (previewMatch && (method === "GET" || method === "HEAD" || method === "POST")) {
         const buildId = decodeURIComponent(previewMatch[1]);
+        if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) {
+          sendJson(res, 409, { ok: false, code: "RESTORE_PENDING" });
+          return;
+        }
         let runtimeState = await coordinator.getRuntime(buildId);
         let targetUrl =
           runtimeState.runtime?.url || runtimeState.preview?.url;
@@ -511,7 +503,7 @@ export async function startPathBuildSurface(options) {
             existsSync(root) &&
             detectBuildArtifact(root, { outcomeHint: buildRec?.intent?.outcome })
               ?.preview?.capability === "web";
-          if (buildRec?.authoritativeSha && webCapable) {
+          if (!buildRec?.pendingRestore && buildRec?.authoritativeSha && webCapable) {
             await coordinator.startRuntime(buildId);
             runtimeState = await coordinator.getRuntime(buildId);
             targetUrl =
@@ -528,6 +520,10 @@ export async function startPathBuildSurface(options) {
         }
         const stripPrefix = `/preview/${encodeURIComponent(buildId)}`;
         const buildRec = readBuildRecord(runtimeRoot, buildId);
+        if (buildRec?.pendingRestore) {
+          sendJson(res, 409, { ok: false, code: "RESTORE_PENDING" });
+          return;
+        }
         proxyPreviewHttp(req, res, {
           targetUrl,
           buildId,
@@ -687,6 +683,7 @@ export async function startPathBuildSurface(options) {
           const openKey = `${buildId}:${build.authoritativeSha || ""}`;
           const root = build.projectBindings?.[0]?.projectRoot || null;
           if (
+            !build.pendingRestore &&
             build.authoritativeSha &&
             build.loop?.status !== "running" &&
             build.loop?.status !== "awaiting_review" &&
@@ -724,9 +721,8 @@ export async function startPathBuildSurface(options) {
             sendJson(res, 400, { ok: false, code: "TITLE_REQUIRED" });
             return;
           }
-          build.displayTitle = title;
-          writeBuildRecord(runtimeRoot, build);
-          sendJson(res, 200, { ok: true, displayTitle: title, view: await viewFor(buildId) });
+          const result = await coordinator.editSurfaceBuild(buildId, "title", { displayTitle: title });
+          sendJson(res, result.ok ? 200 : 409, { ...result, ...(result.ok ? { view: await viewFor(buildId) } : {}) });
           return;
         }
 
@@ -752,10 +748,8 @@ export async function startPathBuildSurface(options) {
             sendJson(res, 404, { ok: false, code: "BUILD_NOT_FOUND" });
             return;
           }
-          if (action === "archive") build.archivedAt = new Date().toISOString();
-          else delete build.archivedAt;
-          writeBuildRecord(runtimeRoot, build);
-          sendJson(res, 200, { ok: true, archived: action === "archive", view: await viewFor(buildId) });
+          const result = await coordinator.editSurfaceBuild(buildId, action === "archive" ? "archive" : "unarchive");
+          sendJson(res, result.ok ? 200 : 409, { ...result, ...(result.ok ? { view: await viewFor(buildId) } : {}) });
           return;
         }
 
@@ -807,18 +801,7 @@ export async function startPathBuildSurface(options) {
           }
           const body = await readJsonBody(req);
           const op = String(body.action || "");
-          let result;
-          if (op === "connect-local") result = connectLocalRemote(build, root, body.remoteUrl);
-          else if (op === "connect-github") {
-            result = connectGitHubRepository(build, root, {
-              name: body.name,
-              visibility: body.visibility,
-            });
-          } else if (op === "sync-mode") result = setAdoptedSync(build, root, body.enabled === true);
-          else if (op === "sync") result = pushAdoptedRevision(build, root, build.authoritativeSha);
-          else if (op === "disconnect") result = disconnectRepository(build, root, body.confirm === true);
-          else result = { ok: false, code: "REPOSITORY_ACTION_REQUIRED" };
-          if (result.ok) writeBuildRecord(runtimeRoot, build);
+          const result = await coordinator.editSurfaceBuild(buildId, "repository", { ...body, action: op });
           sendJson(res, result.ok ? 200 : 400, { ...result, view: await viewFor(buildId) });
           return;
         }
@@ -1296,6 +1279,10 @@ export async function startPathBuildSurface(options) {
           return;
         }
         const buildId = decodeURIComponent(previewMatch[1]);
+        if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) {
+          socket.destroy();
+          return;
+        }
         const runtimeState = await coordinator.getRuntime(buildId);
         const targetUrl =
           runtimeState.runtime?.url || runtimeState.preview?.url;

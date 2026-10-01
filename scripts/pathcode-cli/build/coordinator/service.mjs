@@ -5,7 +5,7 @@
  * runtime synchronization. Browser/HTTP processes are clients only.
  */
 
-import { createBuildController } from "../controller.mjs";
+import { createBuildController, syncConversationLifecycle } from "../controller.mjs";
 import {
   findLatestActiveBuild,
   listBuildRecords,
@@ -15,6 +15,8 @@ import {
 import { createBuildRuntimeManager } from "../runtime/manager.mjs";
 import { createBuildRuntimeSync } from "../runtime/sync.mjs";
 import { detectBuildArtifact } from "../runtime/artifact.mjs";
+import { connectGitHubRepository, connectLocalRemote, disconnectRepository,
+  pushAdoptedRevision, setAdoptedSync } from "../surface/repository.mjs";
 import { appendBuildEvent, readBuildEvents } from "../events.mjs";
 import { ensureGateway, readGatewayPid } from "../../gateway/ensure.mjs";
 import { terminateOwnedPid, withTimeout } from "../shutdown.mjs";
@@ -120,6 +122,7 @@ export async function createBuildCoordinatorService(options) {
 
   function shouldAutoRun(build) {
     return (
+      !build?.pendingRestore &&
       build?.loop?.status === "running" &&
       build?.coordinator?.autoRun !== false
     );
@@ -226,7 +229,14 @@ export async function createBuildCoordinatorService(options) {
 
   async function reconcileStartup() {
     const recovered = [];
-    for (const build of listBuildRecords(runtimeRoot)) {
+    for (const original of listBuildRecords(runtimeRoot)) {
+      let build = original;
+      if (build?.pendingRestore) {
+        const restore = await exclusive(build.buildId, () => controller.recoverPendingHistoricalRestore(build.buildId));
+        recovered.push({ buildId: build.buildId, restore });
+        if (!restore.ok) continue;
+        build = readBuildRecord(runtimeRoot, build.buildId);
+      }
       if (build?.archivedAt) {
         recovered.push({
           buildId: build.buildId,
@@ -280,6 +290,7 @@ export async function createBuildCoordinatorService(options) {
   async function runtimeState(buildId) {
     const build = readBuildRecord(runtimeRoot, buildId);
     if (!build) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (build.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     const binding = build.projectBindings?.[0];
     const inspected = await runtimeManager.inspect(buildId);
     return {
@@ -349,6 +360,7 @@ export async function createBuildCoordinatorService(options) {
           }),
         };
       case BuildCoordinatorMethods.BUILD_MESSAGE:
+        if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
         await interruptActive(
           buildId,
           "steer",
@@ -511,6 +523,56 @@ export async function createBuildCoordinatorService(options) {
         });
       case BuildCoordinatorMethods.BUILD_TICK:
         return exclusive(buildId, () => controller.tick(buildId));
+      case BuildCoordinatorMethods.BUILD_RESTORE_HISTORICAL:
+        return exclusive(buildId, () => {
+          if (Object.keys(params).some((key) => !["buildId", "adoptionIndex", "expectedAuthoritativeSha"].includes(key))) {
+            return { ok: false, code: "INVALID_RESTORE_REQUEST" };
+          }
+          return controller.restoreHistoricalVersion(buildId, params.adoptionIndex, params.expectedAuthoritativeSha);
+        });
+      case BuildCoordinatorMethods.BUILD_SURFACE_EDIT:
+        return exclusive(buildId, () => {
+          const record = readBuildRecord(runtimeRoot, buildId);
+          if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+          if (record.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
+          const action = params.action;
+          const input = params.input || {};
+          if (action === "heal_conversation") {
+            const before = (record.conversation || []).map((row) => `${row.id}:${row.status}`).join("|");
+            syncConversationLifecycle(record);
+            const after = (record.conversation || []).map((row) => `${row.id}:${row.status}`).join("|");
+            if (before !== after) writeBuildRecord(runtimeRoot, record);
+            return { ok: true, changed: before !== after };
+          }
+          if (action === "title") {
+            const title = String(input.displayTitle || "").trim().slice(0, 80);
+            if (!title) return { ok: false, code: "TITLE_REQUIRED" };
+            record.displayTitle = title;
+            writeBuildRecord(runtimeRoot, record);
+            return { ok: true, displayTitle: title };
+          }
+          if (action === "archive" || action === "unarchive") {
+            if (action === "archive") record.archivedAt = new Date().toISOString();
+            else delete record.archivedAt;
+            writeBuildRecord(runtimeRoot, record);
+            return { ok: true, archived: action === "archive" };
+          }
+          if (action === "repository") {
+            const root = record.projectBindings?.[0]?.projectRoot;
+            if (!root) return { ok: false, code: "BUILD_NOT_BOUND" };
+            let result;
+            if (input.action === "connect-local") result = connectLocalRemote(record, root, input.remoteUrl);
+            else if (input.action === "connect-github") result = connectGitHubRepository(record, root, {
+              name: input.name, visibility: input.visibility });
+            else if (input.action === "sync-mode") result = setAdoptedSync(record, root, input.enabled === true);
+            else if (input.action === "sync") result = pushAdoptedRevision(record, root, record.authoritativeSha);
+            else if (input.action === "disconnect") result = disconnectRepository(record, root, input.confirm === true);
+            else result = { ok: false, code: "REPOSITORY_ACTION_REQUIRED" };
+            if (result.ok) writeBuildRecord(runtimeRoot, record);
+            return result;
+          }
+          return { ok: false, code: "SURFACE_EDIT_NOT_ALLOWED" };
+        });
       case BuildCoordinatorMethods.BUILD_RUN:
         return exclusive(buildId, () =>
           controller.runUntilDone(buildId, {

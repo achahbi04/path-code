@@ -24,6 +24,7 @@ import {
 } from "./record.mjs";
 import { ensureBuildOrigin, isBindableProject } from "./origin.mjs";
 import { isEmptyProductTree } from "./adopt.mjs";
+import { restoreHistoricalProductVersion, recoverPendingHistoricalRestore } from "./historical-restore.mjs";
 import {
   captureBindingReality,
   makeEvidenceRef,
@@ -658,6 +659,7 @@ export function createBuildController(opts) {
     if (!record) {
       return { ok: false, code: "BUILD_NOT_FOUND", message: `no build ${buildId}` };
     }
+    if (record.pendingRestore) return { ok: false, code: "RESTORE_PENDING", build: record };
 
     /** @type {object[]} */
     const decisions = [];
@@ -717,12 +719,15 @@ export function createBuildController(opts) {
    * @param {string} buildId
    */
   async function recover(buildId) {
+    const current = readBuildRecord(runtimeRoot, buildId);
+    if (current?.pendingRestore) return recoverPendingHistoricalRestore({ runtimeRoot, buildId });
     return reconcileBuildChildren(buildId);
   }
 
   async function stopBuild(buildId) {
     const record = readBuildRecord(runtimeRoot, buildId);
     if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (record.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     const active = [...(record.children || [])]
       .reverse()
       .find(
@@ -762,6 +767,7 @@ export function createBuildController(opts) {
   async function pauseBuild(buildId) {
     const record = readBuildRecord(runtimeRoot, buildId);
     if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (record.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     if (record.loop.status === "complete") {
       return { ok: true, alreadyComplete: true, build: record };
     }
@@ -792,6 +798,10 @@ export function createBuildController(opts) {
   async function resumeBuild(buildId) {
     let record = readBuildRecord(runtimeRoot, buildId);
     if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (record.pendingRestore) {
+      const restored = recoverPendingHistoricalRestore({ runtimeRoot, buildId });
+      return restored.ok ? { ...restored, awaitCreator: true } : restored;
+    }
     if (record.loop.status === "complete") {
       return { ok: true, alreadyComplete: true, build: record, decisions: [] };
     }
@@ -995,6 +1005,7 @@ export function createBuildController(opts) {
     if (!record) {
       return { ok: false, code: "BUILD_NOT_FOUND" };
     }
+    if (record.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     if (record.loop.pendingReinspect) {
       return {
         ok: false,
@@ -1677,6 +1688,7 @@ export function createBuildController(opts) {
   async function applyCandidate(buildId) {
     const record = readBuildRecord(runtimeRoot, buildId);
     if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (record.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     const pending = record.pendingCandidate;
     if (!pending || pending.status !== "pending") {
       if (record.lastAppliedCandidate) {
@@ -1814,6 +1826,7 @@ export function createBuildController(opts) {
   async function discardCandidate(buildId) {
     const record = readBuildRecord(runtimeRoot, buildId);
     if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (record.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     const pending = record.pendingCandidate;
     if (!pending || pending.status !== "pending") {
       if (record.lastDiscardedCandidate) {
@@ -2258,6 +2271,7 @@ export function createBuildController(opts) {
    * @param {string} buildId
    */
   function markComplete(buildId) {
+    if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     const assessment = assessCompletion(buildId);
     if (!assessment.ok) return assessment;
     if (!assessment.complete) {
@@ -2280,6 +2294,7 @@ export function createBuildController(opts) {
    * @param {string} buildId
    */
   async function tick(buildId) {
+    if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     const recovered = await reconcileBuildChildren(buildId);
     if (!recovered.ok) return recovered;
     let record = /** @type {import('./types.mjs').BuildRecord} */ (recovered.build);
@@ -2631,6 +2646,7 @@ export function createBuildController(opts) {
    * @param {{ maxSteps?: number }} [options]
    */
   async function runUntilDone(buildId, options = {}) {
+    if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     const maxSteps = typeof options.maxSteps === "number" ? options.maxSteps : 12;
     const syncRuntime =
       typeof options.syncRuntime === "function" ? options.syncRuntime : null;
@@ -2707,6 +2723,7 @@ export function createBuildController(opts) {
     const { classifyConversationMessage } = await import("./conversation.mjs");
     const record = readBuildRecord(runtimeRoot, buildId);
     if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (record.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
     const text = String(input.message || "").trim();
     if (!text) return { ok: false, code: "MESSAGE_REQUIRED" };
     if (
@@ -3101,14 +3118,16 @@ export function createBuildController(opts) {
   function patchRuntimeState(buildId, patch) {
     const record = readBuildRecord(runtimeRoot, buildId);
     if (!record) return { ok: false, code: "BUILD_NOT_FOUND" };
+    if (record.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
+    if (typeof patch.authoritativeSha === "string" && patch.authoritativeSha &&
+        patch.authoritativeSha !== record.authoritativeSha) {
+      return { ok: false, code: "STALE_AUTHORITY" };
+    }
     if (typeof patch.previewUrl === "string" || patch.previewUrl === null) {
       record.previewUrl = patch.previewUrl;
     }
     if (typeof patch.runtimeHealth === "string" || patch.runtimeHealth === null) {
       record.runtimeHealth = patch.runtimeHealth;
-    }
-    if (typeof patch.authoritativeSha === "string" && patch.authoritativeSha) {
-      record.authoritativeSha = patch.authoritativeSha;
     }
     if (patch.browserEvidence && typeof patch.browserEvidence === "object") {
       if (!Array.isArray(record.browserEvidence)) record.browserEvidence = [];
@@ -3147,6 +3166,10 @@ export function createBuildController(opts) {
     runUntilDone,
     applyCandidate,
     discardCandidate,
+    restoreHistoricalVersion: (buildId, adoptionIndex, expectedAuthoritativeSha) =>
+      restoreHistoricalProductVersion({ runtimeRoot, buildId, adoptionIndex, expectedAuthoritativeSha }),
+    recoverPendingHistoricalRestore: (buildId) =>
+      recoverPendingHistoricalRestore({ runtimeRoot, buildId }),
     reviseIntent,
     patchRuntimeState,
     formatStatus: (buildId) => {

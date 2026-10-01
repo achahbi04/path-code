@@ -173,6 +173,15 @@ export interface BuildRecord {
     resultFingerprint?: string | null;
     createdAt?: string;
   };
+  pendingRestore?: {
+    operationId: string;
+    expectedAuthoritativeSha: string;
+    targetAdoptionIndex: number;
+    targetSha: string;
+    targetTreeSha: string;
+    candidateSha: string | null;
+    createdAt: string;
+  };
   lastAppliedCandidate?: { taskId?: string; adoptedSha?: string; at?: string };
   lastDiscardedCandidate?: { taskId?: string; sourceSha?: string | null; at?: string };
   lastGoodPreview?: { embedPath: string; sha: string; at?: string };
@@ -411,6 +420,8 @@ export interface BuildController {
   discardCandidate(
     buildId: string,
   ): Promise<{ ok: boolean; deduped?: boolean; build: BuildRecord }>;
+  restoreHistoricalVersion(buildId: string, adoptionIndex: number, expectedAuthoritativeSha: string): { ok: boolean; code?: string; adoptedSha?: string; noOp?: boolean; build?: BuildRecord };
+  recoverPendingHistoricalRestore(buildId: string): { ok: boolean; code?: string; build?: BuildRecord };
   recover(buildId: string): Promise<{ ok: boolean; build: BuildRecord }>;
   resumeBuild(
     buildId: string,
@@ -458,9 +469,10 @@ export interface BuildController {
       previewUrl?: string;
       runtimeHealth?: string;
       browserEvidence?: BuildRecord["browserEvidence"];
+      authoritativeSha?: string | null;
       clearRuntimeRefresh?: boolean;
     },
-  ): BuildRecord;
+  ): { ok: boolean; code?: string; build?: BuildRecord };
   reconcileBuildChildren(
     buildId: string,
   ): Promise<{ ok: boolean; build: BuildRecord }>;
@@ -787,6 +799,8 @@ export interface BuildCoordinatorClient {
   discardCandidate(
     buildId: string,
   ): Promise<{ ok: boolean; deduped?: boolean; build: BuildRecord }>;
+  restoreHistoricalVersion(buildId: string, adoptionIndex: number, expectedAuthoritativeSha: string): Promise<{ ok: boolean; code?: string; adoptedSha?: string; noOp?: boolean; build?: BuildRecord }>;
+  editSurfaceBuild(buildId: string, action: string, input?: object): Promise<{ ok: boolean; code?: string; changed?: boolean; displayTitle?: string; archived?: boolean }>;
   messageBuild(
     buildId: string,
     input: { message: string; element?: SelectedElement },
@@ -796,6 +810,13 @@ export function createBuildCoordinatorClient(options: {
   runtimeRoot: string;
   socketPath?: string;
 }): BuildCoordinatorClient;
+export function createBuildCoordinatorService(options: {
+  runtimeRoot: string; packageRoot: string; fakeMode?: boolean; preferredEngine?: string | null;
+}): Promise<{
+  dispatch(method: string, params?: Record<string, unknown>): Promise<any>;
+  whenReady: Promise<unknown>;
+  close(): Promise<void>;
+}>;
 export function startBuildCoordinatorServer(options: {
   runtimeRoot: string;
   packageRoot: string;
@@ -806,3 +827,4 @@ export function startBuildCoordinatorServer(options: {
   stop(): Promise<void>;
 }>;
 export { listProductVersions, readProductVersion, compareProductVersions } from "./versions.mjs";
+export { restoreHistoricalProductVersion, recoverPendingHistoricalRestore } from "./historical-restore.mjs";

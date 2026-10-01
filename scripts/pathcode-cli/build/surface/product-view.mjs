@@ -101,6 +101,7 @@ export function projectBuildForSurface(build, extras = {}) {
   }
 
   const status = String(build.loop?.status || "unknown");
+  const restorePending = Boolean(build.pendingRestore);
   const complete = status === "complete";
   const paused = status === "paused";
   const blocked = status === "blocked";
@@ -171,7 +172,13 @@ export function projectBuildForSurface(build, extras = {}) {
     !last.adoptedSha &&
     /FAIL|NOT_VERIFIED|BLOCKED/i.test(lastClass);
   const replacementLive = childLive && kind === "engineer";
-  if (awaitingReview) {
+  if (restorePending) {
+    phase = "blocked";
+    uiState = "error";
+    headline = "Product history needs recovery";
+    detail = "A version restore is being reconciled. The current product preview is unavailable until it finishes.";
+    progressLabel = "Needs attention";
+  } else if (awaitingReview) {
     phase = "review";
     uiState = "review";
     headline = "Review this result";
@@ -393,7 +400,7 @@ export function projectBuildForSurface(build, extras = {}) {
     creatorStatus: creatorStatusLabel(build),
     creatorPhase: creatorPhase(build),
     activeEngineering: hasActiveEngineering(build),
-    needsRecovery: status === "blocked" || Boolean(build.loop?.blockedReason),
+    needsRecovery: restorePending || status === "blocked" || Boolean(build.loop?.blockedReason),
     outcomeRevision: build.intent?.outcomeRevision || 1,
     authoritativeSha: build.authoritativeSha || null,
     projectRoot,
@@ -412,12 +419,12 @@ export function projectBuildForSurface(build, extras = {}) {
       productBranch: build.productBranch || null,
       currentIntentRevision: build.intent?.outcomeRevision || 1,
       authoritativeProductSha: build.authoritativeSha || null,
-      runtimeSha:
+      runtimeSha: restorePending ? null :
         runtime?.revision ||
         runtime?.sha ||
         runtime?.authoritativeSha ||
         null,
-      previewSha: preview?.revision || preview?.authoritativeSha || null,
+      previewSha: restorePending ? null : preview?.revision || preview?.authoritativeSha || null,
       loopStatus: status,
     },
     criteria: [],
@@ -442,9 +449,9 @@ export function projectBuildForSurface(build, extras = {}) {
       const text = String(queued?.text || "").replace(/\s+/g, " ").trim();
       return text || null;
     })(),
-    previewPreparing:
+    previewPreparing: !restorePending && (
       Boolean(build.loop?.pendingRuntimeRefresh) ||
-      (status === "running" && !previewReady),
+      (status === "running" && !previewReady)),
     children: activity,
     conversation,
     activity,
@@ -470,21 +477,21 @@ export function projectBuildForSurface(build, extras = {}) {
         : Array.isArray(extras.traceLines)
           ? extras.traceLines.length
           : 0),
-    previewRevision: runtime?.authoritativeSha || preview?.authoritativeSha || null,
-    previewMatchesAuthoritative:
+    previewRevision: restorePending ? null : runtime?.authoritativeSha || preview?.authoritativeSha || null,
+    previewMatchesAuthoritative: !restorePending && (
       !build.authoritativeSha ||
       !runtime?.authoritativeSha ||
-      runtime.authoritativeSha === build.authoritativeSha,
+      runtime.authoritativeSha === build.authoritativeSha),
     proposedNext: build.hypotheses?.proposedNextAction || null,
     blockedReason: build.loop?.blockedReason || null,
     complete,
-    canSteer: !blocked,
-    canPause: status === "running",
-    canStop: status === "running",
+    canSteer: !blocked && !restorePending,
+    canPause: status === "running" && !restorePending,
+    canStop: status === "running" && !restorePending,
     // Discarded candidate is already a completed decision — no Resume loop.
-    canResume: (paused || blocked) && !awaitingReview && !discardedTerminal,
-    canApply: Boolean(pendingCandidate),
-    canDiscard: Boolean(pendingCandidate),
+    canResume: (paused || blocked) && !awaitingReview && !discardedTerminal && !restorePending,
+    canApply: Boolean(pendingCandidate) && !restorePending,
+    canDiscard: Boolean(pendingCandidate) && !restorePending,
     pendingCandidate,
     lastDiscardedCandidate: build.lastDiscardedCandidate
       ? {
@@ -500,7 +507,7 @@ export function projectBuildForSurface(build, extras = {}) {
           at: build.lastAppliedCandidate.at || null,
         }
       : null,
-    lastGoodPreview: projectLastGoodPreview(build),
+    lastGoodPreview: restorePending ? null : projectLastGoodPreview(build),
     candidatePreview: pendingCandidate
       ? {
           status: "ready",
@@ -510,8 +517,8 @@ export function projectBuildForSurface(build, extras = {}) {
       : null,
     requestReceipt: requestReceipt(build),
     selectedElement: build.loop?.pendingSelectedElement || null,
-    preview,
-    runtime,
+    preview: restorePending ? null : preview,
+    runtime: restorePending ? null : runtime,
     artifact: artifact
       ? {
           kind: artifact.kind,
