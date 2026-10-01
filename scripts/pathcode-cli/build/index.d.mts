@@ -805,3 +805,4 @@ export function startBuildCoordinatorServer(options: {
   service: { recovered: Array<{ buildId: string; ok: boolean }> };
   stop(): Promise<void>;
 }>;
+export { listProductVersions, readProductVersion } from "./versions.mjs";
