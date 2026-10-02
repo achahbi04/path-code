@@ -117,6 +117,15 @@ export function createBuildCoordinatorClient(options) {
     latestBuild: () => request(BuildCoordinatorMethods.BUILD_LATEST),
     getBuildEvents: (buildId, options = {}) =>
       request(BuildCoordinatorMethods.BUILD_EVENTS, { buildId, ...options }),
+    listEnvironments: (buildId) =>
+      request(BuildCoordinatorMethods.BUILD_ENVIRONMENTS_LIST, { buildId }),
+    readEnvironment: (buildId, environmentId) =>
+      request(BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ, { buildId, environmentId }),
+    readSecretBinding: (buildId, environmentId, secretRef) =>
+      request(BuildCoordinatorMethods.BUILD_SECRET_BINDING_READ, { buildId, environmentId, secretRef }),
+    mutateEnvironment: (buildId, action, expectedEnvironmentRevision, input) =>
+      request(BuildCoordinatorMethods.BUILD_ENVIRONMENT_MUTATE,
+        { buildId, action, expectedEnvironmentRevision, input }),
     messageBuild: (buildId, input) =>
       request(BuildCoordinatorMethods.BUILD_MESSAGE, { buildId, input }),
     stopBuild: (buildId) =>

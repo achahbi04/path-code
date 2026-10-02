@@ -18,6 +18,10 @@ import { detectBuildArtifact } from "../runtime/artifact.mjs";
 import { connectGitHubRepository, connectLocalRemote, disconnectRepository,
   pushAdoptedRevision, setAdoptedSync } from "../surface/repository.mjs";
 import { appendBuildEvent, readBuildEvents } from "../events.mjs";
+import {
+  listBuildEnvironments, readBuildEnvironment, readBuildSecretBinding,
+  prepareBuildEnvironmentMutation,
+} from "../environments.mjs";
 import { ensureGateway, readGatewayPid } from "../../gateway/ensure.mjs";
 import { terminateOwnedPid, withTimeout } from "../shutdown.mjs";
 import { readPathPackageVersion } from "../../paths.mjs";
@@ -359,6 +363,33 @@ export async function createBuildCoordinatorService(options) {
             limit: params.limit,
           }),
         };
+      case BuildCoordinatorMethods.BUILD_ENVIRONMENTS_LIST:
+        return listBuildEnvironments(runtimeRoot, buildId);
+      case BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ:
+        return readBuildEnvironment(runtimeRoot, buildId, params.environmentId);
+      case BuildCoordinatorMethods.BUILD_SECRET_BINDING_READ:
+        return readBuildSecretBinding(runtimeRoot, buildId, params.environmentId, params.secretRef);
+      case BuildCoordinatorMethods.BUILD_ENVIRONMENT_MUTATE:
+        return exclusive(buildId, () => {
+          if (Object.keys(params).some((key) => !["buildId", "action", "expectedEnvironmentRevision", "input"].includes(key))) {
+            return { ok: false, code: "ENVIRONMENT_MUTATION_INVALID" };
+          }
+          const result = prepareBuildEnvironmentMutation(runtimeRoot, buildId, {
+            action: params.action,
+            expectedEnvironmentRevision: params.expectedEnvironmentRevision,
+            input: params.input,
+          });
+          if (!result.ok) return result;
+          writeBuildRecord(runtimeRoot, result.record);
+          const { record: _record, ...safe } = result;
+          const event = { revision: result.revision, action: params.action,
+            environmentId: params.input?.environmentId || result.environmentId || null,
+            variableName: params.input?.variableName || null,
+            secretRef: result.secretRef || null,
+            backend: params.action === "bind_secret" ? params.input?.backend : null };
+          try { appendBuildEvent(runtimeRoot, buildId, "environment.mutated", event); } catch { /* Build record is authority. */ }
+          return safe;
+        });
       case BuildCoordinatorMethods.BUILD_MESSAGE:
         if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
         await interruptActive(

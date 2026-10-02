@@ -98,6 +98,10 @@ export { createBuildController } from "./controller.mjs";
 export { listProductVersions, readProductVersion, compareProductVersions } from "./versions.mjs";
 export { restoreHistoricalProductVersion, recoverPendingHistoricalRestore } from "./historical-restore.mjs";
 export { createBuildRuntimeSync } from "./runtime/sync.mjs";
+export {
+  ENVIRONMENTS_SCHEMA, listBuildEnvironments, readBuildEnvironment,
+  readBuildSecretBinding,
+} from "./environments.mjs";
 export { createBuildCoordinatorService } from "./coordinator/service.mjs";
 export {
   startBuildCoordinatorServer,

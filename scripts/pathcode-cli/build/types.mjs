@@ -121,6 +121,7 @@
  * @property {OutcomeCriterion[]} outcomeCriteria
  * @property {BuildHypotheses} hypotheses
  * @property {ProjectBinding[]} projectBindings
+ * @property {object} [environments]
  * @property {BuildChild[]} children
  * @property {BuildLoop} loop
  * @property {OriginKind} [originKind]

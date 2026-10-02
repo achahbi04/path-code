@@ -44,6 +44,22 @@ export interface ProjectBinding {
   activeTaskBranch?: string;
 }
 
+export type BuildEnvironmentVariable =
+  | { kind: "config"; variableName: string; value: string; createdAt: string; updatedAt: string }
+  | { kind: "secret"; variableName: string; secretRef: string;
+      backend: "vercel_env" | "local_env_file";
+      descriptor: { provider: "vercel"; teamRef: null; projectRef: null; targetRef: null; bindingRef: null } |
+        { source: ".env.local" };
+      bindingState: "configured"; presenceState: "unknown"; safetyState?: "unknown";
+      createdAt: string; updatedAt: string };
+
+export interface BuildEnvironments {
+  schema: "pathcode.p9.environments.v1";
+  revision: number;
+  items: Array<{ environmentId: string; name: string; createdAt: string;
+    updatedAt: string; variables: BuildEnvironmentVariable[] }>;
+}
+
 export interface BuildChild {
   taskId: string;
   bindingId: string;
@@ -136,6 +152,7 @@ export interface BuildRecord {
     updatedAt?: string;
   };
   projectBindings: ProjectBinding[];
+  environments?: BuildEnvironments;
   children: BuildChild[];
   loop: {
     status: "running" | "paused" | "blocked" | "complete" | "awaiting_review";
@@ -786,6 +803,11 @@ export function projectBuildForSurface(
 export interface BuildCoordinatorClient {
   connect(): Promise<void>;
   close(): void;
+  listEnvironments(buildId: string): Promise<ReturnType<typeof listBuildEnvironments>>;
+  readEnvironment(buildId: string, environmentId: string): Promise<ReturnType<typeof readBuildEnvironment>>;
+  readSecretBinding(buildId: string, environmentId: string, secretRef: string): Promise<ReturnType<typeof readBuildSecretBinding>>;
+  mutateEnvironment(buildId: string, action: string, expectedEnvironmentRevision: number, input: object):
+    Promise<{ ok: boolean; code?: string; revision?: number; environmentId?: string; secretRef?: string }>;
   startBuild(
     outcome: string,
     options: Parameters<BuildController["startBuild"]>[1],
@@ -810,6 +832,16 @@ export function createBuildCoordinatorClient(options: {
   runtimeRoot: string;
   socketPath?: string;
 }): BuildCoordinatorClient;
+export const ENVIRONMENTS_SCHEMA: "pathcode.p9.environments.v1";
+export function listBuildEnvironments(runtimeRoot: string, buildId: string):
+  { ok: true; buildId: string; bindingId: string; schema: string; revision: number; items: BuildEnvironments["items"] } |
+  { ok: false; code: string };
+export function readBuildEnvironment(runtimeRoot: string, buildId: string, environmentId: string):
+  { ok: true; buildId: string; bindingId: string; revision: number; environment: BuildEnvironments["items"][number] } |
+  { ok: false; code: string };
+export function readBuildSecretBinding(runtimeRoot: string, buildId: string, environmentId: string, secretRef: string):
+  { ok: true; buildId: string; environmentId: string; binding: Extract<BuildEnvironmentVariable, { kind: "secret" }> } |
+  { ok: false; code: string };
 export function createBuildCoordinatorService(options: {
   runtimeRoot: string; packageRoot: string; fakeMode?: boolean; preferredEngine?: string | null;
 }): Promise<{
