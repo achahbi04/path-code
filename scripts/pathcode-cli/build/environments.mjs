@@ -6,8 +6,8 @@ export const ENVIRONMENTS_SCHEMA = "pathcode.p9.environments.v1";
 const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SECRET_NAME = /(?:^|_)(?:SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE_KEY|API_KEY|CREDENTIALS)(?:$|_)/i;
 const OBVIOUS_SECRET_VALUE = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\bBearer\s+\S+|\b(?:sk_live|sk_test|ghp|github_pat)_[A-Za-z0-9_]+\b|^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+:[^/@\s]+@/i;
-// PATHCODE_* and Git process controls are operational namespaces. Exact names
-// below are observed PATH/engine/provider credentials or child-process controls.
+// PATHCODE_* is PATH-owned. Git reservations below are the specific controls
+// used by PATH Git children or stripped by src/git/environment.ts.
 // This is an admission guard, not a claim that arbitrary config text is secret-free.
 const RESERVED_EXACT = new Set([
   "PATH", "HOME", "TMPDIR", "TMP", "TEMP", "NODE_OPTIONS",
@@ -16,6 +16,11 @@ const RESERVED_EXACT = new Set([
   "GOOGLE_CLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT", "GOOGLE_GENAI_USE_VERTEXAI",
   "GOOGLE_CLOUD_MODEL", "AG1_MODEL", "CURSOR_MODEL", "COPILOT_CLI_PATH", "COPILOT_HOME",
   "GH_TOKEN", "GITHUB_TOKEN", "COPILOT_GITHUB_TOKEN", "VERCEL_TOKEN",
+  "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+  "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_COUNT",
+  "GIT_CEILING_DIRECTORIES", "GIT_ASKPASS", "GIT_TERMINAL_PROMPT",
+  "GIT_OPTIONAL_LOCKS", "GIT_NO_REPLACE_OBJECTS",
+  "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 ]);
 const SECRET_KEYS = new Set(["variableName", "backend", "replace"]);
 const CONFIG_KEYS = new Set(["variableName", "value", "replace"]);
@@ -99,7 +104,8 @@ function validVariableName(name, kind) {
     return "VARIABLE_NAME_INVALID";
   }
   const upper = name.toUpperCase();
-  if (upper.startsWith("PATHCODE_") || upper.startsWith("GIT_") ||
+  if (upper.startsWith("PATHCODE_") ||
+      upper.startsWith("GIT_CONFIG_KEY_") || upper.startsWith("GIT_CONFIG_VALUE_") ||
       RESERVED_EXACT.has(upper)) return "VARIABLE_NAME_RESERVED";
   if (kind === "config" && (SECRET_NAME.test(upper) || upper === "DATABASE_URL")) {
     return "CONFIG_SECRET_NAME_REJECTED";

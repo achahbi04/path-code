@@ -94,6 +94,38 @@ describe("P9.1 reference-only Build environment authority", () => {
     expect(existsSync(join(runtimeRoot, "project-a", ".env.local"))).toBe(false);
   });
 
+  it("admits benign creator GIT names while reserving evidenced Git controls", async () => {
+    const { mutate, a } = await setup();
+    const envId = (await mutate(a, "create_environment", 0, { name: "development" })).environmentId;
+    for (const [index, variableName] of ["GIT_PRODUCT_NAME", "GIT_COMMIT_DISPLAY", "GIT_FEATURE_ENABLED"].entries()) {
+      expect(await mutate(a, "set_config", index + 1, { environmentId: envId, variableName, value: `ordinary-${index}` }))
+        .toMatchObject({ ok: true, revision: index + 2 });
+    }
+    expect(readBuildEnvironment(runtimeRoot, a, envId)).toMatchObject({ ok: true, environment: {
+      variables: expect.arrayContaining([
+        expect.objectContaining({ kind: "config", variableName: "GIT_PRODUCT_NAME", value: "ordinary-0" }),
+        expect.objectContaining({ kind: "config", variableName: "GIT_COMMIT_DISPLAY", value: "ordinary-1" }),
+        expect.objectContaining({ kind: "config", variableName: "GIT_FEATURE_ENABLED", value: "ordinary-2" }),
+      ]),
+    } });
+    for (const variableName of [
+      "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+      "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_COUNT",
+      "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CEILING_DIRECTORIES",
+      "GIT_ASKPASS", "GIT_TERMINAL_PROMPT", "GIT_OPTIONAL_LOCKS", "GIT_NO_REPLACE_OBJECTS",
+      "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
+      "PATHCODE_RUNTIME_ROOT", "OPENAI_API_KEY", "VERCEL_TOKEN",
+    ]) {
+      expect(await mutate(a, "set_config", 4, { environmentId: envId, variableName, value: "ordinary" }))
+        .toMatchObject({ ok: false, code: "VARIABLE_NAME_RESERVED" });
+    }
+    expect(await mutate(a, "set_config", 4, { environmentId: envId, variableName: "GIT_PRODUCT_SECRET", value: "ordinary" }))
+      .toMatchObject({ ok: false, code: "CONFIG_SECRET_NAME_REJECTED" });
+    expect(await mutate(a, "set_config", 4, { environmentId: envId, variableName: "GIT_PRODUCT_NAME", value: "Bearer disguised-value" }))
+      .toMatchObject({ ok: false, code: "CONFIG_VALUE_INVALID" });
+    expect(listBuildEnvironments(runtimeRoot, a)).toMatchObject({ revision: 4 });
+  });
+
   it("requires explicit kind/backend replacement and leaves external material untouched on unbind/delete", async () => {
     const { mutate, a } = await setup();
     const envId = (await mutate(a, "create_environment", 0, { name: "local" })).environmentId;
