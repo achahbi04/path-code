@@ -79,6 +79,34 @@ const els = {
   closeVersionsBtn: document.getElementById("closeVersionsBtn"),
   confirmVersionRestoreDialog: document.getElementById("confirmVersionRestoreDialog"),
   confirmVersionRestoreCopy: document.getElementById("confirmVersionRestoreCopy"),
+  openEnvironmentsBtn: document.getElementById("openEnvironmentsBtn"),
+  environmentsDialog: document.getElementById("environmentsDialog"),
+  environmentsStatus: document.getElementById("environmentsStatus"),
+  environmentsList: document.getElementById("environmentsList"),
+  environmentDetails: document.getElementById("environmentDetails"),
+  environmentName: document.getElementById("environmentName"),
+  environmentVariables: document.getElementById("environmentVariables"),
+  createEnvironmentForm: document.getElementById("createEnvironmentForm"),
+  newEnvironmentName: document.getElementById("newEnvironmentName"),
+  renameEnvironmentBtn: document.getElementById("renameEnvironmentBtn"),
+  deleteEnvironmentBtn: document.getElementById("deleteEnvironmentBtn"),
+  configForm: document.getElementById("configForm"),
+  configVariableName: document.getElementById("configVariableName"),
+  configValue: document.getElementById("configValue"),
+  secretBindingForm: document.getElementById("secretBindingForm"),
+  secretVariableName: document.getElementById("secretVariableName"),
+  secretBackend: document.getElementById("secretBackend"),
+  vercelLocatorForm: document.getElementById("vercelLocatorForm"),
+  vercelLocatorVariable: document.getElementById("vercelLocatorVariable"),
+  vercelTeamRef: document.getElementById("vercelTeamRef"),
+  vercelProjectRef: document.getElementById("vercelProjectRef"),
+  vercelTargetRef: document.getElementById("vercelTargetRef"),
+  vercelBindingRef: document.getElementById("vercelBindingRef"),
+  cancelVercelLocatorBtn: document.getElementById("cancelVercelLocatorBtn"),
+  runtimeEnvironmentSelect: document.getElementById("runtimeEnvironmentSelect"),
+  startEnvironmentRuntimeBtn: document.getElementById("startEnvironmentRuntimeBtn"),
+  runtimeEnvironmentState: document.getElementById("runtimeEnvironmentState"),
+  closeEnvironmentsBtn: document.getElementById("closeEnvironmentsBtn"),
   archivedToggle: document.getElementById("archivedToggle"),
   archivedList: document.getElementById("archivedList"),
   archivedCount: document.getElementById("archivedCount"),
@@ -133,6 +161,11 @@ let landingModelControl = null;
 let referenceBuildId = null;
 let versionsBuildId = null;
 let restoreIntent = null;
+let environmentsBuildId = null;
+let environmentState = null;
+let selectedEnvironmentId = null;
+let runtimeEnvironmentId = null;
+let locatorVariableName = null;
 /** @type {HTMLIFrameElement | null} */
 let visibleFrame = els.previewFrame;
 /** @type {HTMLIFrameElement | null} */
@@ -402,6 +435,320 @@ els.confirmVersionRestoreDialog?.addEventListener("close", () => {
   restoreIntent = null;
   if (els.confirmVersionRestoreDialog.returnValue === "confirm" && intent) void submitVersionRestore(intent);
 });
+
+const environmentMessages = {
+  ENVIRONMENT_REVISION_STALE: "Environment settings changed. Review the latest state and try again.",
+  STALE_ENVIRONMENT_AUTHORITY: "Environment settings changed. Review the latest state and try again.",
+  ENVIRONMENT_NOT_EMPTY: "Remove this environment's config and bindings before deleting it.",
+  VARIABLE_KIND_CONFLICT: "Choose replacement explicitly to change this variable's kind.",
+  CONFIG_SECRET_NAME_REJECTED: "This variable belongs in a secret binding.",
+  CONFIG_VALUE_INVALID: "This value cannot be saved as ordinary config. Use a secret binding for credentials.",
+  VARIABLE_NAME_RESERVED: "This name is reserved for PATH operations.",
+  LOCAL_ENV_TRACKED: ".env.local is tracked by Git and cannot be used safely.",
+  LOCAL_ENV_NOT_IGNORED: ".env.local is not safely ignored by Git.",
+  LOCAL_ENV_PATH_UNSAFE: ".env.local is not a safe local file.",
+  LOCAL_SECRET_MISSING: "The variable is not present in .env.local.",
+  LOCAL_ENV_SYNTAX_UNSUPPORTED: ".env.local uses syntax PATH cannot safely read.",
+  LOCAL_ENV_DUPLICATE: ".env.local defines a variable more than once.",
+  LOCAL_ENV_NATIVE_LOAD_UNSAFE: ".env.local contains a name outside this environment's local bindings.",
+  SECRET_BACKEND_UNAVAILABLE: "Vercel secret values are not available to the local preview.",
+  PROVIDER_VERIFICATION_UNAVAILABLE: "PATH cannot safely verify this Vercel secret yet.",
+  RESTORE_PENDING: "A version restore is pending. Try again after it is resolved.",
+  ENVIRONMENT_NOT_FOUND: "This environment is no longer available.",
+  SECRET_BINDING_NOT_FOUND: "This binding is no longer available.",
+};
+function environmentStatus(message, error = false) {
+  els.environmentsStatus.textContent = message || "";
+  els.environmentsStatus.dataset.error = String(error);
+}
+function environmentError(code) {
+  return environmentMessages[code] || "The requested environment action could not be completed.";
+}
+function selectedEnvironment() {
+  return environmentState?.items?.find((item) => item.environmentId === selectedEnvironmentId) || null;
+}
+function statusLabel(value) {
+  return ({ configured: "Configured", unknown: "Unknown",
+    verified_present: "Verified present", verified_missing: "Verified missing",
+    verified_safe: "Verified safe", verified_unsafe: "Verified unsafe" })[value] || "Unknown";
+}
+function renderCurrentRuntimeEnvironment() {
+  const currentRuntimeId = lastView?.runtime?.selectedEnvironmentId || null;
+  const currentName = environmentState?.items?.find((item) => item.environmentId === currentRuntimeId)?.name;
+  els.runtimeEnvironmentState.textContent = currentName
+    ? `Current preview: ${currentName}`
+    : currentRuntimeId ? "Current preview: an environment no longer listed here." :
+      "Current preview: no P9 environment selected.";
+}
+function renderEnvironments() {
+  if (!environmentState) return;
+  const items = environmentState.items;
+  els.environmentsList.innerHTML = items.length ? items.map((item) => {
+    const configs = item.variables.filter((entry) => entry.kind === "config").length;
+    const secrets = item.variables.length - configs;
+    return `<button type="button" class="environment-item" data-environment-id="${escapeHtml(item.environmentId)}"
+      aria-current="${item.environmentId === selectedEnvironmentId}">
+      <strong>${escapeHtml(item.name)}</strong><small>${configs} config · ${secrets} secret bindings</small></button>`;
+  }).join("") : '<p class="hint">No environments yet. Create one when you need project settings.</p>';
+  const options = [new Option("No environment", ""), ...items.map((item) => new Option(item.name, item.environmentId))];
+  els.runtimeEnvironmentSelect.replaceChildren(...options);
+  if (!items.some((item) => item.environmentId === runtimeEnvironmentId)) runtimeEnvironmentId = null;
+  els.runtimeEnvironmentSelect.value = runtimeEnvironmentId || "";
+  renderCurrentRuntimeEnvironment();
+  const selected = selectedEnvironment();
+  els.environmentDetails.hidden = !selected;
+  if (!selected) return;
+  els.environmentName.textContent = selected.name;
+  els.environmentVariables.innerHTML = selected.variables.length ? selected.variables.map((entry) => {
+    const name = escapeHtml(entry.variableName);
+    if (entry.kind === "config") return `<div class="environment-variable">
+      <div class="environment-variable-main"><strong>${name}</strong>
+      <small>Config · ${escapeHtml(entry.value)}</small></div>
+      <button type="button" class="ghost tiny" data-config-edit="${name}">Edit</button>
+      <button type="button" class="ghost tiny" data-config-remove="${name}">Remove</button></div>`;
+    const source = entry.backend === "local_env_file" ? "Source: .env.local" : "Backend: Vercel";
+    const safety = entry.backend === "local_env_file"
+      ? ` · Safety: ${statusLabel(entry.safetyState)}` : "";
+    return `<div class="environment-variable">
+      <div class="environment-variable-main"><strong>${name}</strong>
+      <small>${source} · Binding: ${statusLabel(entry.bindingState)} · Presence: ${statusLabel(entry.presenceState)}${safety}</small></div>
+      ${entry.backend === "local_env_file"
+        ? `<button type="button" class="ghost tiny" data-secret-verify="${name}">Verify</button>`
+        : `<button type="button" class="ghost tiny" data-vercel-locator="${name}">Location</button>`}
+      <button type="button" class="ghost tiny" data-secret-unbind="${name}">Unbind</button></div>`;
+  }).join("") : '<p class="hint">No variables in this environment.</p>';
+}
+async function refreshEnvironments(buildId) {
+  try {
+    const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/environments`);
+    const body = await response.json();
+    if (activeBuildId !== buildId || environmentsBuildId !== buildId) return null;
+    if (!response.ok || !body?.ok) {
+      environmentStatus(environmentError(body?.code), true);
+      return null;
+    }
+    environmentState = { revision: body.revision, items: body.items };
+    if (!body.items.some((item) => item.environmentId === selectedEnvironmentId)) {
+      selectedEnvironmentId = body.items[0]?.environmentId || null;
+    }
+    renderEnvironments();
+    return environmentState;
+  } catch {
+    if (activeBuildId === buildId) environmentStatus("Could not load environments.", true);
+    return null;
+  }
+}
+async function submitEnvironmentAction(action, input) {
+  if (!activeBuildId || !environmentState) return false;
+  const buildId = activeBuildId;
+  try {
+    const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/environments/mutate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, input, expectedEnvironmentRevision: environmentState.revision }),
+    });
+    const body = await response.json();
+    if (activeBuildId !== buildId) return false;
+    if (!response.ok || !body?.ok) {
+      if (["ENVIRONMENT_REVISION_STALE", "STALE_ENVIRONMENT_AUTHORITY"].includes(body?.code)) {
+        await refreshEnvironments(buildId);
+      }
+      environmentStatus(environmentError(body?.code), true);
+      return false;
+    }
+    if (action === "create_environment") selectedEnvironmentId = body.environmentId;
+    const refreshed = await refreshEnvironments(buildId);
+    environmentStatus(refreshed ? "Environment settings saved." : "Saved, but the latest settings could not be loaded.", !refreshed);
+    return Boolean(refreshed);
+  } catch {
+    environmentStatus("Could not save environment settings.", true);
+    return false;
+  }
+}
+async function verifyLocalBinding(variableName) {
+  if (!activeBuildId || !environmentState || !selectedEnvironmentId) return;
+  const buildId = activeBuildId;
+  try {
+    const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/environments/verify-local`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ environmentId: selectedEnvironmentId, variableName,
+        expectedEnvironmentRevision: environmentState.revision }),
+    });
+    const body = await response.json();
+    if (activeBuildId !== buildId) return;
+    if (!response.ok || !body?.ok) {
+      if (body?.code === "STALE_ENVIRONMENT_AUTHORITY") await refreshEnvironments(buildId);
+      environmentStatus(environmentError(body?.code), true);
+      return;
+    }
+    await refreshEnvironments(buildId);
+    if (body.safetyState === "verified_unsafe") {
+      environmentStatus(".env.local is not safe for local runtime. Check Git tracking, ignore rules, and file location.", true);
+    } else if (body.presenceState === "verified_missing") {
+      environmentStatus("The variable is not present in .env.local.", true);
+    } else {
+      environmentStatus(`Verification complete: presence ${statusLabel(body.presenceState)}, safety ${statusLabel(body.safetyState)}.`);
+    }
+  } catch {
+    environmentStatus("Could not verify this local binding.", true);
+  }
+}
+function clearEnvironmentsUi() {
+  if (els.environmentsDialog.open) els.environmentsDialog.close();
+  environmentsBuildId = null;
+  environmentState = null;
+  selectedEnvironmentId = null;
+  runtimeEnvironmentId = null;
+  locatorVariableName = null;
+  els.environmentsList.replaceChildren();
+  els.environmentVariables.replaceChildren();
+  els.vercelLocatorForm.hidden = true;
+  environmentStatus("");
+}
+els.openEnvironmentsBtn?.addEventListener("click", () => {
+  if (!activeBuildId || activeBuildId === "pending") return;
+  environmentsBuildId = activeBuildId;
+  els.environmentsDialog.showModal();
+  environmentStatus("Loading environments…");
+  void refreshEnvironments(activeBuildId);
+});
+els.closeEnvironmentsBtn?.addEventListener("click", () => els.environmentsDialog.close());
+els.environmentsDialog?.addEventListener("close", () => {
+  environmentsBuildId = null;
+  environmentState = null;
+  locatorVariableName = null;
+});
+els.environmentsList?.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-environment-id]");
+  if (!item) return;
+  selectedEnvironmentId = item.dataset.environmentId;
+  els.vercelLocatorForm.hidden = true;
+  renderEnvironments();
+});
+els.createEnvironmentForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const name = els.newEnvironmentName.value.trim();
+  if (await submitEnvironmentAction("create_environment", { name })) els.newEnvironmentName.value = "";
+});
+els.renameEnvironmentBtn?.addEventListener("click", async () => {
+  const selected = selectedEnvironment();
+  if (!selected) return;
+  const name = window.prompt("Rename environment", selected.name);
+  if (name === null || name.trim() === selected.name) return;
+  await submitEnvironmentAction("rename_environment", { environmentId: selected.environmentId, name: name.trim() });
+});
+els.deleteEnvironmentBtn?.addEventListener("click", async () => {
+  const selected = selectedEnvironment();
+  if (!selected) return;
+  if (selected.variables.length) {
+    environmentStatus(environmentMessages.ENVIRONMENT_NOT_EMPTY, true);
+    return;
+  }
+  if (!window.confirm(`Delete the empty environment “${selected.name}”? This does not delete external secret values.`)) return;
+  await submitEnvironmentAction("delete_environment", { environmentId: selected.environmentId });
+});
+els.configForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const selected = selectedEnvironment();
+  if (!selected) return;
+  const variableName = els.configVariableName.value.trim();
+  const previous = selected.variables.find((entry) => entry.variableName === variableName);
+  const replace = previous?.kind === "secret";
+  if (replace && !window.confirm(`Replace the PATH secret binding for ${variableName} with ordinary config? The external secret value will remain in its backend.`)) return;
+  const input = { environmentId: selected.environmentId, variableName, value: els.configValue.value,
+    ...(replace ? { replace: true } : {}) };
+  if (await submitEnvironmentAction("set_config", input)) {
+    els.configVariableName.value = "";
+    els.configValue.value = "";
+  }
+});
+els.secretBindingForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const selected = selectedEnvironment();
+  if (!selected) return;
+  const variableName = els.secretVariableName.value.trim();
+  const previous = selected.variables.find((entry) => entry.variableName === variableName);
+  const replace = Boolean(previous);
+  if (replace && !window.confirm(`Replace the PATH binding for ${variableName}? Existing external values will remain where they are managed.`)) return;
+  const input = { environmentId: selected.environmentId, variableName, backend: els.secretBackend.value,
+    ...(replace ? { replace: true } : {}) };
+  if (await submitEnvironmentAction("bind_secret", input)) els.secretVariableName.value = "";
+});
+els.environmentVariables?.addEventListener("click", async (event) => {
+  const selected = selectedEnvironment();
+  if (!selected) return;
+  const node = event.target.closest("[data-config-edit], [data-config-remove], [data-secret-verify], [data-secret-unbind], [data-vercel-locator]");
+  if (!node) return;
+  const name = node.dataset.configEdit || node.dataset.configRemove || node.dataset.secretVerify ||
+    node.dataset.secretUnbind || node.dataset.vercelLocator;
+  const entry = selected.variables.find((item) => item.variableName === name);
+  if (!entry) return;
+  if (node.dataset.configEdit) {
+    els.configVariableName.value = entry.variableName;
+    els.configValue.value = entry.value;
+    els.configValue.focus();
+  } else if (node.dataset.configRemove) {
+    await submitEnvironmentAction("remove_config", { environmentId: selected.environmentId, variableName: name });
+  } else if (node.dataset.secretVerify) {
+    await verifyLocalBinding(name);
+  } else if (node.dataset.secretUnbind) {
+    if (!window.confirm(`Remove the PATH binding for ${name}? This does not delete its value from .env.local or Vercel.`)) return;
+    await submitEnvironmentAction("unbind_secret", { environmentId: selected.environmentId, variableName: name });
+  } else if (node.dataset.vercelLocator) {
+    locatorVariableName = name;
+    els.vercelLocatorVariable.textContent = `Binding: ${name}`;
+    for (const [key, control] of [["teamRef", els.vercelTeamRef], ["projectRef", els.vercelProjectRef],
+      ["targetRef", els.vercelTargetRef], ["bindingRef", els.vercelBindingRef]]) {
+      control.value = entry.descriptor[key] || "";
+    }
+    els.vercelLocatorForm.hidden = false;
+  }
+});
+els.vercelLocatorForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const selected = selectedEnvironment();
+  if (!selected || !locatorVariableName) return;
+  const input = { environmentId: selected.environmentId, variableName: locatorVariableName,
+    teamRef: els.vercelTeamRef.value.trim() || null, projectRef: els.vercelProjectRef.value.trim() || null,
+    targetRef: els.vercelTargetRef.value.trim() || null, bindingRef: els.vercelBindingRef.value.trim() || null };
+  if (await submitEnvironmentAction("set_vercel_locator", input)) {
+    els.vercelLocatorForm.hidden = true;
+    locatorVariableName = null;
+  }
+});
+els.cancelVercelLocatorBtn?.addEventListener("click", () => {
+  locatorVariableName = null;
+  els.vercelLocatorForm.hidden = true;
+});
+els.runtimeEnvironmentSelect?.addEventListener("change", () => {
+  runtimeEnvironmentId = els.runtimeEnvironmentSelect.value || null;
+});
+async function startSelectedEnvironmentRuntime() {
+  if (!activeBuildId || activeBuildId === "pending") return;
+  const buildId = activeBuildId;
+  if (runtimeEnvironmentId && !environmentState?.items?.some((item) => item.environmentId === runtimeEnvironmentId)) {
+    environmentStatus("Review the latest environment list before starting preview.", true);
+    return;
+  }
+  try {
+    const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/runtime/restart`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(runtimeEnvironmentId ? { environmentId: runtimeEnvironmentId } : {}),
+    });
+    const body = await response.json();
+    if (activeBuildId !== buildId) return;
+    if (!response.ok || !body?.ok) {
+      environmentStatus(environmentError(body?.code), true);
+      return;
+    }
+    if (body.view?.buildId) acceptView(body.view);
+    environmentStatus(runtimeEnvironmentId ? "Preview restarted with the selected environment." :
+      "Preview restarted without a P9 environment.");
+    renderEnvironments();
+  } catch {
+    environmentStatus("Could not start the preview.", true);
+  }
+}
+els.startEnvironmentRuntimeBtn?.addEventListener("click", () => void startSelectedEnvironmentRuntime());
 
 function setWorkspaceVisible(on) {
   els.landing.hidden = on;
@@ -841,6 +1188,7 @@ function renderCandidateReview(view) {
  */
 function render(view) {
   lastView = view;
+  if (els.environmentsDialog?.open) renderCurrentRuntimeEnvironment();
   if (view?.serving) renderServingIdentity(view.serving);
   if (view?.modelControl) {
     renderModelSelect(els.workspaceModel, els.workspaceModelHint, els.workspacePreferredEngine, view.modelControl);
@@ -1366,6 +1714,7 @@ function showComposer(pushHistory) {
   lastView = null;
   clearReferenceUi();
   clearVersionsUi();
+  clearEnvironmentsUi();
   landingModelTouched = false;
   renderModelSelect(els.landingModel, null, els.landingPreferredEngine, landingModelControl, true);
   if (visibleFrame) {
@@ -1489,9 +1838,17 @@ els.openCodeBtn.addEventListener("click", async () => {
 
 els.refreshPreviewBtn.addEventListener("click", async () => {
   if (!activeBuildId) return;
-  await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/runtime/restart`, {
+  const result = await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}/runtime/restart`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(runtimeEnvironmentId ? { environmentId: runtimeEnvironmentId } : {}),
   });
+  const outcome = await result.json().catch(() => null);
+  if (!result.ok || !outcome?.ok) {
+    els.previewError.hidden = false;
+    els.previewError.textContent = environmentError(outcome?.code);
+    return;
+  }
   const res = await fetch(`/api/builds/${encodeURIComponent(activeBuildId)}`);
   const view = await res.json().catch(() => null);
   if (view?.buildId) acceptView(view);
@@ -1679,6 +2036,7 @@ async function openProject(buildId, mode, title) {
   activeBuildId = buildId;
   clearReferenceUi();
   clearVersionsUi();
+  clearEnvironmentsUi();
   worklogFollow = true;
   chatStick = true;
   heldPreview = null;

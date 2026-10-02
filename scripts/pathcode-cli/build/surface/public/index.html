@@ -64,6 +64,16 @@
                 <button type="button" class="ghost rail-action" id="openVersionsBtn">View versions…</button>
               </div>
             </section>
+            <section class="rail-row" data-rail="environments">
+              <button type="button" class="rail-row-head" id="environmentsRowHead" aria-expanded="false" aria-controls="environmentsRowBody">
+                <span class="rail-chevron" aria-hidden="true"></span>
+                <span class="rail-row-label">Environments</span>
+                <span class="rail-row-value" aria-hidden="true"></span>
+              </button>
+              <div class="rail-row-body" id="environmentsRowBody" hidden>
+                <button type="button" class="ghost rail-action" id="openEnvironmentsBtn">Manage environments…</button>
+              </div>
+            </section>
             <section class="rail-row" data-rail="details">
               <button type="button" class="rail-row-head" id="detailsRowHead" aria-expanded="false" aria-controls="detailsRowBody">
                 <span class="rail-chevron" aria-hidden="true"></span>
@@ -309,6 +319,56 @@
         <div id="versionComparison" class="versions-comparison"></div>
       </section>
       <div class="dialog-actions"><button type="button" class="ghost" id="closeVersionsBtn">Close</button></div>
+    </dialog>
+
+    <dialog class="choice-dialog environments-dialog" id="environmentsDialog" aria-labelledby="environmentsTitle">
+      <h2 id="environmentsTitle">Environments</h2>
+      <p class="hint">Add ordinary settings and references to secrets managed outside PATH.</p>
+      <p id="environmentsStatus" class="environments-status" role="status"></p>
+      <form id="createEnvironmentForm" class="environment-form">
+        <label>New environment <input id="newEnvironmentName" name="name" autocomplete="off" required maxlength="80" /></label>
+        <button type="submit" class="ghost">Create</button>
+      </form>
+      <div id="environmentsList" class="environments-list"></div>
+      <section id="environmentDetails" class="environment-details" hidden>
+        <div class="environment-heading">
+          <h3 id="environmentName"></h3>
+          <button type="button" class="ghost tiny" id="renameEnvironmentBtn">Rename</button>
+          <button type="button" class="ghost tiny" id="deleteEnvironmentBtn">Delete empty</button>
+        </div>
+        <div id="environmentVariables" class="environment-variables"></div>
+        <form id="configForm" class="environment-form">
+          <h4>Ordinary config</h4>
+          <label>Variable name <input id="configVariableName" name="variableName" autocomplete="off" required /></label>
+          <label>Value <input id="configValue" name="value" autocomplete="off" /></label>
+          <button type="submit" class="ghost">Save config</button>
+        </form>
+        <form id="secretBindingForm" class="environment-form">
+          <h4>Secret binding</h4>
+          <label>Variable name <input id="secretVariableName" name="variableName" autocomplete="off" required /></label>
+          <label>Backend <select id="secretBackend"><option value="local_env_file">Local .env.local</option><option value="vercel_env">Vercel</option></select></label>
+          <p class="hint">PATH stores the binding, not the secret value. Add local values to your project's .env.local, or manage Vercel values in Vercel.</p>
+          <button type="submit" class="ghost">Save binding</button>
+        </form>
+        <form id="vercelLocatorForm" class="environment-form" hidden>
+          <h4>Vercel binding location</h4>
+          <p id="vercelLocatorVariable" class="hint"></p>
+          <label>Team or account <input id="vercelTeamRef" autocomplete="off" /></label>
+          <label>Project <input id="vercelProjectRef" autocomplete="off" /></label>
+          <label>Target <input id="vercelTargetRef" autocomplete="off" /></label>
+          <label>Binding ID <input id="vercelBindingRef" autocomplete="off" /></label>
+          <p class="hint">These locators do not verify that the secret exists. Manage its value in Vercel.</p>
+          <button type="submit" class="ghost">Save location</button>
+          <button type="button" class="ghost tiny" id="cancelVercelLocatorBtn">Cancel</button>
+        </form>
+        <div class="environment-runtime">
+          <h4>Local preview</h4>
+          <label>Environment <select id="runtimeEnvironmentSelect"><option value="">No environment</option></select></label>
+          <button type="button" class="ghost" id="startEnvironmentRuntimeBtn">Start or restart preview</button>
+          <p id="runtimeEnvironmentState" class="hint"></p>
+        </div>
+      </section>
+      <div class="dialog-actions"><button type="button" class="ghost" id="closeEnvironmentsBtn">Close</button></div>
     </dialog>
 
     <dialog class="choice-dialog" id="confirmVersionRestoreDialog" aria-labelledby="confirmVersionRestoreTitle">

@@ -169,6 +169,29 @@ function referenceStatus(result) {
   return 400;
 }
 
+// P9 secretRef is coordinator authority, never browser state.
+function projectBuilderEnvironment(item) {
+  return { environmentId: item.environmentId, name: item.name,
+    createdAt: item.createdAt, updatedAt: item.updatedAt,
+    variables: item.variables.map((entry) => entry.kind === "config"
+      ? { kind: "config", variableName: entry.variableName, value: entry.value,
+          createdAt: entry.createdAt, updatedAt: entry.updatedAt }
+      : { kind: "secret", variableName: entry.variableName, backend: entry.backend,
+          descriptor: entry.descriptor, bindingState: entry.bindingState,
+          presenceState: entry.presenceState,
+          ...(entry.backend === "local_env_file" ? { safetyState: entry.safetyState } : {}),
+          ...(entry.verifiedAt ? { verifiedAt: entry.verifiedAt } : {}),
+          createdAt: entry.createdAt, updatedAt: entry.updatedAt }),
+  };
+}
+
+function environmentStatus(result) {
+  if (result.ok) return 200;
+  if (["BUILD_NOT_FOUND", "BUILD_NOT_BOUND", "ENVIRONMENT_NOT_FOUND", "SECRET_BINDING_NOT_FOUND"].includes(result.code)) return 404;
+  if (["ENVIRONMENT_REVISION_STALE", "STALE_ENVIRONMENT_AUTHORITY", "RESTORE_PENDING", "ENVIRONMENT_NOT_EMPTY", "VARIABLE_KIND_CONFLICT"].includes(result.code)) return 409;
+  return 400;
+}
+
 function versionStatus(result) {
   if (result.ok) return 200;
   if (["BUILD_NOT_FOUND", "VERSION_NOT_FOUND"].includes(result.code)) return 404;
@@ -629,6 +652,87 @@ export async function startPathBuildSurface(options) {
         const action = buildMatch[2] || "";
         const sub = buildMatch[3] || "";
 
+        if (action === "environments") {
+          if (method === "GET" && !sub) {
+            const listed = await coordinator.listEnvironments(buildId);
+            sendJson(res, environmentStatus(listed), listed.ok
+              ? { ok: true, revision: listed.revision,
+                  items: listed.items.map(projectBuilderEnvironment) }
+              : { ok: false, code: listed.code });
+            return;
+          }
+          if (method === "GET" && sub) {
+            const read = await coordinator.readEnvironment(buildId, sub);
+            sendJson(res, environmentStatus(read), read.ok
+              ? { ok: true, revision: read.revision,
+                  environment: projectBuilderEnvironment(read.environment) }
+              : { ok: false, code: read.code });
+            return;
+          }
+          if (method === "POST" && (sub === "mutate" || sub === "verify-local")) {
+            if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) {
+              sendJson(res, 409, { ok: false, code: "RESTORE_PENDING" });
+              return;
+            }
+            let body;
+            try { body = await readJsonBody(req); }
+            catch { body = null; }
+            if (!body || typeof body !== "object" || Array.isArray(body) ||
+                !Number.isSafeInteger(body.expectedEnvironmentRevision)) {
+              sendJson(res, 400, { ok: false, code: "ENVIRONMENT_REQUEST_INVALID" });
+              return;
+            }
+            if (sub === "verify-local") {
+              if (Object.keys(body).some((key) => !["environmentId", "variableName", "expectedEnvironmentRevision"].includes(key))) {
+                sendJson(res, 400, { ok: false, code: "ENVIRONMENT_REQUEST_INVALID" });
+                return;
+              }
+              const result = await coordinator.verifyLocalEnvironmentBinding(
+                buildId, body.environmentId, body.variableName, body.expectedEnvironmentRevision);
+              sendJson(res, environmentStatus(result), result.ok
+                ? { ok: true, revision: result.revision, presenceState: result.presenceState,
+                    safetyState: result.safetyState }
+                : { ok: false, code: result.code });
+              return;
+            }
+            if (Object.keys(body).some((key) => !["action", "input", "expectedEnvironmentRevision"].includes(key)) ||
+                typeof body.action !== "string" || !body.input ||
+                typeof body.input !== "object" || Array.isArray(body.input) ||
+                Object.hasOwn(body.input, "secretRef")) {
+              sendJson(res, 400, { ok: false, code: "ENVIRONMENT_REQUEST_INVALID" });
+              return;
+            }
+            let input = body.input;
+            if (body.action === "set_vercel_locator") {
+              const allowed = ["environmentId", "variableName", "teamRef", "projectRef", "targetRef", "bindingRef"];
+              if (Object.keys(input).some((key) => !allowed.includes(key))) {
+                sendJson(res, 400, { ok: false, code: "PROVIDER_LOCATOR_INVALID" });
+                return;
+              }
+              const read = await coordinator.readEnvironment(buildId, input.environmentId);
+              if (!read.ok) {
+                sendJson(res, environmentStatus(read), { ok: false, code: read.code });
+                return;
+              }
+              const binding = read.environment.variables.find((entry) => entry.kind === "secret" &&
+                entry.backend === "vercel_env" && entry.variableName === input.variableName);
+              if (!binding) {
+                sendJson(res, 404, { ok: false, code: "SECRET_BINDING_NOT_FOUND" });
+                return;
+              }
+              input = { ...input, secretRef: binding.secretRef };
+            }
+            const result = await coordinator.mutateEnvironment(buildId, body.action,
+              body.expectedEnvironmentRevision, input);
+            sendJson(res, environmentStatus(result), result.ok
+              ? { ok: true, revision: result.revision,
+                  ...(result.environmentId ? { environmentId: result.environmentId } : {}),
+                  ...(result.backendMaterialChanged === false ? { backendMaterialChanged: false } : {}) }
+              : { ok: false, code: result.code });
+            return;
+          }
+        }
+
         if (action === "versions") {
           if (method === "GET" && !sub) {
             const listed = listProductVersions({ runtimeRoot, buildId });
@@ -1076,7 +1180,16 @@ export async function startPathBuildSurface(options) {
           }
 
           if (method === "POST" && sub === "start") {
-            const started = await coordinator.startRuntime(buildId);
+            let body;
+            try { body = await readJsonBody(req); }
+            catch { body = null; }
+            if (!body || typeof body !== "object" || Array.isArray(body) ||
+                Object.keys(body).some((key) => key !== "environmentId") ||
+                (body.environmentId != null && (typeof body.environmentId !== "string" || !body.environmentId))) {
+              sendJson(res, 400, { ok: false, code: "ENVIRONMENT_SELECTION_INVALID" });
+              return;
+            }
+            const started = await coordinator.startRuntime(buildId, body.environmentId || null);
             sendJson(res, started.ok ? 200 : 400, {
               ...started,
               view: await viewFor(buildId),
@@ -1085,9 +1198,18 @@ export async function startPathBuildSurface(options) {
           }
 
           if (method === "POST" && sub === "restart") {
+            let body;
+            try { body = await readJsonBody(req); }
+            catch { body = null; }
+            if (!body || typeof body !== "object" || Array.isArray(body) ||
+                Object.keys(body).some((key) => key !== "environmentId") ||
+                (body.environmentId != null && (typeof body.environmentId !== "string" || !body.environmentId))) {
+              sendJson(res, 400, { ok: false, code: "ENVIRONMENT_SELECTION_INVALID" });
+              return;
+            }
             const openKey = `${buildId}:${gate.build?.authoritativeSha || ""}`;
             previewOpenAttempts.delete(openKey);
-            const started = await coordinator.restartRuntime(buildId);
+            const started = await coordinator.restartRuntime(buildId, body.environmentId || null);
             sendJson(res, started.ok ? 200 : 400, {
               ...started,
               view: await viewFor(buildId),

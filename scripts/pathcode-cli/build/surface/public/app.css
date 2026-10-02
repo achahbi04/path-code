@@ -791,6 +791,27 @@ body {
 .versions-compare-controls select { min-width: 9rem; padding: 0.4rem; color: var(--ink); background: #0b1612; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
 .versions-comparison { max-height: 20vh; overflow: auto; color: var(--muted); font-size: 0.82rem; }
 .versions-comparison ul { padding-left: 1.2rem; overflow-wrap: anywhere; }
+.environments-dialog { width: min(720px, calc(100vw - 2rem)); max-width: none; max-height: min(88dvh, 850px); overflow: auto; }
+.environments-dialog h2, .environments-dialog h3, .environments-dialog h4 { margin: 0.2rem 0; }
+.environments-status { min-height: 1.25rem; color: var(--muted); font-size: 0.84rem; }
+.environments-status[data-error="true"] { color: var(--danger); }
+.environments-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.7rem 0; }
+.environment-item { display: grid; gap: 0.1rem; text-align: left; border: 1px solid var(--line); border-radius: 9px; padding: 0.45rem 0.65rem; background: #0b1612; color: var(--ink); font: inherit; }
+.environment-item[aria-current="true"] { border-color: var(--accent); }
+.environment-item small, .environment-meta, .environment-variable small { color: var(--muted); font-size: 0.76rem; }
+.environment-details { border-top: 1px solid var(--line); padding-top: 0.7rem; }
+.environment-heading, .environment-variable { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.environment-variables { display: grid; gap: 0.45rem; margin: 0.7rem 0; }
+.environment-variable { border: 1px solid var(--line); border-radius: 9px; padding: 0.55rem; }
+.environment-variable-main { flex: 1 1 12rem; display: grid; gap: 0.15rem; overflow-wrap: anywhere; }
+.environment-variable-main strong { font-size: 0.86rem; }
+.environment-form { display: flex; flex-wrap: wrap; align-items: end; gap: 0.5rem; border-top: 1px solid var(--line); padding: 0.75rem 0; }
+.environment-form[hidden], .environment-details[hidden] { display: none; }
+.environment-form label, .environment-runtime label { display: grid; gap: 0.2rem; color: var(--muted); font-size: 0.78rem; }
+.environment-form input, .environment-form select, .environment-runtime select { min-width: 10rem; padding: 0.4rem; color: var(--ink); background: #0b1612; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.environment-form .hint { width: 100%; margin: 0.1rem 0; }
+.environment-runtime { border-top: 1px solid var(--line); padding: 0.7rem 0; display: flex; flex-wrap: wrap; align-items: end; gap: 0.5rem; }
+.environment-runtime h4, .environment-runtime p { width: 100%; }
 .repo-field, .repo-sync { display: flex; flex-direction: column; gap: 0.25rem; margin: 0.5rem 0; font-size: 0.85rem; }
 .repo-field input, .repo-field select {
   font: inherit;
