@@ -3,8 +3,9 @@
  */
 
 import { createServer } from "node:http";
-import { readFileSync, existsSync, statSync } from "node:fs";
-import { join, extname, resolve, relative, sep } from "node:path";
+import { readFileSync } from "node:fs";
+import { extname } from "node:path";
+import { resolveSecurePreviewFile } from "./secure-file.mjs";
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -33,50 +34,46 @@ const MIME = {
  * @param {string} [host]
  */
 export function startStaticPreviewServer(root, port, host = "127.0.0.1") {
-  const base = resolve(root);
   const server = createServer((req, res) => {
     try {
       const url = new URL(req.url || "/", `http://${host}:${port}`);
-      let rel = decodeURIComponent(url.pathname);
+      let rel = url.pathname;
       if (rel === "/" || rel === "") rel = "/index.html";
-      const candidate = resolve(base, "." + rel);
-      const relCheck = relative(base, candidate);
-      if (relCheck.startsWith("..") || relCheck.includes(`..${sep}`)) {
-        res.writeHead(403).end("Forbidden");
-        return;
-      }
-      let filePath = candidate;
-      if (!existsSync(filePath) || !statSync(filePath).isFile()) {
-        const fallback = join(base, "404.html");
-        if (existsSync(fallback)) {
-          filePath = fallback;
-          res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
-          res.end(readFileSync(fallback));
-          return;
+      const target = resolveSecurePreviewFile(root, rel);
+      if (!target.ok) {
+        if (target.status === 404) {
+          const fallback = resolveSecurePreviewFile(root, "/404.html");
+          if (fallback.ok) {
+            res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+            res.end(readFileSync(fallback.path));
+            return;
+          }
         }
-        res.writeHead(404).end("Not found");
+        res.writeHead(target.status).end(target.status === 403 ? "Forbidden" : "Not found");
         return;
       }
-      const type = MIME[extname(filePath).toLowerCase()] || "application/octet-stream";
+      const type = MIME[extname(target.path).toLowerCase()] || "application/octet-stream";
       res.writeHead(200, {
         "Content-Type": type,
         "Cache-Control": "no-store",
         "Access-Control-Allow-Origin": "*",
       });
-      res.end(readFileSync(filePath));
-    } catch (err) {
-      res.writeHead(500).end(err instanceof Error ? err.message : String(err));
+      res.end(readFileSync(target.path));
+    } catch {
+      res.writeHead(500).end("Preview unavailable");
     }
   });
 
   return new Promise((resolveListen, reject) => {
     server.once("error", reject);
     server.listen(port, host, () => {
+      const address = server.address();
+      const boundPort = typeof address === "object" && address ? address.port : port;
       resolveListen({
         server,
-        port,
+        port: boundPort,
         host,
-        url: `http://${host}:${port}/`,
+        url: `http://${host}:${boundPort}/`,
         stop: () =>
           new Promise((resStop) => {
             server.close(() => resStop());

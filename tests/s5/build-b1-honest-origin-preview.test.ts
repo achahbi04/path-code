@@ -296,7 +296,7 @@ describe("B1 Part 2 — live product runtime + preview (F4–F7)", () => {
     const started = await manager.start("b1-f5", project, { bindingId: "b" });
     expect(started.ok).toBe(false);
     expect(started.runtime?.status).toMatch(/failed|unavailable|exited/);
-    expect(started.runtime?.stderrTail || "").toMatch(/INTENTIONAL_START_FAIL/);
+    expect(JSON.stringify(started)).not.toMatch(/INTENTIONAL_START_FAIL/);
     expect(started.runtime?.exitCode).toBe(7);
     const preview = manager.getPreviewDescriptor("b1-f5");
     expect(preview.status).not.toBe("ready");

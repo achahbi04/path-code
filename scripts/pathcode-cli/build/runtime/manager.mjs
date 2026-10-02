@@ -21,6 +21,7 @@ import {
   detectBuildArtifact,
   resolveArtifactStartPlan,
 } from "./artifact.mjs";
+import { createProductRuntimeEnv } from "./product-env.mjs";
 
 const STATIC_SERVER_MAIN = fileURLToPath(
   new URL("./static-server-main.mjs", import.meta.url),
@@ -87,12 +88,8 @@ export function parseReadyUrl(chunk, fallbackPort) {
   const text = String(chunk || "");
   const m =
     text.match(/https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(\d+)\b/i) ||
-    text.match(/Local:\s+(https?:\/\/[^\s]+)/i) ||
     text.match(/listening on\s+(?:port\s+)?(\d+)/i);
   if (m) {
-    if (m[1].startsWith("http")) {
-      return m[1].replace("0.0.0.0", "127.0.0.1");
-    }
     const port = Number(m[1]);
     if (Number.isFinite(port)) return `http://127.0.0.1:${port}/`;
   }
@@ -200,8 +197,6 @@ export function createBuildRuntimeManager(opts) {
       plan: {
         kind: state.mode === "static" ? "static" : "spawn",
       },
-      stdout: "",
-      stderr: "",
       artifact: state.artifact || null,
     };
     live.set(buildId, entry);
@@ -352,8 +347,6 @@ export function createBuildRuntimeManager(opts) {
       url: `http://127.0.0.1:${port}/`,
       status: "starting",
       startedAt: new Date().toISOString(),
-      stdout: "",
-      stderr: "",
       processRecord: null,
       ownerTaskId,
       authoritativeSha: ctx.authoritativeSha || null,
@@ -398,13 +391,7 @@ export function createBuildRuntimeManager(opts) {
           : plan.args;
       const child = spawn(command, args, {
         cwd: root,
-        env: {
-          ...process.env,
-          ...plan.env,
-          CI: "1",
-          BROWSER: "none",
-          FORCE_COLOR: "0",
-        },
+        env: createProductRuntimeEnv(plan),
         stdio: ["ignore", "pipe", "pipe"],
         detached: process.platform !== "win32",
       });
@@ -426,17 +413,25 @@ export function createBuildRuntimeManager(opts) {
         artifact,
       });
 
-      const onData = (buf, stream) => {
+      // Application output is untrusted and may contain values printed by
+      // product code. Use it only to discover the local ready URL; never put
+      // arbitrary stdout/stderr into runtime records, errors, or Builder views.
+      // Product code can still disclose its own values through HTTP responses;
+      // P9.2B must treat that as product-controlled disclosure, not PATH redaction.
+      const onData = (buf) => {
         const chunk = buf.toString("utf8");
-        if (stream === "out") entry.stdout = (entry.stdout + chunk).slice(-12_000);
-        else entry.stderr = (entry.stderr + chunk).slice(-12_000);
         const parsed = parseReadyUrl(chunk, port);
         if (parsed) entry.url = parsed.endsWith("/") ? parsed : `${parsed}/`;
       };
-      child.stdout?.on("data", (b) => onData(b, "out"));
-      child.stderr?.on("data", (b) => onData(b, "err"));
+      child.stdout?.on("data", onData);
+      child.stderr?.on("data", onData);
       /** @type {number | null} */
       let earlyExitCode = null;
+      child.once("error", () => {
+        // Node's spawn error may include command diagnostics. Keep only a
+        // bounded failure signal; never serialize the child environment.
+        earlyExitCode = 1;
+      });
       child.on("exit", (code) => {
         earlyExitCode = typeof code === "number" ? code : 1;
         if (live.get(buildId) === entry) {
@@ -468,8 +463,6 @@ export function createBuildRuntimeManager(opts) {
             error: exited
               ? `exited(${earlyExitCode})`
               : ready.error,
-            stdoutTail: entry.stdout.slice(-2_000),
-            stderrTail: entry.stderr.slice(-2_000),
           },
           artifact,
         };
@@ -504,7 +497,7 @@ export function createBuildRuntimeManager(opts) {
       return {
         ok: false,
         code: "RUNTIME_START_FAILED",
-        message: err instanceof Error ? err.message : String(err),
+        message: "Product runtime could not start",
         artifact,
       };
     }
@@ -542,8 +535,6 @@ export function createBuildRuntimeManager(opts) {
       error: entry.error || null,
       reason: entry.reason || null,
       exitCode: typeof entry.exitCode === "number" ? entry.exitCode : null,
-      stdoutTail: typeof entry.stdout === "string" ? entry.stdout.slice(-2_000) : null,
-      stderrTail: typeof entry.stderr === "string" ? entry.stderr.slice(-2_000) : null,
     };
   }
 

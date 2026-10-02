@@ -47,6 +47,8 @@ export {
 export { classifyConversationMessage } from "./conversation.mjs";
 export { detectBuildArtifact, resolveArtifactStartPlan } from "./runtime/artifact.mjs";
 export { createBuildRuntimeManager } from "./runtime/manager.mjs";
+export { createProductRuntimeEnv, PRODUCT_HOST_ENV_KEYS } from "./runtime/product-env.mjs";
+export { checkLocalEnvGitSafety } from "./runtime/local-env-safety.mjs";
 export { captureBrowserEvidence } from "./runtime/browser-evidence.mjs";
 export {
   adoptEngineerResultIntoBuild,

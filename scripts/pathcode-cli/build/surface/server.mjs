@@ -11,7 +11,7 @@ import {
   statSync,
   rmSync,
 } from "node:fs";
-import { dirname, join, extname, resolve, relative, sep } from "node:path";
+import { dirname, join, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -42,6 +42,7 @@ import {
   storeUploadedCreatorReference,
 } from "../references.mjs";
 import { detectBuildArtifact } from "../runtime/artifact.mjs";
+import { resolveSecurePreviewFile } from "../runtime/secure-file.mjs";
 import {
   proxyPreviewHttp,
   proxyPreviewWs,
@@ -488,13 +489,12 @@ export async function startPathBuildSurface(options) {
         }
         let rel = `/${candidateMatch[2] || ""}`;
         if (rel === "/" || rel === "") rel = "/index.html";
-        const filePath = resolve(rooted.root, `.${rel}`);
-        const relCheck = relative(resolve(rooted.root), filePath);
-        if (relCheck.startsWith("..") || relCheck.includes(`..${sep}`)) {
-          res.writeHead(403).end("Forbidden");
+        const guarded = resolveSecurePreviewFile(rooted.root, rel);
+        if (!guarded.ok) {
+          res.writeHead(guarded.status).end(guarded.status === 403 ? "Forbidden" : "Not found");
           return;
         }
-        sendFile(res, filePath);
+        sendFile(res, guarded.path);
         return;
       }
 

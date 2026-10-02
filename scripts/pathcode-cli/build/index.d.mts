@@ -560,6 +560,7 @@ export interface RuntimeManager {
   ): Promise<RuntimeStartResult>;
   stop(buildId: string): Promise<void>;
   stopAll(): Promise<void>;
+  inspect(buildId: string): Promise<{ ok: boolean; runtime: RuntimeState | null; live: boolean }>;
   getPreviewDescriptor(buildId: string): {
     capability: string;
     mode: string;
@@ -579,8 +580,6 @@ export interface RuntimeState {
   url: string;
   pid?: number;
   startKey?: string;
-  stderrTail?: string;
-  stdoutTail?: string;
   exitCode?: number | null;
 }
 export type RuntimeStartResult =
@@ -598,6 +597,14 @@ export type RuntimeStartResult =
       artifact?: BuildArtifact;
     };
 export function createBuildRuntimeManager(options: { runtimeRoot: string }): RuntimeManager;
+export const PRODUCT_HOST_ENV_KEYS: readonly string[];
+export function createProductRuntimeEnv(
+  plan: { kind: string; port: number; env: Record<string, string> },
+  host?: NodeJS.ProcessEnv,
+): Record<string, string>;
+export function checkLocalEnvGitSafety(projectRoot: string):
+  | { ok: true; gitSafety: "ignored_untracked" }
+  | { ok: false; code: string };
 
 export interface ServingProcessIdentity {
   role: "surface" | "coordinator" | "gateway";
