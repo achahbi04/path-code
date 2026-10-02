@@ -25,14 +25,15 @@ import {
 import { probeCursorDispatchReadiness } from "../ag10/cursor-sdk.mjs";
 import { readPreferences } from "../preferences.mjs";
 import { MODEL_PREFERENCE_ENGINES, readProjectModelPreferences, validateModelPreference } from "../model-plane/preference-config.mjs";
+import { listBuildEnvironments } from "../build/environments.mjs";
 
 /**
- * @param {{ cwd?: string, env?: NodeJS.ProcessEnv, packageRoot?: string, checkpoint?: object | null, engineeringModelId?: string | null }} [opts]
+ * @param {{ cwd?: string, env?: NodeJS.ProcessEnv, packageRoot?: string, runtimeRoot?: string, checkpoint?: object | null, engineeringModelId?: string | null, buildId?: string }} [opts]
  */
 export function runPathcodeDoctor(opts = {}) {
   const env = opts.env ?? process.env;
   const packageRoot = opts.packageRoot ?? resolvePathPackageRoot();
-  const runtimeRoot = resolvePathRuntimeRoot({ packageRoot });
+  const runtimeRoot = opts.runtimeRoot ?? resolvePathRuntimeRoot({ packageRoot });
   const cwd = opts.cwd ?? process.cwd();
 
   /** @type {Array<{ name: string, ok: boolean, detail: string, optional?: boolean }>} */
@@ -244,6 +245,25 @@ export function runPathcodeDoctor(opts = {}) {
     ok: true,
     detail: "Adapter/provider defaults apply after preferences and legacy env; no execution model inferred",
   });
+
+  if (opts.buildId) {
+    const configured = listBuildEnvironments(runtimeRoot, opts.buildId);
+    rows.push({ name: "P9 environments", ok: configured.ok, optional: true,
+      detail: configured.ok ? `${configured.items.length} configured` : configured.code });
+    if (configured.ok) for (const item of configured.items) {
+      rows.push({ name: `P9 ${item.name}`, ok: true, optional: true,
+        detail: `${item.variables.length} variable bindings` });
+      for (const variable of item.variables) {
+        rows.push({ name: `P9 ${item.name}/${variable.variableName}`, ok: true, optional: true,
+          detail: variable.kind === "config" ? "ordinary config configured" :
+            `${variable.backend}; binding ${variable.bindingState}; presence ${variable.presenceState}` +
+            (variable.backend === "local_env_file" ? `; safety ${variable.safetyState}` : "") });
+      }
+    }
+    rows.push({ name: "P9 Vercel auth", ok: true, optional: true,
+      detail: env.VERCEL_TOKEN ? "exported operational token present; provider status unverified" :
+        "operational readiness unknown; provider status unverified" });
+  }
 
   const agReady = probeAntigravityReadiness({ env });
   rows.push({

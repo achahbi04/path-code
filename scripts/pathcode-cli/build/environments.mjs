@@ -26,7 +26,7 @@ const SECRET_KEYS = new Set(["variableName", "backend", "replace"]);
 const CONFIG_KEYS = new Set(["variableName", "value", "replace"]);
 const ACTIONS = new Set([
   "create_environment", "rename_environment", "delete_environment",
-  "set_config", "remove_config", "bind_secret", "unbind_secret",
+  "set_config", "remove_config", "bind_secret", "unbind_secret", "set_vercel_locator",
 ]);
 
 const fail = (code) => ({ ok: false, code });
@@ -64,18 +64,22 @@ function validAuthority(section) {
         typeof entry.value === "string";
       if (entry.kind !== "secret" || !keysOnly(entry,
         new Set(["kind", "variableName", "secretRef", "backend", "descriptor",
-          "bindingState", "presenceState", "safetyState", "createdAt", "updatedAt"])) ||
+          "bindingState", "presenceState", "safetyState", "verifiedAt", "createdAt", "updatedAt"])) ||
           validVariableName(entry.variableName, "secret") !== null ||
           typeof entry.secretRef !== "string" || refs.has(entry.secretRef) ||
-          entry.bindingState !== "configured" || entry.presenceState !== "unknown") return false;
+          entry.bindingState !== "configured" ||
+          !["unknown", "verified_present", "verified_missing"].includes(entry.presenceState) ||
+          (entry.verifiedAt !== undefined && typeof entry.verifiedAt !== "string")) return false;
       refs.add(entry.secretRef);
-      if (entry.backend === "local_env_file") return entry.safetyState === "unknown" &&
+      if (entry.backend === "local_env_file") return ["unknown", "verified_safe", "verified_unsafe"].includes(entry.safetyState) &&
         keysOnly(entry.descriptor, new Set(["source"])) &&
         entry.descriptor.source === ".env.local";
-      return entry.backend === "vercel_env" && !own(entry, "safetyState") &&
+      return entry.backend === "vercel_env" && entry.presenceState === "unknown" && !own(entry, "safetyState") &&
         keysOnly(entry.descriptor, new Set(["provider", "teamRef", "projectRef", "targetRef", "bindingRef"])) &&
         entry.descriptor.provider === "vercel" &&
-        ["teamRef", "projectRef", "targetRef", "bindingRef"].every((key) => entry.descriptor[key] === null);
+        ["teamRef", "projectRef", "targetRef", "bindingRef"].every((key) =>
+          entry.descriptor[key] === null ||
+          (typeof entry.descriptor[key] === "string" && /^[A-Za-z0-9._-]{1,160}$/.test(entry.descriptor[key])));
     });
   });
 }
@@ -127,6 +131,7 @@ function projectEnvironment(item) {
           backend: entry.backend, descriptor: { ...entry.descriptor },
           bindingState: entry.bindingState, presenceState: entry.presenceState,
           ...(entry.backend === "local_env_file" ? { safetyState: entry.safetyState } : {}),
+          ...(entry.verifiedAt ? { verifiedAt: entry.verifiedAt } : {}),
           createdAt: entry.createdAt, updatedAt: entry.updatedAt }),
   };
 }
@@ -189,6 +194,27 @@ export function prepareBuildEnvironmentMutation(runtimeRoot, buildId, request) {
   } else if (action === "delete_environment") {
     if (!keysOnly(input, new Set(["environmentId"])) || environment.variables.length) return fail("ENVIRONMENT_NOT_EMPTY");
     section.items = section.items.filter((item) => item.environmentId !== environment.environmentId);
+  } else if (action === "set_vercel_locator") {
+    if (!keysOnly(input, new Set(["environmentId", "variableName", "secretRef", "teamRef", "projectRef", "targetRef", "bindingRef"]))) {
+      return fail("PROVIDER_LOCATOR_INVALID");
+    }
+    const entry = environment.variables.find((item) => item.variableName === input.variableName);
+    if (!entry || entry.kind !== "secret" || entry.backend !== "vercel_env" || entry.secretRef !== input.secretRef) {
+      return fail("SECRET_BINDING_NOT_FOUND");
+    }
+    const locator = {};
+    for (const key of ["teamRef", "projectRef", "targetRef", "bindingRef"]) {
+      const value = input[key] ?? null;
+      if (value !== null && (typeof value !== "string" || !/^[A-Za-z0-9._-]{1,160}$/.test(value))) {
+        return fail("PROVIDER_LOCATOR_INVALID");
+      }
+      locator[key] = value;
+    }
+    entry.descriptor = { provider: "vercel", ...locator };
+    entry.presenceState = "unknown";
+    delete entry.verifiedAt;
+    entry.updatedAt = at;
+    environment.updatedAt = at;
   } else {
     const allowed = action === "set_config" ? new Set(["environmentId", ...CONFIG_KEYS])
       : action === "bind_secret" ? new Set(["environmentId", ...SECRET_KEYS])
@@ -232,4 +258,29 @@ export function prepareBuildEnvironmentMutation(runtimeRoot, buildId, request) {
   section.revision += 1;
   found.record.environments = section;
   return { ok: true, record: found.record, revision: section.revision, ...result };
+}
+
+/** Apply only an allowlisted verification fact to the exact still-current binding. */
+export function prepareBuildEnvironmentVerification(runtimeRoot, buildId, request) {
+  const found = boundRecord(runtimeRoot, buildId);
+  if (!found.ok) return found;
+  if (!keysOnly(request, new Set(["environmentId", "variableName", "secretRef", "expectedEnvironmentRevision", "presenceState", "safetyState"])) ||
+      request.expectedEnvironmentRevision !== found.section.revision) return fail("STALE_ENVIRONMENT_AUTHORITY");
+  const section = structuredClone(found.section);
+  const environment = section.items.find((item) => item.environmentId === request.environmentId);
+  const entry = environment?.variables.find((item) => item.variableName === request.variableName);
+  if (!entry || entry.kind !== "secret" || entry.secretRef !== request.secretRef) return fail("SECRET_BINDING_NOT_FOUND");
+  if (entry.backend === "vercel_env") return fail("PROVIDER_VERIFICATION_UNAVAILABLE");
+  if (!["unknown", "verified_present", "verified_missing"].includes(request.presenceState) ||
+      (entry.backend === "local_env_file"
+        ? !["unknown", "verified_safe", "verified_unsafe"].includes(request.safetyState)
+        : request.safetyState !== undefined)) return fail("VERIFICATION_INVALID");
+  entry.presenceState = request.presenceState;
+  if (entry.backend === "local_env_file") entry.safetyState = request.safetyState;
+  entry.verifiedAt = new Date().toISOString();
+  entry.updatedAt = entry.verifiedAt;
+  environment.updatedAt = entry.verifiedAt;
+  section.revision += 1;
+  found.record.environments = section;
+  return { ok: true, record: found.record, revision: section.revision };
 }

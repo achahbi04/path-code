@@ -48,9 +48,10 @@ export type BuildEnvironmentVariable =
   | { kind: "config"; variableName: string; value: string; createdAt: string; updatedAt: string }
   | { kind: "secret"; variableName: string; secretRef: string;
       backend: "vercel_env" | "local_env_file";
-      descriptor: { provider: "vercel"; teamRef: null; projectRef: null; targetRef: null; bindingRef: null } |
+      descriptor: { provider: "vercel"; teamRef: string | null; projectRef: string | null; targetRef: string | null; bindingRef: string | null } |
         { source: ".env.local" };
-      bindingState: "configured"; presenceState: "unknown"; safetyState?: "unknown";
+      bindingState: "configured"; presenceState: "unknown" | "verified_present" | "verified_missing";
+      safetyState?: "unknown" | "verified_safe" | "verified_unsafe"; verifiedAt?: string;
       createdAt: string; updatedAt: string };
 
 export interface BuildEnvironments {
@@ -556,6 +557,7 @@ export interface RuntimeManager {
       authoritativeSha?: string | null;
       descriptor?: object | null;
       restartAllowed?: boolean;
+      environmentId?: string | null;
     },
   ): Promise<RuntimeStartResult>;
   stop(buildId: string): Promise<void>;
@@ -580,6 +582,7 @@ export interface RuntimeState {
   url: string;
   pid?: number;
   startKey?: string;
+  selectedEnvironmentId?: string | null;
   exitCode?: number | null;
 }
 export type RuntimeStartResult =
@@ -601,6 +604,7 @@ export const PRODUCT_HOST_ENV_KEYS: readonly string[];
 export function createProductRuntimeEnv(
   plan: { kind: string; port: number; env: Record<string, string> },
   host?: NodeJS.ProcessEnv,
+  selection?: { runtimeRoot: string; buildId: string; environmentId: string; projectRoot: string } | null,
 ): Record<string, string>;
 export function checkLocalEnvGitSafety(projectRoot: string):
   | { ok: true; gitSafety: "ignored_untracked" }
@@ -815,6 +819,11 @@ export interface BuildCoordinatorClient {
   readSecretBinding(buildId: string, environmentId: string, secretRef: string): Promise<ReturnType<typeof readBuildSecretBinding>>;
   mutateEnvironment(buildId: string, action: string, expectedEnvironmentRevision: number, input: object):
     Promise<{ ok: boolean; code?: string; revision?: number; environmentId?: string; secretRef?: string }>;
+  verifyLocalEnvironmentBinding(buildId: string, environmentId: string, variableName: string,
+    expectedEnvironmentRevision: number): Promise<{ ok: boolean; code?: string; revision?: number;
+      presenceState?: string; safetyState?: string }>;
+  startRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
+  restartRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   startBuild(
     outcome: string,
     options: Parameters<BuildController["startBuild"]>[1],

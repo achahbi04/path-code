@@ -12,6 +12,7 @@ export const BuildCoordinatorMethods = Object.freeze({
   BUILD_ENVIRONMENT_READ: "build.environments.read",
   BUILD_SECRET_BINDING_READ: "build.environments.readSecretBinding",
   BUILD_ENVIRONMENT_MUTATE: "build.environments.mutate",
+  BUILD_ENVIRONMENT_VERIFY_LOCAL: "build.environments.verifyLocal",
   BUILD_MESSAGE: "build.message",
   BUILD_STOP: "build.stop",
   BUILD_PAUSE: "build.pause",

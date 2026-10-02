@@ -265,6 +265,7 @@ export function createBuildRuntimeManager(opts) {
       descriptor: cur.descriptor || null,
       artifact: cur.artifact || null,
       restartAllowed: cur.restartAllowed !== false,
+      selectedEnvironmentId: cur.selectedEnvironmentId || null,
       pid: cur.processRecord?.pid || cur.pid || null,
       startKey: cur.processRecord?.startKey || cur.startKey || null,
       status: "stopped",
@@ -284,11 +285,13 @@ export function createBuildRuntimeManager(opts) {
    *   authoritativeSha?: string | null,
    *   descriptor?: object | null,
    *   restartAllowed?: boolean,
+   *   environmentId?: string | null,
    * }} [ctx]
    */
   async function start(buildId, projectRoot, ctx = {}) {
     const existing = live.get(buildId) || hydrate(buildId);
-    if (existing && !ctx.forceRestart) {
+    const selectedEnvironmentId = ctx.environmentId || null;
+    if (existing && !ctx.forceRestart && (existing.selectedEnvironmentId || null) === selectedEnvironmentId) {
       const health = await inspect(buildId);
       if (health.ok && health.runtime?.status === "ready") {
         return { ok: true, runtime: health.runtime, reused: true };
@@ -318,6 +321,7 @@ export function createBuildRuntimeManager(opts) {
         reason: emptyTree ? "empty_tree" : "no_preview_capability",
         artifact,
         authoritativeSha: ctx.authoritativeSha || null,
+        selectedEnvironmentId,
         startedAt: new Date().toISOString(),
       };
       persist(buildId, state);
@@ -352,6 +356,7 @@ export function createBuildRuntimeManager(opts) {
       authoritativeSha: ctx.authoritativeSha || null,
       descriptor: ctx.descriptor || null,
       restartAllowed: ctx.restartAllowed !== false,
+      selectedEnvironmentId,
     };
 
     if (plan.kind === "none") {
@@ -379,6 +384,7 @@ export function createBuildRuntimeManager(opts) {
       descriptor: entry.descriptor,
       artifact,
       restartAllowed: entry.restartAllowed,
+      selectedEnvironmentId,
     });
 
     try {
@@ -391,7 +397,9 @@ export function createBuildRuntimeManager(opts) {
           : plan.args;
       const child = spawn(command, args, {
         cwd: root,
-        env: createProductRuntimeEnv(plan),
+        env: createProductRuntimeEnv(plan, process.env, selectedEnvironmentId ? {
+          runtimeRoot, buildId, environmentId: selectedEnvironmentId, projectRoot: root,
+        } : null),
         stdio: ["ignore", "pipe", "pipe"],
         detached: process.platform !== "win32",
       });
@@ -489,6 +497,7 @@ export function createBuildRuntimeManager(opts) {
         descriptor: entry.descriptor,
         artifact,
         restartAllowed: entry.restartAllowed,
+        selectedEnvironmentId,
         startedAt: entry.startedAt,
       });
       return { ok: true, runtime: snapshot(entry), artifact };
@@ -496,7 +505,8 @@ export function createBuildRuntimeManager(opts) {
       await stop(buildId);
       return {
         ok: false,
-        code: "RUNTIME_START_FAILED",
+        code: typeof err?.code === "string" && /^(LOCAL_|SECRET_|CONFIG_|ENVIRONMENT_|BUILD_BINDING_|RESTORE_PENDING|RUNTIME_ENV_)/.test(err.code)
+          ? err.code : "RUNTIME_START_FAILED",
         message: "Product runtime could not start",
         artifact,
       };
@@ -530,6 +540,7 @@ export function createBuildRuntimeManager(opts) {
       authoritativeSha: entry.authoritativeSha || null,
       descriptor: entry.descriptor || null,
       restartAllowed: entry.restartAllowed !== false,
+      selectedEnvironmentId: entry.selectedEnvironmentId || null,
       artifactKind: entry.artifact?.kind || null,
       framework: entry.artifact?.framework || null,
       error: entry.error || null,

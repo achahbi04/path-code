@@ -126,6 +126,9 @@ export function createBuildCoordinatorClient(options) {
     mutateEnvironment: (buildId, action, expectedEnvironmentRevision, input) =>
       request(BuildCoordinatorMethods.BUILD_ENVIRONMENT_MUTATE,
         { buildId, action, expectedEnvironmentRevision, input }),
+    verifyLocalEnvironmentBinding: (buildId, environmentId, variableName, expectedEnvironmentRevision) =>
+      request(BuildCoordinatorMethods.BUILD_ENVIRONMENT_VERIFY_LOCAL,
+        { buildId, environmentId, variableName, expectedEnvironmentRevision }),
     messageBuild: (buildId, input) =>
       request(BuildCoordinatorMethods.BUILD_MESSAGE, { buildId, input }),
     stopBuild: (buildId) =>
@@ -154,10 +157,10 @@ export function createBuildCoordinatorClient(options) {
       request(BuildCoordinatorMethods.RUNTIME_GET, { buildId }),
     syncRuntime: (buildId) =>
       request(BuildCoordinatorMethods.RUNTIME_SYNC, { buildId }),
-    startRuntime: (buildId) =>
-      request(BuildCoordinatorMethods.RUNTIME_START, { buildId }),
-    restartRuntime: (buildId) =>
-      request(BuildCoordinatorMethods.RUNTIME_RESTART, { buildId }),
+    startRuntime: (buildId, environmentId = null) =>
+      request(BuildCoordinatorMethods.RUNTIME_START, { buildId, environmentId }),
+    restartRuntime: (buildId, environmentId = null) =>
+      request(BuildCoordinatorMethods.RUNTIME_RESTART, { buildId, environmentId }),
     captureRuntimeEvidence: (buildId) =>
       request(BuildCoordinatorMethods.RUNTIME_EVIDENCE, { buildId }),
     stopRuntime: (buildId) =>

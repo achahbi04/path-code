@@ -21,7 +21,9 @@ import { appendBuildEvent, readBuildEvents } from "../events.mjs";
 import {
   listBuildEnvironments, readBuildEnvironment, readBuildSecretBinding,
   prepareBuildEnvironmentMutation,
+  prepareBuildEnvironmentVerification,
 } from "../environments.mjs";
+import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
 import { ensureGateway, readGatewayPid } from "../../gateway/ensure.mjs";
 import { terminateOwnedPid, withTimeout } from "../shutdown.mjs";
 import { readPathPackageVersion } from "../../paths.mjs";
@@ -385,10 +387,46 @@ export async function createBuildCoordinatorService(options) {
           const event = { revision: result.revision, action: params.action,
             environmentId: params.input?.environmentId || result.environmentId || null,
             variableName: params.input?.variableName || null,
-            secretRef: result.secretRef || null,
             backend: params.action === "bind_secret" ? params.input?.backend : null };
           try { appendBuildEvent(runtimeRoot, buildId, "environment.mutated", event); } catch { /* Build record is authority. */ }
           return safe;
+        });
+      case BuildCoordinatorMethods.BUILD_ENVIRONMENT_VERIFY_LOCAL:
+        return exclusive(buildId, () => {
+          if (Object.keys(params).some((key) => !["buildId", "environmentId", "variableName", "expectedEnvironmentRevision"].includes(key))) {
+            return { ok: false, code: "VERIFICATION_INVALID" };
+          }
+          const selected = readBuildEnvironment(runtimeRoot, buildId, params.environmentId);
+          if (!selected.ok) return selected;
+          if (selected.revision !== params.expectedEnvironmentRevision) return { ok: false, code: "STALE_ENVIRONMENT_AUTHORITY" };
+          const binding = selected.environment.variables.find((item) => item.variableName === params.variableName);
+          if (!binding || binding.kind !== "secret" || binding.backend !== "local_env_file") {
+            return { ok: false, code: "SECRET_BINDING_NOT_FOUND" };
+          }
+          const build = readBuildRecord(runtimeRoot, buildId);
+          const names = selected.environment.variables.filter((item) => item.kind === "secret" && item.backend === "local_env_file")
+            .map((item) => item.variableName);
+          const observed = resolveExactLocalEnvValues({
+            projectRoot: build.projectBindings[0].projectRoot,
+            exactNames: [binding.variableName], allowedNativeNames: names,
+          });
+          const unsafe = ["LOCAL_ENV_TRACKED", "LOCAL_ENV_NOT_IGNORED", "LOCAL_ENV_PATH_UNSAFE"].includes(observed.code);
+          if (!observed.ok && !unsafe && observed.code !== "LOCAL_SECRET_MISSING") return observed;
+          const presenceState = observed.ok ? "verified_present" :
+            observed.code === "LOCAL_SECRET_MISSING" ? "verified_missing" : "unknown";
+          const safetyState = unsafe ? "verified_unsafe" : "verified_safe";
+          const prepared = prepareBuildEnvironmentVerification(runtimeRoot, buildId, {
+            environmentId: params.environmentId, variableName: binding.variableName,
+            secretRef: binding.secretRef, expectedEnvironmentRevision: selected.revision,
+            presenceState, safetyState,
+          });
+          if (!prepared.ok) return prepared;
+          writeBuildRecord(runtimeRoot, prepared.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "environment.binding_verified", {
+            environmentId: params.environmentId, variableName: binding.variableName,
+            backend: "local_env_file", presenceState, safetyState,
+          }); } catch { /* Build record is authority. */ }
+          return { ok: true, revision: prepared.revision, presenceState, safetyState };
         });
       case BuildCoordinatorMethods.BUILD_MESSAGE:
         if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
@@ -621,6 +659,11 @@ export async function createBuildCoordinatorService(options) {
       case BuildCoordinatorMethods.RUNTIME_START:
       case BuildCoordinatorMethods.RUNTIME_RESTART:
         return exclusive(buildId, async () => {
+          if (Object.keys(params).some((key) => !["buildId", "environmentId"].includes(key)) ||
+              (params.environmentId != null &&
+                (typeof params.environmentId !== "string" || !params.environmentId))) {
+            return { ok: false, code: "ENVIRONMENT_SELECTION_INVALID" };
+          }
           const gate = runtimeSync.requireBinding(buildId);
           if (!gate.ok) return gate;
           const operation =
@@ -637,6 +680,7 @@ export async function createBuildCoordinatorService(options) {
               projectRoot: gate.projectRoot,
             },
             restartAllowed: true,
+            environmentId: params.environmentId || null,
           });
           appendBuildEvent(
             runtimeRoot,
@@ -648,6 +692,12 @@ export async function createBuildCoordinatorService(options) {
               ok: result.ok !== false,
               status: result.runtime?.status || null,
               authoritativeSha: gate.build.authoritativeSha || null,
+              ...(params.environmentId ? {
+                environmentId: params.environmentId,
+                consumer: "local_product_runtime",
+                operation: "runtime_environment_selection",
+                outcome: result.ok ? "started" : "failed",
+              } : {}),
             },
           );
           return result;
