@@ -181,10 +181,10 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(await s.transition(op, dep, 3, "uncertain")).toMatchObject({ ok: true, revision: 4 });
     const record = readBuildRecord(root, s.target.buildId)!;
     const requestedAt = new Date(Date.now() - 40 * 60_000);
-    record.deployments!.deployments[0].requestedAt = requestedAt.toISOString();
+    record.deployments!.deployments[0]!.requestedAt = requestedAt.toISOString();
     writeBuildRecord(root, record);
     const evidence = { buildId: s.target.buildId, operationId: op, deploymentId: dep,
-      mappingId: record.deployments!.mappings[0].mappingId, teamRef: null, projectRef: "product",
+      mappingId: record.deployments!.mappings[0]!.mappingId, teamRef: null, projectRef: "product",
       targetRef: "preview", exactLookupCount: 3, exactMetadataMatchCount: 0,
       recentDeploymentMatchCount: 0, windowStart: new Date(requestedAt.getTime() - 10 * 60_000).toISOString(),
       windowEnd: new Date(requestedAt.getTime() + 10 * 60_000).toISOString(),
