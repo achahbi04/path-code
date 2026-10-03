@@ -7,18 +7,39 @@ const variable = (v) => typeof v === "string" && /^[A-Za-z_][A-Za-z0-9_]{0,127}$
 const targetName = (v) => v === "preview" || v === "production";
 const deploymentId = (v) => typeof v === "string" && /^dpl_[A-Za-z0-9]{8,100}$/.test(v);
 
-/** Only a proven value-free transport may feed this parser in P10.2. */
+/** Reduce installed CLI 59.10.0 env ls JSON. Raw Config values are toxic input. */
 export function parseVercelConfigMetadata(raw) {
-  if (!keys(raw, ["variables"]) || !Array.isArray(raw.variables)) return fail("PROVIDER_METADATA_UNSAFE");
+  const cli = keys(raw, ["envs"]) && Array.isArray(raw.envs);
+  const fixture = keys(raw, ["variables"]) && Array.isArray(raw.variables);
+  if (!cli && !fixture) return fail("PROVIDER_METADATA_UNSAFE");
   const variables = [];
-  for (const row of raw.variables) {
-    if (!keys(row, ["name", "visibility", "target", "origin"]) ||
-        !variable(row.name) || !["config", "secret"].includes(row.visibility) ||
-        !targetName(row.target) || !["user", "provider", "system", "integration", "unknown"].includes(row.origin)) {
-      return fail("PROVIDER_METADATA_UNSAFE");
+  for (const row of cli ? raw.envs : raw.variables) {
+    if (cli) {
+      if (!keys(row, ["key", "value", "type", "visibility", "target", "gitBranch", "configurationId", "createdAt", "updatedAt"])) return fail("PROVIDER_METADATA_UNSAFE");
+      const visibility = row.type === "sensitive" ? "secret" :
+        ["plain", "encrypted", "system"].includes(row.type) ? "config" : null;
+      const targets = Array.isArray(row.target) ? row.target : [row.target];
+      if (!variable(row.key) || !visibility ||
+          (row.visibility !== undefined && row.visibility !== visibility) ||
+          targets.length === 0 || new Set(targets).size !== targets.length ||
+          targets.some((t) => !targetName(t)) ||
+          (row.gitBranch !== undefined && row.gitBranch !== null) ||
+          (visibility === "secret" && Object.hasOwn(row, "value") && row.value != null)) {
+        return fail("PROVIDER_METADATA_UNSAFE");
+      }
+      // A system type is factual origin evidence. configurationId alone is not.
+      for (const target of targets) variables.push({ name: row.key, visibility, target,
+        origin: row.type === "system" ? "system" : "unknown" });
+    } else {
+      if (!keys(row, ["name", "visibility", "target", "origin", "value"]) ||
+          !variable(row.name) || !["config", "secret"].includes(row.visibility) ||
+          !targetName(row.target) || !["user", "provider", "system", "integration", "unknown"].includes(row.origin) ||
+          (row.visibility === "secret" && Object.hasOwn(row, "value") && row.value != null)) {
+        return fail("PROVIDER_METADATA_UNSAFE");
+      }
+      variables.push({ name: row.name, visibility: row.visibility,
+        target: row.target, origin: row.origin });
     }
-    variables.push({ name: row.name, visibility: row.visibility,
-      target: row.target, origin: row.origin });
   }
   return { ok: true, variables };
 }
@@ -50,12 +71,17 @@ export function planVercelConfigProjection({ config, metadata, target }) {
 }
 
 /** Return value separately as a bounded stdin payload; never place it in argv. */
-export function makeVercelConfigCommand({ operation, variableName, target, value }) {
+export function makeVercelConfigCommand({ operation, variableName, target, value, projectRef = null, teamRef = null }) {
   if (!["add", "update"].includes(operation) || !variable(variableName) || !targetName(target) ||
-      typeof value !== "string") return fail("CONFIG_COMMAND_INVALID");
-  const argv = ["env", operation, variableName, target, "--visibility", "config", "--yes"];
+      typeof value !== "string" || value.length === 0 ||
+      ((value.endsWith("\n") && !value.slice(0, -1).includes("\n") && !value.slice(0, -1).includes("\r"))) ||
+      (projectRef !== null && !locator(projectRef)) ||
+      (teamRef !== null && !locator(teamRef))) return fail("CONFIG_COMMAND_INVALID");
+  const argv = ["env", operation, variableName, target, "--type", "config", "--yes",
+    ...(projectRef === null ? [] : ["--project", projectRef]),
+    ...(teamRef === null ? [] : ["--scope", teamRef])];
   return { ok: true, executable: "vercel", argv, shell: false,
-    stdinPayload: value, display: `vercel env ${operation} ${variableName} ${target} --visibility config --yes` };
+    stdinPayload: value, display: `vercel env ${operation} ${variableName} ${target} --type config --yes --project <project>` };
 }
 
 export function parseVercelDeploymentReceipt(raw) {
@@ -93,7 +119,8 @@ export function operationMetadata({ operationId, buildId, projectRef }) {
 }
 
 export const VERCEL_LIVE_PROOF_GATES = Object.freeze([
-  "visibility_config", "env_add_stdin", "env_update_stdin", "value_absent_from_argv",
-  "value_free_config_metadata", "safe_deployment_receipt", "safe_deployment_status",
-  "operation_metadata_lookup", "safe_production_serving_observation",
+  "type_config", "env_add_stdin", "env_update_stdin", "value_absent_from_argv",
+  "config_metadata_reduction", "secret_plaintext_fail_closed", "safe_deployment_receipt",
+  "safe_deployment_status", "operation_metadata_lookup", "creator_auth_readiness",
+  "mapped_project_readiness",
 ]);

@@ -125,12 +125,12 @@ describe("P10.1 deployment foundation without live provider work", () => {
     const sentinel = "P10_CONFIG_VALUE_SENTINEL_DO_NOT_EXPOSE";
     const command = makeVercelConfigCommand({ operation: "add", variableName: "PUBLIC_URL", target: "preview", value: sentinel });
     expect(command).toMatchObject({ executable: "vercel", shell: false, stdinPayload: sentinel,
-      argv: ["env", "add", "PUBLIC_URL", "preview", "--visibility", "config", "--yes"] });
+      argv: ["env", "add", "PUBLIC_URL", "preview", "--type", "config", "--yes"] });
     expect(JSON.stringify(command.argv) + command.display).not.toContain(sentinel);
     expect(makeVercelConfigCommand({ operation: "add", variableName: "--value", target: "preview", value: sentinel })).toMatchObject({ ok: false });
-    const unsafe = parseVercelConfigMetadata({ variables: [{ name: "PUBLIC_URL", visibility: "config", target: "preview", origin: "user", value: "P10_PROVIDER_VALUE_SENTINEL" }] });
-    expect(unsafe).toEqual({ ok: false, code: "PROVIDER_METADATA_UNSAFE" });
-    expect(JSON.stringify(unsafe)).not.toContain("P10_PROVIDER_VALUE_SENTINEL");
+    const reduced = parseVercelConfigMetadata({ variables: [{ name: "PUBLIC_URL", visibility: "config", target: "preview", origin: "user", value: "P10_PROVIDER_VALUE_SENTINEL" }] });
+    expect(reduced).toMatchObject({ ok: true, variables: [{ name: "PUBLIC_URL", visibility: "config" }] });
+    expect(JSON.stringify(reduced)).not.toContain("P10_PROVIDER_VALUE_SENTINEL");
     const metadata = parseVercelConfigMetadata({ variables: [{ name: "PUBLIC_URL", visibility: "config", target: "preview", origin: "user" }] });
     expect(planVercelConfigProjection({ config: [{ kind: "config", variableName: "PUBLIC_URL", value: sentinel }], metadata, target: "preview" }))
       .toMatchObject({ ok: true, actions: [{ operation: "update", variableName: "PUBLIC_URL" }] });

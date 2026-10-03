@@ -901,6 +901,17 @@ export function makeVercelConfigCommand(input: object): { ok: boolean; code?: st
 export function parseVercelDeploymentReceipt(raw: unknown): object;
 export function parseVercelServingObservation(raw: unknown): object;
 export function operationMetadata(input: object): object;
+export function createVercelChildEnv(parent?: Record<string, string | undefined>): Record<string, string>;
+export function makePreviewReadCommands(input: object): object;
+export function makePreviewDeployCommand(input: object): object;
+export function makePreviewInspectCommand(input: object): object;
+export function makePreviewReconcileCommand(input: object): object;
+export function parsePreviewAuth(raw: unknown, teamRef?: string | null): object;
+export function parsePreviewProjectList(raw: unknown, input: object): object;
+export function parsePreviewDeploymentReceipt(raw: unknown): object;
+export function parsePreviewDeploymentStatus(raw: unknown, expectedId: string): object;
+export function parsePreviewReconciliation(raw: unknown, input: object): object;
+export function executeVercelAdapterCommand(spec: object, input: object): Promise<object>;
 export function listBuildEnvironments(runtimeRoot: string, buildId: string):
   { ok: true; buildId: string; bindingId: string; schema: string; revision: number; items: BuildEnvironments["items"] } |
   { ok: false; code: string };

@@ -59,6 +59,10 @@ export { DEPLOYMENTS_SCHEMA, emptyDeploymentAuthority, listBuildDeployments,
 export { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfigCommand,
   parseVercelDeploymentReceipt, parseVercelServingObservation, operationMetadata,
   VERCEL_LIVE_PROOF_GATES } from "./vercel-deploy-contract.mjs";
+export { createVercelChildEnv, makePreviewReadCommands, makePreviewDeployCommand,
+  makePreviewInspectCommand, makePreviewReconcileCommand, parsePreviewAuth,
+  parsePreviewProjectList, parsePreviewDeploymentReceipt, parsePreviewDeploymentStatus,
+  parsePreviewReconciliation, executeVercelAdapterCommand } from "./vercel-preview-adapter.mjs";
 export { captureBrowserEvidence } from "./runtime/browser-evidence.mjs";
 export {
   adoptEngineerResultIntoBuild,
