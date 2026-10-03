@@ -827,6 +827,7 @@ export function projectBuildForSurface(
 export interface BuildCoordinatorClient {
   connect(): Promise<void>;
   close(): void;
+  request(method: string, params?: Record<string, unknown>): Promise<any>;
   listEnvironments(buildId: string): Promise<ReturnType<typeof listBuildEnvironments>>;
   listDeployments(buildId: string): Promise<ReturnType<typeof listBuildDeployments>>;
   preflightDeployment(buildId: string, environmentId: string): Promise<ReturnType<typeof preflightDeployment>>;
@@ -923,6 +924,7 @@ export function readBuildSecretBinding(runtimeRoot: string, buildId: string, env
   { ok: false; code: string };
 export function createBuildCoordinatorService(options: {
   runtimeRoot: string; packageRoot: string; fakeMode?: boolean; preferredEngine?: string | null;
+  scopedBuildId?: string;
 }): Promise<{
   dispatch(method: string, params?: Record<string, unknown>): Promise<any>;
   whenReady: Promise<unknown>;
@@ -932,6 +934,7 @@ export function startBuildCoordinatorServer(options: {
   runtimeRoot: string;
   packageRoot: string;
   fakeMode?: boolean;
+  scopedBuildId?: string;
 }): Promise<{
   socketPath: string;
   service: { recovered: Array<{ buildId: string; ok: boolean }> };

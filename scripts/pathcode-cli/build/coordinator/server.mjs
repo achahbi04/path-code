@@ -33,6 +33,11 @@ export function resolveBuildCoordinatorPidPath(runtimeRoot) {
 }
 
 export async function startBuildCoordinatorServer(options) {
+  if (options.scopedBuildId !== undefined &&
+      (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.scopedBuildId) ||
+       options.service)) {
+    throw new Error("Invalid scoped coordinator invocation");
+  }
   const socketPath =
     options.socketPath ||
     resolveBuildCoordinatorSocketPath(options.runtimeRoot);

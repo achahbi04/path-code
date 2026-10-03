@@ -41,9 +41,15 @@ export async function createBuildCoordinatorService(options) {
     packageRoot,
     fakeMode = false,
     preferredEngine = null,
+    scopedBuildId = null,
   } = options;
+  const scopedControlPlane = typeof scopedBuildId === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scopedBuildId);
+  if (scopedBuildId !== null && !scopedControlPlane) {
+    throw new Error("Invalid scoped Build identity");
+  }
   let gatewayHandle = null;
-  const gateway = fakeMode
+  const gateway = fakeMode || scopedControlPlane
     ? {
         async bindProject() {
           return { ok: true };
@@ -317,6 +323,14 @@ export async function createBuildCoordinatorService(options) {
 
   async function dispatch(method, params = {}) {
     const buildId = String(params.buildId || "");
+    if (scopedControlPlane && method !== BuildCoordinatorMethods.HELLO &&
+        (buildId !== scopedBuildId || !new Set([
+          BuildCoordinatorMethods.BUILD_ENVIRONMENTS_LIST,
+          BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ,
+          BuildCoordinatorMethods.BUILD_ENVIRONMENT_MUTATE,
+          BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST,
+          BuildCoordinatorMethods.BUILD_DEPLOYMENT_MAPPING_MUTATE,
+        ]).has(method))) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
     switch (method) {
       case BuildCoordinatorMethods.HELLO:
         return {
@@ -750,7 +764,9 @@ export async function createBuildCoordinatorService(options) {
   }
 
   let recovered = [];
-  const whenReady = reconcileStartup().then((rows) => {
+  // A scoped control-plane owner never recovers unrelated Builds. It accepts
+  // only exact-Build P9/P10 commands, and the normal owner keeps full recovery.
+  const whenReady = (scopedControlPlane ? Promise.resolve([]) : reconcileStartup()).then((rows) => {
     recovered = rows;
     return rows;
   });

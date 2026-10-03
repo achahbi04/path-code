@@ -4,6 +4,8 @@ export function startBuildCoordinatorServer(options: {
   runtimeRoot: string;
   packageRoot: string;
   fakeMode?: boolean;
+  /** Exact-Build P9/P10 control-plane mode; skips startup recovery. */
+  scopedBuildId?: string;
   preferredEngine?: string | null;
   socketPath?: string;
 }): Promise<{
