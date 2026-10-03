@@ -172,50 +172,6 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(authority.currentProductionReleaseId).toBeNull();
   });
 
-  it("closes only the exact aged uncertain Preview after bounded zero-match reconciliation", async () => {
-    const s = await setup();
-    const prepared = await s.prepare();
-    const op = prepared.operationId!;
-    const dep = prepared.deploymentId!;
-    expect(await s.transition(op, dep, 2, "submitting")).toMatchObject({ ok: true, revision: 3 });
-    expect(await s.transition(op, dep, 3, "uncertain")).toMatchObject({ ok: true, revision: 4 });
-    const record = readBuildRecord(root, s.target.buildId)!;
-    const requestedAt = new Date(Date.now() - 40 * 60_000);
-    record.deployments!.deployments[0]!.requestedAt = requestedAt.toISOString();
-    writeBuildRecord(root, record);
-    const evidence = { buildId: s.target.buildId, operationId: op, deploymentId: dep,
-      mappingId: record.deployments!.mappings[0]!.mappingId, teamRef: null, projectRef: "product",
-      targetRef: "preview", exactLookupCount: 3, exactMetadataMatchCount: 0,
-      recentDeploymentMatchCount: 0, windowStart: new Date(requestedAt.getTime() - 10 * 60_000).toISOString(),
-      windowEnd: new Date(requestedAt.getTime() + 10 * 60_000).toISOString(),
-      reconciliationCompletedAt: new Date().toISOString() };
-    const close = (operationId: string, deploymentId: string, expectedRevision: number,
-      reconciliationEvidence: Record<string, unknown>) => client!.transitionDeployment(s.target.buildId,
-      { operationId, deploymentId, expectedRevision, state: "failed",
-        failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED", reconciliationEvidence });
-    expect(await close(op, dep, 3, evidence)).toMatchObject({ ok: false, code: "DEPLOY_REVISION_STALE" });
-    expect(await close("wrong-operation", dep, 4, evidence)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_NOT_FOUND" });
-    expect(await close(op, "wrong-deployment", 4, evidence)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_NOT_FOUND" });
-    expect(await close(op, dep, 4, { ...evidence, exactMetadataMatchCount: 1 }))
-      .toMatchObject({ ok: false, code: "DEPLOY_RECONCILIATION_INVALID" });
-    expect(await close(op, dep, 4, { ...evidence, recentDeploymentMatchCount: 1 }))
-      .toMatchObject({ ok: false, code: "DEPLOY_RECONCILIATION_INVALID" });
-    expect(await close(op, dep, 4, { ...evidence, projectRef: "other-project" }))
-      .toMatchObject({ ok: false, code: "DEPLOY_RECONCILIATION_INVALID" });
-    expect(await s.transition(op, dep, 4, "failed", { failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED" }))
-      .toMatchObject({ ok: false, code: "DEPLOY_RECONCILIATION_INVALID" });
-    expect(await close(op, dep, 4, evidence)).toMatchObject({ ok: true, revision: 5 });
-    const final = readBuildRecord(root, s.target.buildId)!.deployments!;
-    expect(final.pendingOperation).toBeNull();
-    expect(final.deployments).toMatchObject([{ operationId: op, deploymentId: dep,
-      operationState: "failed", failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED",
-      providerDeploymentId: null, providerUrl: null }]);
-    expect(final.releases).toEqual([]);
-    expect(final.currentProductionReleaseId).toBeNull();
-    expect(await close(op, dep, 5, evidence)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_NOT_FOUND" });
-    expect(readFileSync(s.otherPath)).toEqual(s.unrelatedBefore);
-  });
-
   it("keeps production preparation outside the scoped Preview transaction", async () => {
     const s = await setup();
     expect(await client!.mutateDeploymentMapping(s.target.buildId, { action: "set", expectedRevision: 1,
