@@ -127,6 +127,8 @@ export function createBuildCoordinatorClient(options) {
       request(BuildCoordinatorMethods.BUILD_DEPLOYMENT_MAPPING_MUTATE, { buildId, ...input }),
     prepareDeployment: (buildId, input) =>
       request(BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE, { buildId, ...input }),
+    transitionDeployment: (buildId, input) =>
+      request(BuildCoordinatorMethods.BUILD_DEPLOYMENT_TRANSITION, { buildId, ...input }),
     readEnvironment: (buildId, environmentId) =>
       request(BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ, { buildId, environmentId }),
     readSecretBinding: (buildId, environmentId, secretRef) =>

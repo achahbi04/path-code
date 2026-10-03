@@ -25,7 +25,8 @@ import {
 } from "../environments.mjs";
 import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
 import { listBuildDeployments, preflightDeployment, prepareDeploymentMappingMutation,
-  prepareDeploymentOperation, recoverDeploymentFoundation } from "../deployments.mjs";
+  prepareDeploymentOperation, transitionDeploymentOperation, validateOperationSnapshot,
+  recoverDeploymentFoundation } from "../deployments.mjs";
 import { ensureGateway, readGatewayPid } from "../../gateway/ensure.mjs";
 import { terminateOwnedPid, withTimeout } from "../shutdown.mjs";
 import { readPathPackageVersion } from "../../paths.mjs";
@@ -330,6 +331,8 @@ export async function createBuildCoordinatorService(options) {
           BuildCoordinatorMethods.BUILD_ENVIRONMENT_MUTATE,
           BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_MAPPING_MUTATE,
+          BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE,
+          BuildCoordinatorMethods.BUILD_DEPLOYMENT_TRANSITION,
         ]).has(method))) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
     switch (method) {
       case BuildCoordinatorMethods.HELLO:
@@ -406,11 +409,40 @@ export async function createBuildCoordinatorService(options) {
           const { buildId: _buildId, ...request } = params;
           const result = prepareDeploymentOperation(runtimeRoot, buildId, request);
           if (!result.ok) return result;
+          if (scopedControlPlane && result.record.deployments.deployments.at(-1)?.target !== "preview") {
+            return { ok: false, code: "DEPLOY_TARGET_FORBIDDEN" };
+          }
           writeBuildRecord(runtimeRoot, result.record);
           try { appendBuildEvent(runtimeRoot, buildId, "deployment.prepared", {
             operationId: result.operationId, deploymentId: result.deploymentId, revision: result.revision }); } catch { /* Build record is authority. */ }
           const { record: _record, ...safe } = result;
           return safe;
+        });
+      case BuildCoordinatorMethods.BUILD_DEPLOYMENT_TRANSITION:
+        return exclusive(buildId, () => {
+          const { buildId: _buildId, expectedRevision, ...input } = params;
+          if (!Number.isSafeInteger(expectedRevision)) return { ok: false, code: "DEPLOY_TRANSITION_INVALID" };
+          const record = readBuildRecord(runtimeRoot, buildId);
+          if (!record || record.buildId !== buildId) return { ok: false, code: "BUILD_NOT_FOUND" };
+          const authority = record.deployments;
+          if (!authority || authority.revision !== expectedRevision) return { ok: false, code: "DEPLOY_REVISION_STALE" };
+          const op = authority.pendingOperation;
+          if (!op || op.kind !== "deploy" || op.operationId !== input.operationId ||
+              op.deploymentId !== input.deploymentId ||
+              authority.deployments.find((item) => item.deploymentId === op.deploymentId)?.target !== "preview") {
+            return { ok: false, code: "DEPLOY_OPERATION_NOT_FOUND" };
+          }
+          if (["config_receipt", "config_projection_incomplete", "submitting"].includes(input.state)) {
+            const current = validateOperationSnapshot(runtimeRoot, buildId, input.operationId);
+            if (!current.ok) return current;
+          }
+          const result = transitionDeploymentOperation(record, input);
+          if (!result.ok) return result;
+          writeBuildRecord(runtimeRoot, result.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "deployment.transition", {
+            operationId: input.operationId, deploymentId: input.deploymentId,
+            state: input.state, revision: result.revision }); } catch { /* Build record is authority. */ }
+          return { ok: true, revision: result.revision, state: input.state };
         });
       case BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ:
         return readBuildEnvironment(runtimeRoot, buildId, params.environmentId);

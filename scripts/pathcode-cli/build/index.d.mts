@@ -833,6 +833,7 @@ export interface BuildCoordinatorClient {
   preflightDeployment(buildId: string, environmentId: string): Promise<ReturnType<typeof preflightDeployment>>;
   mutateDeploymentMapping(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; mappingId?: string }>;
   prepareDeployment(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; operationId?: string; deploymentId?: string }>;
+  transitionDeployment(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; state?: string }>;
   readEnvironment(buildId: string, environmentId: string): Promise<ReturnType<typeof readBuildEnvironment>>;
   readSecretBinding(buildId: string, environmentId: string, secretRef: string): Promise<ReturnType<typeof readBuildSecretBinding>>;
   mutateEnvironment(buildId: string, action: string, expectedEnvironmentRevision: number, input: object):

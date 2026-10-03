@@ -178,7 +178,10 @@ describe("P10.1 deployment foundation without live provider work", () => {
     expect(recoverDeploymentFoundation(uncertain.record!)).toMatchObject({ state: "provider_outcome_uncertain", retry: false });
     const submitted = transitionDeploymentOperation(uncertain.record!, { operationId, state: "submitted",
       providerDeploymentId: "dpl_12345678", providerUrl: "https://example.vercel.app" });
-    const confirmed = transitionDeploymentOperation(submitted.record!, { operationId, state: "confirmed", providerState: "READY" });
+    const observed = transitionDeploymentOperation(submitted.record!, { operationId, state: "provider_observation",
+      providerDeploymentId: "dpl_12345678", providerUrl: "https://example.vercel.app", providerState: "READY" });
+    const confirmed = transitionDeploymentOperation(observed.record!, { operationId, state: "confirmed",
+      providerDeploymentId: "dpl_12345678" });
     expect(confirmed).toMatchObject({ ok: true, record: { deployments: { pendingOperation: null } } });
     const releaseOp = prepareFixtureReleaseOperation(confirmed.record!, { action: "reestablish", deploymentId,
       expectedRevision: confirmed.record!.deployments!.revision, projectRef: "project-a" });

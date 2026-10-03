@@ -61,7 +61,7 @@ describe("exact-Build scoped coordinator control plane", () => {
     expect(await client.mutateEnvironment(other.buildId, "create_environment", 0, { name: "forbidden" }))
       .toMatchObject({ ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" });
     expect(await client.request("build.get", { buildId: target.buildId })).toMatchObject({ ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" });
-    expect(await client.prepareDeployment(target.buildId, {})).toMatchObject({ ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" });
+    expect(await client.request("build.restoreHistorical", { buildId: target.buildId })).toMatchObject({ ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" });
     expect(readFileSync(otherPath)).toEqual(unrelatedBefore);
     const persisted = readBuildRecord(root, target.buildId)!;
     expect(persisted.environments?.items).toHaveLength(1);

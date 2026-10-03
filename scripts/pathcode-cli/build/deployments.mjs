@@ -173,13 +173,22 @@ export function transitionDeploymentOperation(record, input) {
   const op = a.pendingOperation;
   if (!op || op.operationId !== input?.operationId || op.kind !== "deploy") return fail("DEPLOY_OPERATION_NOT_FOUND");
   const deployment = a.deployments.find((item) => item.deploymentId === op.deploymentId);
-  if (!deployment) return fail("DEPLOYMENTS_INVALID");
+  if (!deployment || (input.deploymentId !== undefined && input.deploymentId !== op.deploymentId)) return fail("DEPLOYMENTS_INVALID");
   const state = input.state;
-  if (!only(input, ["operationId", "state", "variableName", "providerDeploymentId", "providerUrl", "providerState", "failureCode"])) return fail("DEPLOY_TRANSITION_INVALID");
+  const fields = {
+    config_receipt: ["variableName"], config_projection_incomplete: [], submitting: [], uncertain: [],
+    submitted: ["providerDeploymentId", "providerUrl", "providerState"],
+    provider_observation: ["providerDeploymentId", "providerUrl", "providerState"],
+    confirmed: ["providerDeploymentId"], failed: ["failureCode"],
+  }[state];
+  if (!fields || !only(input, ["operationId", "deploymentId", "state", ...fields])) return fail("DEPLOY_TRANSITION_INVALID");
   if (state === "config_receipt") {
     if (!["prepared", "config_projection_incomplete"].includes(op.state) ||
       !op.snapshot.configNames.includes(input.variableName) || op.configReceipts.some((r) => r.variableName === input.variableName)) return fail("DEPLOY_TRANSITION_INVALID");
     op.configReceipts.push({ variableName: input.variableName, acknowledgedAt: now() });
+    op.state = "config_projection_incomplete";
+  } else if (state === "config_projection_incomplete") {
+    if (!["prepared", "config_projection_incomplete"].includes(op.state)) return fail("DEPLOY_TRANSITION_INVALID");
     op.state = "config_projection_incomplete";
   } else if (state === "submitting") {
     if (!["prepared", "config_projection_incomplete"].includes(op.state) ||
@@ -191,13 +200,23 @@ export function transitionDeploymentOperation(record, input) {
   } else if (state === "submitted") {
     if (!["submitting", "uncertain"].includes(op.state) || !/^dpl_[A-Za-z0-9]{8,100}$/.test(input.providerDeploymentId || "") ||
       typeof input.providerUrl !== "string" || !/^https:\/\/[A-Za-z0-9.-]+\.vercel\.app\/?$/.test(input.providerUrl)) return fail("DEPLOY_TRANSITION_INVALID");
+    if (input.providerState !== undefined && !["QUEUED", "INITIALIZING", "BUILDING", "DEPLOYING", "ANALYZING", "READY", "ERROR", "CANCELED"].includes(input.providerState)) return fail("DEPLOY_TRANSITION_INVALID");
     op.state = "submitted";
     op.providerDeploymentId = input.providerDeploymentId;
     deployment.providerDeploymentId = input.providerDeploymentId;
     deployment.providerUrl = input.providerUrl;
+    if (input.providerState !== undefined) deployment.providerState = input.providerState;
     deployment.submittedAt = now();
+  } else if (state === "provider_observation") {
+    if (op.state !== "submitted" || input.providerDeploymentId !== op.providerDeploymentId ||
+      deployment.providerDeploymentId !== op.providerDeploymentId ||
+      input.providerUrl !== deployment.providerUrl ||
+      !["QUEUED", "INITIALIZING", "BUILDING", "DEPLOYING", "ANALYZING", "READY", "ERROR", "CANCELED"].includes(input.providerState)) return fail("DEPLOY_TRANSITION_INVALID");
+    deployment.providerState = input.providerState;
+    op.readyObservedAt = input.providerState === "READY" ? now() : null;
   } else if (state === "confirmed") {
-    if (op.state !== "submitted" || input.providerState !== "READY") return fail("DEPLOY_TRANSITION_INVALID");
+    if (op.state !== "submitted" || input.providerDeploymentId !== op.providerDeploymentId ||
+      deployment.providerState !== "READY" || !op.readyObservedAt) return fail("DEPLOY_TRANSITION_INVALID");
     op.state = "confirmed";
     deployment.providerState = "READY";
     deployment.completedAt = now();
@@ -205,12 +224,17 @@ export function transitionDeploymentOperation(record, input) {
   } else if (state === "failed") {
     if (!["CONFIG_PROJECTION_FAILED", "PROVIDER_SUBMISSION_FAILED", "PROVIDER_BUILD_FAILED",
       "PROVIDER_STATUS_CONTRADICTION", "SOURCE_STALE", "ENVIRONMENT_STALE"].includes(input.failureCode)) return fail("DEPLOY_TRANSITION_INVALID");
+    if ((input.failureCode === "CONFIG_PROJECTION_FAILED" && !["prepared", "config_projection_incomplete"].includes(op.state)) ||
+      (input.failureCode === "PROVIDER_SUBMISSION_FAILED" && op.state !== "submitting") ||
+      (["PROVIDER_BUILD_FAILED", "PROVIDER_STATUS_CONTRADICTION"].includes(input.failureCode) && op.state !== "submitted") ||
+      (input.failureCode === "PROVIDER_BUILD_FAILED" && !["ERROR", "CANCELED"].includes(deployment.providerState)) ||
+      (["SOURCE_STALE", "ENVIRONMENT_STALE"].includes(input.failureCode) && !["prepared", "config_projection_incomplete"].includes(op.state))) return fail("DEPLOY_TRANSITION_INVALID");
     op.state = "failed";
     deployment.failureCode = input.failureCode;
     deployment.completedAt = now();
     a.pendingOperation = null;
   } else return fail("DEPLOY_TRANSITION_INVALID");
-  deployment.operationState = state === "config_receipt" ? "config_projection_incomplete" : state;
+  if (state !== "provider_observation") deployment.operationState = state === "config_receipt" ? "config_projection_incomplete" : state;
   op.updatedAt = now();
   a.revision += 1;
   return { ok: true, record: { ...record, deployments: a }, revision: a.revision };

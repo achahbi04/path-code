@@ -17,6 +17,7 @@ export const BuildCoordinatorMethods = Object.freeze({
   BUILD_DEPLOYMENT_PREFLIGHT: "build.deployments.preflight",
   BUILD_DEPLOYMENT_MAPPING_MUTATE: "build.deployments.mappingMutate",
   BUILD_DEPLOYMENT_PREPARE: "build.deployments.prepare",
+  BUILD_DEPLOYMENT_TRANSITION: "build.deployments.transition",
   BUILD_MESSAGE: "build.message",
   BUILD_STOP: "build.stop",
   BUILD_PAUSE: "build.pause",
