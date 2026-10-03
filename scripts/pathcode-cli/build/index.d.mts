@@ -133,6 +133,18 @@ export interface SelectedElement {
   sourceHint?: string;
 }
 
+export interface BuildDeployments {
+  schema: "pathcode.p10.deployments.v1";
+  revision: number;
+  mappings: Array<{ mappingId: string; provider: "vercel"; environmentId: string;
+    teamRef: string | null; projectRef: string; targetRef: "preview" | "production"; updatedAt: string }>;
+  deployments: Array<Record<string, unknown>>;
+  releases: Array<Record<string, unknown>>;
+  currentProductionReleaseId: string | null;
+  serving: { state: "verified" | "unknown" | "drifted"; observedProviderDeploymentId: string | null; observedAt: string | null };
+  pendingOperation: Record<string, unknown> | null;
+}
+
 export interface BuildRecord {
   schema: string;
   buildId: string;
@@ -154,6 +166,7 @@ export interface BuildRecord {
   };
   projectBindings: ProjectBinding[];
   environments?: BuildEnvironments;
+  deployments?: BuildDeployments;
   children: BuildChild[];
   loop: {
     status: "running" | "paused" | "blocked" | "complete" | "awaiting_review";
@@ -815,6 +828,10 @@ export interface BuildCoordinatorClient {
   connect(): Promise<void>;
   close(): void;
   listEnvironments(buildId: string): Promise<ReturnType<typeof listBuildEnvironments>>;
+  listDeployments(buildId: string): Promise<ReturnType<typeof listBuildDeployments>>;
+  preflightDeployment(buildId: string, environmentId: string): Promise<ReturnType<typeof preflightDeployment>>;
+  mutateDeploymentMapping(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; mappingId?: string }>;
+  prepareDeployment(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; operationId?: string; deploymentId?: string }>;
   readEnvironment(buildId: string, environmentId: string): Promise<ReturnType<typeof readBuildEnvironment>>;
   readSecretBinding(buildId: string, environmentId: string, secretRef: string): Promise<ReturnType<typeof readBuildSecretBinding>>;
   mutateEnvironment(buildId: string, action: string, expectedEnvironmentRevision: number, input: object):
@@ -849,6 +866,41 @@ export function createBuildCoordinatorClient(options: {
   socketPath?: string;
 }): BuildCoordinatorClient;
 export const ENVIRONMENTS_SCHEMA: "pathcode.p9.environments.v1";
+export const DEPLOYMENTS_SCHEMA: "pathcode.p10.deployments.v1";
+export const VERCEL_LIVE_PROOF_GATES: readonly string[];
+export function emptyDeploymentAuthority(): BuildDeployments;
+export function listBuildDeployments(runtimeRoot: string, buildId: string):
+  { ok: boolean; code?: string; schema?: string; revision?: number; mappings?: BuildDeployments["mappings"];
+    deployments?: BuildDeployments["deployments"]; releases?: BuildDeployments["releases"];
+    currentProductionReleaseId?: string | null; serving?: BuildDeployments["serving"]; pendingOperation?: object | null };
+export function preflightDeployment(runtimeRoot: string, buildId: string, environmentId: string):
+  { ok: boolean; code?: string; sourceSha?: string; treeSha?: string; framework?: string;
+    environmentRevision?: number; mappingId?: string; unknownSecretPresence?: boolean };
+export function prepareDeploymentMappingMutation(runtimeRoot: string, buildId: string, request: object):
+  { ok: boolean; code?: string; record?: BuildRecord; revision?: number; mappingId?: string | null };
+export function prepareDeploymentOperation(runtimeRoot: string, buildId: string, request: object):
+  { ok: boolean; code?: string; record?: BuildRecord; revision?: number; operationId?: string; deploymentId?: string };
+export function inspectDeploymentSource(input: { runtimeRoot: string; buildId: string }): object;
+export function prepareDeploymentSource(input: { runtimeRoot: string; buildId: string }):
+  { ok: boolean; code?: string; workspace: string; repositoryRoot: string; authoritativeSha: string; treeSha: string; framework: string };
+export function cleanupDeploymentSource(input: { runtimeRoot: string; workspace: string }): { ok: boolean; code?: string };
+export function inspectDeploymentTree(root: string, sha: string): object;
+export function isUnsafeDeploymentPath(path: string): boolean;
+export function canonicalConfigDigest(entries: Array<{ kind: string; variableName: string; value?: string }>): string;
+export function validateDeploymentLocator(mapping: object, variables: object[]): { ok: boolean; code?: string; unknownSecretPresence?: boolean };
+export function transitionDeploymentOperation(record: BuildRecord, input: object): { ok: boolean; code?: string; record?: BuildRecord };
+export function reconcileServing(record: BuildRecord, safeObservation: object | null): { ok: boolean; code?: string; record: BuildRecord; serving: BuildDeployments["serving"] };
+export function productionActionEligibility(record: BuildRecord, action: string, deploymentId: string): object;
+export function finalizeFixtureRelease(record: BuildRecord, input: object): { ok: boolean; code?: string; record?: BuildRecord; releaseId?: string };
+export function prepareFixtureReleaseOperation(record: BuildRecord, input: object): { ok: boolean; code?: string; record: BuildRecord; operationId: string; revision: number };
+export function recoverDeploymentFoundation(record: BuildRecord): object;
+export function validateOperationSnapshot(runtimeRoot: string, buildId: string, operationId: string): object;
+export function parseVercelConfigMetadata(raw: unknown): object;
+export function planVercelConfigProjection(input: object): object;
+export function makeVercelConfigCommand(input: object): { ok: boolean; code?: string; executable: string; argv: string[]; shell: false; stdinPayload: string; display: string };
+export function parseVercelDeploymentReceipt(raw: unknown): object;
+export function parseVercelServingObservation(raw: unknown): object;
+export function operationMetadata(input: object): object;
 export function listBuildEnvironments(runtimeRoot: string, buildId: string):
   { ok: true; buildId: string; bindingId: string; schema: string; revision: number; items: BuildEnvironments["items"] } |
   { ok: false; code: string };

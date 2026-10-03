@@ -119,6 +119,14 @@ export function createBuildCoordinatorClient(options) {
       request(BuildCoordinatorMethods.BUILD_EVENTS, { buildId, ...options }),
     listEnvironments: (buildId) =>
       request(BuildCoordinatorMethods.BUILD_ENVIRONMENTS_LIST, { buildId }),
+    listDeployments: (buildId) =>
+      request(BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST, { buildId }),
+    preflightDeployment: (buildId, environmentId) =>
+      request(BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREFLIGHT, { buildId, environmentId }),
+    mutateDeploymentMapping: (buildId, input) =>
+      request(BuildCoordinatorMethods.BUILD_DEPLOYMENT_MAPPING_MUTATE, { buildId, ...input }),
+    prepareDeployment: (buildId, input) =>
+      request(BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE, { buildId, ...input }),
     readEnvironment: (buildId, environmentId) =>
       request(BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ, { buildId, environmentId }),
     readSecretBinding: (buildId, environmentId, secretRef) =>

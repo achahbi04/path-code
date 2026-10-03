@@ -26,6 +26,7 @@ import { probeCursorDispatchReadiness } from "../ag10/cursor-sdk.mjs";
 import { readPreferences } from "../preferences.mjs";
 import { MODEL_PREFERENCE_ENGINES, readProjectModelPreferences, validateModelPreference } from "../model-plane/preference-config.mjs";
 import { listBuildEnvironments } from "../build/environments.mjs";
+import { listBuildDeployments } from "../build/deployments.mjs";
 
 /**
  * @param {{ cwd?: string, env?: NodeJS.ProcessEnv, packageRoot?: string, runtimeRoot?: string, checkpoint?: object | null, engineeringModelId?: string | null, buildId?: string }} [opts]
@@ -247,6 +248,9 @@ export function runPathcodeDoctor(opts = {}) {
   });
 
   if (opts.buildId) {
+    const deployments = listBuildDeployments(runtimeRoot, opts.buildId);
+    rows.push({ name: "P10 deployment foundation", ok: deployments.ok, optional: true,
+      detail: deployments.ok ? `${deployments.mappings.length} target mappings; ${deployments.deployments.length} recorded operations; serving ${deployments.serving.state}; provider unverified` : deployments.code });
     const configured = listBuildEnvironments(runtimeRoot, opts.buildId);
     rows.push({ name: "P9 environments", ok: configured.ok, optional: true,
       detail: configured.ok ? `${configured.items.length} configured` : configured.code });

@@ -24,6 +24,8 @@ import {
   prepareBuildEnvironmentVerification,
 } from "../environments.mjs";
 import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
+import { listBuildDeployments, preflightDeployment, prepareDeploymentMappingMutation,
+  prepareDeploymentOperation, recoverDeploymentFoundation } from "../deployments.mjs";
 import { ensureGateway, readGatewayPid } from "../../gateway/ensure.mjs";
 import { terminateOwnedPid, withTimeout } from "../shutdown.mjs";
 import { readPathPackageVersion } from "../../paths.mjs";
@@ -237,6 +239,8 @@ export async function createBuildCoordinatorService(options) {
     const recovered = [];
     for (const original of listBuildRecords(runtimeRoot)) {
       let build = original;
+      if (build?.deployments?.pendingOperation) recovered.push({ buildId: build.buildId,
+        deployment: recoverDeploymentFoundation(build) });
       if (build?.pendingRestore) {
         const restore = await exclusive(build.buildId, () => controller.recoverPendingHistoricalRestore(build.buildId));
         recovered.push({ buildId: build.buildId, restore });
@@ -367,6 +371,33 @@ export async function createBuildCoordinatorService(options) {
         };
       case BuildCoordinatorMethods.BUILD_ENVIRONMENTS_LIST:
         return listBuildEnvironments(runtimeRoot, buildId);
+      case BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST:
+        return listBuildDeployments(runtimeRoot, buildId);
+      case BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREFLIGHT:
+        if (Object.keys(params).some((key) => !["buildId", "environmentId"].includes(key))) return { ok: false, code: "DEPLOY_REQUEST_INVALID" };
+        return preflightDeployment(runtimeRoot, buildId, params.environmentId);
+      case BuildCoordinatorMethods.BUILD_DEPLOYMENT_MAPPING_MUTATE:
+        return exclusive(buildId, () => {
+          const { buildId: _buildId, ...request } = params;
+          const result = prepareDeploymentMappingMutation(runtimeRoot, buildId, request);
+          if (!result.ok) return result;
+          writeBuildRecord(runtimeRoot, result.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "deployment.mapping_mutated", {
+            revision: result.revision, environmentId: request.environmentId, action: request.action }); } catch { /* Build record is authority. */ }
+          const { record: _record, ...safe } = result;
+          return safe;
+        });
+      case BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE:
+        return exclusive(buildId, () => {
+          const { buildId: _buildId, ...request } = params;
+          const result = prepareDeploymentOperation(runtimeRoot, buildId, request);
+          if (!result.ok) return result;
+          writeBuildRecord(runtimeRoot, result.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "deployment.prepared", {
+            operationId: result.operationId, deploymentId: result.deploymentId, revision: result.revision }); } catch { /* Build record is authority. */ }
+          const { record: _record, ...safe } = result;
+          return safe;
+        });
       case BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ:
         return readBuildEnvironment(runtimeRoot, buildId, params.environmentId);
       case BuildCoordinatorMethods.BUILD_SECRET_BINDING_READ:

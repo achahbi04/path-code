@@ -122,6 +122,7 @@
  * @property {BuildHypotheses} hypotheses
  * @property {ProjectBinding[]} projectBindings
  * @property {object} [environments]
+ * @property {object} [deployments] P10.1 deployment/release authority (optional for legacy Builds)
  * @property {BuildChild[]} children
  * @property {BuildLoop} loop
  * @property {OriginKind} [originKind]

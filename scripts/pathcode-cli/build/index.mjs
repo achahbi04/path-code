@@ -49,6 +49,16 @@ export { detectBuildArtifact, resolveArtifactStartPlan } from "./runtime/artifac
 export { createBuildRuntimeManager } from "./runtime/manager.mjs";
 export { createProductRuntimeEnv, PRODUCT_HOST_ENV_KEYS } from "./runtime/product-env.mjs";
 export { checkLocalEnvGitSafety } from "./runtime/local-env-safety.mjs";
+export { inspectDeploymentSource, prepareDeploymentSource, cleanupDeploymentSource,
+  inspectDeploymentTree, isUnsafeDeploymentPath } from "./deploy-source.mjs";
+export { DEPLOYMENTS_SCHEMA, emptyDeploymentAuthority, listBuildDeployments,
+  prepareDeploymentMappingMutation, preflightDeployment, prepareDeploymentOperation,
+  transitionDeploymentOperation, reconcileServing, productionActionEligibility,
+  prepareFixtureReleaseOperation, finalizeFixtureRelease, recoverDeploymentFoundation, validateOperationSnapshot,
+  canonicalConfigDigest, validateDeploymentLocator } from "./deployments.mjs";
+export { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfigCommand,
+  parseVercelDeploymentReceipt, parseVercelServingObservation, operationMetadata,
+  VERCEL_LIVE_PROOF_GATES } from "./vercel-deploy-contract.mjs";
 export { captureBrowserEvidence } from "./runtime/browser-evidence.mjs";
 export {
   adoptEngineerResultIntoBuild,
