@@ -39,6 +39,25 @@ export function makePreviewDeployCommand({ projectRef, teamRef = null, operation
   return command(argv, "vercel deploy --target preview --project <project> --meta pathOperationId=<operation> --json --no-wait --yes");
 }
 
+/** Installed CLI's --dry branch returns before createDeploy. This spec cannot submit. */
+export function makePreviewDryRunCommand({ projectRef, teamRef = null }) {
+  if (!locator(projectRef) || (teamRef !== null && !locator(teamRef))) return fail("PROVIDER_MAPPING_INVALID");
+  return command(["deploy", "--dry", "--format=json", "--target", "preview", "--project", projectRef,
+    "--yes", ...scopeArgs(teamRef)], "vercel deploy --dry --format=json --target preview --project <project> --yes");
+}
+
+export function parsePreviewDryRun(raw) {
+  if (!shape(raw, ["framework", "basePath", "fileCount", "totalSize", "ignoredCount", "ignored",
+    "directories", "largestFiles", "files"]) || !object(raw.framework) ||
+    typeof raw.framework.name !== "string" ||
+    !Number.isSafeInteger(raw.fileCount) || raw.fileCount < 0 ||
+    !Number.isSafeInteger(raw.totalSize) || raw.totalSize < 0 ||
+    !Number.isSafeInteger(raw.ignoredCount) || raw.ignoredCount < 0 ||
+    !Array.isArray(raw.files)) return fail("PROVIDER_DRY_RUN_UNSAFE");
+  return { ok: true, framework: raw.framework.name, fileCount: raw.fileCount,
+    totalSize: raw.totalSize, ignoredCount: raw.ignoredCount };
+}
+
 export function makePreviewInspectCommand({ providerDeploymentId, teamRef = null }) {
   if (!deploymentId(providerDeploymentId) || (teamRef !== null && !locator(teamRef))) return fail("PROVIDER_INSPECT_INVALID");
   return command(["inspect", providerDeploymentId, "--json", ...scopeArgs(teamRef)], "vercel inspect <deployment> --json");
@@ -71,6 +90,18 @@ export function parsePreviewProjectList(raw, { projectRef }) {
 
 /** Installed deploy --json may return a direct deployment or noninteractive wrapper. */
 export function parsePreviewDeploymentReceipt(raw) {
+  if (object(raw) && ["error", "action_required"].includes(raw.status)) {
+    if (!shape(raw, ["status", "reason", "message", "next", "deployment"]) ||
+        typeof raw.reason !== "string" || typeof raw.message !== "string" ||
+        !Array.isArray(raw.next) || raw.deployment !== undefined) return fail("PROVIDER_RECEIPT_UNSAFE");
+    // These installed CLI preflight reasons precede deployment creation. Other
+    // errors may follow an accepted submission and remain uncertain.
+    if (["project_not_found", "not_linked", "login_required", "missing_scope",
+      "scope_not_accessible", "confirmation_required", "project_settings_required"].includes(raw.reason)) {
+      return fail("PROVIDER_SUBMISSION_REJECTED");
+    }
+    return fail("PROVIDER_SUBMISSION_OUTCOME_UNKNOWN");
+  }
   if (object(raw) && Object.hasOwn(raw, "deployment") &&
       !shape(raw, ["status", "deployment", "message", "hint", "next"])) return fail("PROVIDER_RECEIPT_UNSAFE");
   const wrapper = object(raw) && raw.status === "ok" && object(raw.deployment) ? raw.deployment : raw;
@@ -112,24 +143,28 @@ export function parsePreviewReconciliation(raw, { projectRef, projectName = proj
 export async function executeVercelAdapterCommand(spec, { cwd, parentEnv = process.env, mode,
   context = {}, spawnImpl = spawn, timeoutMs = 30000 }) {
   if (!spec?.ok || spec.executable !== "vercel" || spec.shell !== false || !Array.isArray(spec.argv) ||
-      typeof cwd !== "string" || !["config_write", "config_metadata", "auth", "project", "deploy_receipt", "status", "reconcile"].includes(mode) ||
+      typeof cwd !== "string" || !["config_write", "config_metadata", "auth", "project", "dry_run", "deploy_receipt", "status", "reconcile"].includes(mode) ||
       timeoutMs < 1 || timeoutMs > 120000) return fail("PROVIDER_COMMAND_INVALID");
   if (spec.argv.some((arg) => typeof arg !== "string" ||
       ["--token", "--value", "--env", "--build-env", "--prod", "--logs", "--debug"].includes(arg) ||
       /^(?:--token|--value|--env|--build-env)=/.test(arg))) return fail("PROVIDER_COMMAND_INVALID");
   if (mode !== "config_write" && Object.hasOwn(spec, "stdinPayload")) return fail("PROVIDER_COMMAND_INVALID");
   const expected = { config_write: ["env", "add"], config_metadata: ["env", "ls"], auth: ["whoami", "--json"],
-    project: ["project", "list"], deploy_receipt: ["deploy", "--target"], status: ["inspect", context.providerDeploymentId],
+    project: ["project", "list"], dry_run: ["deploy", "--dry"], deploy_receipt: ["deploy", "--target"], status: ["inspect", context.providerDeploymentId],
     reconcile: ["list", context.projectRef] }[mode];
   if (spec.argv[0] !== expected[0] || spec.argv[1] !== expected[1] &&
       !(mode === "config_write" && spec.argv[1] === "update")) return fail("PROVIDER_COMMAND_INVALID");
   if (mode === "config_write" && (typeof spec.stdinPayload !== "string" ||
       spec.argv[4] !== "--type" || spec.argv[5] !== "config")) return fail("PROVIDER_COMMAND_INVALID");
+  if (mode === "dry_run" && (spec.argv[2] !== "--format=json" ||
+      spec.argv[3] !== "--target" || spec.argv[4] !== "preview" ||
+      spec.argv.includes("--prod") || !spec.argv.includes("--dry"))) return fail("PROVIDER_COMMAND_INVALID");
   const reduce = (raw) => {
     switch (mode) {
       case "config_metadata": return parseVercelConfigMetadata(raw);
       case "auth": return parsePreviewAuth(raw, context.teamRef ?? null);
       case "project": return parsePreviewProjectList(raw, context);
+      case "dry_run": return parsePreviewDryRun(raw);
       case "deploy_receipt": return parsePreviewDeploymentReceipt(raw);
       case "status": return parsePreviewDeploymentStatus(raw, context.providerDeploymentId);
       case "reconcile": return parsePreviewReconciliation(raw, context);
@@ -152,7 +187,15 @@ export async function executeVercelAdapterCommand(spec, { cwd, parentEnv = proce
     child.stderr.on("data", (chunk) => receive(chunk, false));
     child.on("error", () => { clearTimeout(timer); finish(fail("PROVIDER_EXECUTION_FAILED")); });
     child.on("close", (code) => { clearTimeout(timer); if (done) return;
-      if (code !== 0) return finish(fail("PROVIDER_COMMAND_FAILED"));
+      if (code !== 0) {
+        if (mode === "deploy_receipt") {
+          try {
+            const classified = parsePreviewDeploymentReceipt(JSON.parse(output));
+            return finish(classified.ok ? fail("PROVIDER_SUBMISSION_OUTCOME_UNKNOWN") : classified);
+          } catch { return finish(fail("PROVIDER_SUBMISSION_OUTCOME_UNKNOWN")); }
+        }
+        return finish(fail("PROVIDER_COMMAND_FAILED"));
+      }
       if (mode === "config_write") return finish({ ok: true, acknowledged: true });
       try { finish(reduce(JSON.parse(output))); } catch { finish(fail("PROVIDER_OUTPUT_UNSAFE")); }
     });

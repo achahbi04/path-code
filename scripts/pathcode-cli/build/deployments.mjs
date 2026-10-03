@@ -179,7 +179,7 @@ export function transitionDeploymentOperation(record, input) {
     config_receipt: ["variableName"], config_projection_incomplete: [], submitting: [], uncertain: [],
     submitted: ["providerDeploymentId", "providerUrl", "providerState"],
     provider_observation: ["providerDeploymentId", "providerUrl", "providerState"],
-    confirmed: ["providerDeploymentId"], failed: ["failureCode"],
+    confirmed: ["providerDeploymentId"], failed: ["failureCode", "reconciliationEvidence"],
   }[state];
   if (!fields || !only(input, ["operationId", "deploymentId", "state", ...fields])) return fail("DEPLOY_TRANSITION_INVALID");
   if (state === "config_receipt") {
@@ -222,8 +222,30 @@ export function transitionDeploymentOperation(record, input) {
     deployment.completedAt = now();
     a.pendingOperation = null;
   } else if (state === "failed") {
-    if (!["CONFIG_PROJECTION_FAILED", "PROVIDER_SUBMISSION_FAILED", "PROVIDER_BUILD_FAILED",
+    if (!["CONFIG_PROJECTION_FAILED", "PROVIDER_SUBMISSION_FAILED", "PROVIDER_SUBMISSION_NOT_OBSERVED", "PROVIDER_BUILD_FAILED",
       "PROVIDER_STATUS_CONTRADICTION", "SOURCE_STALE", "ENVIRONMENT_STALE"].includes(input.failureCode)) return fail("DEPLOY_TRANSITION_INVALID");
+    if (input.failureCode === "PROVIDER_SUBMISSION_NOT_OBSERVED") {
+      const evidence = input.reconciliationEvidence;
+      const mapping = a.mappings.find((item) => item.mappingId === op.snapshot.mappingId);
+      const began = Date.parse(evidence?.windowStart);
+      const ended = Date.parse(evidence?.windowEnd);
+      const completed = Date.parse(evidence?.reconciliationCompletedAt);
+      if (op.state !== "uncertain" || op.providerDeploymentId !== null ||
+          deployment.providerDeploymentId !== null || deployment.providerUrl !== null ||
+          !only(evidence, ["buildId", "operationId", "deploymentId", "mappingId", "teamRef", "projectRef",
+            "targetRef", "exactMetadataMatchCount", "recentDeploymentMatchCount", "exactLookupCount",
+            "windowStart", "windowEnd", "reconciliationCompletedAt"]) ||
+          evidence.buildId !== record.buildId || evidence.operationId !== op.operationId ||
+          evidence.deploymentId !== op.deploymentId || evidence.mappingId !== op.snapshot.mappingId ||
+          evidence.teamRef !== mapping?.teamRef || evidence.projectRef !== mapping?.projectRef ||
+          evidence.targetRef !== "preview" || mapping?.targetRef !== "preview" ||
+          evidence.exactMetadataMatchCount !== 0 || evidence.recentDeploymentMatchCount !== 0 ||
+          !Number.isSafeInteger(evidence.exactLookupCount) || evidence.exactLookupCount < 3 ||
+          !Number.isFinite(began) || !Number.isFinite(ended) || !Number.isFinite(completed) ||
+          began > Date.parse(deployment.requestedAt) || ended < Date.parse(deployment.requestedAt) ||
+          ended - began > 30 * 60_000 || completed < ended || completed > Date.now() + 60_000 ||
+          completed - Date.parse(deployment.requestedAt) < 10 * 60_000) return fail("DEPLOY_RECONCILIATION_INVALID");
+    } else if (input.reconciliationEvidence !== undefined) return fail("DEPLOY_TRANSITION_INVALID");
     if ((input.failureCode === "CONFIG_PROJECTION_FAILED" && !["prepared", "config_projection_incomplete"].includes(op.state)) ||
       (input.failureCode === "PROVIDER_SUBMISSION_FAILED" && op.state !== "submitting") ||
       (["PROVIDER_BUILD_FAILED", "PROVIDER_STATUS_CONTRADICTION"].includes(input.failureCode) && op.state !== "submitted") ||

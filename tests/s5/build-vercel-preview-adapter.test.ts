@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfigCommand,
-  createVercelChildEnv, makePreviewReadCommands, makePreviewDeployCommand,
+  createVercelChildEnv, makePreviewReadCommands, makePreviewDeployCommand, makePreviewDryRunCommand,
   makePreviewInspectCommand, makePreviewReconcileCommand, parsePreviewAuth,
-  parsePreviewProjectList, parsePreviewDeploymentReceipt, parsePreviewDeploymentStatus,
+  parsePreviewProjectList, parsePreviewDeploymentReceipt, parsePreviewDryRun, parsePreviewDeploymentStatus,
   parsePreviewReconciliation, executeVercelAdapterCommand } from "../../scripts/pathcode-cli/build/index.mjs";
 
 const operationId = "11111111-1111-4111-8111-111111111111";
@@ -135,5 +135,61 @@ describe("P10.2A installed CLI 59.10.0 preview contracts; no provider calls", ()
     expect(JSON.stringify(observed.argv) + JSON.stringify(observed.options)).not.toContain(sentinel);
     expect(observed.options).toMatchObject({ shell: false, env: { PATH: "/bin", NO_COLOR: "1" } });
     expect(JSON.stringify(observed.options)).not.toContain("engine");
+  });
+
+  it("classifies installed noninteractive deployment envelopes without returning raw diagnostics", async () => {
+    const receipt = { id, url: "https://example.vercel.app", inspectorUrl: null,
+      readyState: "BUILDING", target: "preview", deploymentApiUrl: "https://api.vercel.com/v13/deployments/dpl_12345678" };
+    const success = { status: "ok", deployment: receipt, message: "Deployment example.vercel.app ready.",
+      next: [{ command: "vercel inspect example.vercel.app", when: "Inspect deployment" }] };
+    expect(parsePreviewDeploymentReceipt(success)).toEqual({ ok: true, providerDeploymentId: id,
+      url: receipt.url, target: "preview", providerState: "BUILDING" });
+    expect(JSON.stringify(parsePreviewDeploymentReceipt(success))).not.toContain("inspectorUrl");
+    const error = { status: "error", reason: "project_not_found", message: "RAW_DIAGNOSTIC_SENTINEL", next: [] };
+    expect(parsePreviewDeploymentReceipt(error)).toEqual({ ok: false, code: "PROVIDER_SUBMISSION_REJECTED" });
+    expect(JSON.stringify(parsePreviewDeploymentReceipt(error))).not.toContain("RAW_DIAGNOSTIC_SENTINEL");
+    expect(parsePreviewDeploymentReceipt({ ...error, reason: "deploy_failed" }))
+      .toEqual({ ok: false, code: "PROVIDER_SUBMISSION_OUTCOME_UNKNOWN" });
+    expect(parsePreviewDeploymentReceipt({ ...error, deployment: receipt })).toEqual({ ok: false, code: "PROVIDER_RECEIPT_UNSAFE" });
+    expect(parsePreviewDeploymentReceipt({ ...success, token: "SECRET_SENTINEL" })).toEqual({ ok: false, code: "PROVIDER_RECEIPT_UNSAFE" });
+    expect(parsePreviewDeploymentReceipt({ ...receipt, value: "SECRET_SENTINEL" })).toEqual({ ok: false, code: "PROVIDER_RECEIPT_UNSAFE" });
+    expect(parsePreviewDeploymentReceipt([{ ...success }, { ...success }])).toEqual({ ok: false, code: "PROVIDER_RECEIPT_UNSAFE" });
+    const fakeSpawn = (_bin: string, _argv: string[], _options: unknown) => {
+      const child = new EventEmitter() as any;
+      child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+      child.stdin.on("finish", () => { child.stdout.end(JSON.stringify(error)); queueMicrotask(() => child.emit("close", 1)); });
+      child.kill = () => {};
+      return child;
+    };
+    const command = makePreviewDeployCommand({ projectRef, operationId });
+    const result = await executeVercelAdapterCommand(command, { cwd: "/tmp", mode: "deploy_receipt", spawnImpl: fakeSpawn });
+    expect(result).toEqual({ ok: false, code: "PROVIDER_SUBMISSION_REJECTED" });
+    expect(JSON.stringify(result)).not.toContain("RAW_DIAGNOSTIC_SENTINEL");
+  });
+
+  it("keeps the installed dry-run command non-deploying and reduces its file summary", async () => {
+    const command = makePreviewDryRunCommand({ projectRef, teamRef: "team-a" }) as { ok: boolean; argv: string[]; shell: boolean };
+    expect(command).toMatchObject({ ok: true, shell: false });
+    expect(command.argv).toContain("--dry");
+    expect(command.argv).not.toContain("--prod");
+    const raw = { framework: { name: "Other", slug: null }, basePath: "/unsafe/path", fileCount: 5,
+      totalSize: 8784, ignoredCount: 1, ignored: [], directories: [], largestFiles: [],
+      files: [{ path: "private-file", size: 123 }] };
+    expect(parsePreviewDryRun(raw)).toEqual({ ok: true, framework: "Other", fileCount: 5,
+      totalSize: 8784, ignoredCount: 1 });
+    expect(parsePreviewDeploymentReceipt(raw)).toMatchObject({ ok: false });
+    expect(parsePreviewDryRun({ ...raw, env: { TOKEN: "SECRET_SENTINEL" } })).toMatchObject({ ok: false });
+    const fakeSpawn = (_bin: string, argv: string[], _options: unknown) => {
+      expect(argv).toContain("--dry");
+      const child = new EventEmitter() as any;
+      child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+      child.stdin.on("finish", () => { child.stdout.end(JSON.stringify(raw)); queueMicrotask(() => child.emit("close", 0)); });
+      child.kill = () => {};
+      return child;
+    };
+    expect(await executeVercelAdapterCommand(command, { cwd: "/tmp", mode: "dry_run", spawnImpl: fakeSpawn }))
+      .toEqual({ ok: true, framework: "Other", fileCount: 5, totalSize: 8784, ignoredCount: 1 });
+    expect(await executeVercelAdapterCommand(makePreviewDeployCommand({ projectRef, operationId }),
+      { cwd: "/tmp", mode: "dry_run", spawnImpl: fakeSpawn })).toMatchObject({ ok: false });
   });
 });
