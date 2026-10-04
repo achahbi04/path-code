@@ -5,7 +5,8 @@ import { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfig
   createVercelChildEnv, makePreviewReadCommands, makePreviewDeployCommand,
   makePreviewInspectCommand, makePreviewReconcileCommand, parsePreviewAuth,
   parsePreviewProjectList, parsePreviewDeploymentReceipt, parsePreviewDeploymentStatus,
-  parsePreviewReconciliation, executeVercelAdapterCommand } from "../../scripts/pathcode-cli/build/index.mjs";
+  parsePreviewReconciliation, executeVercelAdapterCommand,
+  PREVIEW_RECONCILIATION_CODES } from "../../scripts/pathcode-cli/build/index.mjs";
 
 const operationId = "11111111-1111-4111-8111-111111111111";
 const id = "dpl_12345678";
@@ -108,7 +109,7 @@ describe("P10.2A installed CLI 59.10.0 preview contracts; no provider calls", ()
     expect(parsePreviewReconciliation({ ...listing, deployments: [] }, { projectRef, operationId }))
       .toEqual({ ok: true, match: null, retry: false });
     expect(parsePreviewReconciliation({ ...listing, deployments: [row, row] }, { projectRef, operationId }))
-      .toMatchObject({ ok: false, code: "PROVIDER_RECONCILE_AMBIGUOUS" });
+      .toMatchObject({ ok: false, code: PREVIEW_RECONCILIATION_CODES.AMBIGUOUS });
     expect(parsePreviewReconciliation({ ...listing, deployments: [{ ...row, meta: { pathOperationId: "other" } }] }, { projectRef, operationId }))
       .toMatchObject({ ok: false });
   });

@@ -936,6 +936,21 @@ export function parsePreviewDeploymentReceipt(raw: unknown): object;
 export function parsePreviewDeploymentStatus(raw: unknown, expectedId: string): object;
 export function parsePreviewReconciliation(raw: unknown, input: object): object;
 export function executeVercelAdapterCommand(spec: object, input: object): Promise<object>;
+export const PREVIEW_RECONCILIATION_CODES: Readonly<{
+  INVALID: "PROVIDER_RECONCILE_INVALID";
+  UNSAFE: "PROVIDER_RECONCILE_UNSAFE";
+  AMBIGUOUS: "PROVIDER_RECONCILE_AMBIGUOUS";
+  INCOMPLETE: "PROVIDER_RECONCILE_INCOMPLETE";
+  CONFLICT: "PROVIDER_RECONCILE_CONFLICT";
+}>;
+export const MAX_RECONCILIATION_PAGES: number;
+export const MAX_RECONCILIATION_INSPECTIONS: number;
+export function makePreviewReconciliationPageCommand(input: object): object;
+export function parsePreviewReconciliationPage(raw: unknown, input: object): object;
+export function combinePreviewReconciliation(filtered: object, projectWindow: object): object;
+export function makeNoDeploymentObservedEvidence(identity: object, filtered: object, projectWindow: object,
+  completedAt: string): { ok: boolean; code?: string; evidence?: NoDeploymentObservedReconciliationEvidence };
+export function reconcilePreviewWindow(input: object, execution?: object): Promise<object>;
 export function listBuildEnvironments(runtimeRoot: string, buildId: string):
   { ok: true; buildId: string; bindingId: string; schema: string; revision: number; items: BuildEnvironments["items"] } |
   { ok: false; code: string };

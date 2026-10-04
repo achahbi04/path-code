@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createBuildRecordSkeleton, createBuildCoordinatorClient, readBuildRecord,
-  resolveBuildRecordPath, startBuildCoordinatorServer, writeBuildRecord } from "../../scripts/pathcode-cli/build/index.mjs";
+  resolveBuildRecordPath, startBuildCoordinatorServer, writeBuildRecord,
+  recoverDeploymentFoundation, makeNoDeploymentObservedEvidence,
+  combinePreviewReconciliation } from "../../scripts/pathcode-cli/build/index.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
 
 describe("P10 Preview transaction through the scoped coordinator", () => {
@@ -218,6 +220,99 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(final.deployments!.currentProductionReleaseId).toBeNull();
     expect(await s.transition(operationId, deploymentId, 5, "submitting"))
       .toMatchObject({ ok: false, code: "DEPLOY_OPERATION_NOT_FOUND" });
+    expect(readFileSync(s.otherPath)).toEqual(s.unrelatedBefore);
+  });
+
+  it("recovers a persisted submitting boundary after restart without a provider invocation or retry", async () => {
+    const s = await setup();
+    const prepared = await s.prepare();
+    const operationId = prepared.operationId!;
+    const deploymentId = prepared.deploymentId!;
+    expect(await s.transition(operationId, deploymentId, 2, "submitting"))
+      .toMatchObject({ ok: true, revision: 3 });
+    const onDisk = readBuildRecord(root, s.target.buildId)!;
+    expect(onDisk.deployments!.pendingOperation).toMatchObject({ operationId, deploymentId,
+      state: "submitting", providerDeploymentId: null });
+    // No adapter/deploy stub is invoked; the durable boundary is the last act.
+    client!.close(); client = null;
+    await server!.stop(); server = null;
+    server = await startBuildCoordinatorServer({ runtimeRoot: root,
+      packageRoot: resolvePathPackageRoot(), scopedBuildId: s.target.buildId });
+    client = createBuildCoordinatorClient({ runtimeRoot: root, socketPath: server.socketPath });
+    await client.connect();
+    const restarted = readBuildRecord(root, s.target.buildId)!;
+    expect(restarted.deployments!.revision).toBe(3);
+    expect(restarted.deployments!.pendingOperation).toMatchObject({ operationId, deploymentId, state: "submitting" });
+    expect(recoverDeploymentFoundation(restarted)).toEqual({ ok: true,
+      state: "provider_outcome_uncertain", retry: false });
+    expect(await s.prepare(3)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_PENDING" });
+    expect(await s.transition(operationId, deploymentId, 3, "uncertain"))
+      .toMatchObject({ ok: true, revision: 4 });
+    expect(await s.transition(operationId, deploymentId, 4, "submitting"))
+      .toMatchObject({ ok: false });
+    const uncertain = readBuildRecord(root, s.target.buildId)!;
+    expect(recoverDeploymentFoundation(uncertain)).toEqual({ ok: true,
+      state: "provider_outcome_uncertain", retry: false });
+    // Fixture ages the persisted uncertain boundary to satisfy B5R's own
+    // 120-second settlement guard. This never mutates a live Build.
+    const uncertainAt = new Date(Date.now() - 600_000);
+    uncertain.deployments!.pendingOperation!.updatedAt = uncertainAt.toISOString();
+    writeBuildRecord(root, uncertain);
+    const windowStart = new Date(uncertainAt.getTime() - 60_000).toISOString();
+    const windowEnd = new Date(uncertainAt.getTime() + 60_000).toISOString();
+    const source = (mode: string) => ({ ok: true, mode, windowStart, windowEnd,
+      completed: true, exhausted: true, nextCursor: null, matches: [],
+      exactMatchCount: 0, totalDeploymentsObserved: 0 });
+    const filtered = source("METADATA_FILTERED_OPERATION");
+    const projectWindow = source("PROJECT_WINDOW");
+    expect(combinePreviewReconciliation(filtered, projectWindow)).toMatchObject({
+      ok: true, outcome: "VALID_ZERO_ZERO_EVIDENCE_CANDIDATE", retry: false });
+    const mapping = uncertain.deployments!.mappings[0]!;
+    const mapped = makeNoDeploymentObservedEvidence({ buildId: s.target.buildId, operationId,
+      deploymentId, mappingId: mapping.mappingId, teamRef: null,
+      projectRef: "product", target: "preview" }, filtered, projectWindow,
+    new Date().toISOString()) as any;
+    expect(mapped.ok).toBe(true);
+    expect(await s.transition(operationId, deploymentId, 4, "failed", {
+      failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED", reconciliationEvidence: mapped.evidence,
+    })).toMatchObject({ ok: true, revision: 5 });
+    const final = readBuildRecord(root, s.target.buildId)!.deployments!;
+    expect(final.pendingOperation).toBeNull();
+    expect(final.deployments).toHaveLength(1);
+    expect(final.deployments[0]).toMatchObject({ operationId, deploymentId, operationState: "failed",
+      failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED", providerDeploymentId: null, providerUrl: null });
+    expect(final.releases).toEqual([]);
+    expect(final.currentProductionReleaseId).toBeNull();
+    expect(readFileSync(s.otherPath)).toEqual(s.unrelatedBefore);
+  });
+
+  it("retains a known provider identity through unknown status and a polling stop", async () => {
+    const s = await setup();
+    const prepared = await s.prepare();
+    const operationId = prepared.operationId!;
+    const deploymentId = prepared.deploymentId!;
+    expect(await s.transition(operationId, deploymentId, 2, "submitting"))
+      .toMatchObject({ ok: true, revision: 3 });
+    expect(await s.transition(operationId, deploymentId, 3, "submitted", {
+      providerDeploymentId: "dpl_12345678", providerUrl: "https://example.vercel.app",
+    })).toMatchObject({ ok: true, revision: 4 });
+    const before = readBuildRecord(root, s.target.buildId)!;
+    expect(recoverDeploymentFoundation(before)).toEqual({ ok: true,
+      state: "provider_verification_required", retry: false });
+    expect(before.deployments!.pendingOperation).toMatchObject({ operationId, deploymentId,
+      state: "submitted", providerDeploymentId: "dpl_12345678" });
+    expect(await s.prepare(4)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_PENDING" });
+    client!.close(); client = null;
+    await server!.stop(); server = null;
+    server = await startBuildCoordinatorServer({ runtimeRoot: root,
+      packageRoot: resolvePathPackageRoot(), scopedBuildId: s.target.buildId });
+    const after = readBuildRecord(root, s.target.buildId)!;
+    expect(after.deployments!.pendingOperation).toMatchObject({ operationId, deploymentId,
+      state: "submitted", providerDeploymentId: "dpl_12345678" });
+    expect(after.deployments!.deployments[0]).toMatchObject({ providerDeploymentId: "dpl_12345678",
+      operationState: "submitted", providerState: null });
+    expect(recoverDeploymentFoundation(after)).toEqual({ ok: true,
+      state: "provider_verification_required", retry: false });
     expect(readFileSync(s.otherPath)).toEqual(s.unrelatedBefore);
   });
 

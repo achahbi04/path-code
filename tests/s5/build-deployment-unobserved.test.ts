@@ -112,6 +112,15 @@ describe("P10 uncertain submission with no observed provider deployment", () => 
     }
     expect(close(record, { ...evidence, projectWindowLookup: { ...evidence.projectWindowLookup,
       totalProjectDeployments: 0 } })).toMatchObject({ ok: false });
+    expect(close(record, { ...evidence, metadataFilteredLookup: {
+      completed: true, exhausted: true, nextCursor: null, exactOperationMatchCount: 0,
+    } })).toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    expect(close(record, { ...evidence, projectWindowLookup: {
+      completed: true, exhausted: true, nextCursor: null, exactMatchCount: 0,
+    } })).toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    expect(close(record, { ...evidence, projectWindowLookup: {
+      ...evidence.projectWindowLookup, totalDeploymentsObserved: 0,
+    } })).toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
     expect(close(record, { ...evidence, metadataFilteredLookup: { ...evidence.metadataFilteredLookup,
       value: "PROVIDER_RAW_SENTINEL" } })).toMatchObject({ ok: false });
     expect(transitionDeploymentOperation(record, { operationId, deploymentId, state: "failed",

@@ -62,7 +62,11 @@ export { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfig
 export { createVercelChildEnv, makePreviewReadCommands, makePreviewDeployCommand,
   makePreviewInspectCommand, makePreviewReconcileCommand, parsePreviewAuth,
   parsePreviewProjectList, parsePreviewDeploymentReceipt, parsePreviewDeploymentStatus,
-  parsePreviewReconciliation, executeVercelAdapterCommand } from "./vercel-preview-adapter.mjs";
+  parsePreviewReconciliation, executeVercelAdapterCommand,
+  PREVIEW_RECONCILIATION_CODES, MAX_RECONCILIATION_PAGES, MAX_RECONCILIATION_INSPECTIONS,
+  makePreviewReconciliationPageCommand, parsePreviewReconciliationPage,
+  combinePreviewReconciliation, makeNoDeploymentObservedEvidence,
+  reconcilePreviewWindow } from "./vercel-preview-adapter.mjs";
 export { captureBrowserEvidence } from "./runtime/browser-evidence.mjs";
 export {
   adoptEngineerResultIntoBuild,
