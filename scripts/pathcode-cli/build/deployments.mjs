@@ -11,6 +11,49 @@ const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 const only = (object, allowed) => object && typeof object === "object" && !Array.isArray(object) &&
   Object.keys(object).every((key) => allowed.includes(key));
 const now = () => new Date().toISOString();
+const NO_DEPLOYMENT_SETTLEMENT_MS = 120_000;
+
+function validTimestamp(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value)) return false;
+  const time = Date.parse(value);
+  return Number.isFinite(time) && new Date(time).toISOString() === value;
+}
+
+/** A no-deployment observation is evidence about one exhausted search window, never retry authority. */
+function validUnobservedSubmissionEvidence(record, authority, op, deployment, evidence) {
+  if (!only(evidence, ["buildId", "operationId", "deploymentId", "mappingId", "teamRef", "projectRef",
+    "target", "pathOperationId", "windowStart", "windowEnd", "metadataFilteredLookup",
+    "projectWindowLookup", "completedAt"])) return false;
+  const required = ["buildId", "operationId", "deploymentId", "mappingId", "teamRef", "projectRef",
+    "target", "pathOperationId", "windowStart", "windowEnd", "metadataFilteredLookup",
+    "projectWindowLookup", "completedAt"];
+  if (!required.every((key) => own(evidence, key))) return false;
+  const mapping = authority.mappings.find((item) => item.mappingId === op.snapshot?.mappingId &&
+    item.environmentId === op.snapshot.environmentId && item.provider === "vercel");
+  if (!mapping || record.buildId !== evidence.buildId || op.operationId !== evidence.operationId ||
+    op.deploymentId !== evidence.deploymentId || evidence.pathOperationId !== op.operationId ||
+    deployment.operationId !== op.operationId || deployment.target !== "preview" ||
+    deployment.mappingId !== mapping.mappingId || evidence.mappingId !== mapping.mappingId ||
+    evidence.teamRef !== mapping.teamRef || evidence.projectRef !== mapping.projectRef ||
+    evidence.target !== "preview" || mapping.targetRef !== "preview" ||
+    op.providerDeploymentId !== null || deployment.providerDeploymentId !== null || deployment.providerUrl !== null) return false;
+  const metadata = evidence.metadataFilteredLookup;
+  const project = evidence.projectWindowLookup;
+  if (!only(metadata, ["completed", "exhausted", "nextCursor", "exactMatchCount"]) ||
+    !only(project, ["completed", "exhausted", "nextCursor", "exactOperationMatchCount"]) ||
+    !["completed", "exhausted", "nextCursor", "exactMatchCount"].every((key) => own(metadata, key)) ||
+    !["completed", "exhausted", "nextCursor", "exactOperationMatchCount"].every((key) => own(project, key)) ||
+    metadata.completed !== true || metadata.exhausted !== true || metadata.nextCursor !== null ||
+    metadata.exactMatchCount !== 0 || project.completed !== true || project.exhausted !== true ||
+    project.nextCursor !== null || project.exactOperationMatchCount !== 0) return false;
+  if (![evidence.windowStart, evidence.windowEnd, evidence.completedAt, op.updatedAt].every(validTimestamp)) return false;
+  const start = Date.parse(evidence.windowStart), end = Date.parse(evidence.windowEnd);
+  const completed = Date.parse(evidence.completedAt), uncertainAt = Date.parse(op.updatedAt);
+  // `uncertain` was persisted after the submission attempt; its PATH timestamp
+  // is the conservative lower bound when no provider receipt was captured.
+  return start <= uncertainAt && uncertainAt <= end && end <= completed && completed <= Date.now() &&
+    completed - uncertainAt >= NO_DEPLOYMENT_SETTLEMENT_MS;
+}
 
 export function emptyDeploymentAuthority() {
   return { schema: DEPLOYMENTS_SCHEMA, revision: 0, mappings: [], deployments: [], releases: [],
@@ -179,7 +222,7 @@ export function transitionDeploymentOperation(record, input) {
     config_receipt: ["variableName"], config_projection_incomplete: [], submitting: [], uncertain: [],
     submitted: ["providerDeploymentId", "providerUrl", "providerState"],
     provider_observation: ["providerDeploymentId", "providerUrl", "providerState"],
-    confirmed: ["providerDeploymentId"], failed: ["failureCode"],
+    confirmed: ["providerDeploymentId"], failed: ["failureCode", "reconciliationEvidence"],
   }[state];
   if (!fields || !only(input, ["operationId", "deploymentId", "state", ...fields])) return fail("DEPLOY_TRANSITION_INVALID");
   if (state === "config_receipt") {
@@ -223,7 +266,12 @@ export function transitionDeploymentOperation(record, input) {
     a.pendingOperation = null;
   } else if (state === "failed") {
     if (!["CONFIG_PROJECTION_FAILED", "PROVIDER_SUBMISSION_FAILED", "PROVIDER_BUILD_FAILED",
-      "PROVIDER_STATUS_CONTRADICTION", "SOURCE_STALE", "ENVIRONMENT_STALE"].includes(input.failureCode)) return fail("DEPLOY_TRANSITION_INVALID");
+      "PROVIDER_STATUS_CONTRADICTION", "SOURCE_STALE", "ENVIRONMENT_STALE",
+      "PROVIDER_SUBMISSION_NOT_OBSERVED"].includes(input.failureCode)) return fail("DEPLOY_TRANSITION_INVALID");
+    if (input.failureCode === "PROVIDER_SUBMISSION_NOT_OBSERVED") {
+      if (op.state !== "uncertain" || !validUnobservedSubmissionEvidence(record, a, op, deployment,
+        input.reconciliationEvidence)) return fail("DEPLOY_TRANSITION_INVALID");
+    } else if (own(input, "reconciliationEvidence")) return fail("DEPLOY_TRANSITION_INVALID");
     if ((input.failureCode === "CONFIG_PROJECTION_FAILED" && !["prepared", "config_projection_incomplete"].includes(op.state)) ||
       (input.failureCode === "PROVIDER_SUBMISSION_FAILED" && op.state !== "submitting") ||
       (["PROVIDER_BUILD_FAILED", "PROVIDER_STATUS_CONTRADICTION"].includes(input.failureCode) && op.state !== "submitted") ||

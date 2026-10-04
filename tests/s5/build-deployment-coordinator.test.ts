@@ -172,6 +172,55 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(authority.currentProductionReleaseId).toBeNull();
   });
 
+  it("terminalizes only the exact aged uncertain Preview after two exhausted zero-match searches", async () => {
+    const s = await setup();
+    const prepared = await s.prepare();
+    const operationId = prepared.operationId!;
+    const deploymentId = prepared.deploymentId!;
+    expect(await s.transition(operationId, deploymentId, 2, "submitting")).toMatchObject({ ok: true, revision: 3 });
+    expect(await s.transition(operationId, deploymentId, 3, "uncertain")).toMatchObject({ ok: true, revision: 4 });
+    const record = readBuildRecord(root, s.target.buildId)!;
+    const sourceSha = record.authoritativeSha;
+    const environmentBefore = structuredClone(record.environments);
+    const mappingBefore = structuredClone(record.deployments!.mappings);
+    const uncertainAt = new Date(Date.now() - 600_000);
+    record.deployments!.pendingOperation!.updatedAt = uncertainAt.toISOString();
+    writeBuildRecord(root, record);
+    const evidence = {
+      buildId: s.target.buildId, operationId, deploymentId,
+      mappingId: mappingBefore[0]!.mappingId, teamRef: null, projectRef: "product",
+      target: "preview", pathOperationId: operationId,
+      windowStart: new Date(uncertainAt.getTime() - 60_000).toISOString(),
+      windowEnd: new Date(uncertainAt.getTime() + 60_000).toISOString(),
+      metadataFilteredLookup: { completed: true, exhausted: true, nextCursor: null, exactMatchCount: 0 },
+      projectWindowLookup: { completed: true, exhausted: true, nextCursor: null, exactOperationMatchCount: 0 },
+      completedAt: new Date().toISOString(),
+    };
+    const failure = { failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED", reconciliationEvidence: evidence };
+    expect(await s.transition(operationId, deploymentId, 3, "failed", failure))
+      .toMatchObject({ ok: false, code: "DEPLOY_REVISION_STALE" });
+    expect(await s.transition(operationId, deploymentId, 4, "failed", {
+      ...failure, reconciliationEvidence: { ...evidence, projectWindowLookup: {
+        ...evidence.projectWindowLookup, exactOperationMatchCount: 1 } },
+    })).toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    expect(await s.transition(operationId, deploymentId, 4, "failed", failure))
+      .toMatchObject({ ok: true, revision: 5 });
+    const final = readBuildRecord(root, s.target.buildId)!;
+    expect(final.deployments!.pendingOperation).toBeNull();
+    expect(final.deployments!.deployments).toHaveLength(1);
+    expect(final.deployments!.deployments[0]).toMatchObject({ operationId, deploymentId,
+      operationState: "failed", failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED",
+      providerDeploymentId: null, providerUrl: null, providerState: null });
+    expect(final.deployments!.mappings).toEqual(mappingBefore);
+    expect(final.authoritativeSha).toBe(sourceSha);
+    expect(final.environments).toEqual(environmentBefore);
+    expect(final.deployments!.releases).toEqual([]);
+    expect(final.deployments!.currentProductionReleaseId).toBeNull();
+    expect(await s.transition(operationId, deploymentId, 5, "submitting"))
+      .toMatchObject({ ok: false, code: "DEPLOY_OPERATION_NOT_FOUND" });
+    expect(readFileSync(s.otherPath)).toEqual(s.unrelatedBefore);
+  });
+
   it("keeps production preparation outside the scoped Preview transaction", async () => {
     const s = await setup();
     expect(await client!.mutateDeploymentMapping(s.target.buildId, { action: "set", expectedRevision: 1,

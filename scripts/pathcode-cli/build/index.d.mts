@@ -882,6 +882,28 @@ export function prepareDeploymentMappingMutation(runtimeRoot: string, buildId: s
   { ok: boolean; code?: string; record?: BuildRecord; revision?: number; mappingId?: string | null };
 export function prepareDeploymentOperation(runtimeRoot: string, buildId: string, request: object):
   { ok: boolean; code?: string; record?: BuildRecord; revision?: number; operationId?: string; deploymentId?: string };
+export type NoDeploymentObservedReconciliationEvidence = {
+  buildId: string;
+  operationId: string;
+  deploymentId: string;
+  mappingId: string;
+  teamRef: string | null;
+  projectRef: string;
+  target: "preview";
+  pathOperationId: string;
+  windowStart: string;
+  windowEnd: string;
+  metadataFilteredLookup: { completed: true; exhausted: true; nextCursor: null; exactMatchCount: 0 };
+  projectWindowLookup: { completed: true; exhausted: true; nextCursor: null; exactOperationMatchCount: 0 };
+  completedAt: string;
+};
+export type NoDeploymentObservedTransitionInput = {
+  operationId: string;
+  deploymentId: string;
+  state: "failed";
+  failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED";
+  reconciliationEvidence: NoDeploymentObservedReconciliationEvidence;
+};
 export function inspectDeploymentSource(input: { runtimeRoot: string; buildId: string }): object;
 export function prepareDeploymentSource(input: { runtimeRoot: string; buildId: string }):
   { ok: boolean; code?: string; workspace: string; repositoryRoot: string; authoritativeSha: string; treeSha: string; framework: string };
