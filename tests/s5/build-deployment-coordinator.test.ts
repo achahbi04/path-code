@@ -9,7 +9,6 @@ import { createBuildRecordSkeleton, createBuildCoordinatorClient, readBuildRecor
   combinePreviewReconciliation, PREVIEW_RECONCILIATION_CODES, PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS,
   PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS } from "../../scripts/pathcode-cli/build/index.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
-import * as previewAdapter from "../../scripts/pathcode-cli/build/index.mjs";
 
 describe("P10 Preview transaction through the scoped coordinator", () => {
   let root = "";
@@ -17,7 +16,6 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
   let client: ReturnType<typeof createBuildCoordinatorClient> | null = null;
   afterEach(async () => {
     vi.useRealTimers();
-    vi.restoreAllMocks();
     client?.close(); client = null;
     if (server) { await server.stop(); server = null; }
     if (root) rmSync(root, { recursive: true, force: true });
@@ -41,6 +39,26 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     record.deployments!.deployments.at(-1)!.reconciliationWindow = structuredClone(window);
     return window;
   }
+
+  it("keeps scoped existing-operation recovery outside provider deploy execution", () => {
+    const service = readFileSync(new URL("../../scripts/pathcode-cli/build/coordinator/service.mjs", import.meta.url), "utf8");
+    const deployments = readFileSync(new URL("../../scripts/pathcode-cli/build/deployments.mjs", import.meta.url), "utf8");
+    const startup = service.split("async function reconcileStartup() {")[1]?.split("async function runtimeState(")[0];
+    const transaction = service.split("case BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE:")[1]
+      ?.split("case BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ:")[0];
+    const recovery = deployments.split("export function recoverDeploymentFoundation(record) {")[1]
+      ?.split("export function validateOperationSnapshot(")[0];
+    expect(service).toContain("scopedControlPlane ? Promise.resolve([]) : reconcileStartup()");
+    expect(startup).toContain("recoverDeploymentFoundation(build)");
+    expect(transaction).toContain("prepareDeploymentOperation(runtimeRoot, buildId, request)");
+    expect(transaction).toContain("transitionDeploymentOperation(record, input)");
+    expect(recovery).toContain('state: "provider_outcome_uncertain", retry: false');
+    for (const section of [startup, transaction, recovery]) {
+      expect(section).toBeDefined();
+      expect(section).not.toMatch(/\b(?:makePreviewDeployCommand|executeVercelAdapterCommand|deploy_receipt|vercel deploy)\b|\bspawn\s*\(/);
+    }
+    expect(service).not.toMatch(/from ["'][^"']*vercel-preview-adapter\.mjs["']/);
+  });
   async function setup(configNames: string[] = []) {
     root = mkdtempSync(join(tmpdir(), "path-p10-coordinator-"));
     const project = join(root, "product");
@@ -273,9 +291,6 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     const prepared = await s.prepare();
     const operationId = prepared.operationId!;
     const deploymentId = prepared.deploymentId!;
-    const adapterSpy = vi.spyOn(previewAdapter, "executeVercelAdapterCommand");
-    const providerDeployInvocationCount = () => adapterSpy.mock.calls.filter(([, options]) =>
-      (options as { mode?: string })?.mode === "deploy_receipt").length;
     vi.useFakeTimers({ toFake: ["Date"] });
     expect(await s.transition(operationId, deploymentId, 2, "submitting"))
       .toMatchObject({ ok: true, revision: 3 });
@@ -285,7 +300,6 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     const frozenWindow = structuredClone(onDisk.deployments!.pendingOperation!.reconciliationWindow!) as
       { windowStart: string; windowEnd: string };
     const submissionBoundaryAt = onDisk.deployments!.pendingOperation!.submissionBoundaryAt;
-    expect(providerDeployInvocationCount()).toBe(0);
     // No adapter/deploy stub is invoked; the durable boundary is the last act.
     client!.close(); client = null;
     await server!.stop(); server = null;
@@ -300,7 +314,6 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(recoverDeploymentFoundation(restarted)).toEqual({ ok: true,
       state: "provider_outcome_uncertain", retry: false });
     expect(await s.prepare(3)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_PENDING" });
-    expect(providerDeployInvocationCount()).toBe(0);
     vi.setSystemTime(new Date(Date.parse(submissionBoundaryAt as string) + 4 * 60 * 60 * 1000));
     expect(await s.transition(operationId, deploymentId, 3, "uncertain"))
       .toMatchObject({ ok: true, revision: 4 });
@@ -313,13 +326,14 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(Date.parse(uncertainAt)).toBeGreaterThan(Date.parse(frozenWindow.windowEnd));
     expect(recoverDeploymentFoundation(uncertain)).toEqual({ ok: true,
       state: "provider_outcome_uncertain", retry: false });
-    expect(providerDeployInvocationCount()).toBe(0);
+    expect(await s.prepare(4)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_PENDING" });
     const incompleteSource = (mode: string) => ({ ok: true, mode, ...frozenWindow,
       completed: true, exhausted: false, nextCursor: 123, matches: [], exactMatchCount: 0 });
     expect(combinePreviewReconciliation(incompleteSource("METADATA_FILTERED_OPERATION"),
       incompleteSource("PROJECT_WINDOW"))).toEqual({ ok: false,
         code: PREVIEW_RECONCILIATION_CODES.INCOMPLETE });
-    expect(providerDeployInvocationCount()).toBe(0);
+    expect(uncertain.deployments!.pendingOperation).toMatchObject({ operationId, deploymentId,
+      state: "uncertain", submissionBoundaryAt, reconciliationWindow: frozenWindow });
     client!.close(); client = null;
     await server!.stop(); server = null;
     server = await startBuildCoordinatorServer({ runtimeRoot: root,
@@ -332,7 +346,9 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(recoverDeploymentFoundation(secondRestart)).toEqual({ ok: true,
       state: "provider_outcome_uncertain", retry: false });
     expect(secondRestart.deployments!.pendingOperation!.updatedAt).toBe(uncertainAt);
-    expect(providerDeployInvocationCount()).toBe(0);
+    expect(secondRestart.deployments!.deployments).toHaveLength(1);
+    expect(secondRestart.deployments!.deployments[0]).toMatchObject({ operationId, deploymentId });
+    expect(await s.prepare(4)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_PENDING" });
     const { windowStart, windowEnd } = frozenWindow;
     const source = (mode: string) => ({ ok: true, mode, windowStart, windowEnd,
       completed: true, exhausted: true, nextCursor: null, matches: [],
@@ -341,7 +357,7 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     const projectWindow = source("PROJECT_WINDOW");
     expect(combinePreviewReconciliation(filtered, projectWindow)).toMatchObject({
       ok: true, outcome: "VALID_ZERO_ZERO_EVIDENCE_CANDIDATE", retry: false });
-    expect(providerDeployInvocationCount()).toBe(0);
+    expect(await s.prepare(4)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_PENDING" });
     const mapping = uncertain.deployments!.mappings[0]!;
     const evidenceAtCurrentTime = () => makeNoDeploymentObservedEvidence({ buildId: s.target.buildId, operationId,
       deploymentId, mappingId: mapping.mappingId, teamRef: null,
@@ -353,7 +369,6 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
       failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED", reconciliationEvidence: premature.evidence,
     })).toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
     expect(readBuildRecord(root, s.target.buildId)!.deployments!.pendingOperation!.updatedAt).toBe(uncertainAt);
-    expect(providerDeployInvocationCount()).toBe(0);
     vi.setSystemTime(new Date(Date.parse(uncertainAt) + 120_000));
     const mapped = evidenceAtCurrentTime();
     expect(mapped.ok).toBe(true);
@@ -368,7 +383,6 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(final.releases).toEqual([]);
     expect(final.currentProductionReleaseId).toBeNull();
     expect(readFileSync(s.otherPath)).toEqual(s.unrelatedBefore);
-    expect(providerDeployInvocationCount()).toBe(0);
   });
 
   it("retains a known provider identity through unknown status and a polling stop", async () => {
