@@ -82,9 +82,9 @@ function validUnobservedSubmissionEvidence(record, authority, op, deployment, ev
       ![evidence.windowStart, evidence.windowEnd, evidence.completedAt, op.updatedAt].every(validTimestamp)) return false;
   const start = Date.parse(evidence.windowStart), end = Date.parse(evidence.windowEnd);
   const completed = Date.parse(evidence.completedAt), uncertainAt = Date.parse(op.updatedAt);
-  // `uncertain` was persisted after the submission attempt; its PATH timestamp
-  // is the conservative lower bound when no provider receipt was captured.
-  return start < end && end <= completed && completed <= Date.now() &&
+  // The uncertain boundary may follow the frozen provider window by hours, but
+  // must not precede its lower bound. Settlement age starts at uncertainAt.
+  return start < end && start <= uncertainAt && end <= completed && completed <= Date.now() &&
     completed - uncertainAt >= NO_DEPLOYMENT_SETTLEMENT_MS;
 }
 

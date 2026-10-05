@@ -242,6 +242,33 @@ describe("P10 uncertain submission with no observed provider deployment", () => 
     ]) expect(close(aged.record, { ...aged.evidence, ...change })).toMatchObject({ ok: false });
   });
 
+  it("retains lower chronology while allowing uncertain time after the frozen window", () => {
+    const aged = fixture(600_000, 4 * 60 * 60 * 1000);
+    const op = aged.record.deployments!.pendingOperation!;
+    const start = Date.parse(aged.evidence.windowStart);
+    const end = Date.parse(aged.evidence.windowEnd);
+    expect(Date.parse(op.updatedAt as string)).toBeGreaterThan(end);
+    expect(close(aged.record, aged.evidence)).toMatchObject({ ok: true });
+    op.updatedAt = new Date(start - 1).toISOString();
+    expect(close(aged.record, aged.evidence)).toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    op.updatedAt = new Date(start).toISOString();
+    expect(close(aged.record, aged.evidence)).toMatchObject({ ok: true });
+    op.updatedAt = new Date(start + 60_000).toISOString();
+    expect(close(aged.record, { ...aged.evidence, completedAt: new Date(end - 1).toISOString() }))
+      .toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    expect(close(aged.record, { ...aged.evidence, completedAt: new Date(Date.now() + 60_000).toISOString() }))
+      .toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    expect(close(aged.record, { ...aged.evidence, windowStart: new Date(start + 1).toISOString() }))
+      .toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    expect(close(aged.record, { ...aged.evidence, metadataFilteredLookup: {
+      ...aged.evidence.metadataFilteredLookup, exactMatchCount: 1 } }))
+      .toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    const premature = fixture(30_000, 4 * 60 * 60 * 1000);
+    expect(close(premature.record, premature.evidence)).toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    const settled = fixture(120_000, 4 * 60 * 60 * 1000);
+    expect(close(settled.record, settled.evidence)).toMatchObject({ ok: true });
+  });
+
   it("fails closed for a legacy pending operation without inventing a window", () => {
     const { record } = fixture();
     const op = record.deployments!.pendingOperation!;
