@@ -63,6 +63,7 @@ export { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfig
 export { createVercelChildEnv, makePreviewReadCommands, makePreviewDeployCommand,
   makePreviewInspectCommand, makePreviewReconcileCommand, parsePreviewAuth,
   parsePreviewProjectList, parsePreviewDeploymentReceipt, parsePreviewDeploymentStatus,
+  makePreviewReconciliationIdentityInspectCommand, parsePreviewReconciliationIdentityStatus,
   parsePreviewReconciliation, executeVercelAdapterCommand,
   PREVIEW_RECONCILIATION_CODES, MAX_RECONCILIATION_PAGES, MAX_RECONCILIATION_INSPECTIONS,
   PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS,

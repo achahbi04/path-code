@@ -936,6 +936,8 @@ export function parsePreviewAuth(raw: unknown, teamRef?: string | null): object;
 export function parsePreviewProjectList(raw: unknown, input: object): object;
 export function parsePreviewDeploymentReceipt(raw: unknown): object;
 export function parsePreviewDeploymentStatus(raw: unknown, expectedId: string): object;
+export function makePreviewReconciliationIdentityInspectCommand(input: object): object;
+export function parsePreviewReconciliationIdentityStatus(raw: unknown, input: object): object;
 export function parsePreviewReconciliation(raw: unknown, input: object): object;
 export function executeVercelAdapterCommand(spec: object, input: object): Promise<object>;
 export const PREVIEW_RECONCILIATION_CODES: Readonly<{

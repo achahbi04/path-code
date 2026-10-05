@@ -130,14 +130,39 @@ export function parsePreviewDeploymentReceipt(raw) {
     target: wrapper.target, providerState: wrapper.readyState ?? null };
 }
 
-/** Inspect JSON can include routes/builds/aliases; reject those rather than forwarding. */
+const inspectOptionalFields = Object.freeze({ aliases: Array.isArray, builds: Array.isArray, routes: Array.isArray });
+
+/** Inspect JSON admits only the optional containers emitted by installed CLI 59.10.0. */
 export function parsePreviewDeploymentStatus(raw, expectedId) {
-  if (!shape(raw, ["id", "name", "url", "target", "readyState", "createdAt", "contextName"]) ||
+  if (!shape(raw, ["id", "name", "url", "target", "readyState", "createdAt", "contextName", ...Object.keys(inspectOptionalFields)]) ||
+      Object.entries(inspectOptionalFields).some(([key, check]) => Object.hasOwn(raw ?? {}, key) && !check(raw[key])) ||
+      (Object.hasOwn(raw ?? {}, "contextName") && typeof raw.contextName !== "string") ||
       !deploymentId(raw.id) || raw.id !== expectedId || raw.target !== "preview" ||
       !states.has(raw.readyState) || !locator(raw.name) || !providerUrl(`https://${raw.url}`) ||
       !Number.isSafeInteger(raw.createdAt)) return fail("PROVIDER_STATUS_UNSAFE");
   return { ok: true, providerDeploymentId: raw.id, providerState: raw.readyState,
     url: `https://${raw.url}`, target: "preview", createdAt: raw.createdAt };
+}
+
+/** Narrow read-only locator used only after operation correspondence is proven by list metadata. */
+export function makePreviewReconciliationIdentityInspectCommand({ url, teamRef = null }) {
+  if (!providerUrl(url) || (teamRef !== null && !locator(teamRef)))
+    return fail(PREVIEW_RECONCILIATION_CODES.INVALID);
+  return command(["inspect", url, "--json", ...scopeArgs(teamRef)],
+    "vercel inspect <operation-correlated deployment URL> --json");
+}
+
+/** Resolve a missing list-row ID while retaining provider ID as the only deployment identity. */
+export function parsePreviewReconciliationIdentityStatus(raw, { url, projectName }) {
+  if (!providerUrl(url) || !locator(projectName) ||
+      !shape(raw, ["id", "name", "url", "target", "readyState", "createdAt", "contextName", ...Object.keys(inspectOptionalFields)]) ||
+      Object.entries(inspectOptionalFields).some(([key, check]) => Object.hasOwn(raw ?? {}, key) && !check(raw[key])) ||
+      (Object.hasOwn(raw ?? {}, "contextName") && typeof raw.contextName !== "string") ||
+      !deploymentId(raw.id) || raw.name !== projectName || typeof raw.url !== "string" ||
+      `https://${raw.url}` !== url || raw.target !== "preview" || !states.has(raw.readyState) ||
+      !Number.isSafeInteger(raw.createdAt)) return fail(PREVIEW_RECONCILIATION_CODES.UNSAFE);
+  return { ok: true, providerDeploymentId: raw.id, url, providerState: raw.readyState,
+    target: "preview", createdAt: raw.createdAt };
 }
 
 export function parsePreviewReconciliation(raw, { projectRef, projectName = projectRef, operationId }) {
@@ -173,7 +198,8 @@ export function parsePreviewReconciliationPage(raw, { mode, projectRef, projectN
   let inWindowCount = 0;
   for (const dep of raw.deployments) {
     if (!shape(dep, ["id", "url", "name", "state", "target", "customEnvironment", "createdAt",
-      "buildingAt", "ready", "creator", "meta"]) || !deploymentId(dep.id) || dep.name !== projectName ||
+      "buildingAt", "ready", "creator", "meta"]) ||
+      (Object.hasOwn(dep, "id") && !deploymentId(dep.id)) || dep.name !== projectName ||
       !["preview", null].includes(dep.target) || dep.customEnvironment != null || !states.has(dep.state) || !Number.isSafeInteger(dep.createdAt) ||
       dep.createdAt < 0 || (dep.url !== null && !providerUrl(`https://${dep.url}`)) ||
       (dep.meta !== undefined && dep.meta !== null && !object(dep.meta)))
@@ -184,13 +210,11 @@ export function parsePreviewReconciliationPage(raw, { mode, projectRef, projectN
     if (!object(dep.meta) || !opId(dep.meta.pathOperationId))
       return fail(PREVIEW_RECONCILIATION_CODES.INCOMPLETE);
     const factualOperationId = dep.meta.pathOperationId;
-    if (mode === "METADATA_FILTERED_OPERATION" && factualOperationId !== operationId)
-      return fail(PREVIEW_RECONCILIATION_CODES.UNSAFE);
     if (factualOperationId !== operationId) {
       continue;
     }
     if (dep.url === null) return fail(PREVIEW_RECONCILIATION_CODES.INCOMPLETE);
-    matches.push({ providerDeploymentId: dep.id, url: `https://${dep.url}`,
+    matches.push({ providerDeploymentId: Object.hasOwn(dep, "id") ? dep.id : null, url: `https://${dep.url}`,
       providerState: dep.state, target: "preview", createdAt: dep.createdAt });
   }
   return { ok: true, mode, windowStart, windowEnd, completed: true,
@@ -247,9 +271,24 @@ export async function reconcilePreviewWindow(input, execution = {}) {
   if (!locator(projectRef) || !locator(projectName) || (teamRef !== null && !locator(teamRef)) ||
       !opId(operationId) || !windowValid(windowStart, windowEnd)) return fail(PREVIEW_RECONCILIATION_CODES.INVALID);
   const results = [];
+  const identityInspectCache = new Map();
+  const completeIdentity = async (candidate) => {
+    if (candidate.providerDeploymentId !== null) return candidate;
+    let recovered = identityInspectCache.get(candidate.url);
+    if (!recovered) {
+      if (identityInspectCache.size >= MAX_RECONCILIATION_INSPECTIONS) return null;
+      const spec = makePreviewReconciliationIdentityInspectCommand({ url: candidate.url, teamRef });
+      recovered = await executeVercelAdapterCommand(spec, { ...execution,
+        mode: "reconcile_identity_inspect", context: { url: candidate.url, projectName, teamRef } });
+      if (!recovered.ok) return null;
+      identityInspectCache.set(candidate.url, recovered);
+    }
+    if (recovered.url !== candidate.url || recovered.target !== "preview") return null;
+    return { ...candidate, providerDeploymentId: recovered.providerDeploymentId };
+  };
   for (const mode of ["METADATA_FILTERED_OPERATION", "PROJECT_WINDOW"]) {
     const matches = [];
-    const seenIds = new Set();
+    const seenCandidates = new Set();
     let cursor = null, pages = 0, totalDeploymentsObserved = 0;
     do {
       const spec = makePreviewReconciliationPageCommand({ mode, projectRef, teamRef, operationId,
@@ -261,16 +300,19 @@ export async function reconcilePreviewWindow(input, execution = {}) {
       pages += 1;
       totalDeploymentsObserved += page.totalDeploymentsObserved;
       for (const match of page.matches) {
-        if (seenIds.has(match.providerDeploymentId)) return fail(PREVIEW_RECONCILIATION_CODES.INCOMPLETE);
-        seenIds.add(match.providerDeploymentId);
-        matches.push(match);
+        const candidateKey = match.providerDeploymentId ?? match.url;
+        if (seenCandidates.has(candidateKey)) return fail(PREVIEW_RECONCILIATION_CODES.INCOMPLETE);
+        seenCandidates.add(candidateKey);
+        const complete = await completeIdentity(match);
+        if (!complete) return fail(PREVIEW_RECONCILIATION_CODES.INCOMPLETE);
+        matches.push(complete);
       }
       cursor = page.nextCursor;
       if (cursor !== null && pages >= MAX_RECONCILIATION_PAGES) return fail(PREVIEW_RECONCILIATION_CODES.INCOMPLETE);
     } while (cursor !== null);
     results.push({ ok: true, mode, windowStart, windowEnd, completed: true, exhausted: true,
       nextCursor: null, exactMatchCount: matches.length, totalDeploymentsObserved,
-      pageCount: pages, inspectionCount: 0, matches });
+      pageCount: pages, inspectionCount: identityInspectCache.size, matches });
   }
   const consistency = combinePreviewReconciliation(results[0], results[1]);
   return consistency.ok ? { ok: true, outcome: consistency.outcome, retry: false,
@@ -282,7 +324,7 @@ export async function reconcilePreviewWindow(input, execution = {}) {
 export async function executeVercelAdapterCommand(spec, { cwd, parentEnv = process.env, mode,
   context = {}, spawnImpl = spawn, timeoutMs = PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS }) {
   if (!spec?.ok || spec.executable !== "vercel" || spec.shell !== false || !Array.isArray(spec.argv) ||
-      typeof cwd !== "string" || !["config_write", "config_metadata", "auth", "project", "deploy_receipt", "status", "reconcile", "reconcile_page"].includes(mode) ||
+      typeof cwd !== "string" || !["config_write", "config_metadata", "auth", "project", "deploy_receipt", "status", "reconcile", "reconcile_page", "reconcile_identity_inspect"].includes(mode) ||
       timeoutMs < 1 || timeoutMs > 120000 ||
       (mode === "deploy_receipt" && timeoutMs !== PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS)) return fail("PROVIDER_COMMAND_INVALID");
   if (spec.argv.some((arg) => typeof arg !== "string" ||
@@ -291,12 +333,18 @@ export async function executeVercelAdapterCommand(spec, { cwd, parentEnv = proce
   if (mode !== "config_write" && Object.hasOwn(spec, "stdinPayload")) return fail("PROVIDER_COMMAND_INVALID");
   const expected = { config_write: ["env", "add"], config_metadata: ["env", "ls"], auth: ["whoami", "--json"],
     project: ["project", "list"], deploy_receipt: ["deploy", "--target"], status: ["inspect", context.providerDeploymentId],
-    reconcile: ["list", context.projectRef], reconcile_page: ["list", context.projectRef] }[mode];
+    reconcile: ["list", context.projectRef], reconcile_page: ["list", context.projectRef],
+    reconcile_identity_inspect: ["inspect", context.url] }[mode];
   if (spec.argv[0] !== expected[0] || spec.argv[1] !== expected[1] &&
       !(mode === "config_write" && spec.argv[1] === "update")) return fail("PROVIDER_COMMAND_INVALID");
   if (mode === "reconcile_page") {
     const proven = makePreviewReconciliationPageCommand(context);
     if (!proven.ok || JSON.stringify(spec.argv) !== JSON.stringify(proven.argv)) return fail("PROVIDER_COMMAND_INVALID");
+  }
+  if (mode === "reconcile_identity_inspect") {
+    const proven = makePreviewReconciliationIdentityInspectCommand(context);
+    if (!proven.ok || JSON.stringify(spec.argv) !== JSON.stringify(proven.argv) ||
+        spec.argv.some((arg) => ["--wait", "--logs", "--debug"].includes(arg))) return fail("PROVIDER_COMMAND_INVALID");
   }
   if (mode === "config_write" && (typeof spec.stdinPayload !== "string" ||
       spec.argv[4] !== "--type" || spec.argv[5] !== "config")) return fail("PROVIDER_COMMAND_INVALID");
@@ -307,6 +355,7 @@ export async function executeVercelAdapterCommand(spec, { cwd, parentEnv = proce
       case "project": return parsePreviewProjectList(raw, context);
       case "deploy_receipt": return parsePreviewDeploymentReceipt(raw);
       case "status": return parsePreviewDeploymentStatus(raw, context.providerDeploymentId);
+      case "reconcile_identity_inspect": return parsePreviewReconciliationIdentityStatus(raw, context);
       case "reconcile": return parsePreviewReconciliation(raw, context);
       case "reconcile_page": return parsePreviewReconciliationPage(raw, context);
       default: return fail("PROVIDER_COMMAND_INVALID");

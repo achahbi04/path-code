@@ -5,6 +5,7 @@ import { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfig
   createVercelChildEnv, makePreviewReadCommands, makePreviewDeployCommand,
   makePreviewInspectCommand, makePreviewReconcileCommand, parsePreviewAuth,
   parsePreviewProjectList, parsePreviewDeploymentReceipt, parsePreviewDeploymentStatus,
+  makePreviewReconciliationIdentityInspectCommand, parsePreviewReconciliationIdentityStatus,
   parsePreviewReconciliation, executeVercelAdapterCommand,
   PREVIEW_RECONCILIATION_CODES, PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS } from "../../scripts/pathcode-cli/build/index.mjs";
 
@@ -98,6 +99,47 @@ describe("P10.2A installed CLI 59.10.0 preview contracts; no provider calls", ()
     expect(parsePreviewDeploymentStatus(status, id)).toMatchObject({ ok: true, providerState: "READY" });
     expect(parsePreviewDeploymentStatus({ ...status, env: { API_KEY: "hidden" } }, id)).toMatchObject({ ok: false });
     expect(parsePreviewDeploymentStatus(status, "dpl_other123")).toMatchObject({ ok: false });
+  });
+
+  it("admits only installed inspect optional containers and keeps the safe projection unchanged", () => {
+    const status = { id, name: projectRef, url: "example.vercel.app", target: "preview", readyState: "READY", createdAt: 7 };
+    expect(parsePreviewDeploymentStatus(status, id)).toEqual({ ok: true, providerDeploymentId: id,
+      providerState: "READY", url: "https://example.vercel.app", target: "preview", createdAt: 7 });
+    for (const [key, value] of Object.entries({ aliases: ["private.example"], builds: [{ secret: "OPTIONAL_SENTINEL" }], routes: [{ secret: "OPTIONAL_SENTINEL" }] })) {
+      const safe = parsePreviewDeploymentStatus({ ...status, [key]: value }, id);
+      expect(safe).toEqual({ ok: true, providerDeploymentId: id, providerState: "READY",
+        url: "https://example.vercel.app", target: "preview", createdAt: 7 });
+      expect(JSON.stringify(safe)).not.toContain("OPTIONAL_SENTINEL");
+      expect(JSON.stringify(safe)).not.toContain(key);
+    }
+    const all = parsePreviewDeploymentStatus({ ...status, aliases: [], builds: [], routes: [], contextName: "team-a" }, id);
+    expect(Object.keys(all).sort()).toEqual(["createdAt", "ok", "providerDeploymentId", "providerState", "target", "url"].sort());
+    expect(parsePreviewDeploymentStatus({ ...status, aliases: {} }, id)).toEqual({ ok: false, code: "PROVIDER_STATUS_UNSAFE" });
+    expect(parsePreviewDeploymentStatus({ ...status, builds: null }, id)).toEqual({ ok: false, code: "PROVIDER_STATUS_UNSAFE" });
+    expect(parsePreviewDeploymentStatus({ ...status, routes: "bad" }, id)).toEqual({ ok: false, code: "PROVIDER_STATUS_UNSAFE" });
+    expect(parsePreviewDeploymentStatus({ ...status, env: {} }, id)).toEqual({ ok: false, code: "PROVIDER_STATUS_UNSAFE" });
+    expect((parsePreviewDeploymentStatus({ ...status, id: "bad" }, id) as any).ok).toBe(false);
+    expect((parsePreviewDeploymentStatus({ ...status, target: "production" }, id) as any).ok).toBe(false);
+    expect((parsePreviewDeploymentStatus({ ...status, url: "invalid" }, id) as any).ok).toBe(false);
+    expect((parsePreviewDeploymentStatus({ ...status, createdAt: "7" }, id) as any).ok).toBe(false);
+    expect((parsePreviewDeploymentStatus({ ...status, readyState: "PAUSED" }, id) as any).ok).toBe(false);
+  });
+
+  it("constructs and strictly reduces operation-correlated URL identity inspections", () => {
+    const url = "https://example.vercel.app";
+    expect(makePreviewReconciliationIdentityInspectCommand({ url, teamRef: "team-a" })).toMatchObject({
+      ok: true, shell: false, argv: ["inspect", url, "--json", "--scope", "team-a"],
+    });
+    expect(makePreviewReconciliationIdentityInspectCommand({ url: "https://example.com" })).toMatchObject({ ok: false });
+    const inspect = { id, name: projectRef, url: "example.vercel.app", target: "preview", readyState: "READY", createdAt: 5,
+      builds: [{ value: "DO_NOT_LEAK" }] };
+    expect(parsePreviewReconciliationIdentityStatus(inspect, { url, projectName: projectRef })).toEqual({ ok: true,
+      providerDeploymentId: id, url, providerState: "READY", target: "preview", createdAt: 5 });
+    expect((parsePreviewReconciliationIdentityStatus({ ...inspect, url: "other.vercel.app" }, { url, projectName: projectRef }) as any).ok).toBe(false);
+    expect((parsePreviewReconciliationIdentityStatus({ ...inspect, target: "production" }, { url, projectName: projectRef }) as any).ok).toBe(false);
+    expect((parsePreviewReconciliationIdentityStatus({ ...inspect, readyState: "PAUSED" }, { url, projectName: projectRef }) as any).ok).toBe(false);
+    expect((parsePreviewReconciliationIdentityStatus({ ...inspect, env: {} }, { url, projectName: projectRef }) as any).ok).toBe(false);
+    expect(JSON.stringify(parsePreviewReconciliationIdentityStatus(inspect, { url, projectName: projectRef }))).not.toContain("DO_NOT_LEAK");
   });
 
   it("reconciles only exact operation metadata; zero or ambiguous matches never retry", () => {

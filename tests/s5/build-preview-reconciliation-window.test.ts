@@ -8,6 +8,7 @@ import {
   makeNoDeploymentObservedEvidence, reconcilePreviewWindow,
   makePreviewReconcileCommand, parsePreviewReconciliation,
   parsePreviewDeploymentStatus, executeVercelAdapterCommand,
+  makePreviewReconciliationIdentityInspectCommand, parsePreviewReconciliationIdentityStatus,
 } from "../../scripts/pathcode-cli/build/index.mjs";
 
 const operationId = "11111111-1111-4111-8111-111111111111";
@@ -41,6 +42,23 @@ function fakeSpawnFor(pages: (argv: string[]) => object, seen: string[][] = []) 
     child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
     child.stdin.on("finish", () => {
       child.stdout.end(JSON.stringify(pages(argv)));
+      queueMicrotask(() => child.emit("close", 0));
+    });
+    child.kill = () => {};
+    return child;
+  };
+}
+
+function fakeSpawnRouter(respond: (argv: string[]) => object | null, seen: string[][] = []) {
+  return (_bin: string, argv: string[], options: any) => {
+    expect(options.shell).toBe(false);
+    seen.push([...argv]);
+    const child = new EventEmitter() as any;
+    child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+    child.stdin.on("finish", () => {
+      const value = respond(argv);
+      if (value === null) { child.stderr.end("provider read failed"); queueMicrotask(() => child.emit("close", 1)); return; }
+      child.stdout.end(JSON.stringify(value));
       queueMicrotask(() => child.emit("close", 0));
     });
     child.kill = () => {};
@@ -111,7 +129,7 @@ describe("bounded Preview reconciliation through installed CLI list shape", () =
     expect(reduced(projectWindow, [{ ...row(), env: { API_KEY: "RAW_SECRET_SENTINEL" } }]))
       .toEqual({ ok: false, code: C.UNSAFE });
     expect(reduced(projectWindow, [{ ...row(), createdAt: undefined }])).toEqual({ ok: false, code: C.UNSAFE });
-    expect(reduced(filtered, [{ ...row(), meta: { pathOperationId: otherOperationId } }])).toEqual({ ok: false, code: C.UNSAFE });
+    expect(reduced(filtered, [{ ...row(), meta: { pathOperationId: otherOperationId } }])).toMatchObject({ ok: true, exactMatchCount: 0 });
     expect(parsePreviewDeploymentStatus({ ...row(), readyState: "READY" }, "dpl_12345678"))
       .toMatchObject({ ok: false }); // status parser is not metadata-aware
   });
@@ -277,5 +295,77 @@ describe("bounded Preview reconciliation through installed CLI list shape", () =
       expect(pending).toEqual({ operationId, deploymentId: "deployment-a", state: "uncertain",
         providerDeploymentId: null, windowStart, windowEnd });
     }
+  });
+
+  it("keeps ID-bearing rows unchanged and only accepts ID omission as an internal candidate", () => {
+    expect(reduced(filtered, [row()])).toMatchObject({ ok: true, exactMatchCount: 1,
+      matches: [{ providerDeploymentId: "dpl_12345678" }] });
+    const { id: _discarded, ...withoutId } = row();
+    expect(reduced(filtered, [withoutId])).toMatchObject({ ok: true, exactMatchCount: 1,
+      matches: [{ providerDeploymentId: null, url: "https://example-12345678.vercel.app" }] });
+    expect(reduced(filtered, [{ ...withoutId, url: null }])).toEqual({ ok: false, code: C.INCOMPLETE });
+    expect(reduced(filtered, [{ ...withoutId, meta: undefined }])).toEqual({ ok: false, code: C.INCOMPLETE });
+    expect(reduced(filtered, [{ ...withoutId, meta: { pathOperationId: "malformed" } }])).toEqual({ ok: false, code: C.INCOMPLETE });
+    expect(reduced(filtered, [{ ...withoutId, meta: { pathOperationId: otherOperationId } }])).toMatchObject({ ok: true, exactMatchCount: 0 });
+    expect(reduced(projectWindow, [{ ...withoutId, meta: { pathOperationId: otherOperationId } }])).toMatchObject({ ok: true, exactMatchCount: 0 });
+    expect(reduced(filtered, [{ ...withoutId, target: null }])).toMatchObject({ ok: true,
+      matches: [{ providerDeploymentId: null, target: "preview" }] });
+  });
+
+  it("strictly validates identity-inspect response and read-only command", async () => {
+    const url = "https://example-12345678.vercel.app";
+    const inspect = { id: "dpl_12345678", name: projectRef, url: "example-12345678.vercel.app",
+      target: "preview", readyState: "READY", createdAt: at("2026-10-03T19:45:00.000Z"), builds: [] };
+    expect(makePreviewReconciliationIdentityInspectCommand({ url, teamRef: "team-a" })).toMatchObject({
+      ok: true, argv: ["inspect", url, "--json", "--scope", "team-a"], shell: false });
+    expect(parsePreviewReconciliationIdentityStatus(inspect, { url, projectName: projectRef })).toMatchObject({
+      ok: true, providerDeploymentId: "dpl_12345678", url, target: "preview" });
+    for (const bad of [{ ...inspect, url: "other.vercel.app" }, { ...inspect, target: "production" },
+      { ...inspect, readyState: "PAUSED" }, { ...inspect, unknown: true }])
+      expect((parsePreviewReconciliationIdentityStatus(bad, { url, projectName: projectRef }) as any).ok).toBe(false);
+    const spec = makePreviewReconciliationIdentityInspectCommand({ url, teamRef: "team-a" }) as any;
+    expect(await executeVercelAdapterCommand({ ...spec, argv: [...spec.argv, "--wait"] }, {
+      cwd: "/tmp", mode: "reconcile_identity_inspect", context: { url, projectName: projectRef, teamRef: "team-a" },
+      spawnImpl: () => { throw new Error("must not execute altered command"); },
+    })).toEqual({ ok: false, code: "PROVIDER_COMMAND_INVALID" });
+  });
+
+  it("completes URL candidates before provider-ID combination and caches across both modes", async () => {
+    const seen: string[][] = [];
+    const { id: _discarded, ...withoutId } = row();
+    const inspect = { id: "dpl_12345678", name: projectRef, url: "example-12345678.vercel.app",
+      target: "preview", readyState: "READY", createdAt: at("2026-10-03T19:45:00.000Z") };
+    const spawn = fakeSpawnRouter(argv => argv[0] === "inspect" ? inspect : page([withoutId]), seen);
+    const result = await reconcilePreviewWindow(context, { cwd: "/tmp", spawnImpl: spawn }) as any;
+    expect(result).toMatchObject({ ok: true, outcome: "UNIQUE_FACTUAL_MATCH",
+      match: { providerDeploymentId: "dpl_12345678", target: "preview" },
+      metadataFilteredLookup: { inspectionCount: 1, matches: [{ providerDeploymentId: "dpl_12345678" }] },
+      projectWindowLookup: { inspectionCount: 1, matches: [{ providerDeploymentId: "dpl_12345678" }] } });
+    expect(seen.filter(args => args[0] === "inspect")).toHaveLength(1);
+    expect(seen.filter(args => args[0] === "inspect")[0]).toEqual(["inspect", "https://example-12345678.vercel.app", "--json"]);
+    expect(result.match.providerDeploymentId).toBe("dpl_12345678");
+    expect(JSON.stringify(result)).not.toContain("contextName");
+    expect(JSON.stringify(result)).not.toContain("builds");
+  });
+
+  it("returns incomplete on inspect failure and enforces the unique URL inspection bound", async () => {
+    const { id: _discarded, ...withoutId } = row();
+    const failure = await reconcilePreviewWindow(context, { cwd: "/tmp",
+      spawnImpl: fakeSpawnRouter(argv => argv[0] === "inspect" ? null : page([withoutId])) });
+    expect(failure).toEqual({ ok: false, code: C.INCOMPLETE });
+
+    const candidates = Array.from({ length: MAX_RECONCILIATION_INSPECTIONS + 1 }, (_, n) => {
+      const { id: _id, ...candidate } = row(`dpl_${String(n + 10000000)}`, "2026-10-03T19:45:00.000Z");
+      return { ...candidate, url: `identity-${n}.vercel.app` };
+    });
+    let inspectionCount = 0;
+    const bounded = await reconcilePreviewWindow(context, { cwd: "/tmp",
+      spawnImpl: fakeSpawnRouter(argv => {
+        if (argv[0] === "inspect") { inspectionCount++; return { id: "dpl_12345678", name: projectRef,
+          url: new URL(argv[1]!).host, target: "preview", readyState: "READY", createdAt: at("2026-10-03T19:45:00.000Z") }; }
+        return page(candidates);
+      }) });
+    expect(bounded).toEqual({ ok: false, code: C.INCOMPLETE });
+    expect(inspectionCount).toBe(MAX_RECONCILIATION_INSPECTIONS);
   });
 });
