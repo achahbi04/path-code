@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readBuildRecord } from "./record.mjs";
 import { listBuildEnvironments } from "./environments.mjs";
 import { inspectDeploymentSource, prepareDeploymentSource, cleanupDeploymentSource } from "./deploy-source.mjs";
+import { PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS } from "./vercel-preview-adapter.mjs";
 
 export const DEPLOYMENTS_SCHEMA = "pathcode.p10.deployments.v1";
 const fail = (code) => ({ ok: false, code });
@@ -12,12 +13,41 @@ const only = (object, allowed) => object && typeof object === "object" && !Array
   Object.keys(object).every((key) => allowed.includes(key));
 const now = () => new Date().toISOString();
 const NO_DEPLOYMENT_SETTLEMENT_MS = 120_000;
+export const DEPLOY_RECONCILIATION_WINDOW_MISSING = "DEPLOY_RECONCILIATION_WINDOW_MISSING";
+/** V1 headroom for both PATH/provider clock offset and provider-side latency
+ * between request acceptance and the immutable deployment-createdAt stamp. */
+export const PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS = 300_000;
 
 function validTimestamp(value) {
   if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value)) return false;
   const time = Date.parse(value);
   return Number.isFinite(time) && new Date(time).toISOString() === value;
 }
+
+function submissionWindow(boundaryAt) {
+  const boundary = Date.parse(boundaryAt);
+  return { windowStart: new Date(boundary - PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS).toISOString(),
+    windowEnd: new Date(boundary + PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS +
+      PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS).toISOString() };
+}
+
+function hasFrozenSubmissionWindow(op, deployment) {
+  if (!validTimestamp(op.submissionBoundaryAt) || !only(op.reconciliationWindow, ["windowStart", "windowEnd"]) ||
+      !["windowStart", "windowEnd"].every((key) => validTimestamp(op.reconciliationWindow[key]))) return false;
+  const expected = submissionWindow(op.submissionBoundaryAt);
+  return op.reconciliationWindow.windowStart === expected.windowStart &&
+    op.reconciliationWindow.windowEnd === expected.windowEnd &&
+    deployment.submissionBoundaryAt === op.submissionBoundaryAt &&
+    deployment.reconciliationWindow?.windowStart === expected.windowStart &&
+    deployment.reconciliationWindow?.windowEnd === expected.windowEnd;
+}
+
+function safeWindowProjection(item) {
+  const window = item?.reconciliationWindow;
+  return window && validTimestamp(window.windowStart) && validTimestamp(window.windowEnd) ?
+    { windowStart: window.windowStart, windowEnd: window.windowEnd } : null;
+}
+const safeBoundaryProjection = (item) => validTimestamp(item?.submissionBoundaryAt) ? item.submissionBoundaryAt : null;
 
 /** A no-deployment observation is evidence about one exhausted search window, never retry authority. */
 function validUnobservedSubmissionEvidence(record, authority, op, deployment, evidence) {
@@ -46,12 +76,15 @@ function validUnobservedSubmissionEvidence(record, authority, op, deployment, ev
     metadata.completed !== true || metadata.exhausted !== true || metadata.nextCursor !== null ||
     metadata.exactMatchCount !== 0 || project.completed !== true || project.exhausted !== true ||
     project.nextCursor !== null || project.exactOperationMatchCount !== 0) return false;
-  if (![evidence.windowStart, evidence.windowEnd, evidence.completedAt, op.updatedAt].every(validTimestamp)) return false;
+  if (!hasFrozenSubmissionWindow(op, deployment) ||
+      evidence.windowStart !== op.reconciliationWindow.windowStart ||
+      evidence.windowEnd !== op.reconciliationWindow.windowEnd ||
+      ![evidence.windowStart, evidence.windowEnd, evidence.completedAt, op.updatedAt].every(validTimestamp)) return false;
   const start = Date.parse(evidence.windowStart), end = Date.parse(evidence.windowEnd);
   const completed = Date.parse(evidence.completedAt), uncertainAt = Date.parse(op.updatedAt);
   // `uncertain` was persisted after the submission attempt; its PATH timestamp
   // is the conservative lower bound when no provider receipt was captured.
-  return start <= uncertainAt && uncertainAt <= end && end <= completed && completed <= Date.now() &&
+  return start < end && end <= completed && completed <= Date.now() &&
     completed - uncertainAt >= NO_DEPLOYMENT_SETTLEMENT_MS;
 }
 
@@ -87,7 +120,9 @@ export function listBuildDeployments(runtimeRoot, buildId) {
       providerDeploymentId: d.providerDeploymentId, providerUrl: d.providerUrl,
       operationState: d.operationState, providerState: d.providerState,
       requestedAt: d.requestedAt, submittedAt: d.submittedAt, completedAt: d.completedAt,
-      failureCode: d.failureCode })),
+      failureCode: d.failureCode,
+      submissionBoundaryAt: safeBoundaryProjection(d),
+      reconciliationWindow: safeWindowProjection(d) })),
     releases: a.releases.map((r) => ({ releaseId: r.releaseId, operationId: r.operationId,
       deploymentId: r.deploymentId, action: r.action, providerDeploymentId: r.providerDeploymentId,
       projectRef: r.projectRef, sourceSha: r.sourceSha, environmentId: r.environmentId,
@@ -97,7 +132,9 @@ export function listBuildDeployments(runtimeRoot, buildId) {
       observedAt: a.serving.observedAt }, pendingOperation: a.pendingOperation ?
       { operationId: a.pendingOperation.operationId, kind: a.pendingOperation.kind,
         state: a.pendingOperation.state, deploymentId: a.pendingOperation.deploymentId ?? null,
-        failureCode: a.pendingOperation.failureCode ?? null } : null };
+        failureCode: a.pendingOperation.failureCode ?? null,
+        submissionBoundaryAt: safeBoundaryProjection(a.pendingOperation),
+        reconciliationWindow: safeWindowProjection(a.pendingOperation) } : null };
 }
 
 export function prepareDeploymentMappingMutation(runtimeRoot, buildId, request) {
@@ -217,6 +254,9 @@ export function transitionDeploymentOperation(record, input) {
   if (!op || op.operationId !== input?.operationId || op.kind !== "deploy") return fail("DEPLOY_OPERATION_NOT_FOUND");
   const deployment = a.deployments.find((item) => item.deploymentId === op.deploymentId);
   if (!deployment || (input.deploymentId !== undefined && input.deploymentId !== op.deploymentId)) return fail("DEPLOYMENTS_INVALID");
+  if (deployment.target === "preview" && ["submitting", "uncertain"].includes(op.state) &&
+      !hasFrozenSubmissionWindow(op, deployment))
+    return fail(DEPLOY_RECONCILIATION_WINDOW_MISSING);
   const state = input.state;
   const fields = {
     config_receipt: ["variableName"], config_projection_incomplete: [], submitting: [], uncertain: [],
@@ -236,6 +276,14 @@ export function transitionDeploymentOperation(record, input) {
   } else if (state === "submitting") {
     if (!["prepared", "config_projection_incomplete"].includes(op.state) ||
       op.configReceipts.length !== op.snapshot.configNames.length) return fail("CONFIG_PROJECTION_INCOMPLETE");
+    if (deployment.target === "preview") {
+      const boundaryAt = now();
+      const reconciliationWindow = submissionWindow(boundaryAt);
+      op.submissionBoundaryAt = boundaryAt;
+      op.reconciliationWindow = reconciliationWindow;
+      deployment.submissionBoundaryAt = boundaryAt;
+      deployment.reconciliationWindow = structuredClone(reconciliationWindow);
+    }
     op.state = "submitting";
   } else if (state === "uncertain") {
     if (op.state !== "submitting") return fail("DEPLOY_TRANSITION_INVALID");
@@ -354,6 +402,10 @@ export function finalizeFixtureRelease(record, { operationId, deploymentId, acti
 export function recoverDeploymentFoundation(record) {
   const op = record.deployments?.pendingOperation;
   if (!op) return { ok: true, state: "idle" };
+  const deployment = record.deployments.deployments.find((item) => item.deploymentId === op.deploymentId);
+  if (deployment?.target === "preview" && ["submitting", "uncertain"].includes(op.state) &&
+      (!deployment || !hasFrozenSubmissionWindow(op, deployment)))
+    return { ok: false, code: DEPLOY_RECONCILIATION_WINDOW_MISSING, retry: false };
   if (op.state === "prepared") return { ok: true, state: "prepared_no_provider_action", retry: false };
   if (op.state === "config_projection_incomplete") return { ok: true, state: "config_projection_incomplete", retry: false };
   if (op.state === "uncertain" || (op.state === "submitting" && !op.providerDeploymentId)) return { ok: true, state: "provider_outcome_uncertain", retry: false };

@@ -6,7 +6,8 @@ import { spawnSync } from "node:child_process";
 import { createBuildRecordSkeleton, createBuildCoordinatorClient, readBuildRecord,
   resolveBuildRecordPath, startBuildCoordinatorServer, writeBuildRecord,
   recoverDeploymentFoundation, makeNoDeploymentObservedEvidence,
-  combinePreviewReconciliation } from "../../scripts/pathcode-cli/build/index.mjs";
+  combinePreviewReconciliation, PREVIEW_RECONCILIATION_CODES, PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS,
+  PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS } from "../../scripts/pathcode-cli/build/index.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
 
 describe("P10 Preview transaction through the scoped coordinator", () => {
@@ -23,6 +24,19 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     const result = spawnSync("git", args, { cwd, encoding: "utf8" });
     expect(result.status, result.stderr).toBe(0);
     return result.stdout.trim();
+  }
+  function ageFixtureSubmissionBoundary(record: NonNullable<ReturnType<typeof readBuildRecord>>, at: Date) {
+    const boundary = at.toISOString();
+    const window = {
+      windowStart: new Date(at.getTime() - PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS).toISOString(),
+      windowEnd: new Date(at.getTime() + PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS +
+        PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS).toISOString(),
+    };
+    record.deployments!.pendingOperation!.submissionBoundaryAt = boundary;
+    record.deployments!.pendingOperation!.reconciliationWindow = window;
+    record.deployments!.deployments.at(-1)!.submissionBoundaryAt = boundary;
+    record.deployments!.deployments.at(-1)!.reconciliationWindow = structuredClone(window);
+    return window;
   }
   async function setup(configNames: string[] = []) {
     root = mkdtempSync(join(tmpdir(), "path-p10-coordinator-"));
@@ -69,6 +83,25 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     return { target, other, otherPath, unrelatedBefore, environmentId, environmentRevision, prepare, transition };
   }
 
+  it("projects only canonical window timestamps from pending authority", async () => {
+    const s = await setup();
+    const prepared = await s.prepare();
+    expect(await s.transition(prepared.operationId!, prepared.deploymentId!, 2, "submitting"))
+      .toMatchObject({ ok: true, revision: 3 });
+    const record = readBuildRecord(root, s.target.buildId)!;
+    const window = record.deployments!.pendingOperation!.reconciliationWindow as Record<string, unknown>;
+    window.rawProviderPayload = "RAW_SECRET_SENTINEL";
+    (record.deployments!.deployments[0]!.reconciliationWindow as Record<string, unknown>).rawProviderPayload = "RAW_SECRET_SENTINEL";
+    writeBuildRecord(root, record);
+    const projected = await client!.listDeployments(s.target.buildId) as any;
+    expect(projected.pendingOperation.reconciliationWindow).toEqual({
+      windowStart: window.windowStart, windowEnd: window.windowEnd });
+    expect(projected.deployments[0].reconciliationWindow).toEqual({
+      windowStart: window.windowStart, windowEnd: window.windowEnd });
+    expect(JSON.stringify(projected)).not.toContain("RAW_SECRET_SENTINEL");
+    expect(readFileSync(s.otherPath)).toEqual(s.unrelatedBefore);
+  });
+
   it("persists intent first, accepts zero Config, reconciles uncertain submission, and finalizes Preview once", async () => {
     const s = await setup();
     expect(await s.prepare(0)).toMatchObject({ ok: false, code: "DEPLOY_REVISION_STALE" });
@@ -87,6 +120,14 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
       .toMatchObject({ ok: false, code: "DEPLOY_REVISION_STALE" });
     expect(await s.transition(operationId, deploymentId, 2, "submitting"))
       .toMatchObject({ ok: true, revision: 3 });
+    const frozen = readBuildRecord(root, s.target.buildId)!.deployments!.pendingOperation!;
+    const projected = await client!.listDeployments(s.target.buildId) as any;
+    expect(projected.pendingOperation).toMatchObject({ operationId, deploymentId,
+      submissionBoundaryAt: frozen.submissionBoundaryAt,
+      reconciliationWindow: frozen.reconciliationWindow });
+    expect(projected.deployments[0]).toMatchObject({ submissionBoundaryAt: frozen.submissionBoundaryAt,
+      reconciliationWindow: frozen.reconciliationWindow });
+    expect(JSON.stringify(projected)).not.toContain("ordinary-value");
     expect(await s.transition(operationId, deploymentId, 3, "uncertain"))
       .toMatchObject({ ok: true, revision: 4 });
     expect(await s.transition(operationId, deploymentId, 4, "submitting"))
@@ -187,13 +228,14 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     const mappingBefore = structuredClone(record.deployments!.mappings);
     const uncertainAt = new Date(Date.now() - 600_000);
     record.deployments!.pendingOperation!.updatedAt = uncertainAt.toISOString();
+    const frozenWindow = ageFixtureSubmissionBoundary(record, new Date(uncertainAt.getTime() - 600_000));
     writeBuildRecord(root, record);
     const evidence = {
       buildId: s.target.buildId, operationId, deploymentId,
       mappingId: mappingBefore[0]!.mappingId, teamRef: null, projectRef: "product",
       target: "preview", pathOperationId: operationId,
-      windowStart: new Date(uncertainAt.getTime() - 60_000).toISOString(),
-      windowEnd: new Date(uncertainAt.getTime() + 60_000).toISOString(),
+      windowStart: frozenWindow.windowStart,
+      windowEnd: frozenWindow.windowEnd,
       metadataFilteredLookup: { completed: true, exhausted: true, nextCursor: null, exactMatchCount: 0 },
       projectWindowLookup: { completed: true, exhausted: true, nextCursor: null, exactOperationMatchCount: 0 },
       completedAt: new Date().toISOString(),
@@ -233,6 +275,11 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     const onDisk = readBuildRecord(root, s.target.buildId)!;
     expect(onDisk.deployments!.pendingOperation).toMatchObject({ operationId, deploymentId,
       state: "submitting", providerDeploymentId: null });
+    // Fixture sets T0 several hours before the simulated crash/restart. The
+    // same frozen pair must survive both restarts; no provider command runs.
+    const frozenWindow = ageFixtureSubmissionBoundary(onDisk, new Date(Date.now() - 4 * 60 * 60 * 1000));
+    const submissionBoundaryAt = onDisk.deployments!.pendingOperation!.submissionBoundaryAt;
+    writeBuildRecord(root, onDisk);
     // No adapter/deploy stub is invoked; the durable boundary is the last act.
     client!.close(); client = null;
     await server!.stop(); server = null;
@@ -242,7 +289,8 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     await client.connect();
     const restarted = readBuildRecord(root, s.target.buildId)!;
     expect(restarted.deployments!.revision).toBe(3);
-    expect(restarted.deployments!.pendingOperation).toMatchObject({ operationId, deploymentId, state: "submitting" });
+    expect(restarted.deployments!.pendingOperation).toMatchObject({ operationId, deploymentId, state: "submitting",
+      submissionBoundaryAt, reconciliationWindow: frozenWindow });
     expect(recoverDeploymentFoundation(restarted)).toEqual({ ok: true,
       state: "provider_outcome_uncertain", retry: false });
     expect(await s.prepare(3)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_PENDING" });
@@ -251,15 +299,32 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(await s.transition(operationId, deploymentId, 4, "submitting"))
       .toMatchObject({ ok: false });
     const uncertain = readBuildRecord(root, s.target.buildId)!;
+    expect(uncertain.deployments!.pendingOperation).toMatchObject({ submissionBoundaryAt,
+      reconciliationWindow: frozenWindow });
     expect(recoverDeploymentFoundation(uncertain)).toEqual({ ok: true,
+      state: "provider_outcome_uncertain", retry: false });
+    const incompleteSource = (mode: string) => ({ ok: true, mode, ...frozenWindow,
+      completed: true, exhausted: false, nextCursor: 123, matches: [], exactMatchCount: 0 });
+    expect(combinePreviewReconciliation(incompleteSource("METADATA_FILTERED_OPERATION"),
+      incompleteSource("PROJECT_WINDOW"))).toEqual({ ok: false,
+        code: PREVIEW_RECONCILIATION_CODES.INCOMPLETE });
+    client!.close(); client = null;
+    await server!.stop(); server = null;
+    server = await startBuildCoordinatorServer({ runtimeRoot: root,
+      packageRoot: resolvePathPackageRoot(), scopedBuildId: s.target.buildId });
+    client = createBuildCoordinatorClient({ runtimeRoot: root, socketPath: server.socketPath });
+    await client.connect();
+    const secondRestart = readBuildRecord(root, s.target.buildId)!;
+    expect(secondRestart.deployments!.pendingOperation).toMatchObject({ operationId, deploymentId,
+      submissionBoundaryAt, reconciliationWindow: frozenWindow });
+    expect(recoverDeploymentFoundation(secondRestart)).toEqual({ ok: true,
       state: "provider_outcome_uncertain", retry: false });
     // Fixture ages the persisted uncertain boundary to satisfy B5R's own
     // 120-second settlement guard. This never mutates a live Build.
     const uncertainAt = new Date(Date.now() - 600_000);
-    uncertain.deployments!.pendingOperation!.updatedAt = uncertainAt.toISOString();
-    writeBuildRecord(root, uncertain);
-    const windowStart = new Date(uncertainAt.getTime() - 60_000).toISOString();
-    const windowEnd = new Date(uncertainAt.getTime() + 60_000).toISOString();
+    secondRestart.deployments!.pendingOperation!.updatedAt = uncertainAt.toISOString();
+    writeBuildRecord(root, secondRestart);
+    const { windowStart, windowEnd } = frozenWindow;
     const source = (mode: string) => ({ ok: true, mode, windowStart, windowEnd,
       completed: true, exhausted: true, nextCursor: null, matches: [],
       exactMatchCount: 0, totalDeploymentsObserved: 0 });

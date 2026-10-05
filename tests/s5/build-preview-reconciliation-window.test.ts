@@ -11,6 +11,7 @@ import {
 } from "../../scripts/pathcode-cli/build/index.mjs";
 
 const operationId = "11111111-1111-4111-8111-111111111111";
+const otherOperationId = "99999999-9999-4999-8999-999999999999";
 const projectRef = "project-a";
 const windowStart = "2026-10-03T19:30:00.000Z";
 const windowEnd = "2026-10-03T20:15:00.000Z";
@@ -110,7 +111,7 @@ describe("bounded Preview reconciliation through installed CLI list shape", () =
     expect(reduced(projectWindow, [{ ...row(), env: { API_KEY: "RAW_SECRET_SENTINEL" } }]))
       .toEqual({ ok: false, code: C.UNSAFE });
     expect(reduced(projectWindow, [{ ...row(), createdAt: undefined }])).toEqual({ ok: false, code: C.UNSAFE });
-    expect(reduced(filtered, [{ ...row(), meta: { pathOperationId: "another" } }])).toEqual({ ok: false, code: C.UNSAFE });
+    expect(reduced(filtered, [{ ...row(), meta: { pathOperationId: otherOperationId } }])).toEqual({ ok: false, code: C.UNSAFE });
     expect(parsePreviewDeploymentStatus({ ...row(), readyState: "READY" }, "dpl_12345678"))
       .toMatchObject({ ok: false }); // status parser is not metadata-aware
   });
@@ -118,10 +119,41 @@ describe("bounded Preview reconciliation through installed CLI list shape", () =
   it("matches only exact operation metadata; absent list metadata cannot create correspondence", () => {
     const other = { ...row("dpl_other123", "2026-10-03T19:45:00.000Z") } as Record<string, unknown>;
     delete other.meta;
-    expect(reduced(projectWindow, [other])).toMatchObject({ ok: true, exactMatchCount: 0, totalDeploymentsObserved: 1 });
-    expect(reduced(projectWindow, [row("dpl_other123", "2026-10-03T19:45:00.000Z", { pathOperationId: "other" })]))
+    expect(reduced(projectWindow, [other])).toEqual({ ok: false, code: C.INCOMPLETE });
+    expect(reduced(projectWindow, [row("dpl_other123", "2026-10-03T19:45:00.000Z", { pathOperationId: otherOperationId })]))
       .toMatchObject({ ok: true, exactMatchCount: 0 });
     expect(reduced(projectWindow, [row()])).toMatchObject({ ok: true, exactMatchCount: 1 });
+  });
+
+  it("classifies every unknown in-window operation identity as incomplete", () => {
+    const absent = { ...row() } as Record<string, unknown>;
+    delete absent.meta;
+    for (const candidate of [absent, { ...row(), meta: null },
+      { ...row(), meta: {} }, { ...row(), meta: { other: "x" } },
+      { ...row(), meta: { pathOperationId: null } },
+      { ...row(), meta: { pathOperationId: undefined } },
+      { ...row(), meta: { pathOperationId: "malformed" } }]) {
+      expect(reduced(projectWindow, [candidate])).toEqual({ ok: false, code: C.INCOMPLETE });
+      expect(reduced(projectWindow, [{ ...row("dpl_other123"), meta: { pathOperationId: otherOperationId } }, candidate]))
+        .toEqual({ ok: false, code: C.INCOMPLETE });
+    }
+    expect(reduced(projectWindow, [{ ...row(), meta: "bad" }])).toEqual({ ok: false, code: C.UNSAFE });
+    expect(reduced(projectWindow, [{ ...row(), meta: { pathOperationId: otherOperationId } }]))
+      .toMatchObject({ ok: true, exactMatchCount: 0 });
+    expect(reduced(projectWindow, [row()])).toMatchObject({ ok: true, exactMatchCount: 1 });
+    expect(parsePreviewReconciliation(page([absent]), { projectRef, operationId })).toMatchObject({ ok: false });
+  });
+
+  it("uses inclusive creation-time window edges", () => {
+    const submissionBoundaryAt = new Date(at(windowStart) + 5 * 60_000).toISOString();
+    expect(reduced(projectWindow, [row("dpl_12345678", submissionBoundaryAt)]))
+      .toMatchObject({ ok: true, exactMatchCount: 1 });
+    for (const edge of [windowStart, windowEnd])
+      expect(reduced(projectWindow, [row("dpl_12345678", edge)])).toMatchObject({ ok: true, exactMatchCount: 1 });
+    expect(reduced(projectWindow, [row("dpl_12345678", new Date(at(windowStart) - 1).toISOString())]))
+      .toMatchObject({ ok: true, exactMatchCount: 0 });
+    expect(reduced(projectWindow, [row("dpl_12345678", new Date(at(windowEnd) + 1).toISOString())]))
+      .toMatchObject({ ok: true, exactMatchCount: 0 });
   });
 
   it("applies one canonical combiner to zero, unique, conflict, ambiguity and incomplete", () => {
@@ -177,7 +209,7 @@ describe("bounded Preview reconciliation through installed CLI list shape", () =
   it("reaches factual zero/zero after natural exhaustion, including unrelated project deployments", async () => {
     const seen: string[][] = [];
     const unrelated = { ...row("dpl_other123") } as Record<string, unknown>;
-    delete unrelated.meta;
+    unrelated.meta = { pathOperationId: otherOperationId };
     const spawn = fakeSpawnFor((argv) => page(argv.includes("--meta") ? [] : [unrelated]), seen);
     const result = await reconcilePreviewWindow(context, { cwd: "/tmp", spawnImpl: spawn }) as any;
     expect(result).toMatchObject({ ok: true, outcome: "VALID_ZERO_ZERO_EVIDENCE_CANDIDATE",

@@ -27,6 +27,8 @@ export const MAX_RECONCILIATION_PAGES = 20;
 // Installed 59.10.0 list JSON exposes meta; inspect JSON omits it. No inspect
 // fallback is authorized on this CLI. Keep the candidate budget explicit.
 export const MAX_RECONCILIATION_INSPECTIONS = 20;
+/** The sole maximum duration of a Preview deploy CLI invocation. */
+export const PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS = 30_000;
 const canonicalTime = (v) => typeof v === "string" &&
   /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(v) &&
   Number.isFinite(Date.parse(v)) && new Date(Date.parse(v)).toISOString() === v;
@@ -174,17 +176,16 @@ export function parsePreviewReconciliationPage(raw, { mode, projectRef, projectN
       "buildingAt", "ready", "creator", "meta"]) || !deploymentId(dep.id) || dep.name !== projectName ||
       !["preview", null].includes(dep.target) || dep.customEnvironment != null || !states.has(dep.state) || !Number.isSafeInteger(dep.createdAt) ||
       dep.createdAt < 0 || (dep.url !== null && !providerUrl(`https://${dep.url}`)) ||
-      (dep.meta !== undefined && !object(dep.meta)) ||
-      (dep.meta !== undefined && Object.hasOwn(dep.meta, "pathOperationId") &&
-        (typeof dep.meta.pathOperationId !== "string" || dep.meta.pathOperationId.length > 160)))
-      return fail(PREVIEW_RECONCILIATION_CODES.UNSAFE);
-    const factualOperationId = dep.meta && Object.hasOwn(dep.meta, "pathOperationId") ? dep.meta.pathOperationId : null;
-    if (mode === "METADATA_FILTERED_OPERATION" && factualOperationId !== operationId)
+      (dep.meta !== undefined && dep.meta !== null && !object(dep.meta)))
       return fail(PREVIEW_RECONCILIATION_CODES.UNSAFE);
     if (dep.createdAt < start || dep.createdAt > end) continue;
     inWindowCount += 1;
-    // The CLI maps provider dep.meta into list JSON. An absent meta bag is a
-    // factual absence of operation metadata, not a status-parser inference.
+    // An unknown operation identity cannot establish a factual non-match.
+    if (!object(dep.meta) || !opId(dep.meta.pathOperationId))
+      return fail(PREVIEW_RECONCILIATION_CODES.INCOMPLETE);
+    const factualOperationId = dep.meta.pathOperationId;
+    if (mode === "METADATA_FILTERED_OPERATION" && factualOperationId !== operationId)
+      return fail(PREVIEW_RECONCILIATION_CODES.UNSAFE);
     if (factualOperationId !== operationId) {
       continue;
     }
@@ -279,10 +280,11 @@ export async function reconcilePreviewWindow(input, execution = {}) {
 
 /** Executor never exposes stdout/stderr. Parsing is selected from fixed allowlisted modes. */
 export async function executeVercelAdapterCommand(spec, { cwd, parentEnv = process.env, mode,
-  context = {}, spawnImpl = spawn, timeoutMs = 30000 }) {
+  context = {}, spawnImpl = spawn, timeoutMs = PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS }) {
   if (!spec?.ok || spec.executable !== "vercel" || spec.shell !== false || !Array.isArray(spec.argv) ||
       typeof cwd !== "string" || !["config_write", "config_metadata", "auth", "project", "deploy_receipt", "status", "reconcile", "reconcile_page"].includes(mode) ||
-      timeoutMs < 1 || timeoutMs > 120000) return fail("PROVIDER_COMMAND_INVALID");
+      timeoutMs < 1 || timeoutMs > 120000 ||
+      (mode === "deploy_receipt" && timeoutMs !== PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS)) return fail("PROVIDER_COMMAND_INVALID");
   if (spec.argv.some((arg) => typeof arg !== "string" ||
       ["--token", "--value", "--env", "--build-env", "--prod", "--logs", "--debug"].includes(arg) ||
       /^(?:--token|--value|--env|--build-env)=/.test(arg))) return fail("PROVIDER_COMMAND_INVALID");
@@ -319,7 +321,8 @@ export async function executeVercelAdapterCommand(spec, { cwd, parentEnv = proce
     try { child = spawnImpl(spec.executable, spec.argv, { cwd, env: createVercelChildEnv(parentEnv),
       shell: false, stdio: ["pipe", "pipe", "pipe"] }); }
     catch { return finish(fail("PROVIDER_EXECUTION_FAILED")); }
-    const timer = setTimeout(() => { child.kill(); finish(fail("PROVIDER_TIMEOUT")); }, timeoutMs);
+    const timer = setTimeout(() => { child.kill(mode === "deploy_receipt" ? "SIGKILL" : undefined);
+      finish(fail("PROVIDER_TIMEOUT")); }, timeoutMs);
     const receive = (chunk, stdout) => { size += chunk.length; if (size > 1024 * 1024) { child.kill(); return finish(fail("PROVIDER_OUTPUT_LIMIT")); }
       if (stdout) output += chunk.toString("utf8"); };
     child.stdout.on("data", (chunk) => receive(chunk, true));

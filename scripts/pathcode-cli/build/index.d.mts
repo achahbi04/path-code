@@ -869,6 +869,8 @@ export function createBuildCoordinatorClient(options: {
 }): BuildCoordinatorClient;
 export const ENVIRONMENTS_SCHEMA: "pathcode.p9.environments.v1";
 export const DEPLOYMENTS_SCHEMA: "pathcode.p10.deployments.v1";
+export const DEPLOY_RECONCILIATION_WINDOW_MISSING: "DEPLOY_RECONCILIATION_WINDOW_MISSING";
+export const PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS: number;
 export const VERCEL_LIVE_PROOF_GATES: readonly string[];
 export function emptyDeploymentAuthority(): BuildDeployments;
 export function listBuildDeployments(runtimeRoot: string, buildId: string):
@@ -945,6 +947,7 @@ export const PREVIEW_RECONCILIATION_CODES: Readonly<{
 }>;
 export const MAX_RECONCILIATION_PAGES: number;
 export const MAX_RECONCILIATION_INSPECTIONS: number;
+export const PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS: number;
 export function makePreviewReconciliationPageCommand(input: object): object;
 export function parsePreviewReconciliationPage(raw: unknown, input: object): object;
 export function combinePreviewReconciliation(filtered: object, projectWindow: object): object;

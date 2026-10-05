@@ -51,7 +51,8 @@ export { createProductRuntimeEnv, PRODUCT_HOST_ENV_KEYS } from "./runtime/produc
 export { checkLocalEnvGitSafety } from "./runtime/local-env-safety.mjs";
 export { inspectDeploymentSource, prepareDeploymentSource, cleanupDeploymentSource,
   inspectDeploymentTree, isUnsafeDeploymentPath } from "./deploy-source.mjs";
-export { DEPLOYMENTS_SCHEMA, emptyDeploymentAuthority, listBuildDeployments,
+export { DEPLOYMENTS_SCHEMA, DEPLOY_RECONCILIATION_WINDOW_MISSING,
+  PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS, emptyDeploymentAuthority, listBuildDeployments,
   prepareDeploymentMappingMutation, preflightDeployment, prepareDeploymentOperation,
   transitionDeploymentOperation, reconcileServing, productionActionEligibility,
   prepareFixtureReleaseOperation, finalizeFixtureRelease, recoverDeploymentFoundation, validateOperationSnapshot,
@@ -64,6 +65,7 @@ export { createVercelChildEnv, makePreviewReadCommands, makePreviewDeployCommand
   parsePreviewProjectList, parsePreviewDeploymentReceipt, parsePreviewDeploymentStatus,
   parsePreviewReconciliation, executeVercelAdapterCommand,
   PREVIEW_RECONCILIATION_CODES, MAX_RECONCILIATION_PAGES, MAX_RECONCILIATION_INSPECTIONS,
+  PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS,
   makePreviewReconciliationPageCommand, parsePreviewReconciliationPage,
   combinePreviewReconciliation, makeNoDeploymentObservedEvidence,
   reconcilePreviewWindow } from "./vercel-preview-adapter.mjs";

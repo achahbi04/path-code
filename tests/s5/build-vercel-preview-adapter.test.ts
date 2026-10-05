@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfigCommand,
@@ -6,7 +6,7 @@ import { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfig
   makePreviewInspectCommand, makePreviewReconcileCommand, parsePreviewAuth,
   parsePreviewProjectList, parsePreviewDeploymentReceipt, parsePreviewDeploymentStatus,
   parsePreviewReconciliation, executeVercelAdapterCommand,
-  PREVIEW_RECONCILIATION_CODES } from "../../scripts/pathcode-cli/build/index.mjs";
+  PREVIEW_RECONCILIATION_CODES, PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS } from "../../scripts/pathcode-cli/build/index.mjs";
 
 const operationId = "11111111-1111-4111-8111-111111111111";
 const id = "dpl_12345678";
@@ -166,5 +166,43 @@ describe("P10.2A installed CLI 59.10.0 preview contracts; no provider calls", ()
     const result = await executeVercelAdapterCommand(command, { cwd: "/tmp", mode: "deploy_receipt", spawnImpl: fakeSpawn });
     expect(result).toEqual({ ok: false, code: "PROVIDER_SUBMISSION_REJECTED" });
     expect(JSON.stringify(result)).not.toContain("RAW_DIAGNOSTIC_SENTINEL");
+  });
+
+  it("enforces one Preview deploy timeout and rejects overrides before spawning", async () => {
+    expect(PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS).toBe(30_000);
+    const command = makePreviewDeployCommand({ projectRef, operationId });
+    let spawned = 0;
+    let killedWith: string | undefined;
+    const fakeSpawn = () => {
+      spawned += 1;
+      const child = new EventEmitter() as any;
+      child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+      child.kill = (signal?: string) => { killedWith = signal; };
+      return child;
+    };
+    expect(await executeVercelAdapterCommand(command, { cwd: "/tmp", mode: "deploy_receipt",
+      timeoutMs: 60_000, spawnImpl: fakeSpawn })).toEqual({ ok: false, code: "PROVIDER_COMMAND_INVALID" });
+    expect(await executeVercelAdapterCommand(command, { cwd: "/tmp", mode: "deploy_receipt",
+      timeoutMs: 1, spawnImpl: fakeSpawn })).toEqual({ ok: false, code: "PROVIDER_COMMAND_INVALID" });
+    expect(spawned).toBe(0);
+    vi.useFakeTimers();
+    try {
+      const pending = executeVercelAdapterCommand(command, { cwd: "/tmp", mode: "deploy_receipt", spawnImpl: fakeSpawn });
+      expect(spawned).toBe(1);
+      await vi.advanceTimersByTimeAsync(PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS - 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await pending).toEqual({ ok: false, code: "PROVIDER_TIMEOUT" });
+      expect(killedWith).toBe("SIGKILL");
+    } finally { vi.useRealTimers(); }
+    const other = makePreviewReconcileCommand({ projectRef, operationId });
+    const result = await executeVercelAdapterCommand(other, { cwd: "/tmp", mode: "reconcile",
+      timeoutMs: 1, context: { projectRef, operationId },
+      spawnImpl: (_bin: string, _args: string[], _options: object) => {
+        const child = fakeSpawn();
+        child.stdin.on("finish", () => { child.stdout.end(JSON.stringify({ contextName: "x", deployments: [], pagination: { next: null } }));
+          queueMicrotask(() => child.emit("close", 0)); });
+        return child;
+      } });
+    expect(result).toMatchObject({ ok: true });
   });
 });
