@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { createBuildRecordSkeleton, recoverDeploymentFoundation,
   transitionDeploymentOperation, PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS,
   PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS,
@@ -11,10 +12,10 @@ const mappingId = "33333333-3333-3333-3333-333333333333";
 const failureCode = "PROVIDER_SUBMISSION_NOT_OBSERVED";
 const at = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
 
-function fixture(ageMs = 600_000, submissionLagMs = 600_000) {
+function fixture(ageMs = 600_000, submissionLagMs = 600_000, referenceNowMs = Date.now()) {
   const record = createBuildRecordSkeleton({ outcome: "Preview" });
-  const uncertainAt = at(-ageMs);
-  const submissionBoundaryAt = at(-ageMs - submissionLagMs);
+  const uncertainAt = new Date(referenceNowMs - ageMs).toISOString();
+  const submissionBoundaryAt = new Date(referenceNowMs - ageMs - submissionLagMs).toISOString();
   const reconciliationWindow = {
     windowStart: new Date(Date.parse(submissionBoundaryAt) - PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS).toISOString(),
     windowEnd: new Date(Date.parse(submissionBoundaryAt) + PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS +
@@ -40,7 +41,7 @@ function fixture(ageMs = 600_000, submissionLagMs = 600_000) {
     windowStart: reconciliationWindow.windowStart, windowEnd: reconciliationWindow.windowEnd,
     metadataFilteredLookup: { completed: true, exhausted: true, nextCursor: null, exactMatchCount: 0 },
     projectWindowLookup: { completed: true, exhausted: true, nextCursor: null, exactOperationMatchCount: 0 },
-    completedAt: at(0),
+    completedAt: new Date(referenceNowMs).toISOString(),
   };
   return { record, evidence };
 }
@@ -52,6 +53,21 @@ function close(record: ReturnType<typeof fixture>["record"], evidence: object,
 }
 
 describe("P10 uncertain submission with no observed provider deployment", () => {
+  it("keeps the canonical provider-time allowance rationale and window formula in source", () => {
+    const source = readFileSync(new URL("../../scripts/pathcode-cli/build/deployments.mjs", import.meta.url), "utf8");
+    const declaration = source.indexOf("export const PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS");
+    expect(declaration).toBeGreaterThan(0);
+    const contract = source.slice(source.lastIndexOf("/**", declaration), declaration);
+    expect(contract).toMatch(/PATH\/provider clock offset/i);
+    expect(contract).toMatch(/provider-side latency[\s\S]*deployment-createdAt stamp/i);
+    expect(contract).toMatch(/\*\/\s*$/);
+    const windowFunction = source.match(/function submissionWindow\(boundaryAt\) \{([\s\S]*?)\n\}/)?.[1];
+    expect(windowFunction).toBeDefined();
+    expect(windowFunction).toMatch(/windowStart:\s*new Date\(boundary - PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS\)/);
+    expect(windowFunction).toMatch(/windowEnd:\s*new Date\(boundary \+ PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS \+\s*PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS\)/);
+    expect(windowFunction).not.toMatch(/\b(?:30_?000|300_?000)\b/);
+  });
+
   it("terminalizes the same attempt without a provider identity, release, or retry", () => {
     const { record, evidence } = fixture();
     expect(recoverDeploymentFoundation(record)).toMatchObject({ state: "provider_outcome_uncertain", retry: false });
@@ -267,6 +283,27 @@ describe("P10 uncertain submission with no observed provider deployment", () => 
     expect(close(premature.record, premature.evidence)).toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
     const settled = fixture(120_000, 4 * 60 * 60 * 1000);
     expect(close(settled.record, settled.evidence)).toMatchObject({ ok: true });
+  });
+
+  it("settles from the same uncertain time across independently frozen submission windows", () => {
+    const now = Date.now();
+    const makePair = (ageMs: number) => {
+      return { first: fixture(ageMs, 600_000, now), second: fixture(ageMs, 1_200_000, now) };
+    };
+    const premature = makePair(30_000);
+    expect(premature.first.record.deployments!.pendingOperation!.updatedAt)
+      .toBe(premature.second.record.deployments!.pendingOperation!.updatedAt);
+    expect(premature.first.evidence.completedAt).toBe(premature.second.evidence.completedAt);
+    expect(premature.first.evidence.windowStart).not.toBe(premature.second.evidence.windowStart);
+    for (const item of [premature.first, premature.second])
+      expect(close(item.record, item.evidence)).toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    const settled = makePair(120_000);
+    expect(settled.first.record.deployments!.pendingOperation!.updatedAt)
+      .toBe(settled.second.record.deployments!.pendingOperation!.updatedAt);
+    expect(settled.first.evidence.completedAt).toBe(settled.second.evidence.completedAt);
+    expect(settled.first.evidence.windowStart).not.toBe(settled.second.evidence.windowStart);
+    for (const item of [settled.first, settled.second])
+      expect(close(item.record, item.evidence)).toMatchObject({ ok: true });
   });
 
   it("fails closed for a legacy pending operation without inventing a window", () => {

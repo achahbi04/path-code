@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,12 +9,15 @@ import { createBuildRecordSkeleton, createBuildCoordinatorClient, readBuildRecor
   combinePreviewReconciliation, PREVIEW_RECONCILIATION_CODES, PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS,
   PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS } from "../../scripts/pathcode-cli/build/index.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
+import * as previewAdapter from "../../scripts/pathcode-cli/build/index.mjs";
 
 describe("P10 Preview transaction through the scoped coordinator", () => {
   let root = "";
   let server: Awaited<ReturnType<typeof startBuildCoordinatorServer>> | null = null;
   let client: ReturnType<typeof createBuildCoordinatorClient> | null = null;
   afterEach(async () => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     client?.close(); client = null;
     if (server) { await server.stop(); server = null; }
     if (root) rmSync(root, { recursive: true, force: true });
@@ -270,16 +273,19 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     const prepared = await s.prepare();
     const operationId = prepared.operationId!;
     const deploymentId = prepared.deploymentId!;
+    const adapterSpy = vi.spyOn(previewAdapter, "executeVercelAdapterCommand");
+    const providerDeployInvocationCount = () => adapterSpy.mock.calls.filter(([, options]) =>
+      (options as { mode?: string })?.mode === "deploy_receipt").length;
+    vi.useFakeTimers({ toFake: ["Date"] });
     expect(await s.transition(operationId, deploymentId, 2, "submitting"))
       .toMatchObject({ ok: true, revision: 3 });
     const onDisk = readBuildRecord(root, s.target.buildId)!;
     expect(onDisk.deployments!.pendingOperation).toMatchObject({ operationId, deploymentId,
       state: "submitting", providerDeploymentId: null });
-    // Fixture sets T0 several hours before the simulated crash/restart. The
-    // same frozen pair must survive both restarts; no provider command runs.
-    const frozenWindow = ageFixtureSubmissionBoundary(onDisk, new Date(Date.now() - 4 * 60 * 60 * 1000));
+    const frozenWindow = structuredClone(onDisk.deployments!.pendingOperation!.reconciliationWindow!) as
+      { windowStart: string; windowEnd: string };
     const submissionBoundaryAt = onDisk.deployments!.pendingOperation!.submissionBoundaryAt;
-    writeBuildRecord(root, onDisk);
+    expect(providerDeployInvocationCount()).toBe(0);
     // No adapter/deploy stub is invoked; the durable boundary is the last act.
     client!.close(); client = null;
     await server!.stop(); server = null;
@@ -294,6 +300,8 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(recoverDeploymentFoundation(restarted)).toEqual({ ok: true,
       state: "provider_outcome_uncertain", retry: false });
     expect(await s.prepare(3)).toMatchObject({ ok: false, code: "DEPLOY_OPERATION_PENDING" });
+    expect(providerDeployInvocationCount()).toBe(0);
+    vi.setSystemTime(new Date(Date.parse(submissionBoundaryAt as string) + 4 * 60 * 60 * 1000));
     expect(await s.transition(operationId, deploymentId, 3, "uncertain"))
       .toMatchObject({ ok: true, revision: 4 });
     expect(await s.transition(operationId, deploymentId, 4, "submitting"))
@@ -301,13 +309,17 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     const uncertain = readBuildRecord(root, s.target.buildId)!;
     expect(uncertain.deployments!.pendingOperation).toMatchObject({ submissionBoundaryAt,
       reconciliationWindow: frozenWindow });
+    const uncertainAt = uncertain.deployments!.pendingOperation!.updatedAt as string;
+    expect(Date.parse(uncertainAt)).toBeGreaterThan(Date.parse(frozenWindow.windowEnd));
     expect(recoverDeploymentFoundation(uncertain)).toEqual({ ok: true,
       state: "provider_outcome_uncertain", retry: false });
+    expect(providerDeployInvocationCount()).toBe(0);
     const incompleteSource = (mode: string) => ({ ok: true, mode, ...frozenWindow,
       completed: true, exhausted: false, nextCursor: 123, matches: [], exactMatchCount: 0 });
     expect(combinePreviewReconciliation(incompleteSource("METADATA_FILTERED_OPERATION"),
       incompleteSource("PROJECT_WINDOW"))).toEqual({ ok: false,
         code: PREVIEW_RECONCILIATION_CODES.INCOMPLETE });
+    expect(providerDeployInvocationCount()).toBe(0);
     client!.close(); client = null;
     await server!.stop(); server = null;
     server = await startBuildCoordinatorServer({ runtimeRoot: root,
@@ -319,11 +331,8 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
       submissionBoundaryAt, reconciliationWindow: frozenWindow });
     expect(recoverDeploymentFoundation(secondRestart)).toEqual({ ok: true,
       state: "provider_outcome_uncertain", retry: false });
-    // Fixture ages the persisted uncertain boundary to satisfy B5R's own
-    // 120-second settlement guard. This never mutates a live Build.
-    const uncertainAt = new Date(Date.now() - 600_000);
-    secondRestart.deployments!.pendingOperation!.updatedAt = uncertainAt.toISOString();
-    writeBuildRecord(root, secondRestart);
+    expect(secondRestart.deployments!.pendingOperation!.updatedAt).toBe(uncertainAt);
+    expect(providerDeployInvocationCount()).toBe(0);
     const { windowStart, windowEnd } = frozenWindow;
     const source = (mode: string) => ({ ok: true, mode, windowStart, windowEnd,
       completed: true, exhausted: true, nextCursor: null, matches: [],
@@ -332,11 +341,21 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     const projectWindow = source("PROJECT_WINDOW");
     expect(combinePreviewReconciliation(filtered, projectWindow)).toMatchObject({
       ok: true, outcome: "VALID_ZERO_ZERO_EVIDENCE_CANDIDATE", retry: false });
+    expect(providerDeployInvocationCount()).toBe(0);
     const mapping = uncertain.deployments!.mappings[0]!;
-    const mapped = makeNoDeploymentObservedEvidence({ buildId: s.target.buildId, operationId,
+    const evidenceAtCurrentTime = () => makeNoDeploymentObservedEvidence({ buildId: s.target.buildId, operationId,
       deploymentId, mappingId: mapping.mappingId, teamRef: null,
       projectRef: "product", target: "preview" }, filtered, projectWindow,
     new Date().toISOString()) as any;
+    const premature = evidenceAtCurrentTime();
+    expect(premature.ok).toBe(true);
+    expect(await s.transition(operationId, deploymentId, 4, "failed", {
+      failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED", reconciliationEvidence: premature.evidence,
+    })).toMatchObject({ ok: false, code: "DEPLOY_TRANSITION_INVALID" });
+    expect(readBuildRecord(root, s.target.buildId)!.deployments!.pendingOperation!.updatedAt).toBe(uncertainAt);
+    expect(providerDeployInvocationCount()).toBe(0);
+    vi.setSystemTime(new Date(Date.parse(uncertainAt) + 120_000));
+    const mapped = evidenceAtCurrentTime();
     expect(mapped.ok).toBe(true);
     expect(await s.transition(operationId, deploymentId, 4, "failed", {
       failureCode: "PROVIDER_SUBMISSION_NOT_OBSERVED", reconciliationEvidence: mapped.evidence,
@@ -349,6 +368,7 @@ describe("P10 Preview transaction through the scoped coordinator", () => {
     expect(final.releases).toEqual([]);
     expect(final.currentProductionReleaseId).toBeNull();
     expect(readFileSync(s.otherPath)).toEqual(s.unrelatedBefore);
+    expect(providerDeployInvocationCount()).toBe(0);
   });
 
   it("retains a known provider identity through unknown status and a polling stop", async () => {
