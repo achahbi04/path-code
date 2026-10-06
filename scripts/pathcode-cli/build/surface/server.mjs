@@ -652,6 +652,37 @@ export async function startPathBuildSurface(options) {
         const action = buildMatch[2] || "";
         const sub = buildMatch[3] || "";
 
+        if (action === "production-deployments") {
+          if (method === "GET" && !sub) {
+            const listed = await coordinator.listDeployments(buildId);
+            sendJson(res, listed.ok ? 200 : 404, listed.ok ? listed : { ok: false, code: listed.code });
+            return;
+          }
+          if (method === "POST" && ["prepare", "submit", "reconcile", "observe"].includes(sub)) {
+            if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) {
+              sendJson(res, 409, { ok: false, code: "RESTORE_PENDING" });
+              return;
+            }
+            let body;
+            try { body = await readJsonBody(req); } catch { body = null; }
+            const allowed = sub === "prepare" ? ["environmentId", "expectedRevision", "expectedEnvironmentRevision", "acknowledgeUnknownPresence"] :
+              sub === "submit" ? ["operationId", "deploymentId", "expectedRevision"] : ["operationId", "deploymentId"];
+            if (!body || typeof body !== "object" || Array.isArray(body) ||
+                Object.keys(body).some((key) => !allowed.includes(key)) ||
+                (sub === "prepare" && (!Number.isSafeInteger(body.expectedRevision) || !Number.isSafeInteger(body.expectedEnvironmentRevision))) ||
+                (sub === "submit" && !Number.isSafeInteger(body.expectedRevision))) {
+              sendJson(res, 400, { ok: false, code: "DEPLOY_REQUEST_INVALID" });
+              return;
+            }
+            const result = sub === "prepare" ? await coordinator.prepareProductionDeployment(buildId, body) :
+              sub === "submit" ? await coordinator.submitProductionDeployment(buildId, body) :
+              sub === "reconcile" ? await coordinator.reconcileProductionDeployment(buildId, body) :
+              await coordinator.observeProductionDeployment(buildId, body);
+            sendJson(res, result.ok ? 200 : 409, result);
+            return;
+          }
+        }
+
         if (action === "environments") {
           if (method === "GET" && !sub) {
             const listed = await coordinator.listEnvironments(buildId);

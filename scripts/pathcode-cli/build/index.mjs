@@ -52,9 +52,11 @@ export { checkLocalEnvGitSafety } from "./runtime/local-env-safety.mjs";
 export { inspectDeploymentSource, prepareDeploymentSource, cleanupDeploymentSource,
   inspectDeploymentTree, isUnsafeDeploymentPath } from "./deploy-source.mjs";
 export { DEPLOYMENTS_SCHEMA, DEPLOY_RECONCILIATION_WINDOW_MISSING,
-  PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS, emptyDeploymentAuthority, listBuildDeployments,
+  PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS, PRODUCTION_DEPLOY_EXECUTION_TIMEOUT_MS,
+  PRODUCTION_CREATION_TIME_SAFETY_ALLOWANCE_MS, emptyDeploymentAuthority, listBuildDeployments,
   prepareDeploymentMappingMutation, preflightDeployment, prepareDeploymentOperation,
-  transitionDeploymentOperation, reconcileServing, productionActionEligibility,
+  prepareProductionDeploymentOperation, transitionDeploymentOperation,
+  transitionProductionDeploymentOperation, reconcileServing, productionActionEligibility,
   prepareFixtureReleaseOperation, finalizeFixtureRelease, recoverDeploymentFoundation, validateOperationSnapshot,
   canonicalConfigDigest, validateDeploymentLocator } from "./deployments.mjs";
 export { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfigCommand,
@@ -70,6 +72,14 @@ export { createVercelChildEnv, makePreviewReadCommands, makePreviewDeployCommand
   makePreviewReconciliationPageCommand, parsePreviewReconciliationPage,
   combinePreviewReconciliation, makeNoDeploymentObservedEvidence,
   reconcilePreviewWindow } from "./vercel-preview-adapter.mjs";
+export { makeProductionDeployCommand, makeProductionInspectCommand,
+  makeProductionAuthCommand, makeProductionProjectCommand,
+  makeProductionIdentityInspectCommand, makeProductionReconciliationPageCommand,
+  makeProductionConfigMetadataCommand, makeProductionConfigCommand,
+  parseProductionDeploymentReceipt, parseProductionDeploymentStatus,
+  parseProductionReconciliationPage, combineProductionReconciliation,
+  reconcileProductionDeployment, executeProductionVercelCommand,
+  MAX_PRODUCTION_RECONCILIATION_PAGES, MAX_PRODUCTION_IDENTITY_INSPECTIONS } from "./vercel-production-adapter.mjs";
 export { captureBrowserEvidence } from "./runtime/browser-evidence.mjs";
 export {
   adoptEngineerResultIntoBuild,

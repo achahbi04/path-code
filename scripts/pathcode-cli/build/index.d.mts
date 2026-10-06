@@ -834,6 +834,10 @@ export interface BuildCoordinatorClient {
   mutateDeploymentMapping(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; mappingId?: string }>;
   prepareDeployment(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; operationId?: string; deploymentId?: string }>;
   transitionDeployment(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; state?: string }>;
+  prepareProductionDeployment(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; operationId?: string; deploymentId?: string }>;
+  submitProductionDeployment(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; providerDeploymentId?: string; providerUrl?: string; providerState?: string; state?: string }>;
+  reconcileProductionDeployment(buildId: string, input: object): Promise<object>;
+  observeProductionDeployment(buildId: string, input: object): Promise<object>;
   readEnvironment(buildId: string, environmentId: string): Promise<ReturnType<typeof readBuildEnvironment>>;
   readSecretBinding(buildId: string, environmentId: string, secretRef: string): Promise<ReturnType<typeof readBuildSecretBinding>>;
   mutateEnvironment(buildId: string, action: string, expectedEnvironmentRevision: number, input: object):
@@ -871,6 +875,8 @@ export const ENVIRONMENTS_SCHEMA: "pathcode.p9.environments.v1";
 export const DEPLOYMENTS_SCHEMA: "pathcode.p10.deployments.v1";
 export const DEPLOY_RECONCILIATION_WINDOW_MISSING: "DEPLOY_RECONCILIATION_WINDOW_MISSING";
 export const PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS: number;
+export const PRODUCTION_DEPLOY_EXECUTION_TIMEOUT_MS: number;
+export const PRODUCTION_CREATION_TIME_SAFETY_ALLOWANCE_MS: number;
 export const VERCEL_LIVE_PROOF_GATES: readonly string[];
 export function emptyDeploymentAuthority(): BuildDeployments;
 export function listBuildDeployments(runtimeRoot: string, buildId: string):
@@ -883,6 +889,8 @@ export function preflightDeployment(runtimeRoot: string, buildId: string, enviro
 export function prepareDeploymentMappingMutation(runtimeRoot: string, buildId: string, request: object):
   { ok: boolean; code?: string; record?: BuildRecord; revision?: number; mappingId?: string | null };
 export function prepareDeploymentOperation(runtimeRoot: string, buildId: string, request: object):
+  { ok: boolean; code?: string; record?: BuildRecord; revision?: number; operationId?: string; deploymentId?: string };
+export function prepareProductionDeploymentOperation(runtimeRoot: string, buildId: string, request: object):
   { ok: boolean; code?: string; record?: BuildRecord; revision?: number; operationId?: string; deploymentId?: string };
 export type NoDeploymentObservedReconciliationEvidence = {
   buildId: string;
@@ -915,6 +923,7 @@ export function isUnsafeDeploymentPath(path: string): boolean;
 export function canonicalConfigDigest(entries: Array<{ kind: string; variableName: string; value?: string }>): string;
 export function validateDeploymentLocator(mapping: object, variables: object[]): { ok: boolean; code?: string; unknownSecretPresence?: boolean };
 export function transitionDeploymentOperation(record: BuildRecord, input: object): { ok: boolean; code?: string; record?: BuildRecord };
+export function transitionProductionDeploymentOperation(record: BuildRecord, input: object): { ok: boolean; code?: string; record?: BuildRecord };
 export function reconcileServing(record: BuildRecord, safeObservation: object | null): { ok: boolean; code?: string; record: BuildRecord; serving: BuildDeployments["serving"] };
 export function productionActionEligibility(record: BuildRecord, action: string, deploymentId: string): object;
 export function finalizeFixtureRelease(record: BuildRecord, input: object): { ok: boolean; code?: string; record?: BuildRecord; releaseId?: string };
@@ -928,6 +937,22 @@ export function parseVercelDeploymentReceipt(raw: unknown): object;
 export function parseVercelServingObservation(raw: unknown): object;
 export function operationMetadata(input: object): object;
 export function createVercelChildEnv(parent?: Record<string, string | undefined>): Record<string, string>;
+export function makeProductionDeployCommand(input: object): any;
+export function makeProductionAuthCommand(input: object): any;
+export function makeProductionProjectCommand(input: object): any;
+export function makeProductionInspectCommand(input: object): any;
+export function makeProductionIdentityInspectCommand(input: object): any;
+export function makeProductionReconciliationPageCommand(input: object): any;
+export function makeProductionConfigMetadataCommand(input: object): any;
+export function makeProductionConfigCommand(input: object): any;
+export function parseProductionDeploymentReceipt(raw: unknown, context: object): any;
+export function parseProductionDeploymentStatus(raw: unknown, context: object): any;
+export function parseProductionReconciliationPage(raw: unknown, context: object): any;
+export function combineProductionReconciliation(filtered: object, projectWindow: object): any;
+export function reconcileProductionDeployment(input: object, executors: object): Promise<any>;
+export function executeProductionVercelCommand(spec: object, options: object): Promise<any>;
+export const MAX_PRODUCTION_RECONCILIATION_PAGES: number;
+export const MAX_PRODUCTION_IDENTITY_INSPECTIONS: number;
 export function makePreviewReadCommands(input: object): object;
 export function makePreviewDeployCommand(input: object): object;
 export function makePreviewInspectCommand(input: object): object;
@@ -967,7 +992,8 @@ export function readBuildSecretBinding(runtimeRoot: string, buildId: string, env
   { ok: false; code: string };
 export function createBuildCoordinatorService(options: {
   runtimeRoot: string; packageRoot: string; fakeMode?: boolean; preferredEngine?: string | null;
-  scopedBuildId?: string;
+  scopedBuildId?: string; productionCommandExecutor?: (spec: any, options: any) => Promise<any>;
+  productionSpawnImpl?: (...args: any[]) => any;
 }): Promise<{
   dispatch(method: string, params?: Record<string, unknown>): Promise<any>;
   whenReady: Promise<unknown>;

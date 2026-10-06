@@ -14,6 +14,9 @@ const only = (object, allowed) => object && typeof object === "object" && !Array
 const now = () => new Date().toISOString();
 const NO_DEPLOYMENT_SETTLEMENT_MS = 120_000;
 export const DEPLOY_RECONCILIATION_WINDOW_MISSING = "DEPLOY_RECONCILIATION_WINDOW_MISSING";
+export const PRODUCTION_DEPLOY_EXECUTION_TIMEOUT_MS = 120_000;
+// Bounded V1 observation allowance, not a provider guarantee; P10.3D validates it.
+export const PRODUCTION_CREATION_TIME_SAFETY_ALLOWANCE_MS = 600_000;
 /** V1 headroom for both PATH/provider clock offset and provider-side latency
  * between request acceptance and the immutable deployment-createdAt stamp. */
 export const PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS = 300_000;
@@ -29,6 +32,13 @@ function submissionWindow(boundaryAt) {
   return { windowStart: new Date(boundary - PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS).toISOString(),
     windowEnd: new Date(boundary + PREVIEW_DEPLOY_EXECUTION_TIMEOUT_MS +
       PROVIDER_CREATION_TIME_SAFETY_ALLOWANCE_MS).toISOString() };
+}
+
+function productionSubmissionWindow(boundaryAt) {
+  const boundary = Date.parse(boundaryAt);
+  return { windowStart: new Date(boundary - PRODUCTION_CREATION_TIME_SAFETY_ALLOWANCE_MS).toISOString(),
+    windowEnd: new Date(boundary + PRODUCTION_DEPLOY_EXECUTION_TIMEOUT_MS +
+      PRODUCTION_CREATION_TIME_SAFETY_ALLOWANCE_MS).toISOString() };
 }
 
 function hasFrozenSubmissionWindow(op, deployment) {
@@ -247,6 +257,37 @@ export function prepareDeploymentOperation(runtimeRoot, buildId, request) {
     operationId, deploymentId };
 }
 
+/** Explicit Production-only preparation. Generic coordinator preparation is Preview-only. */
+export function prepareProductionDeploymentOperation(runtimeRoot, buildId, request) {
+  if (!only(request, ["environmentId", "expectedRevision", "expectedEnvironmentRevision", "acknowledgeUnknownPresence"]) ||
+      !id(request.environmentId) || !Number.isSafeInteger(request.expectedRevision) ||
+      !Number.isSafeInteger(request.expectedEnvironmentRevision)) return fail("DEPLOY_REQUEST_INVALID");
+  const read = readAuthority(runtimeRoot, buildId);
+  if (!read.ok) return read;
+  const mapping = read.authority.mappings.find((item) => item.environmentId === request.environmentId && item.provider === "vercel");
+  if (!mapping || mapping.targetRef !== "production") return fail("DEPLOY_TARGET_INVALID");
+  const result = prepareDeploymentOperation(runtimeRoot, buildId, request);
+  if (!result.ok) return result;
+  const record = structuredClone(result.record);
+  const authority = record.deployments;
+  const op = authority.pendingOperation;
+  const deployment = authority.deployments.find((item) => item.deploymentId === result.deploymentId);
+  const environmentResult = listBuildEnvironments(runtimeRoot, buildId);
+  const environment = environmentResult.ok && environmentResult.items.find((item) => item.environmentId === request.environmentId);
+  if (!op || !deployment || !environment) return fail("DEPLOYMENTS_INVALID");
+  const configSnapshot = environment.variables.filter((item) => item.kind === "config")
+    .map(({ variableName, value }) => ({ kind: "config", variableName, value })).sort((a, b) => a.variableName.localeCompare(b.variableName));
+  const secretBindings = environment.variables.filter((item) => item.kind === "secret").map((item) => ({
+    variableName: item.variableName, secretRef: item.secretRef, backend: item.backend,
+    descriptor: { ...item.descriptor }, bindingState: item.bindingState, presenceState: item.presenceState,
+    ...(item.safetyState ? { safetyState: item.safetyState } : {}),
+  }));
+  Object.assign(op.snapshot, { provider: "vercel", teamRef: mapping.teamRef, projectRef: mapping.projectRef,
+    target: "production", configSnapshot, secretBindings });
+  Object.assign(deployment, { teamRef: mapping.teamRef, projectRef: mapping.projectRef, target: "production" });
+  return { ...result, record };
+}
+
 /** Safe fixtures only in P10.1. No provider call, no operation retry. */
 export function transitionDeploymentOperation(record, input) {
   const a = structuredClone(record.deployments ?? emptyDeploymentAuthority());
@@ -259,16 +300,32 @@ export function transitionDeploymentOperation(record, input) {
     return fail(DEPLOY_RECONCILIATION_WINDOW_MISSING);
   const state = input.state;
   const fields = {
+    config_attempt: ["variableName", "configOperation"], config_uncertain: ["variableName"],
     config_receipt: ["variableName"], config_projection_incomplete: [], submitting: [], uncertain: [],
     submitted: ["providerDeploymentId", "providerUrl", "providerState"],
     provider_observation: ["providerDeploymentId", "providerUrl", "providerState"],
     confirmed: ["providerDeploymentId"], failed: ["failureCode", "reconciliationEvidence"],
   }[state];
   if (!fields || !only(input, ["operationId", "deploymentId", "state", ...fields])) return fail("DEPLOY_TRANSITION_INVALID");
-  if (state === "config_receipt") {
+  if (state === "config_attempt") {
+    if (deployment.target !== "production" || !["prepared", "config_projection_incomplete"].includes(op.state) ||
+      !op.snapshot.configNames.includes(input.variableName) || !["add", "update"].includes(input.configOperation) ||
+      op.configProjectionAttempt || op.configReceipts.some((r) => r.variableName === input.variableName)) return fail("DEPLOY_TRANSITION_INVALID");
+    op.configProjectionAttempt = { variableName: input.variableName, operation: input.configOperation, state: "in_flight", startedAt: now() };
+    op.state = "config_projection_incomplete";
+  } else if (state === "config_uncertain") {
+    if (deployment.target !== "production" || op.state !== "config_projection_incomplete" ||
+      op.configProjectionAttempt?.variableName !== input.variableName || op.configProjectionAttempt.state !== "in_flight") return fail("DEPLOY_TRANSITION_INVALID");
+    op.configProjectionAttempt.state = "uncertain";
+    op.configProjectionAttempt.updatedAt = now();
+  } else if (state === "config_receipt") {
     if (!["prepared", "config_projection_incomplete"].includes(op.state) ||
-      !op.snapshot.configNames.includes(input.variableName) || op.configReceipts.some((r) => r.variableName === input.variableName)) return fail("DEPLOY_TRANSITION_INVALID");
+      !op.snapshot.configNames.includes(input.variableName) || op.configReceipts.some((r) => r.variableName === input.variableName) ||
+      deployment.target === "production" && op.snapshot?.target === "production" &&
+        (op.configProjectionAttempt?.variableName !== input.variableName ||
+        op.configProjectionAttempt.state !== "in_flight")) return fail("DEPLOY_TRANSITION_INVALID");
     op.configReceipts.push({ variableName: input.variableName, acknowledgedAt: now() });
+    if (deployment.target === "production" && op.snapshot?.target === "production") op.configProjectionAttempt = null;
     op.state = "config_projection_incomplete";
   } else if (state === "config_projection_incomplete") {
     if (!["prepared", "config_projection_incomplete"].includes(op.state)) return fail("DEPLOY_TRANSITION_INVALID");
@@ -279,6 +336,13 @@ export function transitionDeploymentOperation(record, input) {
     if (deployment.target === "preview") {
       const boundaryAt = now();
       const reconciliationWindow = submissionWindow(boundaryAt);
+      op.submissionBoundaryAt = boundaryAt;
+      op.reconciliationWindow = reconciliationWindow;
+      deployment.submissionBoundaryAt = boundaryAt;
+      deployment.reconciliationWindow = structuredClone(reconciliationWindow);
+    } else if (deployment.target === "production") {
+      const boundaryAt = now();
+      const reconciliationWindow = productionSubmissionWindow(boundaryAt);
       op.submissionBoundaryAt = boundaryAt;
       op.reconciliationWindow = reconciliationWindow;
       deployment.submissionBoundaryAt = boundaryAt;
@@ -330,10 +394,32 @@ export function transitionDeploymentOperation(record, input) {
     deployment.completedAt = now();
     a.pendingOperation = null;
   } else return fail("DEPLOY_TRANSITION_INVALID");
-  if (state !== "provider_observation") deployment.operationState = state === "config_receipt" ? "config_projection_incomplete" : state;
+  if (state !== "provider_observation") deployment.operationState = ["config_attempt", "config_uncertain", "config_receipt"].includes(state)
+    ? "config_projection_incomplete" : state;
   op.updatedAt = now();
   a.revision += 1;
   return { ok: true, record: { ...record, deployments: a }, revision: a.revision };
+}
+
+/** Dedicated transition authority for Production deployment operations. */
+export function transitionProductionDeploymentOperation(record, input) {
+  const authority = record.deployments ?? emptyDeploymentAuthority();
+  const op = authority.pendingOperation;
+  const deployment = op && authority.deployments.find((item) => item.deploymentId === op.deploymentId);
+  if (!op || !deployment || deployment.target !== "production" || op.snapshot?.target !== "production" ||
+      op.snapshot?.provider !== "vercel" || deployment.provider !== "vercel") return fail("DEPLOY_OPERATION_NOT_FOUND");
+  const result = transitionDeploymentOperation(record, input);
+  if (!result.ok) return result;
+  if (["submitting", "uncertain", "submitted"].includes(input.state)) {
+    const next = result.record.deployments.pendingOperation;
+    const dep = result.record.deployments.deployments.find((item) => item.deploymentId === op.deploymentId);
+    const expected = productionSubmissionWindow(next.submissionBoundaryAt || "");
+    if (!validTimestamp(next.submissionBoundaryAt) || next.reconciliationWindow?.windowStart !== expected.windowStart ||
+        next.reconciliationWindow?.windowEnd !== expected.windowEnd || dep.submissionBoundaryAt !== next.submissionBoundaryAt ||
+        dep.reconciliationWindow?.windowStart !== expected.windowStart || dep.reconciliationWindow?.windowEnd !== expected.windowEnd)
+      return fail(DEPLOY_RECONCILIATION_WINDOW_MISSING);
+  }
+  return result;
 }
 
 export function reconcileServing(record, safeObservation) {
@@ -403,8 +489,16 @@ export function recoverDeploymentFoundation(record) {
   const op = record.deployments?.pendingOperation;
   if (!op) return { ok: true, state: "idle" };
   const deployment = record.deployments.deployments.find((item) => item.deploymentId === op.deploymentId);
-  if (deployment?.target === "preview" && ["submitting", "uncertain"].includes(op.state) &&
-      (!deployment || !hasFrozenSubmissionWindow(op, deployment)))
+  const productionWindow = deployment?.target === "production" && validTimestamp(op.submissionBoundaryAt) &&
+    op.submissionBoundaryAt === deployment.submissionBoundaryAt &&
+    op.reconciliationWindow?.windowStart === productionSubmissionWindow(op.submissionBoundaryAt).windowStart &&
+    op.reconciliationWindow?.windowEnd === productionSubmissionWindow(op.submissionBoundaryAt).windowEnd &&
+    deployment.reconciliationWindow?.windowStart === op.reconciliationWindow.windowStart &&
+    deployment.reconciliationWindow?.windowEnd === op.reconciliationWindow.windowEnd;
+  if ((deployment?.target === "preview" ||
+      deployment?.target === "production" && op.snapshot?.target === "production") &&
+      ["submitting", "uncertain"].includes(op.state) &&
+      (!deployment || (deployment.target === "preview" ? !hasFrozenSubmissionWindow(op, deployment) : !productionWindow)))
     return { ok: false, code: DEPLOY_RECONCILIATION_WINDOW_MISSING, retry: false };
   if (op.state === "prepared") return { ok: true, state: "prepared_no_provider_action", retry: false };
   if (op.state === "config_projection_incomplete") return { ok: true, state: "config_projection_incomplete", retry: false };
@@ -422,6 +516,23 @@ export function validateOperationSnapshot(runtimeRoot, buildId, operationId) {
   if (!source.ok || source.sha !== op.snapshot.sourceSha || source.treeSha !== op.snapshot.treeSha) return fail("DEPLOY_SOURCE_STALE");
   const env = listBuildEnvironments(runtimeRoot, buildId);
   if (!env.ok || env.revision !== op.snapshot.environmentRevision) return fail("ENVIRONMENT_REVISION_STALE");
-  if (!read.authority.mappings.some((m) => m.mappingId === op.snapshot.mappingId && m.environmentId === op.snapshot.environmentId)) return fail("DEPLOY_MAPPING_STALE");
+  const mapping = read.authority.mappings.find((m) => m.mappingId === op.snapshot.mappingId && m.environmentId === op.snapshot.environmentId);
+  if (!mapping) return fail("DEPLOY_MAPPING_STALE");
+  if (op.snapshot.target === "production") {
+    if (mapping.provider !== "vercel" || mapping.targetRef !== "production" ||
+        mapping.teamRef !== op.snapshot.teamRef || mapping.projectRef !== op.snapshot.projectRef ||
+        op.snapshot.provider !== "vercel") return fail("DEPLOY_MAPPING_STALE");
+    const selected = env.items.find((item) => item.environmentId === op.snapshot.environmentId);
+    const config = selected?.variables.filter((item) => item.kind === "config")
+      .map(({ variableName, value }) => ({ kind: "config", variableName, value })).sort((a, b) => a.variableName.localeCompare(b.variableName));
+    const secrets = selected?.variables.filter((item) => item.kind === "secret").map((item) => ({
+      variableName: item.variableName, secretRef: item.secretRef, backend: item.backend,
+      descriptor: { ...item.descriptor }, bindingState: item.bindingState, presenceState: item.presenceState,
+      ...(item.safetyState ? { safetyState: item.safetyState } : {}),
+    }));
+    if (!selected || canonicalConfigDigest(selected.variables) !== op.snapshot.configDigest ||
+        JSON.stringify(config) !== JSON.stringify(op.snapshot.configSnapshot) ||
+        JSON.stringify(secrets) !== JSON.stringify(op.snapshot.secretBindings)) return fail("ENVIRONMENT_REVISION_STALE");
+  }
   return { ok: true };
 }

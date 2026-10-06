@@ -25,8 +25,16 @@ import {
 } from "../environments.mjs";
 import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
 import { listBuildDeployments, preflightDeployment, prepareDeploymentMappingMutation,
-  prepareDeploymentOperation, transitionDeploymentOperation, validateOperationSnapshot,
+  prepareDeploymentOperation, prepareProductionDeploymentOperation, transitionDeploymentOperation,
+  transitionProductionDeploymentOperation, validateOperationSnapshot,
   recoverDeploymentFoundation } from "../deployments.mjs";
+import { executeProductionVercelCommand, makeProductionDeployCommand,
+  makeProductionAuthCommand, makeProductionProjectCommand,
+  makeProductionConfigCommand, makeProductionConfigMetadataCommand,
+  makeProductionInspectCommand, makeProductionReconciliationPageCommand,
+  reconcileProductionDeployment } from "../vercel-production-adapter.mjs";
+import { prepareDeploymentSource, cleanupDeploymentSource } from "../deploy-source.mjs";
+import { planVercelConfigProjection } from "../vercel-deploy-contract.mjs";
 import { ensureGateway, readGatewayPid } from "../../gateway/ensure.mjs";
 import { terminateOwnedPid, withTimeout } from "../shutdown.mjs";
 import { readPathPackageVersion } from "../../paths.mjs";
@@ -43,7 +51,12 @@ export async function createBuildCoordinatorService(options) {
     fakeMode = false,
     preferredEngine = null,
     scopedBuildId = null,
+    productionCommandExecutor,
+    productionSpawnImpl,
   } = options;
+  const runProductionCommand = productionCommandExecutor ?? ((spec, executorOptions) =>
+    executeProductionVercelCommand(spec, { ...executorOptions,
+      ...(productionSpawnImpl ? { spawnImpl: productionSpawnImpl } : {}) }));
   const scopedControlPlane = typeof scopedBuildId === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scopedBuildId);
   if (scopedBuildId !== null && !scopedControlPlane) {
@@ -322,6 +335,236 @@ export async function createBuildCoordinatorService(options) {
     };
   }
 
+  function productionOperation(buildId, operationId, deploymentId) {
+    const record = readBuildRecord(runtimeRoot, buildId);
+    const authority = record?.deployments;
+    const op = authority?.pendingOperation;
+    const deployment = op && authority.deployments.find((item) => item.deploymentId === op.deploymentId);
+    if (!record || !op || op.kind !== "deploy" || op.operationId !== operationId ||
+        (deploymentId && op.deploymentId !== deploymentId) || !deployment || deployment.target !== "production" ||
+        op.snapshot?.target !== "production") return { ok: false, code: "DEPLOY_OPERATION_NOT_FOUND" };
+    return { ok: true, record, op, deployment, revision: authority.revision };
+  }
+
+  async function productionWrite(buildId, operationId, deploymentId, expectedRevision, transition) {
+    return exclusive(buildId, () => {
+      const current = productionOperation(buildId, operationId, deploymentId);
+      if (!current.ok) return current;
+      if (current.revision !== expectedRevision) return { ok: false, code: "DEPLOY_REVISION_STALE" };
+      const snapshot = validateOperationSnapshot(runtimeRoot, buildId, operationId);
+      if (!snapshot.ok) return snapshot;
+      const result = transitionProductionDeploymentOperation(current.record, transition);
+      if (!result.ok) return result;
+      writeBuildRecord(runtimeRoot, result.record);
+      try { appendBuildEvent(runtimeRoot, buildId, "production_deployment.transition", {
+        operationId, deploymentId, state: transition.state, revision: result.revision }); } catch { /* record is authority */ }
+      return { ok: true, revision: result.revision, state: transition.state };
+    });
+  }
+
+  async function productionProjectIdentity(snapshot) {
+    const authSpec = makeProductionAuthCommand({ teamRef: snapshot.teamRef });
+    const auth = await runProductionCommand(authSpec, { cwd: packageRoot, mode: "production_auth",
+      context: { teamRef: snapshot.teamRef } });
+    if (!auth.ok) return { ok: false, code: auth.code || "PROVIDER_AUTH_REQUIRED" };
+    const projectSpec = makeProductionProjectCommand({ projectRef: snapshot.projectRef, teamRef: snapshot.teamRef });
+    const project = await runProductionCommand(projectSpec, { cwd: packageRoot, mode: "production_project",
+      context: { projectRef: snapshot.projectRef, teamRef: snapshot.teamRef } });
+    return project.ok ? project : { ok: false, code: project.code || "PROVIDER_PROJECT_UNVERIFIED" };
+  }
+
+  async function submitProductionDeployment(buildId, params) {
+    const initial = await exclusive(buildId, () => {
+      const found = productionOperation(buildId, params.operationId, params.deploymentId);
+      if (!found.ok) return found;
+      if (found.revision !== params.expectedRevision) return { ok: false, code: "DEPLOY_REVISION_STALE" };
+      if (! ["prepared", "config_projection_incomplete"].includes(found.op.state)) return { ok: false, code: "DEPLOY_TRANSITION_INVALID" };
+      if (found.op.configProjectionAttempt) return { ok: false, code: "PROVIDER_CONFIG_OUTCOME_UNKNOWN" };
+      const snapshot = validateOperationSnapshot(runtimeRoot, buildId, params.operationId);
+      return snapshot.ok ? { ok: true, ...found } : snapshot;
+    });
+    if (!initial.ok) return initial;
+
+    const projectIdentity = await productionProjectIdentity(initial.op.snapshot);
+    if (!projectIdentity.ok) return projectIdentity;
+
+    // P9 Config comparison and any Config-only projection happen after durable intent and outside the lock.
+    const metadataSpec = makeProductionConfigMetadataCommand({ projectRef: initial.op.snapshot.projectRef, teamRef: initial.op.snapshot.teamRef });
+    const metadata = await runProductionCommand(metadataSpec, { cwd: packageRoot, mode: "production_config_metadata",
+      context: { projectRef: initial.op.snapshot.projectRef, teamRef: initial.op.snapshot.teamRef } });
+    if (!metadata.ok) return { ok: false, code: metadata.code || "PROVIDER_METADATA_UNSAFE" };
+    const plan = planVercelConfigProjection({ config: initial.op.snapshot.configSnapshot, metadata, target: "production" });
+    if (!plan.ok) return plan;
+    for (const action of plan.actions) {
+      const current = productionOperation(buildId, params.operationId, params.deploymentId);
+      if (!current.ok) return current;
+      if (current.op.configProjectionAttempt) return { ok: false, code: "PROVIDER_CONFIG_OUTCOME_UNKNOWN" };
+      if (!current.op.configReceipts.some((receipt) => receipt.variableName === action.variableName)) {
+        const item = current.op.snapshot.configSnapshot.find((row) => row.variableName === action.variableName);
+        const spec = makeProductionConfigCommand({ ...action, variableName: action.variableName,
+          value: item?.value, projectRef: current.op.snapshot.projectRef, teamRef: current.op.snapshot.teamRef });
+        const attempt = await exclusive(buildId, () => {
+          const latest = productionOperation(buildId, params.operationId, params.deploymentId);
+          if (!latest.ok) return latest;
+          const authorityCheck = validateOperationSnapshot(runtimeRoot, buildId, params.operationId);
+          if (!authorityCheck.ok) return authorityCheck;
+          if (latest.op.configProjectionAttempt) return { ok: false, code: "PROVIDER_CONFIG_OUTCOME_UNKNOWN" };
+          const transition = transitionProductionDeploymentOperation(latest.record, {
+            operationId: params.operationId, deploymentId: params.deploymentId, state: "config_attempt",
+            variableName: action.variableName, configOperation: action.operation });
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          return { ok: true };
+        });
+        if (!attempt.ok) return attempt;
+        let written;
+        try {
+          written = await runProductionCommand(spec, { cwd: packageRoot, mode: "production_config_write",
+            context: { operation: action.operation, variableName: action.variableName,
+              projectRef: current.op.snapshot.projectRef, teamRef: current.op.snapshot.teamRef } });
+        } catch { written = { ok: false, code: "PROVIDER_CONFIG_OUTCOME_UNKNOWN" }; }
+        if (!written.ok) {
+          const uncertain = await exclusive(buildId, () => {
+            const latest = productionOperation(buildId, params.operationId, params.deploymentId);
+            if (!latest.ok) return latest;
+            const transition = transitionProductionDeploymentOperation(latest.record, {
+              operationId: params.operationId, deploymentId: params.deploymentId, state: "config_uncertain",
+              variableName: action.variableName });
+            if (!transition.ok) return transition;
+            writeBuildRecord(runtimeRoot, transition.record);
+            return { ok: true, revision: transition.revision };
+          });
+          return uncertain.ok ? { ok: false, code: "PROVIDER_CONFIG_OUTCOME_UNKNOWN", state: "config_projection_incomplete" } : uncertain;
+        }
+        const receipt = await exclusive(buildId, () => {
+          const latest = productionOperation(buildId, params.operationId, params.deploymentId);
+          if (!latest.ok) return latest;
+          const authorityCheck = validateOperationSnapshot(runtimeRoot, buildId, params.operationId);
+          if (!authorityCheck.ok) return authorityCheck;
+          const transition = transitionProductionDeploymentOperation(latest.record, {
+            operationId: params.operationId, deploymentId: params.deploymentId,
+            state: "config_receipt", variableName: action.variableName });
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          return { ok: true, revision: transition.revision };
+        });
+        if (!receipt.ok) return receipt;
+      }
+    }
+
+    const source = prepareDeploymentSource({ runtimeRoot, buildId });
+    if (!source.ok) return source;
+    const latestBeforeBoundary = productionOperation(buildId, params.operationId, params.deploymentId);
+    if (!latestBeforeBoundary.ok || source.authoritativeSha !== latestBeforeBoundary.op.snapshot.sourceSha ||
+        source.treeSha !== latestBeforeBoundary.op.snapshot.treeSha) {
+      cleanupDeploymentSource({ runtimeRoot, workspace: source.workspace });
+      return { ok: false, code: "DEPLOY_SOURCE_STALE" };
+    }
+    const submitting = await exclusive(buildId, () => {
+      const latest = productionOperation(buildId, params.operationId, params.deploymentId);
+      if (!latest.ok) return latest;
+      const authorityCheck = validateOperationSnapshot(runtimeRoot, buildId, params.operationId);
+      if (!authorityCheck.ok) return authorityCheck;
+      const transition = transitionProductionDeploymentOperation(latest.record, {
+        operationId: params.operationId, deploymentId: params.deploymentId, state: "submitting" });
+      if (!transition.ok) return transition;
+      writeBuildRecord(runtimeRoot, transition.record);
+      return { ok: true, revision: transition.revision, snapshot: latest.op.snapshot };
+    });
+    if (!submitting.ok) { cleanupDeploymentSource({ runtimeRoot, workspace: source.workspace }); return submitting; }
+
+    let outcome;
+    try {
+      const spec = makeProductionDeployCommand({ projectRef: submitting.snapshot.projectRef,
+        teamRef: submitting.snapshot.teamRef, operationId: params.operationId, buildId });
+      outcome = await runProductionCommand(spec, { cwd: source.workspace, mode: "production_deploy_receipt",
+        context: { projectRef: submitting.snapshot.projectRef, teamRef: submitting.snapshot.teamRef,
+          operationId: params.operationId, buildId } });
+    } finally { cleanupDeploymentSource({ runtimeRoot, workspace: source.workspace }); }
+    return exclusive(buildId, () => {
+      const latest = productionOperation(buildId, params.operationId, params.deploymentId);
+      if (!latest.ok || latest.op.state !== "submitting") return latest.ok ? { ok: false, code: "DEPLOY_OPERATION_STALE" } : latest;
+      const authorityCheck = validateOperationSnapshot(runtimeRoot, buildId, params.operationId);
+      if (!authorityCheck.ok) return authorityCheck;
+      const transition = outcome.ok
+        ? transitionProductionDeploymentOperation(latest.record, { operationId: params.operationId,
+            deploymentId: params.deploymentId, state: "submitted", providerDeploymentId: outcome.providerDeploymentId,
+            providerUrl: outcome.url, providerState: outcome.providerState || "INITIALIZING" })
+        : transitionProductionDeploymentOperation(latest.record, {
+              operationId: params.operationId,
+              deploymentId: params.deploymentId, state: "uncertain" });
+      if (!transition.ok) return transition;
+      writeBuildRecord(runtimeRoot, transition.record);
+      return outcome.ok ? { ok: true, revision: transition.revision, providerDeploymentId: outcome.providerDeploymentId,
+        providerUrl: outcome.url, providerState: outcome.providerState || "INITIALIZING" } :
+        { ok: false, code: outcome.code || "PROVIDER_SUBMISSION_OUTCOME_UNKNOWN", state: transition.record.deployments.pendingOperation?.state || "failed" };
+    });
+  }
+
+  async function reconcileProduction(buildId, params) {
+    const initial = productionOperation(buildId, params.operationId, params.deploymentId);
+    if (!initial.ok) return initial;
+    if (! ["uncertain", "submitting"].includes(initial.op.state)) return { ok: false, code: "DEPLOY_TRANSITION_INVALID" };
+    const snapshot = validateOperationSnapshot(runtimeRoot, buildId, params.operationId);
+    if (!snapshot.ok) return snapshot;
+    const projectIdentity = await productionProjectIdentity(initial.op.snapshot);
+    if (!projectIdentity.ok) return { ok: false, outcome: "PROVIDER_RECONCILE_INCOMPLETE" };
+    const context = { projectRef: initial.op.snapshot.projectRef, projectName: projectIdentity.projectName,
+      teamRef: initial.op.snapshot.teamRef, operationId: params.operationId, buildId,
+      windowStart: initial.op.reconciliationWindow?.windowStart, windowEnd: initial.op.reconciliationWindow?.windowEnd };
+    const result = await reconcileProductionDeployment(context, {
+      executePage: (spec, pageContext) => runProductionCommand(spec, { cwd: packageRoot,
+        mode: "production_reconcile_page", context: { ...pageContext, projectName: context.projectName } }),
+      executeIdentity: (spec, identityContext) => runProductionCommand(spec, { cwd: packageRoot,
+        mode: "production_identity_inspect", context: { ...identityContext, teamRef: context.teamRef } }),
+    });
+    if (!result.ok || result.outcome !== "UNIQUE_FACTUAL_MATCH") return result;
+    const current = productionOperation(buildId, params.operationId, params.deploymentId);
+    if (!current.ok || current.op.state !== initial.op.state) return { ok: false, code: "DEPLOY_OPERATION_STALE" };
+    const authorityCheck = validateOperationSnapshot(runtimeRoot, buildId, params.operationId);
+    if (!authorityCheck.ok) return authorityCheck;
+    const transition = await productionWrite(buildId, params.operationId, params.deploymentId, current.revision, {
+      operationId: params.operationId, deploymentId: params.deploymentId, state: "submitted",
+      providerDeploymentId: result.match.providerDeploymentId, providerUrl: result.match.url,
+      providerState: result.match.providerState });
+    return transition.ok ? { ...result, revision: transition.revision } : transition;
+  }
+
+  async function observeProduction(buildId, params) {
+    const initial = productionOperation(buildId, params.operationId, params.deploymentId);
+    if (!initial.ok) return initial;
+    if (initial.op.state !== "submitted" || !initial.op.providerDeploymentId) return { ok: false, code: "DEPLOY_TRANSITION_INVALID" };
+    const snapshot = validateOperationSnapshot(runtimeRoot, buildId, params.operationId);
+    if (!snapshot.ok) return snapshot;
+    const projectIdentity = await productionProjectIdentity(initial.op.snapshot);
+    if (!projectIdentity.ok) return projectIdentity;
+    const spec = makeProductionInspectCommand({ providerDeploymentId: initial.op.providerDeploymentId, teamRef: initial.op.snapshot.teamRef });
+    const observation = await runProductionCommand(spec, { cwd: packageRoot, mode: "production_status",
+      context: { providerDeploymentId: initial.op.providerDeploymentId, teamRef: initial.op.snapshot.teamRef,
+        projectName: projectIdentity.projectName,
+        url: initial.deployment.providerUrl } });
+    if (!observation.ok || observation.url !== initial.deployment.providerUrl || observation.target !== "production")
+      return { ok: false, code: observation.code || "PROVIDER_STATUS_CONTRADICTION" };
+    const latest = productionOperation(buildId, params.operationId, params.deploymentId);
+    if (!latest.ok || latest.revision !== initial.revision || latest.op.state !== "submitted") return { ok: false, code: "DEPLOY_REVISION_STALE" };
+    const result = await productionWrite(buildId, params.operationId, params.deploymentId, latest.revision, {
+      operationId: params.operationId, deploymentId: params.deploymentId, state: "provider_observation",
+      providerDeploymentId: observation.providerDeploymentId, providerUrl: observation.url,
+      providerState: observation.providerState });
+    if (!result.ok) return result;
+    if (["ERROR", "CANCELED"].includes(observation.providerState)) {
+      const failed = productionOperation(buildId, params.operationId, params.deploymentId);
+      return productionWrite(buildId, params.operationId, params.deploymentId, failed.revision, {
+        operationId: params.operationId, deploymentId: params.deploymentId, state: "failed",
+        failureCode: "PROVIDER_BUILD_FAILED" });
+    }
+    if (observation.providerState !== "READY") return { ok: true, ...observation, revision: result.revision, confirmed: false };
+    const after = productionOperation(buildId, params.operationId, params.deploymentId);
+    return productionWrite(buildId, params.operationId, params.deploymentId, after.revision, {
+      operationId: params.operationId, deploymentId: params.deploymentId, state: "confirmed",
+      providerDeploymentId: observation.providerDeploymentId });
+  }
+
   async function dispatch(method, params = {}) {
     const buildId = String(params.buildId || "");
     if (scopedControlPlane && method !== BuildCoordinatorMethods.HELLO &&
@@ -409,7 +652,7 @@ export async function createBuildCoordinatorService(options) {
           const { buildId: _buildId, ...request } = params;
           const result = prepareDeploymentOperation(runtimeRoot, buildId, request);
           if (!result.ok) return result;
-          if (scopedControlPlane && result.record.deployments.deployments.at(-1)?.target !== "preview") {
+          if (result.record.deployments.deployments.at(-1)?.target !== "preview") {
             return { ok: false, code: "DEPLOY_TARGET_FORBIDDEN" };
           }
           writeBuildRecord(runtimeRoot, result.record);
@@ -428,10 +671,11 @@ export async function createBuildCoordinatorService(options) {
           if (!authority || authority.revision !== expectedRevision) return { ok: false, code: "DEPLOY_REVISION_STALE" };
           const op = authority.pendingOperation;
           if (!op || op.kind !== "deploy" || op.operationId !== input.operationId ||
-              op.deploymentId !== input.deploymentId ||
-              authority.deployments.find((item) => item.deploymentId === op.deploymentId)?.target !== "preview") {
+              op.deploymentId !== input.deploymentId) {
             return { ok: false, code: "DEPLOY_OPERATION_NOT_FOUND" };
           }
+          if (authority.deployments.find((item) => item.deploymentId === op.deploymentId)?.target !== "preview")
+            return { ok: false, code: "DEPLOY_TARGET_FORBIDDEN" };
           if (["config_receipt", "config_projection_incomplete", "submitting"].includes(input.state)) {
             const current = validateOperationSnapshot(runtimeRoot, buildId, input.operationId);
             if (!current.ok) return current;
@@ -444,6 +688,32 @@ export async function createBuildCoordinatorService(options) {
             state: input.state, revision: result.revision }); } catch { /* Build record is authority. */ }
           return { ok: true, revision: result.revision, state: input.state };
         });
+      case BuildCoordinatorMethods.BUILD_PRODUCTION_DEPLOYMENT_PREPARE:
+        if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+        return exclusive(buildId, () => {
+          if (Object.keys(params).some((key) => !["buildId", "environmentId", "expectedRevision", "expectedEnvironmentRevision", "acknowledgeUnknownPresence"].includes(key)))
+            return { ok: false, code: "DEPLOY_REQUEST_INVALID" };
+          const { buildId: _buildId, ...request } = params;
+          const result = prepareProductionDeploymentOperation(runtimeRoot, buildId, request);
+          if (!result.ok) return result;
+          writeBuildRecord(runtimeRoot, result.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "production_deployment.prepared", {
+            operationId: result.operationId, deploymentId: result.deploymentId, revision: result.revision }); } catch { /* record is authority */ }
+          return { ok: true, operationId: result.operationId, deploymentId: result.deploymentId, revision: result.revision };
+        });
+      case BuildCoordinatorMethods.BUILD_PRODUCTION_DEPLOYMENT_SUBMIT:
+        if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+        if (Object.keys(params).some((key) => !["buildId", "operationId", "deploymentId", "expectedRevision"].includes(key)) ||
+            !Number.isSafeInteger(params.expectedRevision)) return { ok: false, code: "DEPLOY_REQUEST_INVALID" };
+        return submitProductionDeployment(buildId, params);
+      case BuildCoordinatorMethods.BUILD_PRODUCTION_DEPLOYMENT_RECONCILE:
+        if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+        if (Object.keys(params).some((key) => !["buildId", "operationId", "deploymentId"].includes(key))) return { ok: false, code: "DEPLOY_REQUEST_INVALID" };
+        return reconcileProduction(buildId, params);
+      case BuildCoordinatorMethods.BUILD_PRODUCTION_DEPLOYMENT_OBSERVE:
+        if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+        if (Object.keys(params).some((key) => !["buildId", "operationId", "deploymentId"].includes(key))) return { ok: false, code: "DEPLOY_REQUEST_INVALID" };
+        return observeProduction(buildId, params);
       case BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ:
         return readBuildEnvironment(runtimeRoot, buildId, params.environmentId);
       case BuildCoordinatorMethods.BUILD_SECRET_BINDING_READ:
