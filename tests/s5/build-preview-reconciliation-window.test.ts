@@ -323,6 +323,8 @@ describe("bounded Preview reconciliation through installed CLI list shape", () =
     for (const bad of [{ ...inspect, url: "other.vercel.app" }, { ...inspect, target: "production" },
       { ...inspect, readyState: "PAUSED" }, { ...inspect, unknown: true }])
       expect((parsePreviewReconciliationIdentityStatus(bad, { url, projectName: projectRef }) as any).ok).toBe(false);
+    expect(parsePreviewReconciliationIdentityStatus({ ...inspect, name: "different-project" },
+      { url, projectName: projectRef })).toEqual({ ok: false, code: C.UNSAFE });
     const spec = makePreviewReconciliationIdentityInspectCommand({ url, teamRef: "team-a" }) as any;
     expect(await executeVercelAdapterCommand({ ...spec, argv: [...spec.argv, "--wait"] }, {
       cwd: "/tmp", mode: "reconcile_identity_inspect", context: { url, projectName: projectRef, teamRef: "team-a" },
@@ -346,6 +348,44 @@ describe("bounded Preview reconciliation through installed CLI list shape", () =
     expect(result.match.providerDeploymentId).toBe("dpl_12345678");
     expect(JSON.stringify(result)).not.toContain("contextName");
     expect(JSON.stringify(result)).not.toContain("builds");
+  });
+
+  it("does not let cross-mode identity cache rescue invalid second-source evidence", async () => {
+    const url = "https://example-12345678.vercel.app";
+    const { id: _discarded, ...firstRow } = row();
+    const firstModeRow = { ...firstRow, url: "example-12345678.vercel.app", meta: { pathOperationId: operationId } };
+    const missingMetaRow = { ...firstModeRow } as Record<string, unknown>;
+    delete missingMetaRow.meta;
+    const inspect = { id: "dpl_12345678", name: projectRef, url: "example-12345678.vercel.app",
+      target: "preview", readyState: "READY", createdAt: at("2026-10-03T19:45:00.000Z") };
+    const cases: Array<{ name: string; secondRow: object; expected: object }> = [
+      { name: "missing metadata", secondRow: missingMetaRow, expected: { ok: false, code: C.INCOMPLETE } },
+      { name: "malformed metadata", secondRow: { ...firstModeRow, meta: { pathOperationId: "malformed" } }, expected: { ok: false, code: C.INCOMPLETE } },
+      { name: "different valid operation", secondRow: { ...firstModeRow, meta: { pathOperationId: otherOperationId } }, expected: { ok: false, code: C.CONFLICT } },
+      { name: "outside frozen window", secondRow: { ...firstModeRow, createdAt: at("2026-10-03T19:29:00.000Z") }, expected: { ok: false, code: C.CONFLICT } },
+    ];
+
+    for (const scenario of cases) {
+      const seen: string[][] = [];
+      const spawn = fakeSpawnRouter(argv => {
+        if (argv[0] === "inspect") return inspect;
+        return page(argv.includes("--meta") ? [firstModeRow] : [scenario.secondRow]);
+      }, seen);
+      const result = await reconcilePreviewWindow(context, { cwd: "/tmp", spawnImpl: spawn });
+      expect(result, scenario.name).toEqual(scenario.expected);
+      expect(result).not.toMatchObject({ outcome: "UNIQUE_FACTUAL_MATCH" });
+      const inspectAt = seen.findIndex(args => args[0] === "inspect");
+      const listIndexes = seen.flatMap((args, index) => args[0] === "list" ? [index] : []);
+      expect(listIndexes).toHaveLength(2);
+      expect(inspectAt, `${scenario.name}: first mode must populate cache before second mode`).toBeGreaterThan(listIndexes[0]!);
+      expect(inspectAt, `${scenario.name}: second list mode must follow the cached inspect`).toBeLessThan(listIndexes[1]!);
+      expect(seen[listIndexes[0]!]).toContain("--meta");
+      expect(seen[listIndexes[0]!]).toContain(`pathOperationId=${operationId}`);
+      expect(seen[listIndexes[1]!]).not.toContain("--meta");
+      expect(scenario.secondRow).toMatchObject({ url: "example-12345678.vercel.app" });
+      expect(seen.filter(args => args[0] === "inspect"), `${scenario.name}: cache replaces only repeated inspect`).toHaveLength(1);
+      expect(seen.find(args => args[0] === "inspect")?.slice(0, 3)).toEqual(["inspect", url, "--json"]);
+    }
   });
 
   it("returns incomplete on inspect failure and enforces the unique URL inspection bound", async () => {
