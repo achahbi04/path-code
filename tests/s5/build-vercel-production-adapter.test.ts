@@ -26,6 +26,26 @@ describe("P10.3B Production deployment provider boundary; mocked CLI only", () =
     expect(spec.argv).not.toContain("--prod");
   });
 
+  it("keeps Production deployment target syntax distinct from Vercel list environment syntax", () => {
+    const deploy = makeProductionDeployCommand(common);
+    const metadataList = makeProductionReconciliationPageCommand({ ...common,
+      mode: "METADATA_FILTERED_OPERATION" });
+    const projectWindowList = makeProductionReconciliationPageCommand({ ...common,
+      mode: "PROJECT_WINDOW" });
+
+    expect(deploy.argv).toContain("--target");
+    expect(deploy.argv).toContain("production");
+    expect(deploy.argv).toContain("--skip-domain");
+    expect(metadataList.argv).toContain("--environment");
+    expect(metadataList.argv).toContain("production");
+    expect(metadataList.argv).toContain("--meta");
+    expect(metadataList.argv).toContain(`pathOperationId=${operationId}`);
+    expect(metadataList.argv).not.toContain("--target");
+    expect(projectWindowList.argv).toContain("--environment");
+    expect(projectWindowList.argv).toContain("production");
+    expect(projectWindowList.argv).not.toContain("--target");
+  });
+
   it("keeps Production Config values in stdin and out of argv, display, and safe result", async () => {
     const secretLike = "CONFIG_VALUE_SENTINEL_DO_NOT_LOG";
     const spec = makeProductionConfigCommand({ operation: "add", variableName: "PUBLIC_ORIGIN", value: secretLike,
@@ -89,13 +109,19 @@ describe("P10.3B Production deployment provider boundary; mocked CLI only", () =
     const row = { id: providerDeploymentId, url: "path-production.vercel.app", name: "production-project",
       state: "READY", target: "production", customEnvironment: null, createdAt: Date.parse("2026-10-06T00:02:00.000Z"),
       meta: { pathOperationId: operationId, pathBuildId: buildId, pathProjectRef: "production-project" } };
-    const page = { contextName: "production-project", deployments: [row], pagination: { count: 1, next: null, prev: null } };
+    const page = { contextName: "nordic-rain", deployments: [row], pagination: { count: 1, next: null, prev: null } };
     const result = parseProductionReconciliationPage(page, input);
     expect(result).toMatchObject({ ok: true, matches: [{ providerDeploymentId, url, target: "production" }] });
+    expect(parseProductionReconciliationPage({ ...page, deployments: [{ ...row, name: "some-other-project" }] }, input))
+      .toMatchObject({ ok: false, code: "PROVIDER_RECONCILE_UNSAFE" });
+    expect(parseProductionReconciliationPage({ ...page, deployments: [{ ...row, target: "preview" }] }, input))
+      .toMatchObject({ ok: false, code: "PROVIDER_RECONCILE_UNSAFE" });
+    for (const contextName of ["", "bad context", undefined]) {
+      const malformed = { ...page, contextName };
+      expect(parseProductionReconciliationPage(malformed, input)).toMatchObject({ ok: false, code: "PROVIDER_RECONCILE_UNSAFE" });
+    }
     expect(parseProductionReconciliationPage({ ...page, deployments: [{ ...row, meta: {} }] }, input))
       .toMatchObject({ ok: false, code: "PROVIDER_RECONCILE_INCOMPLETE" });
-    expect(parseProductionReconciliationPage({ ...page, contextName: "other-project" }, input))
-      .toMatchObject({ ok: false, code: "PROVIDER_RECONCILE_UNSAFE" });
     const source = (mode: string, matches: unknown[]) => ({ ok: true, completed: true, nextCursor: null, mode, matches });
     const match = result.ok ? result.matches[0] : null;
     expect(combineProductionReconciliation(source("METADATA_FILTERED_OPERATION", [match]),
@@ -110,12 +136,32 @@ describe("P10.3B Production deployment provider boundary; mocked CLI only", () =
       source("PROJECT_WINDOW", []))).toMatchObject({ ok: true, outcome: "VALID_ZERO_ZERO_EVIDENCE_CANDIDATE" });
   });
 
+  it("accepts a successful empty team-scoped Production list through the strict executor", async () => {
+    const context = { projectRef: "prj_HiUd222ObwDcp1fljJc81JbJWUS7",
+      projectName: "path-p10-production-acceptance", teamRef: "team_SqWewpQeCPwU8WuZNHTGViOO",
+      operationId, buildId, mode: "PROJECT_WINDOW" as const,
+      windowStart: "2026-10-06T00:00:00.000Z", windowEnd: "2026-10-06T00:05:00.000Z" };
+    const spec = makeProductionReconciliationPageCommand(context);
+    const child = new EventEmitter() as any;
+    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough(); child.kill = vi.fn();
+    const spawnImpl = vi.fn(() => child);
+    const resultPromise = executeProductionVercelCommand(spec, { cwd: "/tmp",
+      mode: "production_reconcile_page", context, spawnImpl });
+    expect(spawnImpl).toHaveBeenCalledWith("vercel", ["list", context.projectRef, "--environment", "production",
+      "--json", "--limit", "100", "--scope", context.teamRef], expect.objectContaining({ shell: false }));
+    child.stdout.end(JSON.stringify({ contextName: "nordic-rain", deployments: [],
+      pagination: { count: 0, next: null, prev: null } }));
+    child.emit("close", 0);
+    await expect(resultPromise).resolves.toEqual({ ok: true, mode: "PROJECT_WINDOW", matches: [],
+      nextCursor: null, completed: true });
+  });
+
   it("uses the exact read-only Production list and inspect command forms", () => {
     expect(makeProductionInspectCommand({ providerDeploymentId, teamRef: "team-a" }).argv)
       .toEqual(["inspect", providerDeploymentId, "--json", "--scope", "team-a"]);
     expect(makeProductionReconciliationPageCommand({ ...common, mode: "PROJECT_WINDOW",
       windowStart: "2026-10-06T00:00:00.000Z", windowEnd: "2026-10-06T00:05:00.000Z" }).argv)
-      .toEqual(["list", "production-project", "--target", "production", "--json", "--limit", "100",
+      .toEqual(["list", "production-project", "--environment", "production", "--json", "--limit", "100",
         "--scope", "team-a"]);
   });
 

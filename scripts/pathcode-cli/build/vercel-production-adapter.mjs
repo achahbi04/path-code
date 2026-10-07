@@ -66,11 +66,11 @@ export function makeProductionReconciliationPageCommand({ mode, projectRef, team
       (teamRef !== null && !locator(teamRef)) || !/^[a-f0-9-]{36}$/i.test(String(operationId || "")) ||
       !/^[a-f0-9-]{36}$/i.test(String(buildId || "")) ||
       (nextCursor !== null && (!Number.isSafeInteger(nextCursor) || nextCursor <= 0))) return fail("PRODUCTION_RECONCILE_INVALID");
-  const argv = ["list", projectRef, "--target", "production", "--json", "--limit", "100"];
+  const argv = ["list", projectRef, "--environment", "production", "--json", "--limit", "100"];
   if (mode === "METADATA_FILTERED_OPERATION") argv.push("--meta", `pathOperationId=${operationId}`);
   if (nextCursor !== null) argv.push("--next", String(nextCursor));
   argv.push(...scopeArgs(teamRef));
-  return command(argv, "vercel list <project> --target production --meta <PATH operation> --json --limit 100");
+  return command(argv, "vercel list <project> --environment production --meta <PATH operation> --json --limit 100");
 }
 
 function validCreatedAt(value) { return Number.isSafeInteger(value) && value >= 0; }
@@ -112,7 +112,7 @@ export function parseProductionDeploymentStatus(raw, context) {
 
 export function parseProductionReconciliationPage(raw, { mode, projectName, operationId, buildId, projectRef, windowStart, windowEnd }) {
   if (!object(raw) || !only(raw, ["contextName", "deployments", "pagination"]) ||
-      typeof raw.contextName !== "string" || !Array.isArray(raw.deployments) || raw.deployments.length > 100 ||
+      !locator(raw.contextName) || !Array.isArray(raw.deployments) || raw.deployments.length > 100 ||
       !object(raw.pagination) || !only(raw.pagination, ["count", "next", "prev"]) ||
       !Number.isSafeInteger(raw.pagination.count) || raw.pagination.count < 0 ||
       (raw.pagination.next !== null && (!Number.isSafeInteger(raw.pagination.next) || raw.pagination.next <= 0)) ||
@@ -120,7 +120,6 @@ export function parseProductionReconciliationPage(raw, { mode, projectName, oper
       !/^[a-f0-9-]{36}$/i.test(String(operationId || "")) || !/^[a-f0-9-]{36}$/i.test(String(buildId || "")) ||
       !locator(projectRef) || !Number.isFinite(Date.parse(windowStart)) || !Number.isFinite(Date.parse(windowEnd)) ||
       Date.parse(windowStart) >= Date.parse(windowEnd)) return fail("PROVIDER_RECONCILE_UNSAFE");
-  if (raw.contextName !== projectName) return fail("PROVIDER_RECONCILE_UNSAFE");
   const matches = [];
   const start = Date.parse(windowStart), end = Date.parse(windowEnd);
   for (const row of raw.deployments) {

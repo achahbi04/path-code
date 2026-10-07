@@ -175,7 +175,8 @@ describe("P10.3B Production deployment authority; deterministic provider boundar
       "list", "inspect", "list", "whoami", "project", "inspect"]);
     expect(calls[1]).toContain("--scope"); expect(calls[1]).toContain("team-a");
     expect(calls[3]).toEqual(expect.arrayContaining(["--target", "production", "--skip-domain", "--json", "--no-wait", "--yes", "--scope", "team-a"]));
-    expect(calls[6]).toContain("--target"); expect(calls[6]).toContain("production");
+    expect(calls[6]).toContain("--environment"); expect(calls[6]).toContain("production");
+    expect(calls[6]).not.toContain("--target");
     expect(calls[6]).toContain("--meta");
     expect(calls[7]).toEqual(["inspect", "https://candidate.vercel.app", "--json", "--scope", "team-a"]);
     expect(calls[8]).not.toContain("pathOperationId=");
