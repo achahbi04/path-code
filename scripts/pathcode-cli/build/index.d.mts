@@ -140,6 +140,7 @@ export interface BuildDeployments {
     teamRef: string | null; projectRef: string; targetRef: "preview" | "production"; updatedAt: string }>;
   deployments: Array<Record<string, unknown>>;
   releases: Array<Record<string, unknown>>;
+  releaseOperations?: Array<Record<string, unknown>>;
   currentProductionReleaseId: string | null;
   serving: { state: "verified" | "unknown" | "drifted"; observedProviderDeploymentId: string | null; observedAt: string | null };
   pendingOperation: Record<string, unknown> | null;
@@ -838,6 +839,9 @@ export interface BuildCoordinatorClient {
   submitProductionDeployment(buildId: string, input: object): Promise<{ ok: boolean; code?: string; revision?: number; providerDeploymentId?: string; providerUrl?: string; providerState?: string; state?: string }>;
   reconcileProductionDeployment(buildId: string, input: object): Promise<object>;
   observeProductionDeployment(buildId: string, input: object): Promise<object>;
+  prepareRelease(buildId: string, input: object): Promise<object>;
+  executeRelease(buildId: string, input: object): Promise<object>;
+  observeRelease(buildId: string, input?: object): Promise<object>;
   readEnvironment(buildId: string, environmentId: string): Promise<ReturnType<typeof readBuildEnvironment>>;
   readSecretBinding(buildId: string, environmentId: string, secretRef: string): Promise<ReturnType<typeof readBuildSecretBinding>>;
   mutateEnvironment(buildId: string, action: string, expectedEnvironmentRevision: number, input: object):
@@ -882,6 +886,7 @@ export function emptyDeploymentAuthority(): BuildDeployments;
 export function listBuildDeployments(runtimeRoot: string, buildId: string):
   { ok: boolean; code?: string; schema?: string; revision?: number; mappings?: BuildDeployments["mappings"];
     deployments?: BuildDeployments["deployments"]; releases?: BuildDeployments["releases"];
+    releaseOperations?: BuildDeployments["releaseOperations"];
     currentProductionReleaseId?: string | null; serving?: BuildDeployments["serving"]; pendingOperation?: object | null };
 export function preflightDeployment(runtimeRoot: string, buildId: string, environmentId: string):
   { ok: boolean; code?: string; sourceSha?: string; treeSha?: string; framework?: string;
@@ -928,6 +933,9 @@ export function reconcileServing(record: BuildRecord, safeObservation: object | 
 export function productionActionEligibility(record: BuildRecord, action: string, deploymentId: string): object;
 export function finalizeFixtureRelease(record: BuildRecord, input: object): { ok: boolean; code?: string; record?: BuildRecord; releaseId?: string };
 export function prepareFixtureReleaseOperation(record: BuildRecord, input: object): { ok: boolean; code?: string; record: BuildRecord; operationId: string; revision: number };
+export function prepareReleaseOperation(record: BuildRecord, input: object): { ok: boolean; code?: string; record: BuildRecord; operationId: string; revision: number };
+export function transitionReleaseOperation(record: BuildRecord, input: object): { ok: boolean; code?: string; record?: BuildRecord; revision?: number };
+export function finalizeReleaseOperation(record: BuildRecord, input: object): { ok: boolean; code?: string; record?: BuildRecord; revision?: number; releaseId?: string | null };
 export function recoverDeploymentFoundation(record: BuildRecord): object;
 export function validateOperationSnapshot(runtimeRoot: string, buildId: string, operationId: string): object;
 export function parseVercelConfigMetadata(raw: unknown): object;
@@ -935,6 +943,12 @@ export function planVercelConfigProjection(input: object): object;
 export function makeVercelConfigCommand(input: object): { ok: boolean; code?: string; executable: string; argv: string[]; shell: false; stdinPayload: string; display: string };
 export function parseVercelDeploymentReceipt(raw: unknown): object;
 export function parseVercelServingObservation(raw: unknown): object;
+export function makeProductionAliasesCommand(input?: object): object;
+export function makeProductionReleaseInspectCommand(input: object): object;
+export function makeProductionServingEffectCommand(input: object): object;
+export function parseProductionAliasPage(raw: unknown): object;
+export function observeProductionServing(input: object): Promise<object>;
+export function executeProductionReleaseCommand(spec: object, options: object): Promise<object>;
 export function operationMetadata(input: object): object;
 export function createVercelChildEnv(parent?: Record<string, string | undefined>): Record<string, string>;
 export function makeProductionDeployCommand(input: object): any;
@@ -994,6 +1008,8 @@ export function createBuildCoordinatorService(options: {
   runtimeRoot: string; packageRoot: string; fakeMode?: boolean; preferredEngine?: string | null;
   scopedBuildId?: string; productionCommandExecutor?: (spec: any, options: any) => Promise<any>;
   productionSpawnImpl?: (...args: any[]) => any;
+  releaseCommandExecutor?: (spec: any, options: any) => Promise<any>;
+  releaseSpawnImpl?: (...args: any[]) => any;
 }): Promise<{
   dispatch(method: string, params?: Record<string, unknown>): Promise<any>;
   whenReady: Promise<unknown>;

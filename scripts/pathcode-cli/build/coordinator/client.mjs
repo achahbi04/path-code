@@ -137,6 +137,12 @@ export function createBuildCoordinatorClient(options) {
       request(BuildCoordinatorMethods.BUILD_PRODUCTION_DEPLOYMENT_RECONCILE, { buildId, ...input }),
     observeProductionDeployment: (buildId, input) =>
       request(BuildCoordinatorMethods.BUILD_PRODUCTION_DEPLOYMENT_OBSERVE, { buildId, ...input }),
+    prepareRelease: (buildId, input) =>
+      request(BuildCoordinatorMethods.BUILD_RELEASE_PREPARE, { buildId, ...input }),
+    executeRelease: (buildId, input) =>
+      request(BuildCoordinatorMethods.BUILD_RELEASE_EXECUTE, { buildId, ...input }),
+    observeRelease: (buildId, input = {}) =>
+      request(BuildCoordinatorMethods.BUILD_RELEASE_OBSERVE, { buildId, ...input }),
     readEnvironment: (buildId, environmentId) =>
       request(BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ, { buildId, environmentId }),
     readSecretBinding: (buildId, environmentId, secretRef) =>

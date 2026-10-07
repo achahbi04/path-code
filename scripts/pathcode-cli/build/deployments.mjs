@@ -100,6 +100,7 @@ function validUnobservedSubmissionEvidence(record, authority, op, deployment, ev
 
 export function emptyDeploymentAuthority() {
   return { schema: DEPLOYMENTS_SCHEMA, revision: 0, mappings: [], deployments: [], releases: [],
+    releaseOperations: [],
     currentProductionReleaseId: null, serving: { state: "unknown", observedProviderDeploymentId: null, observedAt: null },
     pendingOperation: null };
 }
@@ -110,7 +111,8 @@ function readAuthority(runtimeRoot, buildId) {
   const authority = record.deployments ?? emptyDeploymentAuthority();
   if (authority.schema !== DEPLOYMENTS_SCHEMA || !Number.isSafeInteger(authority.revision) ||
     !Array.isArray(authority.mappings) || !Array.isArray(authority.deployments) ||
-    !Array.isArray(authority.releases) || !own(authority, "pendingOperation")) return fail("DEPLOYMENTS_INVALID");
+    !Array.isArray(authority.releases) || (own(authority, "releaseOperations") && !Array.isArray(authority.releaseOperations)) ||
+    !own(authority, "pendingOperation")) return fail("DEPLOYMENTS_INVALID");
   return { ok: true, record, authority };
 }
 
@@ -135,13 +137,30 @@ export function listBuildDeployments(runtimeRoot, buildId) {
       reconciliationWindow: safeWindowProjection(d) })),
     releases: a.releases.map((r) => ({ releaseId: r.releaseId, operationId: r.operationId,
       deploymentId: r.deploymentId, action: r.action, providerDeploymentId: r.providerDeploymentId,
+      provider: r.provider ?? "vercel", teamRef: r.teamRef ?? null, mappingId: r.mappingId ?? null,
       projectRef: r.projectRef, sourceSha: r.sourceSha, environmentId: r.environmentId,
+      environmentRevision: r.environmentRevision ?? null,
       releasedAt: r.releasedAt, previousReleaseId: r.previousReleaseId })),
+    releaseOperations: (a.releaseOperations ?? []).map((op) => ({ operationId: op.operationId,
+      kind: op.kind, state: op.state, deploymentId: op.deploymentId,
+      provider: op.provider ?? "vercel", teamRef: op.teamRef ?? null, projectRef: op.projectRef,
+      mappingId: op.mappingId ?? null, sourceSha: op.sourceSha ?? null, treeSha: op.treeSha ?? null,
+      environmentId: op.environmentId ?? null, environmentRevision: op.environmentRevision ?? null,
+      targetProviderDeploymentId: op.targetProviderDeploymentId, expectedCurrentReleaseId: op.expectedCurrentReleaseId,
+      targetReleaseId: op.targetReleaseId ?? null, createdAt: op.createdAt, updatedAt: op.updatedAt,
+      completedAt: op.completedAt ?? null, resultReleaseId: op.resultReleaseId ?? null,
+      supersededByOperationId: op.supersededByOperationId ?? null,
+      failureCode: op.failureCode ?? null })),
     currentProductionReleaseId: a.currentProductionReleaseId,
     serving: { state: a.serving.state, observedProviderDeploymentId: a.serving.observedProviderDeploymentId,
       observedAt: a.serving.observedAt }, pendingOperation: a.pendingOperation ?
       { operationId: a.pendingOperation.operationId, kind: a.pendingOperation.kind,
         state: a.pendingOperation.state, deploymentId: a.pendingOperation.deploymentId ?? null,
+        targetProviderDeploymentId: a.pendingOperation.targetProviderDeploymentId ?? null,
+        expectedCurrentReleaseId: a.pendingOperation.expectedCurrentReleaseId ?? null,
+        targetReleaseId: a.pendingOperation.targetReleaseId ?? null,
+        provider: a.pendingOperation.provider ?? null, teamRef: a.pendingOperation.teamRef ?? null,
+        projectRef: a.pendingOperation.projectRef ?? null, mappingId: a.pendingOperation.mappingId ?? null,
         failureCode: a.pendingOperation.failureCode ?? null,
         submissionBoundaryAt: safeBoundaryProjection(a.pendingOperation),
         reconciliationWindow: safeWindowProjection(a.pendingOperation) } : null };
@@ -425,8 +444,16 @@ export function transitionProductionDeploymentOperation(record, input) {
 export function reconcileServing(record, safeObservation) {
   const a = structuredClone(record.deployments ?? emptyDeploymentAuthority());
   const release = a.releases.find((item) => item.releaseId === a.currentProductionReleaseId);
-  if (!safeObservation?.ok || !release) a.serving = { state: "unknown", observedProviderDeploymentId: null, observedAt: null };
-  else if (safeObservation.projectRef !== release.projectRef || safeObservation.target !== "production") return fail("PROVIDER_PATH_CONTRADICTION");
+  if (!safeObservation?.ok) a.serving = { state: "unknown", observedProviderDeploymentId: null, observedAt: null };
+  else if (!/^dpl_[A-Za-z0-9]{8,100}$/.test(safeObservation.providerDeploymentId || "") ||
+      safeObservation.target !== "production" || !id(safeObservation.projectRef) ||
+      !validTimestamp(safeObservation.observedAt) ||
+      (safeObservation.url != null && !/^https:\/\/[A-Za-z0-9.-]+\.vercel\.app\/?$/.test(safeObservation.url)))
+    return fail("PROVIDER_SERVING_UNSAFE");
+  else if (!release) a.serving = { state: "unknown", observedProviderDeploymentId: safeObservation.providerDeploymentId,
+    observedAt: safeObservation.observedAt };
+  else if (safeObservation.projectRef !== release.projectRef || safeObservation.target !== "production" ||
+      (release.teamRef != null && safeObservation.teamRef !== release.teamRef)) return fail("PROVIDER_PATH_CONTRADICTION");
   else a.serving = { state: safeObservation.providerDeploymentId === release.providerDeploymentId ? "verified" : "drifted",
     observedProviderDeploymentId: safeObservation.providerDeploymentId, observedAt: safeObservation.observedAt };
   a.revision += 1;
@@ -438,51 +465,187 @@ export function productionActionEligibility(record, action, deploymentId) {
   if (!["publish", "rollback", "reestablish"].includes(action)) return fail("RELEASE_ACTION_INVALID");
   const deployment = a.deployments.find((item) => item.deploymentId === deploymentId);
   if (!deployment || deployment.target !== "production" || deployment.operationState !== "confirmed" ||
-    deployment.providerState !== "READY" || !deployment.providerDeploymentId) return fail("RELEASE_TARGET_INVALID");
-  if (action !== "reestablish" && a.currentProductionReleaseId && a.serving.state !== "verified") return fail("RELEASE_SERVING_UNVERIFIED");
-  if (action === "rollback" && !a.releases.some((item) => item.deploymentId === deploymentId)) return fail("ROLLBACK_TARGET_INVALID");
+    deployment.provider !== "vercel" || deployment.providerState !== "READY" ||
+    !/^dpl_[A-Za-z0-9]{8,100}$/.test(deployment.providerDeploymentId || "")) return fail("RELEASE_TARGET_INVALID");
+  if (action === "publish" && a.currentProductionReleaseId && a.serving.state !== "verified") return fail("RELEASE_SERVING_UNVERIFIED");
+  if (action === "rollback" && a.currentProductionReleaseId && a.serving.state !== "verified") return fail("RELEASE_SERVING_UNVERIFIED");
+  if (action === "rollback" && (!a.currentProductionReleaseId ||
+      !a.releases.some((item) => item.deploymentId === deploymentId) ||
+      a.releases.find((item) => item.releaseId === a.currentProductionReleaseId)?.deploymentId === deploymentId)) return fail("ROLLBACK_TARGET_INVALID");
+  if (action === "reestablish" && (!a.currentProductionReleaseId || a.serving.state === "verified")) return fail("REESTABLISH_NOT_REQUIRED");
   return { ok: true, deployment };
 }
 
 /** Models the durable intent that must precede a future production switch. */
 export function prepareFixtureReleaseOperation(record, { action, deploymentId, expectedRevision, projectRef }) {
+  if (!id(projectRef)) return fail("DEPLOY_MAPPING_INVALID");
+  const prepared = prepareReleaseOperation(record, { action, deploymentId, expectedRevision });
+  if (!prepared.ok) return prepared;
+  if (prepared.operation?.projectRef !== projectRef) return fail("DEPLOY_MAPPING_STALE");
+  return prepared;
+}
+
+/** Durable PATH release intent. Provider effects are always performed by the coordinator after this write. */
+export function prepareReleaseOperation(record, { action, deploymentId, expectedRevision }) {
   const a = structuredClone(record.deployments ?? emptyDeploymentAuthority());
-  if (a.pendingOperation) return fail("DEPLOY_OPERATION_PENDING");
+  const priorSafeStop = a.pendingOperation?.state === "safe_stop" &&
+    ["publish", "rollback", "reestablish"].includes(a.pendingOperation?.kind);
+  if (a.pendingOperation && !priorSafeStop) return fail("DEPLOY_OPERATION_PENDING");
   if (a.revision !== expectedRevision) return fail("DEPLOY_REVISION_STALE");
+  const deployment = a.deployments.find((item) => item.deploymentId === deploymentId);
   const eligible = productionActionEligibility({ deployments: a }, action, deploymentId);
   if (!eligible.ok) return eligible;
-  if (!id(projectRef)) return fail("DEPLOY_MAPPING_INVALID");
-  const mapping = a.mappings.find((item) => item.environmentId === eligible.deployment.environmentId &&
-    item.projectRef === projectRef && item.targetRef === "production");
-  if (!mapping || mapping.mappingId !== eligible.deployment.mappingId) return fail("DEPLOY_MAPPING_STALE");
-  const operationId = randomUUID();
+  const mapping = a.mappings.find((item) => item.mappingId === deployment.mappingId &&
+    item.environmentId === deployment.environmentId && item.provider === "vercel" && item.provider === deployment.provider &&
+    item.targetRef === "production" && item.projectRef === deployment.projectRef &&
+    item.teamRef === deployment.teamRef);
+  if (!mapping) return fail("DEPLOY_MAPPING_STALE");
+  const releaseMatchesMapping = (release) => release && release.provider === mapping.provider &&
+    release.teamRef === mapping.teamRef && release.projectRef === mapping.projectRef &&
+    release.mappingId === mapping.mappingId;
+  if (a.currentProductionReleaseId) {
+    const currentRelease = a.releases.find((item) => item.releaseId === a.currentProductionReleaseId);
+    const currentDeployment = currentRelease && a.deployments.find((item) => item.deploymentId === currentRelease.deploymentId);
+    if (!releaseMatchesMapping(currentRelease) || !currentDeployment || currentDeployment.target !== "production" ||
+        currentDeployment.operationState !== "confirmed" || currentDeployment.providerState !== "READY" ||
+        currentDeployment.providerDeploymentId !== currentRelease.providerDeploymentId) return fail("RELEASE_AUTHORITY_STALE");
+  }
+  let targetRelease = null;
+  if (action === "rollback") {
+    targetRelease = a.releases.find((item) => item.deploymentId === deploymentId) ?? null;
+    if (!releaseMatchesMapping(targetRelease)) return fail("ROLLBACK_TARGET_INVALID");
+  }
+  if (action === "reestablish") {
+    targetRelease = a.releases.find((item) => item.releaseId === a.currentProductionReleaseId) ?? null;
+    if (!releaseMatchesMapping(targetRelease)) return fail("RELEASE_AUTHORITY_STALE");
+    if (targetRelease.deploymentId !== deploymentId) return fail("RELEASE_TARGET_INVALID");
+  }
+  const operationId = randomUUID(), at = now();
+  if (priorSafeStop) {
+    const priorAudit = a.releaseOperations?.find((item) => item.operationId === a.pendingOperation.operationId);
+    if (!priorAudit) return fail("RELEASE_OPERATION_STALE");
+    priorAudit.supersededByOperationId = operationId;
+    priorAudit.updatedAt = at;
+    a.pendingOperation = null;
+  }
+  const operation = { operationId, kind: action, state: "prepared", deploymentId,
+    targetProviderDeploymentId: deployment.providerDeploymentId, provider: deployment.provider,
+    teamRef: mapping.teamRef, projectRef: mapping.projectRef, mappingId: mapping.mappingId,
+    sourceSha: deployment.sourceSha, treeSha: deployment.treeSha,
+    environmentId: deployment.environmentId, environmentRevision: deployment.environmentRevision,
+    expectedCurrentReleaseId: a.currentProductionReleaseId,
+    targetReleaseId: targetRelease?.releaseId ?? null,
+    createdAt: at, updatedAt: at, failureCode: null };
+  a.releaseOperations = [...(a.releaseOperations ?? []), structuredClone(operation)];
   a.pendingOperation = { operationId, kind: action, deploymentId, state: "prepared",
-    expectedCurrentReleaseId: a.currentProductionReleaseId, projectRef,
-    providerDeploymentId: eligible.deployment.providerDeploymentId, createdAt: now(), updatedAt: now() };
+    expectedCurrentReleaseId: a.currentProductionReleaseId, targetReleaseId: operation.targetReleaseId,
+    targetProviderDeploymentId: deployment.providerDeploymentId, mappingId: mapping.mappingId,
+    provider: deployment.provider, teamRef: mapping.teamRef, projectRef: mapping.projectRef,
+    sourceSha: deployment.sourceSha, treeSha: deployment.treeSha,
+    environmentId: deployment.environmentId, environmentRevision: deployment.environmentRevision,
+    createdAt: at, updatedAt: at, failureCode: null };
   a.revision += 1;
-  return { ok: true, record: { ...record, deployments: a }, operationId, revision: a.revision };
+  return { ok: true, record: { ...record, deployments: a }, operationId, revision: a.revision,
+    operation: structuredClone(operation) };
+}
+
+/** Update a release operation without granting permission to repeat an external effect. */
+export function transitionReleaseOperation(record, input) {
+  const a = structuredClone(record.deployments ?? emptyDeploymentAuthority());
+  const op = a.pendingOperation;
+  if (!input || typeof input !== "object" || Array.isArray(input)) return fail("RELEASE_TRANSITION_INVALID");
+  const fields = { switching: [], verifying: ["effectAccepted"], uncertain: ["failureCode"],
+    safe_stop: ["failureCode"], failed: ["failureCode"] }[input?.state];
+  if (!op || !["publish", "rollback", "reestablish"].includes(op.kind) ||
+      op.operationId !== input.operationId || op.deploymentId !== input.deploymentId ||
+      !fields || !only(input, ["operationId", "deploymentId", "state", ...fields])) return fail("RELEASE_OPERATION_NOT_FOUND");
+  const allowed = { switching: ["prepared"], verifying: ["switching", "uncertain", "safe_stop"],
+    uncertain: ["switching", "verifying"], safe_stop: ["switching", "verifying", "uncertain"],
+    failed: ["prepared", "switching"] };
+  if (!allowed[input.state].includes(op.state)) return fail("RELEASE_TRANSITION_INVALID");
+  if (input.state === "verifying" && input.effectAccepted !== true) return fail("RELEASE_TRANSITION_INVALID");
+  if (["uncertain", "safe_stop", "failed"].includes(input.state) &&
+      (typeof input.failureCode !== "string" || !/^[A-Z0-9_]{1,80}$/.test(input.failureCode))) return fail("RELEASE_TRANSITION_INVALID");
+  op.state = input.state; op.updatedAt = now();
+  if (input.failureCode) op.failureCode = input.failureCode;
+  const audit = a.releaseOperations.find((item) => item.operationId === op.operationId);
+  if (!audit) return fail("RELEASE_OPERATION_NOT_FOUND");
+  Object.assign(audit, { state: op.state, updatedAt: op.updatedAt, failureCode: op.failureCode });
+  if (input.state === "failed") a.pendingOperation = null;
+  a.revision += 1;
+  return { ok: true, record: { ...record, deployments: a }, revision: a.revision, state: input.state };
+}
+
+/** Finalize only after factual target-serving evidence and a fresh expected-release guard. */
+export function finalizeReleaseOperation(record, { operationId, deploymentId, action, expectedCurrentReleaseId, safeObservation }) {
+  const a = structuredClone(record.deployments ?? emptyDeploymentAuthority());
+  const op = a.pendingOperation;
+  if (!op || op.operationId !== operationId || op.kind !== action || op.deploymentId !== deploymentId ||
+      op.state !== "verifying") return fail("RELEASE_OPERATION_NOT_FOUND");
+  if (op.expectedCurrentReleaseId !== expectedCurrentReleaseId || a.currentProductionReleaseId !== expectedCurrentReleaseId)
+    return fail("RELEASE_AUTHORITY_STALE");
+  const deployment = a.deployments.find((item) => item.deploymentId === deploymentId);
+  const mapping = a.mappings.find((item) => item.mappingId === op.mappingId && item.environmentId === op.environmentId);
+  const historicalTarget = action !== "rollback" || a.releases.some((item) => item.releaseId === op.targetReleaseId && item.deploymentId === deploymentId);
+  const targetRelease = action === "rollback" ? a.releases.find((item) => item.releaseId === op.targetReleaseId) : null;
+  const currentRelease = a.releases.find((item) => item.releaseId === a.currentProductionReleaseId);
+  const releaseMappingMatches = (release) => release && release.provider === op.provider &&
+    release.teamRef === op.teamRef && release.projectRef === op.projectRef && release.mappingId === op.mappingId;
+  const currentDeployment = currentRelease && a.deployments.find((item) => item.deploymentId === currentRelease.deploymentId);
+  const rollbackNotCurrent = action !== "rollback" || a.releases.find((item) => item.releaseId === a.currentProductionReleaseId)?.deploymentId !== deploymentId;
+  const reestablishCurrent = action !== "reestablish" || a.releases.find((item) => item.releaseId === a.currentProductionReleaseId)?.deploymentId === deploymentId;
+  if (!deployment || deployment.target !== "production" || deployment.operationState !== "confirmed" || deployment.providerState !== "READY" ||
+      !deployment.providerDeploymentId || !mapping || !historicalTarget || !rollbackNotCurrent || !reestablishCurrent ||
+      (action === "rollback" && !releaseMappingMatches(targetRelease)) ||
+      (action === "reestablish" && !releaseMappingMatches(currentRelease)) ||
+      (expectedCurrentReleaseId !== null && (!releaseMappingMatches(currentRelease) || !currentDeployment ||
+        currentDeployment.target !== "production" || currentDeployment.operationState !== "confirmed" ||
+        currentDeployment.providerState !== "READY" || currentDeployment.providerDeploymentId !== currentRelease.providerDeploymentId)) ||
+      mapping.provider !== op.provider || mapping.teamRef !== op.teamRef ||
+      mapping.projectRef !== op.projectRef || mapping.targetRef !== "production" || deployment.providerDeploymentId !== op.targetProviderDeploymentId ||
+      deployment.sourceSha !== op.sourceSha || deployment.treeSha !== op.treeSha ||
+      deployment.environmentRevision !== op.environmentRevision || deployment.environmentId !== op.environmentId ||
+      !safeObservation?.ok || safeObservation.providerDeploymentId !== op.targetProviderDeploymentId ||
+      safeObservation.projectRef !== op.projectRef || safeObservation.teamRef !== op.teamRef || safeObservation.target !== "production" ||
+      typeof safeObservation.observedAt !== "string" || !validTimestamp(safeObservation.observedAt)) return fail("RELEASE_SERVING_UNVERIFIED");
+  const audit = a.releaseOperations.find((item) => item.operationId === operationId);
+  if (!audit || audit.state !== op.state) return fail("RELEASE_OPERATION_STALE");
+  let releaseId = a.currentProductionReleaseId;
+  if (action !== "reestablish") {
+    releaseId = randomUUID();
+    a.releases.push({ releaseId, operationId, deploymentId, action, providerDeploymentId: deployment.providerDeploymentId,
+      provider: op.provider, teamRef: op.teamRef, projectRef: op.projectRef, mappingId: op.mappingId,
+      sourceSha: deployment.sourceSha, environmentId: deployment.environmentId, environmentRevision: deployment.environmentRevision,
+      releasedAt: now(), previousReleaseId: a.currentProductionReleaseId });
+    a.currentProductionReleaseId = releaseId;
+  }
+  a.serving = { state: "verified", observedProviderDeploymentId: safeObservation.providerDeploymentId,
+    observedAt: safeObservation.observedAt };
+  audit.state = "completed"; audit.completedAt = now(); audit.updatedAt = audit.completedAt;
+  audit.resultReleaseId = action === "reestablish" ? null : releaseId;
+  a.pendingOperation = null;
+  a.revision += 1;
+  return { ok: true, record: { ...record, deployments: a }, revision: a.revision,
+    releaseId: action === "reestablish" ? null : releaseId, action };
 }
 
 export function finalizeFixtureRelease(record, { operationId, deploymentId, action, safeObservation }) {
-  const a = structuredClone(record.deployments ?? emptyDeploymentAuthority());
-  const op = a.pendingOperation;
-  if (!op || op.operationId !== operationId || op.kind !== action || op.deploymentId !== deploymentId) return fail("RELEASE_OPERATION_NOT_FOUND");
-  if (op.expectedCurrentReleaseId !== a.currentProductionReleaseId) return fail("RELEASE_AUTHORITY_STALE");
-  const eligible = productionActionEligibility({ deployments: a }, action, deploymentId);
-  if (!eligible.ok) return eligible;
-  const deployment = eligible.deployment;
-  if (!safeObservation?.ok || safeObservation.providerDeploymentId !== deployment.providerDeploymentId ||
-    safeObservation.target !== "production" || safeObservation.projectRef !== op.projectRef) return fail("RELEASE_SERVING_UNVERIFIED");
-  const releaseId = randomUUID();
-  a.releases.push({ releaseId, operationId, deploymentId, action, providerDeploymentId: deployment.providerDeploymentId,
-    projectRef: op.projectRef, sourceSha: deployment.sourceSha, environmentId: deployment.environmentId, releasedAt: now(),
-    previousReleaseId: a.currentProductionReleaseId });
-  a.currentProductionReleaseId = releaseId;
-  a.serving = { state: "verified", observedProviderDeploymentId: deployment.providerDeploymentId,
-    observedAt: safeObservation.observedAt };
-  a.pendingOperation = null;
-  a.revision += 1;
-  return { ok: true, record: { ...record, deployments: a }, releaseId };
+  let current = record;
+  const op = current.deployments?.pendingOperation;
+  if (!op || op.operationId !== operationId || op.kind !== action || op.deploymentId !== deploymentId)
+    return fail("RELEASE_OPERATION_NOT_FOUND");
+  if (op.state === "prepared") {
+    const switching = transitionReleaseOperation(current, { operationId, deploymentId, state: "switching" });
+    if (!switching.ok) return switching;
+    const verifying = transitionReleaseOperation(switching.record, { operationId, deploymentId, state: "verifying", effectAccepted: true });
+    if (!verifying.ok) return verifying;
+    current = verifying.record;
+  }
+  const expectedCurrentReleaseId = current.deployments?.pendingOperation?.expectedCurrentReleaseId ?? null;
+  const auditedObservation = safeObservation?.ok ? { ...safeObservation,
+    teamRef: current.deployments?.pendingOperation?.teamRef ?? null } : safeObservation;
+  return finalizeReleaseOperation(current, { operationId, deploymentId, action, expectedCurrentReleaseId,
+    safeObservation: auditedObservation });
 }
 
 export function recoverDeploymentFoundation(record) {

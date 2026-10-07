@@ -57,7 +57,8 @@ export { DEPLOYMENTS_SCHEMA, DEPLOY_RECONCILIATION_WINDOW_MISSING,
   prepareDeploymentMappingMutation, preflightDeployment, prepareDeploymentOperation,
   prepareProductionDeploymentOperation, transitionDeploymentOperation,
   transitionProductionDeploymentOperation, reconcileServing, productionActionEligibility,
-  prepareFixtureReleaseOperation, finalizeFixtureRelease, recoverDeploymentFoundation, validateOperationSnapshot,
+  prepareFixtureReleaseOperation, finalizeFixtureRelease, prepareReleaseOperation,
+  transitionReleaseOperation, finalizeReleaseOperation, recoverDeploymentFoundation, validateOperationSnapshot,
   canonicalConfigDigest, validateDeploymentLocator } from "./deployments.mjs";
 export { parseVercelConfigMetadata, planVercelConfigProjection, makeVercelConfigCommand,
   parseVercelDeploymentReceipt, parseVercelServingObservation, operationMetadata,
@@ -80,6 +81,9 @@ export { makeProductionDeployCommand, makeProductionInspectCommand,
   parseProductionReconciliationPage, combineProductionReconciliation,
   reconcileProductionDeployment, executeProductionVercelCommand,
   MAX_PRODUCTION_RECONCILIATION_PAGES, MAX_PRODUCTION_IDENTITY_INSPECTIONS } from "./vercel-production-adapter.mjs";
+export { makeProductionAliasesCommand, makeProductionReleaseInspectCommand,
+  makeProductionServingEffectCommand, parseProductionAliasPage, observeProductionServing,
+  executeProductionReleaseCommand } from "./vercel-release-adapter.mjs";
 export { captureBrowserEvidence } from "./runtime/browser-evidence.mjs";
 export {
   adoptEngineerResultIntoBuild,

@@ -683,6 +683,45 @@ export async function startPathBuildSurface(options) {
           }
         }
 
+        if (action === "releases") {
+          if (method === "POST" && sub === "prepare") {
+            let body;
+            try { body = await readJsonBody(req); } catch { body = null; }
+            if (!body || typeof body !== "object" || Array.isArray(body) ||
+                Object.keys(body).some((key) => !["action", "deploymentId", "expectedRevision"].includes(key)) ||
+                !["publish", "rollback", "reestablish"].includes(body.action) || !Number.isSafeInteger(body.expectedRevision)) {
+              sendJson(res, 400, { ok: false, code: "RELEASE_REQUEST_INVALID" });
+              return;
+            }
+            const result = await coordinator.prepareRelease(buildId, body);
+            sendJson(res, result.ok ? 200 : 409, result);
+            return;
+          }
+          if (method === "POST" && ["execute", "observe"].includes(sub)) {
+            let body;
+            try { body = await readJsonBody(req); } catch { body = null; }
+            const allowed = sub === "execute" ? ["operationId", "deploymentId", "expectedRevision"] : ["operationId", "deploymentId"];
+            if (!body || typeof body !== "object" || Array.isArray(body) ||
+                Object.keys(body).some((key) => !allowed.includes(key)) || !body.operationId ||
+                (sub === "execute" && !Number.isSafeInteger(body.expectedRevision))) {
+              sendJson(res, 400, { ok: false, code: "RELEASE_REQUEST_INVALID" });
+              return;
+            }
+            const result = sub === "execute" ? await coordinator.executeRelease(buildId, body) :
+              await coordinator.observeRelease(buildId, body);
+            sendJson(res, result.ok ? 200 : 409, result);
+            return;
+          }
+          if (method === "GET" && !sub) {
+            const listed = await coordinator.listDeployments(buildId);
+            sendJson(res, listed.ok ? 200 : 404, listed.ok ? { ok: true,
+              releases: listed.releases, releaseOperations: listed.releaseOperations,
+              currentProductionReleaseId: listed.currentProductionReleaseId, serving: listed.serving,
+              revision: listed.revision } : listed);
+            return;
+          }
+        }
+
         if (action === "environments") {
           if (method === "GET" && !sub) {
             const listed = await coordinator.listEnvironments(buildId);

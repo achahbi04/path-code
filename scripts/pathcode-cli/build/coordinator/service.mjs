@@ -27,12 +27,15 @@ import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
 import { listBuildDeployments, preflightDeployment, prepareDeploymentMappingMutation,
   prepareDeploymentOperation, prepareProductionDeploymentOperation, transitionDeploymentOperation,
   transitionProductionDeploymentOperation, validateOperationSnapshot,
+  prepareReleaseOperation, transitionReleaseOperation, finalizeReleaseOperation, reconcileServing,
   recoverDeploymentFoundation } from "../deployments.mjs";
 import { executeProductionVercelCommand, makeProductionDeployCommand,
   makeProductionAuthCommand, makeProductionProjectCommand,
   makeProductionConfigCommand, makeProductionConfigMetadataCommand,
   makeProductionInspectCommand, makeProductionReconciliationPageCommand,
   reconcileProductionDeployment } from "../vercel-production-adapter.mjs";
+import { executeProductionReleaseCommand, makeProductionServingEffectCommand,
+  makeProductionReleaseInspectCommand, observeProductionServing } from "../vercel-release-adapter.mjs";
 import { prepareDeploymentSource, cleanupDeploymentSource } from "../deploy-source.mjs";
 import { planVercelConfigProjection } from "../vercel-deploy-contract.mjs";
 import { ensureGateway, readGatewayPid } from "../../gateway/ensure.mjs";
@@ -53,10 +56,15 @@ export async function createBuildCoordinatorService(options) {
     scopedBuildId = null,
     productionCommandExecutor,
     productionSpawnImpl,
+    releaseCommandExecutor,
+    releaseSpawnImpl,
   } = options;
   const runProductionCommand = productionCommandExecutor ?? ((spec, executorOptions) =>
     executeProductionVercelCommand(spec, { ...executorOptions,
       ...(productionSpawnImpl ? { spawnImpl: productionSpawnImpl } : {}) }));
+  const runReleaseCommand = releaseCommandExecutor ?? ((spec, executorOptions) =>
+    executeProductionReleaseCommand(spec, { ...executorOptions,
+      ...(releaseSpawnImpl ? { spawnImpl: releaseSpawnImpl } : {}) }));
   const scopedControlPlane = typeof scopedBuildId === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scopedBuildId);
   if (scopedBuildId !== null && !scopedControlPlane) {
@@ -565,6 +573,206 @@ export async function createBuildCoordinatorService(options) {
       providerDeploymentId: observation.providerDeploymentId });
   }
 
+  function releaseContext(buildId, operationId, deploymentId = null) {
+    const record = readBuildRecord(runtimeRoot, buildId);
+    const authority = record?.deployments;
+    const op = authority?.pendingOperation;
+    const deployment = op && authority.deployments.find((item) => item.deploymentId === op.deploymentId);
+    if (!record || !op || !["publish", "rollback", "reestablish"].includes(op.kind) ||
+        op.operationId !== operationId || (deploymentId && op.deploymentId !== deploymentId) || !deployment)
+      return { ok: false, code: "RELEASE_OPERATION_NOT_FOUND" };
+    const mapping = authority.mappings.find((item) => item.mappingId === op.mappingId &&
+      item.provider === op.provider && item.environmentId === op.environmentId &&
+      item.teamRef === op.teamRef && item.projectRef === op.projectRef && item.targetRef === "production");
+    if (!mapping || deployment.target !== "production" || deployment.provider !== op.provider ||
+        deployment.providerDeploymentId !== op.targetProviderDeploymentId || deployment.mappingId !== op.mappingId ||
+        deployment.teamRef !== op.teamRef || deployment.projectRef !== op.projectRef ||
+        deployment.sourceSha !== op.sourceSha || deployment.treeSha !== op.treeSha ||
+        deployment.environmentId !== op.environmentId || deployment.environmentRevision !== op.environmentRevision)
+      return { ok: false, code: "RELEASE_AUTHORITY_STALE" };
+    return { ok: true, record, authority, op, deployment, mapping, revision: authority.revision };
+  }
+
+  async function readProductionServing(mapping) {
+    const project = await productionProjectIdentity({ projectRef: mapping.projectRef, teamRef: mapping.teamRef });
+    if (!project.ok || !project.projectName) return { ok: false, code: project.code || "PROVIDER_PROJECT_UNVERIFIED" };
+    return observeProductionServing({ teamRef: mapping.teamRef, projectRef: mapping.projectRef,
+      projectName: project.projectName, executeAliases: (spec, context) => runReleaseCommand(spec, {
+        cwd: packageRoot, mode: "release_aliases", context: { teamRef: mapping.teamRef, nextCursor: context.nextCursor } }),
+      executeInspect: (spec, context) => runReleaseCommand(spec, { cwd: packageRoot, mode: "release_inspect",
+        context: { providerDeploymentId: context.providerDeploymentId, projectName: project.projectName,
+          projectRef: mapping.projectRef, teamRef: mapping.teamRef } }) });
+  }
+
+  async function prepareRelease(buildId, params) {
+    if (Object.keys(params).some((key) => !["buildId", "action", "deploymentId", "expectedRevision"].includes(key)) ||
+        !["publish", "rollback", "reestablish"].includes(params.action) || !Number.isSafeInteger(params.expectedRevision))
+      return { ok: false, code: "RELEASE_REQUEST_INVALID" };
+    return exclusive(buildId, () => {
+      if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+      const record = readBuildRecord(runtimeRoot, buildId);
+      if (!record || record.buildId !== buildId) return { ok: false, code: "BUILD_NOT_FOUND" };
+      const result = prepareReleaseOperation(record, params);
+      if (!result.ok) return result;
+      writeBuildRecord(runtimeRoot, result.record);
+      try { appendBuildEvent(runtimeRoot, buildId, "release.prepared", {
+        operationId: result.operationId, action: params.action, deploymentId: params.deploymentId,
+        revision: result.revision }); } catch { /* canonical record is authority */ }
+      return { ok: true, operationId: result.operationId, action: params.action,
+        deploymentId: params.deploymentId, revision: result.revision };
+    });
+  }
+
+  async function observeRelease(buildId, params) {
+    if (Object.keys(params).some((key) => !["buildId", "operationId", "deploymentId"].includes(key)))
+      return { ok: false, code: "RELEASE_REQUEST_INVALID" };
+    if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+    const initialRecord = readBuildRecord(runtimeRoot, buildId);
+    if (!initialRecord || initialRecord.buildId !== buildId) return { ok: false, code: "BUILD_NOT_FOUND" };
+    const pending = initialRecord.deployments?.pendingOperation;
+    if (pending && (!params.operationId || pending.operationId !== params.operationId ||
+        !["publish", "rollback", "reestablish"].includes(pending.kind))) return { ok: false, code: "RELEASE_OPERATION_PENDING" };
+    const operationId = params.operationId ?? null;
+    const found = operationId ? releaseContext(buildId, operationId, params.deploymentId ?? null) : null;
+    if (operationId && !found.ok) return found;
+    const mapping = found?.mapping ?? initialRecord.deployments?.mappings.find((item) =>
+      item.mappingId === initialRecord.deployments?.deployments.find((d) => d.deploymentId ===
+        initialRecord.deployments?.releases.find((r) => r.releaseId === initialRecord.deployments.currentProductionReleaseId)?.deploymentId)?.mappingId) ??
+      (initialRecord.deployments?.mappings.filter((item) => item.provider === "vercel" && item.targetRef === "production").length === 1
+        ? initialRecord.deployments.mappings.find((item) => item.provider === "vercel" && item.targetRef === "production") : null);
+    if (!mapping || mapping.targetRef !== "production") return { ok: false, code: "DEPLOY_MAPPING_STALE" };
+    const observed = await readProductionServing(mapping);
+    const latest = readBuildRecord(runtimeRoot, buildId);
+    if (!latest || latest.deployments?.revision !== initialRecord.deployments?.revision)
+      return { ok: false, code: "RELEASE_AUTHORITY_STALE" };
+    let servingResult = reconcileServing(latest, observed.ok && observed.providerDeploymentId ? { ...observed, ok: true } : null);
+    if (!servingResult.ok) return servingResult;
+    const stored = await exclusive(buildId, () => {
+      const current = readBuildRecord(runtimeRoot, buildId);
+      if (!current || current.deployments?.revision !== initialRecord.deployments?.revision)
+        return { ok: false, code: "RELEASE_AUTHORITY_STALE" };
+      // The pure reduction is re-run against the locked canonical reread.
+      const reduced = reconcileServing(current, observed.ok && observed.providerDeploymentId ? observed : null);
+      if (!reduced.ok) return reduced;
+      writeBuildRecord(runtimeRoot, reduced.record);
+      try { appendBuildEvent(runtimeRoot, buildId, "release.serving_observed", {
+        providerDeploymentId: observed.ok ? observed.providerDeploymentId : null,
+        state: reduced.serving.state, revision: reduced.revision }); } catch { /* canonical record is authority */ }
+      return { ok: true, record: reduced.record, revision: reduced.revision, serving: reduced.serving };
+    });
+    if (!stored.ok) return stored;
+    if (!operationId) return { ok: true, revision: stored.revision, serving: stored.serving };
+    const current = releaseContext(buildId, operationId, params.deploymentId ?? null);
+    if (!current.ok) return current;
+    if (observed.ok && observed.state === "observed" && observed.providerDeploymentId === current.op.targetProviderDeploymentId) {
+      if (current.op.state !== "verifying") {
+        const verifying = await exclusive(buildId, () => {
+          const reread = releaseContext(buildId, operationId, current.op.deploymentId);
+          if (!reread.ok || reread.revision !== current.revision) return { ok: false, code: "RELEASE_AUTHORITY_STALE" };
+          const transition = transitionReleaseOperation(reread.record, { operationId, deploymentId: current.op.deploymentId,
+            state: "verifying", effectAccepted: true });
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          return { ok: true, revision: transition.revision };
+        });
+        if (!verifying.ok) return verifying;
+      }
+      return exclusive(buildId, () => {
+        const reread = releaseContext(buildId, operationId, current.op.deploymentId);
+        if (!reread.ok || reread.op.expectedCurrentReleaseId !== reread.authority.currentProductionReleaseId)
+          return { ok: false, code: "RELEASE_AUTHORITY_STALE" };
+        const result = finalizeReleaseOperation(reread.record, { operationId, deploymentId: current.op.deploymentId,
+          action: current.op.kind, expectedCurrentReleaseId: reread.op.expectedCurrentReleaseId, safeObservation: observed });
+        if (!result.ok) return result;
+        writeBuildRecord(runtimeRoot, result.record);
+        try { appendBuildEvent(runtimeRoot, buildId, "release.completed", { operationId, action: current.op.kind,
+          releaseId: result.releaseId, revision: result.revision }); } catch { /* canonical record is authority */ }
+        return { ok: true, outcome: "FINALIZED", action: current.op.kind,
+          releaseId: result.releaseId, revision: result.revision, serving: result.record.deployments.serving };
+      });
+    }
+    const latestOp = releaseContext(buildId, operationId, params.deploymentId ?? null);
+    if (latestOp.ok && !["safe_stop", "failed"].includes(latestOp.op.state)) {
+      const failureCode = observed.ok ? "SERVING_TARGET_MISMATCH" : "SERVING_OBSERVATION_UNKNOWN";
+      await exclusive(buildId, () => {
+        const reread = releaseContext(buildId, operationId, latestOp.op.deploymentId);
+        if (!reread.ok) return reread;
+        const transition = transitionReleaseOperation(reread.record, { operationId,
+          deploymentId: latestOp.op.deploymentId, state: "safe_stop", failureCode });
+        if (!transition.ok) return transition;
+        writeBuildRecord(runtimeRoot, transition.record);
+        return { ok: true, revision: transition.revision };
+      });
+    }
+    return { ok: false, outcome: observed.ok ? "PROVIDER_SERVING_DRIFT" : "PROVIDER_SERVING_UNKNOWN",
+      code: observed.code || (observed.ok ? "SERVING_TARGET_MISMATCH" : "SERVING_OBSERVATION_UNKNOWN"),
+      revision: stored.revision, serving: stored.serving };
+  }
+
+  async function executeRelease(buildId, params) {
+    if (Object.keys(params).some((key) => !["buildId", "operationId", "deploymentId", "expectedRevision"].includes(key)) ||
+        !Number.isSafeInteger(params.expectedRevision)) return { ok: false, code: "RELEASE_REQUEST_INVALID" };
+    if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+    const started = await exclusive(buildId, () => {
+      const found = releaseContext(buildId, params.operationId, params.deploymentId);
+      if (!found.ok) return found;
+      if (found.revision !== params.expectedRevision) return { ok: false, code: "DEPLOY_REVISION_STALE" };
+      if (found.op.state !== "prepared") return { ok: false, code: "RELEASE_EFFECT_ALREADY_ATTEMPTED" };
+      const transition = transitionReleaseOperation(found.record, { operationId: params.operationId,
+        deploymentId: params.deploymentId, state: "switching" });
+      if (!transition.ok) return transition;
+      writeBuildRecord(runtimeRoot, transition.record);
+      return { ok: true, revision: transition.revision, op: transition.record.deployments.pendingOperation };
+    });
+    if (!started.ok) return started;
+    const projectIdentity = await productionProjectIdentity(started.op);
+    const inspectSpec = makeProductionReleaseInspectCommand({ providerDeploymentId: started.op.targetProviderDeploymentId,
+      teamRef: started.op.teamRef });
+    const preflight = projectIdentity.ok && inspectSpec.ok ? await runReleaseCommand(inspectSpec, { cwd: packageRoot,
+      mode: "release_inspect", context: { providerDeploymentId: started.op.targetProviderDeploymentId,
+        projectName: projectIdentity.projectName, projectRef: started.op.projectRef, teamRef: started.op.teamRef } }) :
+      { ok: false, code: projectIdentity.code || inspectSpec.code };
+    if (!preflight.ok || preflight.providerDeploymentId !== started.op.targetProviderDeploymentId ||
+        preflight.projectRef !== started.op.projectRef || preflight.target !== "production" || preflight.providerState !== "READY") {
+      return exclusive(buildId, () => {
+        const current = releaseContext(buildId, params.operationId, params.deploymentId);
+        if (!current.ok) return current;
+        const failed = transitionReleaseOperation(current.record, { operationId: params.operationId,
+          deploymentId: params.deploymentId, state: "failed", failureCode: preflight.code || "RELEASE_TARGET_INELIGIBLE" });
+        if (!failed.ok) return failed;
+        writeBuildRecord(runtimeRoot, failed.record);
+        return { ok: false, code: "RELEASE_TARGET_INELIGIBLE" };
+      });
+    }
+    const preEffect = await exclusive(buildId, () => {
+      const current = releaseContext(buildId, params.operationId, params.deploymentId);
+      if (!current.ok || current.revision !== started.revision || current.op.state !== "switching" ||
+          current.authority.currentProductionReleaseId !== current.op.expectedCurrentReleaseId)
+        return { ok: false, code: "RELEASE_AUTHORITY_STALE" };
+      return { ok: true, revision: current.revision };
+    });
+    if (!preEffect.ok) return preEffect;
+    const spec = makeProductionServingEffectCommand({ action: started.op.kind,
+      providerDeploymentId: started.op.targetProviderDeploymentId, teamRef: started.op.teamRef });
+    const effect = spec.ok ? await runReleaseCommand(spec, { cwd: packageRoot, mode: "release_effect",
+      context: { action: started.op.kind, providerDeploymentId: started.op.targetProviderDeploymentId,
+        teamRef: started.op.teamRef } }) : spec;
+    const nextState = effect.ok && effect.accepted === true ? "verifying" : "uncertain";
+    const recorded = await exclusive(buildId, () => {
+      const current = releaseContext(buildId, params.operationId, params.deploymentId);
+      if (!current.ok || current.op.state !== "switching") return { ok: false, code: "RELEASE_AUTHORITY_STALE" };
+      const transition = transitionReleaseOperation(current.record, nextState === "verifying" ? {
+        operationId: params.operationId, deploymentId: params.deploymentId, state: "verifying", effectAccepted: true } : {
+        operationId: params.operationId, deploymentId: params.deploymentId, state: "uncertain",
+        failureCode: effect.code || "RELEASE_EFFECT_UNCERTAIN" });
+      if (!transition.ok) return transition;
+      writeBuildRecord(runtimeRoot, transition.record);
+      return { ok: true, revision: transition.revision, state: nextState };
+    });
+    if (!recorded.ok) return recorded;
+    return observeRelease(buildId, { operationId: params.operationId, deploymentId: params.deploymentId });
+  }
+
   async function dispatch(method, params = {}) {
     const buildId = String(params.buildId || "");
     if (scopedControlPlane && method !== BuildCoordinatorMethods.HELLO &&
@@ -714,6 +922,12 @@ export async function createBuildCoordinatorService(options) {
         if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
         if (Object.keys(params).some((key) => !["buildId", "operationId", "deploymentId"].includes(key))) return { ok: false, code: "DEPLOY_REQUEST_INVALID" };
         return observeProduction(buildId, params);
+      case BuildCoordinatorMethods.BUILD_RELEASE_PREPARE:
+        return prepareRelease(buildId, params);
+      case BuildCoordinatorMethods.BUILD_RELEASE_EXECUTE:
+        return executeRelease(buildId, params);
+      case BuildCoordinatorMethods.BUILD_RELEASE_OBSERVE:
+        return observeRelease(buildId, params);
       case BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ:
         return readBuildEnvironment(runtimeRoot, buildId, params.environmentId);
       case BuildCoordinatorMethods.BUILD_SECRET_BINDING_READ:

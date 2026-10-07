@@ -162,7 +162,8 @@ describe("P10.1 deployment foundation without live provider work", () => {
       mappings: [{ mappingId: "map", provider: "vercel", environmentId: "env", teamRef: null,
         projectRef: "project-a", targetRef: "production", updatedAt: "2026-01-01T00:00:00Z" }],
       deployments: [{ deploymentId, operationId, target: "production", sourceSha: "source", environmentId: "env",
-        mappingId: "map", providerDeploymentId: null, providerState: null, operationState: "prepared" }],
+        treeSha: "tree", environmentRevision: 1, mappingId: "map", provider: "vercel", teamRef: null,
+        projectRef: "project-a", providerDeploymentId: null, providerState: null, operationState: "prepared" }],
       releases: [], currentProductionReleaseId: null,
       serving: { state: "unknown", observedProviderDeploymentId: null, observedAt: null },
       pendingOperation: { operationId, kind: "deploy", deploymentId, state: "prepared", snapshot,
@@ -183,13 +184,13 @@ describe("P10.1 deployment foundation without live provider work", () => {
     const confirmed = transitionDeploymentOperation(observed.record!, { operationId, state: "confirmed",
       providerDeploymentId: "dpl_12345678" });
     expect(confirmed).toMatchObject({ ok: true, record: { deployments: { pendingOperation: null } } });
-    const releaseOp = prepareFixtureReleaseOperation(confirmed.record!, { action: "reestablish", deploymentId,
+    const releaseOp = prepareFixtureReleaseOperation(confirmed.record!, { action: "publish", deploymentId,
       expectedRevision: confirmed.record!.deployments!.revision, projectRef: "project-a" });
     expect(releaseOp).toMatchObject({ ok: true });
     const serving = parseVercelServingObservation({ projectRef: "project-a", target: "production",
-      deploymentId: "dpl_12345678", url: null, observedAt: "2026-01-01T00:00:00Z" });
+      deploymentId: "dpl_12345678", url: null, observedAt: "2026-01-01T00:00:00.000Z" });
     const released = finalizeFixtureRelease(releaseOp.record, { operationId: releaseOp.operationId,
-      deploymentId, action: "reestablish", safeObservation: serving });
+      deploymentId, action: "publish", safeObservation: serving });
     expect(released).toMatchObject({ ok: true, record: { deployments: { serving: { state: "verified" }, releases: [expect.any(Object)] } } });
   });
 
@@ -198,11 +199,11 @@ describe("P10.1 deployment foundation without live provider work", () => {
     const op = "11111111-1111-1111-1111-111111111111";
     record.deployments = { schema: "pathcode.p10.deployments.v1", revision: 0, mappings: [], deployments: [{
       deploymentId: "dep", operationId: op, target: "production", sourceSha: "source", environmentId: "env",
-      providerDeploymentId: "dpl_12345678", providerState: "READY", operationState: "confirmed",
+      provider: "vercel", providerDeploymentId: "dpl_12345678", providerState: "READY", operationState: "confirmed",
     }], releases: [{ releaseId: "release-old", deploymentId: "dep", providerDeploymentId: "dpl_12345678", projectRef: "project-a" }],
     currentProductionReleaseId: "release-old", serving: { state: "unknown", observedProviderDeploymentId: null, observedAt: null },
     pendingOperation: null };
-    const observation = parseVercelServingObservation({ projectRef: "project-a", target: "production", deploymentId: "dpl_87654321", url: null, observedAt: "2026-01-01T00:00:00Z" });
+    const observation = parseVercelServingObservation({ projectRef: "project-a", target: "production", deploymentId: "dpl_87654321", url: null, observedAt: "2026-01-01T00:00:00.000Z" });
     const drift = reconcileServing(record, observation);
     expect(drift).toMatchObject({ ok: true, serving: { state: "drifted" }, record: { deployments: { currentProductionReleaseId: "release-old" } } });
     expect(drift.record.deployments!.releases).toHaveLength(1);
