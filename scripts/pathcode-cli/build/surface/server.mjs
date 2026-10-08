@@ -652,6 +652,32 @@ export async function startPathBuildSurface(options) {
         const action = buildMatch[2] || "";
         const sub = buildMatch[3] || "";
 
+        if (action === "domains") {
+          if (method === "GET" && !sub) {
+            const listed = await coordinator.listDomains(buildId);
+            sendJson(res, listed.ok ? 200 : 404, listed);
+            return;
+          }
+          if (method === "POST" && ["prepare", "execute", "observe"].includes(sub)) {
+            let body;
+            try { body = await readJsonBody(req); } catch { body = null; }
+            const allowed = sub === "prepare" ? ["kind", "fqdn", "requiredRecordId", "expectedRevision"] :
+              sub === "execute" ? ["operationId", "expectedRevision"] : ["fqdn"];
+            if (!body || typeof body !== "object" || Array.isArray(body) ||
+                Object.keys(body).some((key) => !allowed.includes(key)) ||
+                (sub === "prepare" && (!Number.isSafeInteger(body.expectedRevision) || typeof body.kind !== "string" || typeof body.fqdn !== "string")) ||
+                (sub === "execute" && (typeof body.operationId !== "string" || !Number.isSafeInteger(body.expectedRevision))) ||
+                (sub === "observe" && typeof body.fqdn !== "string")) {
+              sendJson(res, 400, { ok: false, code: "P11_REQUEST_INVALID" });
+              return;
+            }
+            const result = sub === "prepare" ? await coordinator.prepareDomainOperation(buildId, body) :
+              sub === "execute" ? await coordinator.executeDomainOperation(buildId, body) : await coordinator.observeDomain(buildId, body);
+            sendJson(res, result.ok ? 200 : 409, result);
+            return;
+          }
+        }
+
         if (action === "production-deployments") {
           if (method === "GET" && !sub) {
             const listed = await coordinator.listDeployments(buildId);

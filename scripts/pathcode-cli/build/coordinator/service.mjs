@@ -36,6 +36,9 @@ import { executeProductionVercelCommand, makeProductionDeployCommand,
   reconcileProductionDeployment } from "../vercel-production-adapter.mjs";
 import { executeProductionReleaseCommand, makeProductionServingEffectCommand,
   makeProductionReleaseInspectCommand, observeProductionServing } from "../vercel-release-adapter.mjs";
+import { emptyP11DomainAuthority, prepareP11DomainOperation, transitionP11DomainOperation,
+  readP11DomainAuthority, recordP11DomainObservation } from "../p11-domains.mjs";
+import { makeP11VercelApiCommand, executeP11VercelApi, observeP11VercelDomain } from "../vercel-domain-adapter.mjs";
 import { prepareDeploymentSource, cleanupDeploymentSource } from "../deploy-source.mjs";
 import { planVercelConfigProjection } from "../vercel-deploy-contract.mjs";
 import { ensureGateway, readGatewayPid } from "../../gateway/ensure.mjs";
@@ -58,6 +61,9 @@ export async function createBuildCoordinatorService(options) {
     productionSpawnImpl,
     releaseCommandExecutor,
     releaseSpawnImpl,
+    p11CommandExecutor,
+    p11SpawnImpl,
+    p11HttpsProbe,
   } = options;
   const runProductionCommand = productionCommandExecutor ?? ((spec, executorOptions) =>
     executeProductionVercelCommand(spec, { ...executorOptions,
@@ -65,6 +71,9 @@ export async function createBuildCoordinatorService(options) {
   const runReleaseCommand = releaseCommandExecutor ?? ((spec, executorOptions) =>
     executeProductionReleaseCommand(spec, { ...executorOptions,
       ...(releaseSpawnImpl ? { spawnImpl: releaseSpawnImpl } : {}) }));
+  const runP11Command = p11CommandExecutor ?? ((spec, executorOptions) =>
+    executeP11VercelApi(spec, { ...executorOptions,
+      ...(p11SpawnImpl ? { spawnImpl: p11SpawnImpl } : {}) }));
   const scopedControlPlane = typeof scopedBuildId === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scopedBuildId);
   if (scopedBuildId !== null && !scopedControlPlane) {
@@ -773,6 +782,262 @@ export async function createBuildCoordinatorService(options) {
     return observeRelease(buildId, { operationId: params.operationId, deploymentId: params.deploymentId });
   }
 
+  function p11Current(record, expected = {}) {
+    const p10 = record?.deployments;
+    const release = p10?.releases?.find((item) => item.releaseId === p10.currentProductionReleaseId);
+    const mapping = release && p10?.mappings?.find((item) => item.mappingId === release.mappingId &&
+      item.provider === "vercel" && item.targetRef === "production" && item.projectRef === release.projectRef && item.teamRef === release.teamRef);
+    if (!release || !mapping || p10.serving?.state !== "verified" || p10.serving.observedProviderDeploymentId !== release.providerDeploymentId ||
+        (expected.expectedProductionReleaseId !== undefined && p10.currentProductionReleaseId !== expected.expectedProductionReleaseId) ||
+        (expected.mappingId !== undefined && mapping.mappingId !== expected.mappingId) ||
+        (expected.projectRef !== undefined && mapping.projectRef !== expected.projectRef) ||
+        (expected.teamRef !== undefined && mapping.teamRef !== expected.teamRef)) return null;
+    return { release, mapping };
+  }
+
+  async function freshP11Serving(buildId) {
+    const record = readBuildRecord(runtimeRoot, buildId);
+    const authority = p11Current(record);
+    if (!authority) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_UNVERIFIED" };
+    const identity = await productionProjectIdentity(authority.mapping);
+    if (!identity.ok) return identity;
+    const serving = await observeProductionServing({ teamRef: authority.mapping.teamRef,
+      projectRef: authority.mapping.projectRef, projectName: identity.projectName,
+      executeAliases: (spec, context) => runReleaseCommand(spec, { cwd: packageRoot, mode: "release_aliases", context }),
+      executeInspect: (spec, context) => runReleaseCommand(spec, { cwd: packageRoot, mode: "release_inspect", context }) });
+    if (!serving.ok || serving.providerDeploymentId !== authority.release.providerDeploymentId)
+      return { ok: false, code: "P10_PRODUCTION_SERVING_NOT_VERIFIED" };
+    return { ok: true, releaseId: authority.release.releaseId, mapping: authority.mapping };
+  }
+
+  async function observeP11(buildId, fqdn) {
+    const record = readBuildRecord(runtimeRoot, buildId);
+    const current = p11Current(record);
+    if (!current) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_UNVERIFIED" };
+    const observation = await observeP11VercelDomain({ fqdn, projectRef: current.mapping.projectRef,
+      teamRef: current.mapping.teamRef }, { cwd: packageRoot,
+      execute: (spec, context) => runP11Command(spec, { cwd: packageRoot, context }),
+      ...(p11HttpsProbe ? { httpsProbe: p11HttpsProbe } : {}) });
+    return observation.ok ? { ...observation, p10: { releaseId: current.release.releaseId,
+      mappingId: current.mapping.mappingId, projectRef: current.mapping.projectRef, teamRef: current.mapping.teamRef } } : observation;
+  }
+
+  async function listP11Domains(buildId) {
+    const record = readBuildRecord(runtimeRoot, buildId);
+    if (!record || record.buildId !== buildId) return { ok: false, code: "BUILD_NOT_FOUND" };
+    const read = readP11DomainAuthority(record);
+    if (!read.ok) return read;
+    return { ok: true, schema: read.authority.schema, revision: read.authority.revision,
+      domains: read.authority.domains.map((item) => ({ ...item })),
+      pendingOperation: read.authority.pendingOperation ? { ...read.authority.pendingOperation } : null,
+      operationHistory: read.authority.operationHistory.map((item) => ({ ...item })) };
+  }
+
+  async function prepareP11(buildId, input) {
+    if (Object.keys(input).some((key) => !["kind", "fqdn", "requiredRecordId", "expectedRevision"].includes(key)) ||
+        !Number.isSafeInteger(input.expectedRevision)) return { ok: false, code: "P11_OPERATION_INVALID" };
+    const fresh = await freshP11Serving(buildId);
+    if (!fresh.ok) return fresh;
+    return exclusive(buildId, () => {
+      const record = readBuildRecord(runtimeRoot, buildId);
+      if (!p11Current(record, { expectedProductionReleaseId: fresh.releaseId,
+        mappingId: fresh.mapping.mappingId, projectRef: fresh.mapping.projectRef, teamRef: fresh.mapping.teamRef }))
+        return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+      const result = prepareP11DomainOperation(record, input);
+      if (!result.ok) return result;
+      writeBuildRecord(runtimeRoot, result.record);
+      try { appendBuildEvent(runtimeRoot, buildId, "domain.operation.prepared", {
+        operationId: result.operationId, kind: input.kind, fqdn: result.operation.fqdn, revision: result.revision }); } catch { /* Build record is authority. */ }
+      return { ok: true, operationId: result.operationId, revision: result.revision,
+        expectedProductionReleaseId: result.operation.expectedProductionReleaseId,
+        state: result.operation.state, kind: result.operation.kind };
+    });
+  }
+
+  async function executeP11(buildId, input) {
+    if (Object.keys(input).some((key) => !["operationId", "expectedRevision"].includes(key)) ||
+        typeof input.operationId !== "string" || !Number.isSafeInteger(input.expectedRevision)) return { ok: false, code: "P11_OPERATION_INVALID" };
+    const prepared = await exclusive(buildId, () => {
+      const record = readBuildRecord(runtimeRoot, buildId);
+      const read = readP11DomainAuthority(record);
+      const op = read.ok ? read.authority.pendingOperation : null;
+      if (!op || op.operationId !== input.operationId) return { ok: false, code: "P11_OPERATION_NOT_CURRENT" };
+      if (read.authority.revision !== input.expectedRevision) return { ok: false, code: "P11_REVISION_STALE" };
+      if (op.state !== "prepared") return { ok: false, code: "P11_EFFECT_ALREADY_ATTEMPTED" };
+      const current = p11Current(record, op);
+      if (!current) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+      return { ok: true, operation: op };
+    });
+    if (!prepared.ok) return prepared;
+    const op = prepared.operation;
+    const fresh = await freshP11Serving(buildId);
+    if (!fresh.ok || fresh.releaseId !== op.expectedProductionReleaseId || fresh.mapping.mappingId !== op.mappingId)
+      return { ok: false, code: fresh.code || "P10_PRODUCTION_AUTHORITY_STALE" };
+    let before = null;
+    if (op.kind === "apply_required_dns_record" || op.kind === "detach" || op.kind === "attach" || op.kind === "verify") {
+      before = await observeP11VercelDomain({ fqdn: op.fqdn, projectRef: op.projectRef, teamRef: op.teamRef },
+        { cwd: packageRoot, execute: (spec, context) => runP11Command(spec, { cwd: packageRoot, context }),
+          ...(p11HttpsProbe ? { httpsProbe: p11HttpsProbe } : {}) });
+      if (!before.ok) return before;
+    }
+    if (before?.dnsState === "conflict" && ["attach", "verify", "apply_required_dns_record"].includes(op.kind)) {
+      return exclusive(buildId, () => {
+        const record = readBuildRecord(runtimeRoot, buildId);
+        if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+        const transition = transitionP11DomainOperation(record, { operationId: op.operationId,
+          state: "failed_no_effect", observation: before, failureCode: "P11_DNS_CONFLICT" });
+        if (!transition.ok) return transition;
+        writeBuildRecord(runtimeRoot, transition.record);
+        return { ok: false, code: "P11_DNS_CONFLICT", revision: transition.revision, retry: false };
+      });
+    }
+    if (op.kind === "apply_required_dns_record") {
+      const canonical = readBuildRecord(runtimeRoot, buildId)?.p11Domains?.domains?.find((item) => item.domainId === op.domainId);
+      const currentRecord = canonical?.requiredRecords?.find((item) => item.recordId === op.requiredRecordId);
+      if (!currentRecord || canonical?.teamClaimState !== "claimed" || JSON.stringify(currentRecord) !== JSON.stringify(op.record) ||
+          before.teamClaimState !== "claimed" || before.dnsMode !== "vercel_managed" || !before.dnsZone || before.dnsState === "conflict")
+        return { ok: false, code: "P11_REQUIRED_RECORD_STALE" };
+      const sameName = before.dnsRecords?.filter((item) => item.name === op.record.name && item.type === op.record.type) ?? [];
+      if (sameName.some((item) => item.value !== op.record.value) || sameName.length > 1)
+        return { ok: false, code: "P11_DNS_CONFLICT" };
+      if (sameName.length === 1) {
+        const completed = await exclusive(buildId, () => {
+          const record = readBuildRecord(runtimeRoot, buildId);
+          if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+          const transition = transitionP11DomainOperation(record, { operationId: op.operationId, state: "completed", observation: before,
+            providerRecordId: sameName[0].recordId });
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          return { ok: true, revision: transition.revision, reconciledExisting: true };
+        });
+        return completed;
+      }
+    }
+    if (op.kind === "attach" && before?.attachmentState === "attached") {
+      const done = await exclusive(buildId, () => {
+        const record = readBuildRecord(runtimeRoot, buildId);
+        if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+        const transition = transitionP11DomainOperation(record, { operationId: op.operationId, state: "completed", observation: before });
+        if (!transition.ok) return transition;
+        writeBuildRecord(runtimeRoot, transition.record);
+        return { ok: true, revision: transition.revision, alreadyAttached: true };
+      });
+      return done;
+    }
+    if (op.kind === "detach" && before?.attachmentState === "detached") {
+      const done = await exclusive(buildId, () => {
+        const record = readBuildRecord(runtimeRoot, buildId);
+        if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+        const transition = transitionP11DomainOperation(record, { operationId: op.operationId, state: "completed", observation: before });
+        if (!transition.ok) return transition;
+        writeBuildRecord(runtimeRoot, transition.record);
+        return { ok: true, revision: transition.revision, alreadyDetached: true };
+      });
+      return done;
+    }
+    const started = await exclusive(buildId, () => {
+      const record = readBuildRecord(runtimeRoot, buildId);
+      if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+      const transition = transitionP11DomainOperation(record, { operationId: op.operationId, state: "effect_started" });
+      if (!transition.ok) return transition;
+      writeBuildRecord(runtimeRoot, transition.record);
+      return { ok: true };
+    });
+    if (!started.ok) return started;
+    const kind = { attach: "attach", verify: "verify", apply_required_dns_record: "dns_create", detach: "detach" }[op.kind];
+    const spec = makeP11VercelApiCommand(kind, { fqdn: op.fqdn, projectRef: op.projectRef, teamRef: op.teamRef,
+      ...(op.kind === "apply_required_dns_record" ? { record: op.record, teamClaimState: before.teamClaimState,
+        dnsMode: before.dnsMode, dnsZone: before.dnsZone } : {}) });
+    let effect;
+    try { effect = spec.ok ? await runP11Command(spec, { cwd: packageRoot, context: { operationId: op.operationId } }) : spec; }
+    catch { effect = { ok: false, code: "P11_PROVIDER_OUTCOME_UNKNOWN" }; }
+    if (!effect.ok) return exclusive(buildId, () => {
+      const record = readBuildRecord(runtimeRoot, buildId);
+      if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+      const transition = transitionP11DomainOperation(record, { operationId: op.operationId, state: "uncertain", failureCode: effect.code || "P11_PROVIDER_OUTCOME_UNKNOWN" });
+      if (!transition.ok) return transition;
+      writeBuildRecord(runtimeRoot, transition.record);
+      return { ok: false, code: "P11_PROVIDER_OUTCOME_UNKNOWN", revision: transition.revision, retry: false };
+    });
+    const after = await observeP11VercelDomain({ fqdn: op.fqdn, projectRef: op.projectRef, teamRef: op.teamRef },
+      { cwd: packageRoot, execute: (commandSpec, context) => runP11Command(commandSpec, { cwd: packageRoot, context }),
+        ...(p11HttpsProbe ? { httpsProbe: p11HttpsProbe } : {}) });
+    if (!after.ok) return exclusive(buildId, () => {
+      const record = readBuildRecord(runtimeRoot, buildId);
+      if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+      const transition = transitionP11DomainOperation(record, { operationId: op.operationId, state: "safe_stop", failureCode: after.code || "P11_READBACK_UNSAFE" });
+      if (!transition.ok) return transition;
+      writeBuildRecord(runtimeRoot, transition.record);
+      return { ok: false, code: "P11_READBACK_UNSAFE", retry: false };
+    });
+    const freshAfter = await freshP11Serving(buildId);
+    if (!freshAfter.ok || freshAfter.releaseId !== op.expectedProductionReleaseId)
+      return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+    const fulfilled = op.kind === "attach" ? after.attachmentState.startsWith("attached") :
+      op.kind === "verify" ? after.attachmentState.startsWith("attached") :
+      op.kind === "detach" ? after.attachmentState === "detached" :
+      after.dnsRecords.some((item) => item.recordId && item.name === op.record.name && item.type === op.record.type && item.value === op.record.value);
+    return exclusive(buildId, () => {
+      const record = readBuildRecord(runtimeRoot, buildId);
+      if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+      const transition = transitionP11DomainOperation(record, { operationId: op.operationId,
+        state: fulfilled ? "completed" : "safe_stop", observation: after,
+        providerRecordId: op.kind === "apply_required_dns_record" ? after.dnsRecords.find((item) => item.name === op.record.name && item.type === op.record.type && item.value === op.record.value)?.recordId : undefined,
+        failureCode: fulfilled ? undefined : "P11_PROVIDER_STATE_NOT_ESTABLISHED" });
+      if (!transition.ok) return transition;
+      writeBuildRecord(runtimeRoot, transition.record);
+      return fulfilled ? { ok: true, revision: transition.revision, operationState: "completed", domain: transition.domain } :
+        { ok: false, code: "P11_PROVIDER_STATE_NOT_ESTABLISHED", revision: transition.revision, retry: false };
+    });
+  }
+
+  async function observeP11Operation(buildId, fqdn) {
+    const before = readBuildRecord(runtimeRoot, buildId);
+    const current = p11Current(before);
+    if (!current) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_UNVERIFIED" };
+    const authority = readP11DomainAuthority(before);
+    if (!authority.ok) return authority;
+    if (!authority.authority.domains.some((item) => item.fqdn === fqdn)) return { ok: false, code: "P11_DOMAIN_NOT_FOUND" };
+    const observed = await observeP11VercelDomain({ fqdn, projectRef: current.mapping.projectRef, teamRef: current.mapping.teamRef },
+      { cwd: packageRoot, execute: (spec, context) => runP11Command(spec, { cwd: packageRoot, context }),
+        ...(p11HttpsProbe ? { httpsProbe: p11HttpsProbe } : {}) });
+    if (!observed.ok) return observed;
+    const fresh = await freshP11Serving(buildId);
+    if (!fresh.ok || fresh.releaseId !== current.release.releaseId || fresh.mapping.mappingId !== current.mapping.mappingId)
+      return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+    return exclusive(buildId, () => {
+      const record = readBuildRecord(runtimeRoot, buildId);
+      if (!p11Current(record, { expectedProductionReleaseId: current.release.releaseId, mappingId: current.mapping.mappingId }))
+        return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+      const p11 = readP11DomainAuthority(record);
+      if (!p11.ok) return p11;
+      const pending = p11.authority.pendingOperation;
+      if (pending?.fqdn === fqdn && pending.state !== "prepared") {
+        const exactDnsMatches = pending.kind === "apply_required_dns_record"
+          ? observed.dnsRecords.filter((item) => item.name === pending.record.name &&
+              item.type === pending.record.type && item.value === pending.record.value)
+          : [];
+        const matched = pending.kind === "attach" ? observed.attachmentState.startsWith("attached") :
+          pending.kind === "verify" ? observed.verificationState === "verified" :
+          pending.kind === "detach" ? observed.attachmentState === "detached" :
+          exactDnsMatches.length === 1;
+        if (matched) {
+          const transition = transitionP11DomainOperation(record, { operationId: pending.operationId, state: "completed", observation: observed,
+            providerRecordId: pending.kind === "apply_required_dns_record" ? exactDnsMatches[0].recordId : undefined });
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          return { ok: true, observation: observed, reconciled: true, revision: transition.revision };
+        }
+        return { ok: true, observation: observed, reconciled: false, pendingOperationId: pending.operationId,
+          retry: false, revision: p11.authority.revision };
+      }
+      const result = recordP11DomainObservation(record, observed);
+      if (!result.ok) return result;
+      if (result.record !== record) writeBuildRecord(runtimeRoot, result.record);
+      return { ok: true, observation: observed, revision: result.revision };
+    });
+  }
+
   async function dispatch(method, params = {}) {
     const buildId = String(params.buildId || "");
     if (scopedControlPlane && method !== BuildCoordinatorMethods.HELLO &&
@@ -928,6 +1193,19 @@ export async function createBuildCoordinatorService(options) {
         return executeRelease(buildId, params);
       case BuildCoordinatorMethods.BUILD_RELEASE_OBSERVE:
         return observeRelease(buildId, params);
+      case BuildCoordinatorMethods.BUILD_DOMAINS_LIST:
+        return listP11Domains(buildId);
+      case BuildCoordinatorMethods.BUILD_DOMAIN_PREPARE:
+        if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+        return prepareP11(buildId, Object.fromEntries(Object.entries(params).filter(([key]) => key !== "buildId")));
+      case BuildCoordinatorMethods.BUILD_DOMAIN_EXECUTE:
+        if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+        return executeP11(buildId, Object.fromEntries(Object.entries(params).filter(([key]) => key !== "buildId")));
+      case BuildCoordinatorMethods.BUILD_DOMAIN_OBSERVE:
+        if (scopedControlPlane) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+        if (Object.keys(params).some((key) => !["buildId", "fqdn"].includes(key)) || typeof params.fqdn !== "string")
+          return { ok: false, code: "P11_OBSERVE_INVALID" };
+        return observeP11Operation(buildId, params.fqdn);
       case BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ:
         return readBuildEnvironment(runtimeRoot, buildId, params.environmentId);
       case BuildCoordinatorMethods.BUILD_SECRET_BINDING_READ:

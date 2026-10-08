@@ -143,6 +143,10 @@ export function createBuildCoordinatorClient(options) {
       request(BuildCoordinatorMethods.BUILD_RELEASE_EXECUTE, { buildId, ...input }),
     observeRelease: (buildId, input = {}) =>
       request(BuildCoordinatorMethods.BUILD_RELEASE_OBSERVE, { buildId, ...input }),
+    listDomains: (buildId) => request(BuildCoordinatorMethods.BUILD_DOMAINS_LIST, { buildId }),
+    prepareDomainOperation: (buildId, input) => request(BuildCoordinatorMethods.BUILD_DOMAIN_PREPARE, { buildId, ...input }),
+    executeDomainOperation: (buildId, input) => request(BuildCoordinatorMethods.BUILD_DOMAIN_EXECUTE, { buildId, ...input }),
+    observeDomain: (buildId, input) => request(BuildCoordinatorMethods.BUILD_DOMAIN_OBSERVE, { buildId, ...input }),
     readEnvironment: (buildId, environmentId) =>
       request(BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ, { buildId, environmentId }),
     readSecretBinding: (buildId, environmentId, secretRef) =>
