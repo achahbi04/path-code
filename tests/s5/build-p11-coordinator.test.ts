@@ -348,6 +348,51 @@ describe("P11 explicit coordinator domain authority", () => {
     }
   });
 
+  it.each([
+    { label: "exactly one exact record", rows: [{ id: "provider-record-1", match: true }], completed: true, providerRecordId: "provider-record-1" },
+    { label: "one exact record plus unrelated records", rows: [
+      { id: "provider-record-1", match: true }, { id: "unrelated-record", name: "other", type: "A", value: "192.0.2.4" },
+    ], completed: true, providerRecordId: "provider-record-1" },
+    { label: "zero exact records", rows: [], completed: false, providerRecordId: null },
+    { label: "two exact records with distinct IDs", rows: [
+      { id: "provider-record-1", match: true }, { id: "provider-record-2", match: true },
+    ], completed: false, providerRecordId: null },
+  ])("successful DNS create readback requires one exact candidate: $label", async ({ rows, completed, providerRecordId }) => {
+    root = mkdtempSync(join(tmpdir(), "path-p11-dns-immediate-cardinality-"));
+    const initial = recordWithAttachedDomain({ managedDns: true }); writeBuildRecord(root, initial);
+    let dnsRows: any[] = [];
+    let createCount = 0;
+    const provider = providerPages({ attached: true, dnsRecords: () => dnsRows });
+    const p11CommandExecutor = vi.fn(async (spec: any) => {
+      if (spec.argv[3] !== "GET") {
+        createCount++;
+        const record = spec.proofContext.input.record;
+        dnsRows = rows.map((row) => row.match
+          ? { id: row.id, name: record.name, type: record.type, value: record.value }
+          : row);
+        return { ok: true, raw: {} };
+      }
+      return provider(spec);
+    });
+    service = await createBuildCoordinatorService({ runtimeRoot: root, packageRoot: resolvePathPackageRoot(), fakeMode: true,
+      ...providerReleaseExecutors(), p11CommandExecutor, p11HttpsProbe: async () => ({ ok: false, code: "P11_TLS_HANDSHAKE_FAILED" }) });
+    const prepared = await service.dispatch("build.domains.prepare", { buildId, kind: "apply_required_dns_record", fqdn,
+      requiredRecordId: requiredRecord.recordId, expectedRevision: (initial as any).p11Domains.revision });
+    const result = await service.dispatch("build.domains.execute", { buildId, operationId: prepared.operationId, expectedRevision: prepared.revision });
+    expect(createCount).toBe(1);
+    expect(result.ok).toBe(completed);
+    if (completed) expect(result).toMatchObject({ ok: true, operationState: "completed" });
+    else expect(result).toMatchObject({ ok: false, code: "P11_PROVIDER_STATE_NOT_ESTABLISHED", retry: false });
+    const final = readBuildRecord(root, buildId)! as any;
+    if (completed) {
+      expect(final.p11Domains.pendingOperation).toBeNull();
+      expect(final.p11Domains.operationHistory.at(-1)).toMatchObject({ state: "completed", providerRecordId });
+    } else {
+      expect(final.p11Domains.pendingOperation).toMatchObject({ kind: "apply_required_dns_record", state: "safe_stop" });
+      expect(final.p11Domains.operationHistory.at(-1)).toMatchObject({ state: "safe_stop", providerRecordId: null });
+    }
+  });
+
   it.each(["attach", "verify", "apply_required_dns_record", "detach"] as const)(
     "startup recovery never replays pending %s provider effects",
     async (kind) => {

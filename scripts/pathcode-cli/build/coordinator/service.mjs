@@ -973,16 +973,20 @@ export async function createBuildCoordinatorService(options) {
     const freshAfter = await freshP11Serving(buildId);
     if (!freshAfter.ok || freshAfter.releaseId !== op.expectedProductionReleaseId)
       return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+    const exactDnsMatches = op.kind === "apply_required_dns_record"
+      ? after.dnsRecords.filter((item) => item.recordId && item.name === op.record.name &&
+          item.type === op.record.type && item.value === op.record.value)
+      : [];
     const fulfilled = op.kind === "attach" ? after.attachmentState.startsWith("attached") :
       op.kind === "verify" ? after.attachmentState.startsWith("attached") :
       op.kind === "detach" ? after.attachmentState === "detached" :
-      after.dnsRecords.some((item) => item.recordId && item.name === op.record.name && item.type === op.record.type && item.value === op.record.value);
+      exactDnsMatches.length === 1;
     return exclusive(buildId, () => {
       const record = readBuildRecord(runtimeRoot, buildId);
       if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
       const transition = transitionP11DomainOperation(record, { operationId: op.operationId,
         state: fulfilled ? "completed" : "safe_stop", observation: after,
-        providerRecordId: op.kind === "apply_required_dns_record" ? after.dnsRecords.find((item) => item.name === op.record.name && item.type === op.record.type && item.value === op.record.value)?.recordId : undefined,
+        providerRecordId: op.kind === "apply_required_dns_record" && exactDnsMatches.length === 1 ? exactDnsMatches[0].recordId : undefined,
         failureCode: fulfilled ? undefined : "P11_PROVIDER_STATE_NOT_ESTABLISHED" });
       if (!transition.ok) return transition;
       writeBuildRecord(runtimeRoot, transition.record);
@@ -1014,7 +1018,7 @@ export async function createBuildCoordinatorService(options) {
       const pending = p11.authority.pendingOperation;
       if (pending?.fqdn === fqdn && pending.state !== "prepared") {
         const exactDnsMatches = pending.kind === "apply_required_dns_record"
-          ? observed.dnsRecords.filter((item) => item.name === pending.record.name &&
+          ? observed.dnsRecords.filter((item) => item.recordId && item.name === pending.record.name &&
               item.type === pending.record.type && item.value === pending.record.value)
           : [];
         const matched = pending.kind === "attach" ? observed.attachmentState.startsWith("attached") :
