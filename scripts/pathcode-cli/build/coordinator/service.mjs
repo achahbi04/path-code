@@ -803,8 +803,11 @@ export async function createBuildCoordinatorService(options) {
     if (!identity.ok) return identity;
     const serving = await observeProductionServing({ teamRef: authority.mapping.teamRef,
       projectRef: authority.mapping.projectRef, projectName: identity.projectName,
-      executeAliases: (spec, context) => runReleaseCommand(spec, { cwd: packageRoot, mode: "release_aliases", context }),
-      executeInspect: (spec, context) => runReleaseCommand(spec, { cwd: packageRoot, mode: "release_inspect", context }) });
+      executeAliases: (spec, context) => runReleaseCommand(spec, { cwd: packageRoot, mode: "release_aliases",
+        context: { teamRef: authority.mapping.teamRef, nextCursor: context.nextCursor } }),
+      executeInspect: (spec, context) => runReleaseCommand(spec, { cwd: packageRoot, mode: "release_inspect",
+        context: { providerDeploymentId: context.providerDeploymentId, projectName: identity.projectName,
+          projectRef: authority.mapping.projectRef, teamRef: authority.mapping.teamRef } }) });
     if (!serving.ok || serving.providerDeploymentId !== authority.release.providerDeploymentId)
       return { ok: false, code: "P10_PRODUCTION_SERVING_NOT_VERIFIED" };
     return { ok: true, releaseId: authority.release.releaseId, mapping: authority.mapping };

@@ -147,6 +147,62 @@ describe("P11 explicit coordinator domain authority", () => {
     expect(result).toMatchObject({ ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" });
   });
 
+  it("keeps accepted P10 serving observation and P11 fresh preflight on the same executor identity context", async () => {
+    root = mkdtempSync(join(tmpdir(), "path-p11-serving-context-parity-"));
+    writeBuildRecord(root, authorityRecord());
+    const inspectContexts: any[] = [];
+    const aliasContexts: any[] = [];
+    const productionCommandExecutor = async (_spec: any, options: any) => options.mode === "production_auth"
+      ? { ok: true, authenticated: true, teamRef }
+      : { ok: true, projectId, projectName: projectRef, teamRef };
+    const releaseCommandExecutor = async (_spec: any, options: any) => {
+      if (options.mode === "release_aliases") {
+        aliasContexts.push(options.context);
+        return { ok: true, aliases: [{ alias: `${projectRef}.vercel.app`, providerDeploymentId }], nextCursor: null };
+      }
+      inspectContexts.push(options.context);
+      // Model executeProductionReleaseCommand: project identity is reduced from
+      // the strict executor context, never hardcoded into the fixture result.
+      return { ok: true, providerDeploymentId: options.context.providerDeploymentId,
+        projectRef: options.context.projectRef ?? null, teamRef: options.context.teamRef,
+        target: "production", url: "https://production.vercel.app", providerState: "READY", observedAt: at };
+    };
+    service = await createBuildCoordinatorService({ runtimeRoot: root, packageRoot: resolvePathPackageRoot(), fakeMode: true,
+      productionCommandExecutor, releaseCommandExecutor,
+      p11CommandExecutor: vi.fn(async () => ({ ok: false, code: "UNEXPECTED_P11_PROVIDER_CALL" })) });
+    await service.whenReady;
+
+    const p10 = await service.dispatch("build.releases.observe", { buildId });
+    expect(p10).toMatchObject({ ok: true, serving: { state: "verified", observedProviderDeploymentId: providerDeploymentId } });
+    expect(inspectContexts.at(-1)).toEqual({ providerDeploymentId, projectName: projectRef, projectRef, teamRef });
+    expect(aliasContexts.at(-1)).toEqual({ teamRef, nextCursor: null });
+
+    const p11 = await service.dispatch("build.domains.prepare", { buildId, kind: "attach", fqdn, expectedRevision: 0 });
+    expect(p11).toMatchObject({ ok: true, kind: "attach", expectedProductionReleaseId: "release-prod" });
+    expect(inspectContexts.at(-1)).toEqual({ providerDeploymentId, projectName: projectRef, projectRef, teamRef });
+    expect(aliasContexts.at(-1)).toEqual({ teamRef, nextCursor: null });
+    expect(inspectContexts).toHaveLength(2);
+    expect(readBuildRecord(root, buildId)!.deployments?.currentProductionReleaseId).toBe("release-prod");
+  });
+
+  it("fails P11 serving preflight closed when the inspected deployment resolves to another project", async () => {
+    root = mkdtempSync(join(tmpdir(), "path-p11-serving-wrong-project-"));
+    writeBuildRecord(root, authorityRecord());
+    const p11CommandExecutor = vi.fn();
+    const releaseCommandExecutor = async (_spec: any, options: any) => options.mode === "release_aliases"
+      ? { ok: true, aliases: [{ alias: `${projectRef}.vercel.app`, providerDeploymentId }], nextCursor: null }
+      : { ok: true, providerDeploymentId: options.context.providerDeploymentId,
+        projectRef: "another-production-project", teamRef: options.context.teamRef,
+        target: "production", url: "https://production.vercel.app", providerState: "READY", observedAt: at };
+    service = await createBuildCoordinatorService({ runtimeRoot: root, packageRoot: resolvePathPackageRoot(), fakeMode: true,
+      ...providerReleaseExecutors(), releaseCommandExecutor, p11CommandExecutor });
+    await service.whenReady;
+    const result = await service.dispatch("build.domains.prepare", { buildId, kind: "attach", fqdn, expectedRevision: 0 });
+    expect(result).toMatchObject({ ok: false, code: "P10_PRODUCTION_SERVING_NOT_VERIFIED" });
+    expect(p11CommandExecutor).not.toHaveBeenCalled();
+    expect((readBuildRecord(root, buildId) as any).p11Domains).toBeUndefined();
+  });
+
   it("records provider DNS conflict and blocks attachment before any effect", async () => {
     root = mkdtempSync(join(tmpdir(), "path-p11-conflict-"));
     const record = authorityRecord(); writeBuildRecord(root, record);
