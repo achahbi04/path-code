@@ -47,21 +47,28 @@ function recordWithAttachedDomain({ managedDns = false } = {}) {
     dnsMode: "vercel_managed", dnsState: "valid", requiredRecords: [requiredRecord] })).record!;
 }
 
-function providerPages({ attached, verified = false, dnsRecords = [], onRead }:
-  { attached: boolean | (() => boolean); verified?: boolean | (() => boolean); dnsRecords: any[] | (() => any[]); onRead?: (kind: string, method: string) => void }) {
+function providerPages({ attached, verified = false, dnsRecords = [], onRead, apexName = fqdn,
+  intendedNameservers = [], currentNameservers = ["ns1.vercel-dns.com"], serviceType = "zeit.world" }:
+  { attached: boolean | (() => boolean); verified?: boolean | (() => boolean); dnsRecords?: any[] | (() => any[]);
+    onRead?: (kind: string, method: string) => void; apexName?: string; intendedNameservers?: string[] | (() => string[]);
+    currentNameservers?: string[]; serviceType?: string | (() => string) }) {
   return async (spec: any) => {
     const kind = spec.proofContext.kind;
     const method = spec.argv[3];
     onRead?.(kind, method);
-    const projectDomain = { name: fqdn, apexName: fqdn, projectId,
+    const projectDomain = { name: fqdn, apexName, projectId,
       verified: typeof verified === "function" ? verified() : verified, verification: [] };
     const isAttached = typeof attached === "function" ? attached() : attached;
     const currentDnsRecords = typeof dnsRecords === "function" ? dnsRecords() : dnsRecords;
+    const currentIntendedNameservers = typeof intendedNameservers === "function" ? intendedNameservers() : intendedNameservers;
+    const currentServiceType = typeof serviceType === "function" ? serviceType() : serviceType;
     const pages: Record<string, any> = {
-      team_domains: { domains: [{ name: fqdn, teamId: teamRef, serviceType: "zeit.world", nameservers: ["ns1.vercel-dns.com"] }], pagination: { count: 1, next: null, prev: null } },
+      team_domains: { domains: [{ name: apexName, teamId: teamRef, serviceType: currentServiceType, nameservers: currentNameservers,
+        intendedNameservers: currentIntendedNameservers }], pagination: { count: 1, next: null, prev: null } },
       project: { id: projectId, name: projectRef, teamId: teamRef },
       project_domains: { domains: isAttached ? [projectDomain] : [], pagination: { count: isAttached ? 1 : 0, next: null, prev: null } },
-      domain_config: { serviceType: "zeit.world", misconfigured: false, conflicts: [], nameservers: ["ns1.vercel-dns.com"],
+      project_domain: projectDomain,
+      domain_config: { serviceType: currentServiceType, misconfigured: false, conflicts: [], nameservers: currentNameservers,
         acceptedChallenges: [], recommendedIPv4: [], recommendedCNAME: [] },
       dns_records: { records: currentDnsRecords, pagination: { count: currentDnsRecords.length, next: null, prev: null } },
       certificates: { certs: [], pagination: { count: 0, next: null, prev: null } },
@@ -82,10 +89,151 @@ function providerReleaseExecutors() {
   };
 }
 
+function managedDnsEligibleRecord() {
+  const initial = recordWithAttachedDomain();
+  return recordP11DomainObservation(initial, reducedDomainObservation({ teamClaimState: "claimed", attachmentState: "attached",
+    verificationState: "verified", dnsMode: "external", dnsState: "action_required", providerApexName: "example.com",
+    intendedNameservers: [] })).record!;
+}
+
 describe("P11 explicit coordinator domain authority", () => {
   let root = "";
   let service: Awaited<ReturnType<typeof createBuildCoordinatorService>> | null = null;
   afterEach(async () => { await service?.close(); service = null; if (root) rmSync(root, { recursive: true, force: true }); root = ""; });
+
+  it("freezes provider apex, persists effect intent before one PATCH outside the Build lock, and requires authoritative readback", async () => {
+    root = mkdtempSync(join(tmpdir(), "path-p11-managed-dns-success-"));
+    const initial = managedDnsEligibleRecord(); writeBuildRecord(root, initial);
+    let ready = false; let patchCount = 0;
+    const intended = () => ready ? ["ns1.vercel-dns.test", "ns2.vercel-dns.test"] : [];
+    const provider = providerPages({ attached: true, verified: true, apexName: "example.com", intendedNameservers: intended,
+      currentNameservers: ["ns1.simply.com"], serviceType: () => ready ? "zeit.world" : "external" });
+    const p11CommandExecutor = vi.fn(async (spec: any) => {
+      if (spec.argv[3] === "PATCH") {
+        patchCount++;
+        expect(spec.proofContext).toEqual({ kind: "enable_managed_dns", input: { zoneFqdn: "example.com", teamRef } });
+        expect(spec.stdinPayload).toBe(JSON.stringify({ op: "update", zone: true }));
+        const persisted = readBuildRecord(root, buildId)! as any;
+        expect(persisted.p11Domains.pendingOperation).toMatchObject({ kind: "enable_managed_dns", zoneFqdn: "example.com", state: "effect_started" });
+        const concurrentRead = await service!.dispatch("build.domains.list", { buildId });
+        expect(concurrentRead).toMatchObject({ ok: true, pendingOperation: { kind: "enable_managed_dns", state: "effect_started" } });
+        ready = true;
+        return { ok: true, raw: { ignored: "receipt is not authority" } };
+      }
+      return provider(spec);
+    });
+    service = await createBuildCoordinatorService({ runtimeRoot: root, packageRoot: resolvePathPackageRoot(), fakeMode: true,
+      ...providerReleaseExecutors(), p11CommandExecutor, p11HttpsProbe: async () => ({ ok: false, code: "P11_TLS_HANDSHAKE_FAILED" }) });
+    await service.whenReady;
+    const prepared = await service.dispatch("build.domains.prepare", { buildId, kind: "enable_managed_dns", fqdn,
+      expectedRevision: (initial as any).p11Domains.revision });
+    expect(prepared).toMatchObject({ ok: true, kind: "enable_managed_dns" });
+    const op = (readBuildRecord(root, buildId)! as any).p11Domains.pendingOperation;
+    expect(op).toMatchObject({ zoneFqdn: "example.com", expectedProductionReleaseId: "release-prod", mappingId: "mapping-prod", teamRef, projectRef });
+    const completed = await service.dispatch("build.domains.execute", { buildId, operationId: prepared.operationId, expectedRevision: prepared.revision });
+    expect(completed).toMatchObject({ ok: true, operationState: "completed", domain: { dnsMode: "external",
+      providerApexName: "example.com", intendedNameservers: ["ns1.vercel-dns.test", "ns2.vercel-dns.test"] },
+      managedDnsReadback: { zoneFqdn: "example.com", teamRef } });
+    expect(patchCount).toBe(1);
+    const again = await service.dispatch("build.domains.execute", { buildId, operationId: prepared.operationId, expectedRevision: prepared.revision });
+    expect(again).toMatchObject({ ok: false, code: "P11_OPERATION_NOT_CURRENT" });
+    expect(patchCount).toBe(1);
+  });
+
+  it("does not PATCH when fresh provider evidence already proves readiness", async () => {
+    root = mkdtempSync(join(tmpdir(), "path-p11-managed-dns-already-ready-"));
+    const initial = managedDnsEligibleRecord(); writeBuildRecord(root, initial);
+    const provider = providerPages({ attached: true, verified: true, apexName: "example.com",
+      intendedNameservers: ["ns1.vercel-dns.test"], currentNameservers: ["ns1.vercel-dns.test"], serviceType: "zeit.world" });
+    const p11CommandExecutor = vi.fn(async (spec: any) => provider(spec));
+    service = await createBuildCoordinatorService({ runtimeRoot: root, packageRoot: resolvePathPackageRoot(), fakeMode: true,
+      ...providerReleaseExecutors(), p11CommandExecutor, p11HttpsProbe: async () => ({ ok: false, code: "P11_TLS_HANDSHAKE_FAILED" }) });
+    const prepared = await service.dispatch("build.domains.prepare", { buildId, kind: "enable_managed_dns", fqdn,
+      expectedRevision: (initial as any).p11Domains.revision });
+    const completed = await service.dispatch("build.domains.execute", { buildId, operationId: prepared.operationId, expectedRevision: prepared.revision });
+    expect(completed).toMatchObject({ ok: true, operationState: "completed", alreadyReady: true, providerEffect: false,
+      domain: { dnsMode: "vercel_managed" } });
+    expect(p11CommandExecutor.mock.calls.some(([spec]) => spec.argv[3] === "PATCH")).toBe(false);
+  });
+
+  it("does not complete after a successful PATCH without readiness readback", async () => {
+    root = mkdtempSync(join(tmpdir(), "path-p11-managed-dns-no-readback-"));
+    const initial = managedDnsEligibleRecord(); writeBuildRecord(root, initial);
+    const provider = providerPages({ attached: true, verified: true, apexName: "example.com", intendedNameservers: [],
+      currentNameservers: ["ns1.simply.com"], serviceType: "external" });
+    let patchCount = 0;
+    const p11CommandExecutor = vi.fn(async (spec: any) => {
+      if (spec.argv[3] === "PATCH") { patchCount++; return { ok: true, raw: {} }; }
+      return provider(spec);
+    });
+    service = await createBuildCoordinatorService({ runtimeRoot: root, packageRoot: resolvePathPackageRoot(), fakeMode: true,
+      ...providerReleaseExecutors(), p11CommandExecutor, p11HttpsProbe: async () => ({ ok: false, code: "P11_TLS_HANDSHAKE_FAILED" }) });
+    const prepared = await service.dispatch("build.domains.prepare", { buildId, kind: "enable_managed_dns", fqdn,
+      expectedRevision: (initial as any).p11Domains.revision });
+    const result = await service.dispatch("build.domains.execute", { buildId, operationId: prepared.operationId, expectedRevision: prepared.revision });
+    expect(result).toMatchObject({ ok: false, code: "P11_PROVIDER_STATE_NOT_ESTABLISHED", retry: false });
+    expect(patchCount).toBe(1);
+    expect((readBuildRecord(root, buildId)! as any).p11Domains.pendingOperation).toMatchObject({ kind: "enable_managed_dns", state: "safe_stop" });
+  });
+
+  it.each([true, false])("does not repeat an uncertain managed DNS PATCH; read-only recovery ready=%s", async (becomesReady) => {
+    root = mkdtempSync(join(tmpdir(), "path-p11-managed-dns-uncertain-"));
+    const initial = managedDnsEligibleRecord(); writeBuildRecord(root, initial);
+    let ready = false; let patchCount = 0;
+    const provider = providerPages({ attached: true, verified: true, apexName: "example.com",
+      intendedNameservers: () => ready ? ["ns1.vercel-dns.test"] : [], currentNameservers: ["ns1.simply.com"],
+      serviceType: () => ready ? "zeit.world" : "external" });
+    const p11CommandExecutor = vi.fn(async (spec: any) => {
+      if (spec.argv[3] === "PATCH") { patchCount++; ready = becomesReady; return { ok: false, code: "P11_PROVIDER_OUTCOME_UNKNOWN" }; }
+      return provider(spec);
+    });
+    service = await createBuildCoordinatorService({ runtimeRoot: root, packageRoot: resolvePathPackageRoot(), fakeMode: true,
+      ...providerReleaseExecutors(), p11CommandExecutor, p11HttpsProbe: async () => ({ ok: false, code: "P11_TLS_HANDSHAKE_FAILED" }) });
+    const prepared = await service.dispatch("build.domains.prepare", { buildId, kind: "enable_managed_dns", fqdn,
+      expectedRevision: (initial as any).p11Domains.revision });
+    const result = await service.dispatch("build.domains.execute", { buildId, operationId: prepared.operationId, expectedRevision: prepared.revision });
+    expect(result).toMatchObject({ ok: false, code: "P11_PROVIDER_OUTCOME_UNKNOWN", retry: false });
+    const reconciled = await service.dispatch("build.domains.observe", { buildId, fqdn });
+    expect(patchCount).toBe(1);
+    if (becomesReady) expect(reconciled).toMatchObject({ ok: true, reconciled: true });
+    else expect(reconciled).toMatchObject({ ok: true, reconciled: false, retry: false });
+    const duplicate = await service.dispatch("build.domains.execute", { buildId, operationId: prepared.operationId, expectedRevision: prepared.revision });
+    expect(duplicate).toMatchObject({ ok: false, code: becomesReady ? "P11_OPERATION_NOT_CURRENT" : "P11_REVISION_STALE" });
+    expect(patchCount).toBe(1);
+  });
+
+  it("rejects a fresh provider apex change and stale P10 authority before PATCH", async () => {
+    root = mkdtempSync(join(tmpdir(), "path-p11-managed-dns-stale-"));
+    const initial = managedDnsEligibleRecord(); writeBuildRecord(root, initial);
+    const provider = providerPages({ attached: true, verified: true, apexName: "other.example", intendedNameservers: [],
+      currentNameservers: ["ns1.simply.com"], serviceType: "external" });
+    const p11CommandExecutor = vi.fn(async (spec: any) => provider(spec));
+    service = await createBuildCoordinatorService({ runtimeRoot: root, packageRoot: resolvePathPackageRoot(), fakeMode: true,
+      ...providerReleaseExecutors(), p11CommandExecutor, p11HttpsProbe: async () => ({ ok: false, code: "P11_TLS_HANDSHAKE_FAILED" }) });
+    const prepared = await service.dispatch("build.domains.prepare", { buildId, kind: "enable_managed_dns", fqdn,
+      expectedRevision: (initial as any).p11Domains.revision });
+    const staleZone = await service.dispatch("build.domains.execute", { buildId, operationId: prepared.operationId, expectedRevision: prepared.revision });
+    expect(staleZone).toMatchObject({ ok: false, code: "P11_MANAGED_DNS_ZONE_STALE", retry: false });
+    expect(p11CommandExecutor.mock.calls.some(([spec]) => spec.argv[3] === "PATCH")).toBe(false);
+  });
+
+  it.each(["release", "mapping"] as const)("rejects changed P10 %s authority before managed DNS PATCH", async (changedAuthority) => {
+    root = mkdtempSync(join(tmpdir(), `path-p11-managed-dns-stale-p10-${changedAuthority}-`));
+    const initial = managedDnsEligibleRecord(); writeBuildRecord(root, initial);
+    const provider = providerPages({ attached: true, verified: true, apexName: "example.com", intendedNameservers: [] });
+    const p11CommandExecutor = vi.fn(async (spec: any) => provider(spec));
+    service = await createBuildCoordinatorService({ runtimeRoot: root, packageRoot: resolvePathPackageRoot(), fakeMode: true,
+      ...providerReleaseExecutors(), p11CommandExecutor, p11HttpsProbe: async () => ({ ok: false, code: "P11_TLS_HANDSHAKE_FAILED" }) });
+    const prepared = await service.dispatch("build.domains.prepare", { buildId, kind: "enable_managed_dns", fqdn,
+      expectedRevision: (initial as any).p11Domains.revision });
+    const changed = readBuildRecord(root, buildId)! as any;
+    if (changedAuthority === "release") changed.deployments.currentProductionReleaseId = "replacement-release";
+    else changed.deployments.mappings[0].projectRef = "replacement-project";
+    writeBuildRecord(root, changed);
+    const result = await service.dispatch("build.domains.execute", { buildId, operationId: prepared.operationId, expectedRevision: prepared.revision });
+    expect(result).toMatchObject({ ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" });
+    expect(p11CommandExecutor).not.toHaveBeenCalled();
+  });
 
   it("persists exact attach intent before one provider effect, reads back, and preserves P10", async () => {
     root = mkdtempSync(join(tmpdir(), "path-p11-coordinator-"));
@@ -113,6 +261,7 @@ describe("P11 explicit coordinator domain authority", () => {
         team_domains: { domains: [], pagination: { count: 0, next: null, prev: null } },
         project: { id: projectId, name: projectRef, teamId: teamRef },
         project_domains: { domains: attached ? [row] : [], pagination: { count: attached ? 1 : 0, next: null, prev: null } },
+        project_domain: row,
         domain_config: { serviceType: "external", misconfigured: true, nameservers: ["ns.external.test"] },
         certificates: { certs: [], pagination: {} },
       };
@@ -449,12 +598,12 @@ describe("P11 explicit coordinator domain authority", () => {
     }
   });
 
-  it.each(["attach", "verify", "apply_required_dns_record", "detach"] as const)(
+  it.each(["attach", "verify", "apply_required_dns_record", "detach", "enable_managed_dns"] as const)(
     "startup recovery never replays pending %s provider effects",
     async (kind) => {
       root = mkdtempSync(join(tmpdir(), `path-p11-startup-${kind}-`));
       const record = kind === "attach" ? authorityRecord() : kind === "apply_required_dns_record"
-        ? recordWithAttachedDomain({ managedDns: true }) : recordWithAttachedDomain();
+        ? recordWithAttachedDomain({ managedDns: true }) : kind === "enable_managed_dns" ? managedDnsEligibleRecord() : recordWithAttachedDomain();
       const prepared = prepareP11DomainOperation(record, { kind, fqdn,
         ...(kind === "apply_required_dns_record" ? { requiredRecordId: requiredRecord.recordId } : {}),
         expectedRevision: (record as any).p11Domains?.revision ?? 0 });

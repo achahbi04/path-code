@@ -10,7 +10,7 @@ const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v)
 const id = (v) => typeof v === "string" && /^[A-Za-z0-9._:-]{1,160}$/.test(v);
 const timestamp = (v) => typeof v === "string" && Number.isFinite(Date.parse(v)) && new Date(Date.parse(v)).toISOString() === v;
 const now = () => new Date().toISOString();
-const kinds = new Set(["attach", "verify", "apply_required_dns_record", "detach"]);
+const kinds = new Set(["attach", "verify", "apply_required_dns_record", "detach", "enable_managed_dns"]);
 
 export function normalizeP11Fqdn(value) {
   if (typeof value !== "string" || value.length > 253 || value.includes("*") || value.endsWith(".")) return null;
@@ -28,6 +28,29 @@ export function classifyP11Hostname(value) {
   if (!fqdn) return "invalid";
   return P11_PROVIDER_PLATFORM_HOST_SUFFIXES.some((suffix) => fqdn === suffix || fqdn.endsWith(`.${suffix}`))
     ? "provider_platform_hostname" : "creator_domain";
+}
+
+function validProviderApex(value) {
+  return typeof value === "string" && normalizeP11Fqdn(value) === value && classifyP11Hostname(value) === "creator_domain";
+}
+
+export function normalizeP11Nameserver(value) {
+  if (typeof value !== "string" || value.length > 254) return null;
+  const candidate = value.endsWith(".") ? value.slice(0, -1) : value;
+  return normalizeP11Fqdn(candidate);
+}
+
+function validIntendedNameservers(value) {
+  return Array.isArray(value) && value.every((item) => typeof item === "string" && normalizeP11Nameserver(item) === item);
+}
+
+export function p11ManagedDnsReady(observation, { zoneFqdn, teamRef } = {}) {
+  const zone = observation?.providerZoneObservation;
+  return observation?.providerApexName === zoneFqdn && observation?.teamRef === teamRef &&
+    observation?.teamClaimState === "claimed" && observation?.attachmentState === "attached" &&
+    zone?.zoneFqdn === zoneFqdn && zone?.teamRef === teamRef &&
+    Array.isArray(zone?.intendedNameservers) && zone.intendedNameservers.length > 0 &&
+    validIntendedNameservers(zone.intendedNameservers);
 }
 
 export function emptyP11DomainAuthority() {
@@ -79,13 +102,27 @@ export function prepareP11DomainOperation(record, input) {
     if (input.record !== undefined) return fail("P11_RECORD_INPUT_FORBIDDEN");
     input = { ...input, frozenRecord: structuredClone(r) };
   }
+  let zoneFqdn;
+  if (input.kind === "enable_managed_dns") {
+    if (Object.keys(input).some((key) => !["kind", "fqdn", "expectedRevision"].includes(key)))
+      return fail("P11_OPERATION_INVALID");
+    if (domain.provider !== "vercel" || domain.teamClaimState !== "claimed" || domain.attachmentState !== "attached" ||
+        domain.dnsMode !== "external" || domain.dnsState === "conflict" || !validProviderApex(domain.providerApexName))
+      return fail("P11_MANAGED_DNS_NOT_ELIGIBLE");
+    if (Array.isArray(domain.intendedNameservers) && domain.intendedNameservers.length > 0)
+      return fail("P11_MANAGED_DNS_ALREADY_READY");
+    if (domain.intendedNameservers !== undefined && !validIntendedNameservers(domain.intendedNameservers))
+      return fail("P11_MANAGED_DNS_NOT_ELIGIBLE");
+    zoneFqdn = domain.providerApexName;
+  }
   const operationId = randomUUID();
   const createdAt = now();
   const op = { operationId, kind: input.kind, domainId: domain?.domainId ?? randomUUID(), fqdn,
     expectedProductionReleaseId: p10.p10.currentProductionReleaseId,
     mappingId: p10.mapping.mappingId, provider: "vercel", teamRef: p10.mapping.teamRef,
     projectRef: p10.mapping.projectRef, state: "prepared", createdAt, updatedAt: createdAt,
-    ...(input.kind === "apply_required_dns_record" ? { requiredRecordId: input.requiredRecordId, record: input.frozenRecord } : {}) };
+    ...(input.kind === "apply_required_dns_record" ? { requiredRecordId: input.requiredRecordId, record: input.frozenRecord } : {}),
+    ...(input.kind === "enable_managed_dns" ? { zoneFqdn } : {}) };
   if (input.kind === "verify" && !domain.attachmentState?.startsWith("attached")) return fail("P11_DOMAIN_NOT_ATTACHED");
   if (input.kind === "apply_required_dns_record" && !domain.attachmentState?.startsWith("attached")) return fail("P11_DOMAIN_NOT_ATTACHED");
   if (input.kind === "detach" && !domain.attachmentState?.startsWith("attached")) return fail("P11_DOMAIN_NOT_ATTACHED");
@@ -96,7 +133,8 @@ export function prepareP11DomainOperation(record, input) {
       kind: parts.length === 2 ? "apex" : "subdomain", provider: "vercel", teamRef: op.teamRef,
       projectRef: op.projectRef, mappingId: op.mappingId, teamClaimState: "unknown",
       attachmentState: "pending", verificationState: "unknown", dnsMode: "unknown", dnsState: "unknown",
-      tlsState: "unknown", requiredRecords: [], lastObservedAt: null, lastVerifiedAt: null, lastOperationId: operationId }];
+      tlsState: "unknown", requiredRecords: [], providerApexName: null, intendedNameservers: [],
+      lastObservedAt: null, lastVerifiedAt: null, lastOperationId: operationId }];
   }
   const recordNext = { ...record, p11Domains: nextAuthority };
   return { ok: true, record: recordNext, operationId, revision: nextAuthority.revision, operation: op };
@@ -110,6 +148,9 @@ export function transitionP11DomainOperation(record, input) {
   if (!op || op.operationId !== input.operationId) return fail("P11_OPERATION_NOT_CURRENT");
   if (input.expectedRevision !== undefined && input.expectedRevision !== a.revision) return fail("P11_REVISION_STALE");
   if (input.state === "effect_started" && op.state !== "prepared") return fail("P11_EFFECT_ALREADY_ATTEMPTED");
+  if (op.kind === "enable_managed_dns" && input.state === "completed" &&
+      !p11ManagedDnsReady(input.observation, { zoneFqdn: op.zoneFqdn, teamRef: op.teamRef }))
+    return fail("P11_MANAGED_DNS_NOT_READY");
   const updated = { ...op, state: input.state, updatedAt: now(), ...(input.failureCode ? { failureCode: input.failureCode } : {}) };
   let domains = a.domains;
   if (input.state === "completed" || input.state === "failed_no_effect") {
@@ -129,7 +170,8 @@ export function transitionP11DomainOperation(record, input) {
     teamRef: op.teamRef, projectRef: op.projectRef, createdAt: op.createdAt,
     completedAt: ["completed", "failed_no_effect"].includes(input.state) ? now() : null,
     state: input.state, ...(input.failureCode ? { failureCode: input.failureCode } : {}),
-    ...(op.record ? { record: op.record, providerRecordId: input.providerRecordId ?? null } : {}) }];
+    ...(op.record ? { record: op.record, providerRecordId: input.providerRecordId ?? null } : {}),
+    ...(op.zoneFqdn ? { zoneFqdn: op.zoneFqdn } : {}) }];
   const next = { ...a, revision: a.revision + 1, domains,
     pendingOperation: ["completed", "failed_no_effect"].includes(input.state) ? null : updated,
     operationHistory: history };
@@ -166,10 +208,14 @@ export function reduceP11DomainObservation(raw, expected) {
       !Array.isArray(raw.requiredRecords) || raw.requiredRecords.some((r) => !isObject(r) ||
         !["TXT", "A", "AAAA", "CNAME", "ALIAS", "CAA", "MX", "SRV"].includes(r.type) ||
         typeof r.name !== "string" || typeof r.value !== "string" ||
-        !["ownership", "routing"].includes(r.purpose) || !id(r.recordId))) return fail("P11_PROVIDER_OBSERVATION_UNSAFE");
+        !["ownership", "routing"].includes(r.purpose) || !id(r.recordId)) ||
+      (raw.providerApexName !== undefined && raw.providerApexName !== null && !validProviderApex(raw.providerApexName)) ||
+      (raw.intendedNameservers !== undefined && !validIntendedNameservers(raw.intendedNameservers))) return fail("P11_PROVIDER_OBSERVATION_UNSAFE");
   return { ok: true, domain: { teamClaimState: raw.teamClaimState, attachmentState: raw.attachmentState,
     verificationState: raw.verificationState, dnsMode: raw.dnsMode, dnsState: raw.dnsState,
     tlsState: raw.tlsState, requiredRecords: structuredClone(raw.requiredRecords), lastObservedAt: raw.observedAt,
+    providerApexName: raw.providerApexName ?? null,
+    intendedNameservers: structuredClone(raw.intendedNameservers ?? []),
     lastVerifiedAt: raw.verificationState === "verified" ? raw.observedAt : null } };
 }
 

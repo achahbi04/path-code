@@ -952,6 +952,8 @@ export function executeProductionReleaseCommand(spec: object, options: object): 
 export const P11_DOMAINS_SCHEMA: "pathcode.p11.domains.v1";
 export const P11_PROVIDER_PLATFORM_HOST_SUFFIXES: readonly string[];
 export function normalizeP11Fqdn(value: unknown): string | null;
+export function normalizeP11Nameserver(value: unknown): string | null;
+export function p11ManagedDnsReady(observation: unknown, expected: object): boolean;
 export function classifyP11Hostname(value: unknown): "invalid" | "provider_platform_hostname" | "creator_domain";
 export function emptyP11DomainAuthority(): object;
 export function readP11DomainAuthority(record: object): any;
@@ -966,6 +968,7 @@ export function executeP11VercelApi(spec: object, options: object): Promise<obje
 export function reduceP11Project(raw: unknown, expected: object): any;
 export function reduceP11TeamDomainPage(raw: unknown, expectedTeamRef: string): any;
 export function reduceP11ProjectDomainPage(raw: unknown, expected: object): any;
+export function reduceP11ProjectDomainDetail(raw: unknown, expected: object): any;
 export function reduceP11DnsPage(raw: unknown): any;
 export function reduceP11Certificates(raw: unknown): any;
 export function reduceP11DomainConfig(raw: unknown, fqdn: string): any;

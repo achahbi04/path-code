@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createVercelChildEnv } from "./vercel-preview-adapter.mjs";
-import { normalizeP11Fqdn, classifyP11Hostname } from "./p11-domains.mjs";
+import { normalizeP11Fqdn, normalizeP11Nameserver, classifyP11Hostname } from "./p11-domains.mjs";
 import { probeP11Https } from "./p11-https-probe.mjs";
 
 const fail = (code, details = {}) => ({ ok: false, code, ...details });
@@ -30,6 +30,7 @@ export const P11_PROVIDER_CONTRACTS = Object.freeze({
   certificates: { method: "GET", path: "/v4/certs" },
   certificate: { method: "GET", path: "/v6/certs/{certificateId}" },
   detach: { method: "DELETE", path: "/v9/projects/{projectRef}/domains/{fqdn}" },
+  enable_managed_dns: { method: "PATCH", path: "/v3/domains/{zoneFqdn}" },
 });
 
 export function makeP11VercelApiCommand(kind, input = {}) {
@@ -51,6 +52,12 @@ export function makeP11VercelApiCommand(kind, input = {}) {
   } else if (kind === "project_domains") {
     if (!locator(input.projectRef) || !locator(input.teamRef)) return fail("P11_PROVIDER_COMMAND_INVALID");
     endpoint = `/v9/projects/${encodeURIComponent(input.projectRef)}/domains?${teamQuery(input.teamRef)}&limit=100`;
+  } else if (kind === "enable_managed_dns") {
+    if (!only(input, ["zoneFqdn", "teamRef"]) || Reflect.ownKeys(input).length !== 2 || !locator(input.teamRef) ||
+        normalizeP11Fqdn(input.zoneFqdn) !== input.zoneFqdn || classifyP11Hostname(input.zoneFqdn) !== "creator_domain")
+      return fail("P11_PROVIDER_COMMAND_INVALID");
+    endpoint = `/v3/domains/${encodeURIComponent(input.zoneFqdn)}?${teamQuery(input.teamRef)}`;
+    body = { op: "update", zone: true };
   } else {
     if (!safeBase(input)) return fail("P11_PROVIDER_COMMAND_INVALID");
     const fqdn = normalizeP11Fqdn(input.fqdn), project = encodeURIComponent(input.projectRef), domain = encodeURIComponent(fqdn);
@@ -81,6 +88,7 @@ export function makeP11VercelApiCommand(kind, input = {}) {
     kind === "project" || kind === "project_domains" ? { projectRef: input.projectRef, teamRef: input.teamRef } :
     kind === "certificate" ? { certificateId: input.certificateId, teamRef: input.teamRef } :
     kind === "dns_record" ? { recordId: input.recordId, teamRef: input.teamRef } :
+    kind === "enable_managed_dns" ? { zoneFqdn: input.zoneFqdn, teamRef: input.teamRef } :
     { fqdn: input.fqdn, projectRef: input.projectRef, teamRef: input.teamRef,
       ...(["dns_records", "dns_create"].includes(kind) ? { teamClaimState: input.teamClaimState,
         dnsMode: input.dnsMode, dnsZone: input.dnsZone } : {}),
@@ -91,7 +99,7 @@ export function makeP11VercelApiCommand(kind, input = {}) {
 export async function executeP11VercelApi(spec, { cwd, parentEnv = process.env, spawnImpl = spawn, timeoutMs = 30_000 } = {}) {
   if (typeof cwd !== "string" || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120_000 || !spec?.ok) return fail("P11_PROVIDER_COMMAND_INVALID");
   const argv = spec.argv;
-  if (spec.executable !== "vercel" || spec.shell !== false || !Array.isArray(argv) || argv[0] !== "api" || argv.length < 4 || !["GET", "POST", "DELETE"].includes(argv[3]) ||
+  if (spec.executable !== "vercel" || spec.shell !== false || !Array.isArray(argv) || argv[0] !== "api" || argv.length < 4 || !["GET", "POST", "PATCH", "DELETE"].includes(argv[3]) ||
       (spec.stdinPayload !== null && (!argv.includes("--input") || argv.at(-1) !== "-")) ||
       (spec.stdinPayload === null && argv.includes("--input"))) return fail("P11_PROVIDER_COMMAND_INVALID");
   const proof = spec.proofContext;
@@ -159,11 +167,19 @@ export function reduceP11TeamDomainPage(raw, expectedTeamRef) {
       !(raw.pagination.next === null || Number.isSafeInteger(raw.pagination.next)) ||
       raw.domains.some((d) => !obj(d) || classifyP11Hostname(d.name) === "invalid" || normalizeP11Fqdn(d.name) !== d.name ||
         (d.serviceType !== undefined && typeof d.serviceType !== "string") ||
-        (d.nameservers !== undefined && typeof d.nameservers !== "string" && (!Array.isArray(d.nameservers) || d.nameservers.some((n) => typeof n !== "string"))) ||
+        (d.nameservers !== undefined && typeof d.nameservers !== "string" && (!Array.isArray(d.nameservers) || d.nameservers.some((n) => normalizeP11Nameserver(n) === null))) ||
+        (d.intendedNameservers !== undefined && (!Array.isArray(d.intendedNameservers) || d.intendedNameservers.some((n) => normalizeP11Nameserver(n) === null))) ||
         (d.teamId !== undefined && d.teamId !== expectedTeamRef))) return fail("P11_PROVIDER_SHAPE_UNSAFE");
-  return { ok: true, teamRef: expectedTeamRef, domains: raw.domains.filter((d) => !isPlatformHost(d.name)).map((d) => ({ fqdn: d.name,
-    dnsMode: d.nameservers === "vercel" || d.serviceType === "zeit.world" ? "vercel_managed" : "external",
-    teamClaimState: "claimed" })), next: raw.pagination.next };
+  return { ok: true, teamRef: expectedTeamRef, domains: raw.domains.filter((d) => !isPlatformHost(d.name)).map((d) => {
+    const intendedNameservers = (d.intendedNameservers ?? []).map((n) => normalizeP11Nameserver(n));
+    const currentNameservers = Array.isArray(d.nameservers) ? d.nameservers.map((n) => normalizeP11Nameserver(n)) : d.nameservers ?? null;
+    const matchesIntent = Array.isArray(currentNameservers) && intendedNameservers.length > 0 &&
+      currentNameservers.length === intendedNameservers.length && intendedNameservers.every((n) => currentNameservers.includes(n));
+    return { fqdn: d.name, teamRef: expectedTeamRef, serviceType: d.serviceType ?? null,
+      currentNameservers, intendedNameservers,
+      dnsMode: d.nameservers === "vercel" || (d.serviceType === "zeit.world" && (intendedNameservers.length === 0 || matchesIntent)) ? "vercel_managed" : "external",
+      teamClaimState: "claimed" };
+  }), next: raw.pagination.next };
 }
 
 export function reduceP11ProjectDomainPage(raw, { projectId, projectRef, teamRef }) {
@@ -186,6 +202,16 @@ function validProjectDomain(d, projectRef) {
 function reduceProjectDomain(d) { return { fqdn: d.name, apexName: d.apexName, projectRef: d.projectId, verified: d.verified,
   verification: (d.verification ?? []).map(({ domain, type, value }) => ({ domain, type, value })),
   redirect: d.redirect ?? null, redirectStatusCode: d.redirectStatusCode ?? null }; }
+
+export function reduceP11ProjectDomainDetail(raw, expected) {
+  if (!validProjectDomain(raw, expected.projectId)) return fail("P11_PROVIDER_SHAPE_UNSAFE");
+  const reduced = reduceProjectDomain(raw);
+  if (reduced.fqdn !== expected.fqdn || reduced.projectRef !== expected.projectId ||
+      (reduced.apexName !== undefined && reduced.apexName !== null &&
+        (normalizeP11Fqdn(reduced.apexName) !== reduced.apexName || classifyP11Hostname(reduced.apexName) !== "creator_domain")))
+    return fail("P11_PROVIDER_SHAPE_UNSAFE");
+  return { ok: true, projectRef: expected.projectRef, teamRef: expected.teamRef, domain: reduced };
+}
 
 export function reduceP11DnsPage(raw) {
   if (!obj(raw) || !only(raw, ["records", "pagination"]) || !Array.isArray(raw.records) || !obj(raw.pagination) ||
@@ -270,10 +296,22 @@ export async function observeP11VercelDomain(input, { execute = executeP11Vercel
   const domains = reduceP11ProjectDomainPage(domainsRaw.raw, { projectId: project.projectId,
     projectRef: input.projectRef, teamRef: input.teamRef });
   if (!domains.ok) return domains;
+  const listedProjectDomain = domains.domains.find((item) => item.fqdn === input.fqdn);
+  let projectDomain = null;
+  if (listedProjectDomain) {
+    const detailRaw = await run("project_domain");
+    if (!detailRaw.ok) return detailRaw;
+    const detail = reduceP11ProjectDomainDetail(detailRaw.raw, { fqdn: input.fqdn, projectId: project.projectId,
+      projectRef: input.projectRef, teamRef: input.teamRef });
+    if (!detail.ok) return detail;
+    projectDomain = detail.domain;
+  }
   const teamDomain = team.domains.filter((item) => zoneContains(input.fqdn, item.fqdn))
     .sort((left, right) => right.fqdn.length - left.fqdn.length)[0] ?? null;
-  const projectDomain = domains.domains.find((item) => item.fqdn === input.fqdn);
   if (projectDomain?.redirect) return fail("P11_DOMAIN_REDIRECT_UNSUPPORTED");
+  const exactTeamApex = projectDomain?.fqdn === input.fqdn && projectDomain.apexName &&
+    team.domains.find((item) => item.fqdn === projectDomain.apexName && item.teamRef === input.teamRef) || null;
+  const providerApexName = exactTeamApex ? projectDomain.apexName : null;
   const dnsMode = teamDomain?.dnsMode ?? (config.dnsMode === "external" ? "external" : "unknown");
   const dnsZoneEligible = teamDomain?.teamClaimState === "claimed" && teamDomain.dnsMode === "vercel_managed" &&
     !isPlatformHost(teamDomain.fqdn) && zoneContains(input.fqdn, teamDomain.fqdn);
@@ -305,6 +343,11 @@ export async function observeP11VercelDomain(input, { execute = executeP11Vercel
     attachmentState: projectDomain ? (projectDomain.verified ? "attached" : "attached_unverified") : "detached",
     verificationState: projectDomain ? (projectDomain.verified ? "verified" : "action_required") : "unknown",
     dnsMode, dnsState, tlsState: tls.tlsState,
+    providerApexName,
+    intendedNameservers: exactTeamApex?.intendedNameservers ?? [],
+    providerZoneObservation: exactTeamApex ? { zoneFqdn: providerApexName, teamRef: input.teamRef,
+      intendedNameservers: exactTeamApex.intendedNameservers, currentNameservers: exactTeamApex.currentNameservers,
+      serviceType: exactTeamApex.serviceType, dnsMode: exactTeamApex.dnsMode } : null,
     requiredRecords: required.requiredRecords, observedAt, verifiedAt: projectDomain?.verified ? observedAt : null,
     dnsRecords: dns.records, certificateId: tls.certificateId ?? null, tlsProbe: tls };
 }

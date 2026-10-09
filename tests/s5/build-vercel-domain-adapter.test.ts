@@ -27,6 +27,7 @@ describe("P11 Vercel structured provider boundary", () => {
       dns_create: { method: "POST", path: "/v3/domains/{fqdn}/records" },
       certificates: { method: "GET", path: "/v4/certs" },
       detach: { method: "DELETE", path: "/v9/projects/{projectRef}/domains/{fqdn}" },
+      enable_managed_dns: { method: "PATCH", path: "/v3/domains/{zoneFqdn}" },
     });
     expect(makeP11VercelApiCommand("attach", { fqdn: "example.com", projectRef, teamRef }))
       .toMatchObject({ argv: ["api", `/v10/projects/${projectRef}/domains?teamId=${teamRef}`, "-X", "POST", "--include", "--input", "-"], stdinPayload: JSON.stringify({ name: "example.com" }) });
@@ -38,6 +39,15 @@ describe("P11 Vercel structured provider boundary", () => {
       teamClaimState: "claimed", dnsMode: "vercel_managed", dnsZone: "example.com",
       record: { type: "TXT", name: "_verify", value: "exact", purpose: "ownership" } }).stdinPayload)
       .toBe(JSON.stringify({ type: "TXT", name: "_verify", value: "exact" }));
+    const enable = makeP11VercelApiCommand("enable_managed_dns", { zoneFqdn: "pathcode.dk", teamRef });
+    expect(enable).toMatchObject({ argv: ["api", `/v3/domains/pathcode.dk?teamId=${teamRef}`, "-X", "PATCH", "--include", "--input", "-"],
+      stdinPayload: JSON.stringify({ op: "update", zone: true }) });
+    for (const extra of [{ op: "move-out" }, { destination: "other" }, { renew: true }, { customNameservers: [] },
+      { nameservers: ["attacker.test"] }, { body: { op: "move-out" } }, { requestBody: {} }])
+      expect(makeP11VercelApiCommand("enable_managed_dns", { zoneFqdn: "pathcode.dk", teamRef, ...extra })).toMatchObject({ ok: false });
+    for (const zoneFqdn of ["bad", "pathcode.vercel.app", "pathcode.dk."])
+      expect(makeP11VercelApiCommand("enable_managed_dns", { zoneFqdn, teamRef })).toMatchObject({ ok: false });
+    expect(makeP11VercelApiCommand("enable_managed_dns", { zoneFqdn: "pathcode.dk", teamRef: "unsafe/team" })).toMatchObject({ ok: false });
   });
 
   it("executor rejects human CLI commands, forged routes, and context mismatch before spawn", async () => {
@@ -64,6 +74,26 @@ describe("P11 Vercel structured provider boundary", () => {
     }) as any;
     const result = await executeP11VercelApi(spec, { cwd: "/tmp", parentEnv: {}, spawnImpl });
     expect(result).toEqual({ ok: true, raw: { domains: [], pagination: { count: 0, next: null, prev: null } } });
+  });
+
+  it("executes the exact hardcoded managed-zone PATCH and rejects body tampering before spawn", async () => {
+    const spec = makeP11VercelApiCommand("enable_managed_dns", { zoneFqdn: "pathcode.dk", teamRef });
+    let spawns = 0; let stdin = "";
+    const spawnImpl = ((_exe: string, argv: string[], options: any) => {
+      spawns++;
+      expect(_exe).toBe("vercel"); expect(argv).toEqual(spec.argv); expect(options.shell).toBe(false);
+      const child = new EventEmitter() as any;
+      child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough(); child.kill = () => {};
+      child.stdin.on("data", (chunk: any) => { stdin += chunk.toString(); });
+      queueMicrotask(() => { child.stdout.end("HTTP 200 OK\ncontent-type: application/json\n\n{}"); child.emit("close", 0); });
+      return child;
+    }) as any;
+    expect(await executeP11VercelApi(spec, { cwd: "/tmp", parentEnv: {}, spawnImpl })).toMatchObject({ ok: true });
+    expect(stdin).toBe(JSON.stringify({ op: "update", zone: true }));
+    const forged = { ...spec, stdinPayload: JSON.stringify({ op: "move-out", destination: "elsewhere" }) };
+    expect(await executeP11VercelApi(forged, { cwd: "/tmp", parentEnv: {}, spawnImpl }))
+      .toMatchObject({ ok: false, code: "P11_PROVIDER_COMMAND_INVALID" });
+    expect(spawns).toBe(1);
   });
 
   it.each([[404, "not_found"], [403, "forbidden"], [429, "rate_limited"]])(
@@ -105,6 +135,47 @@ describe("P11 Vercel structured provider boundary", () => {
       .toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
     expect(reduceP11Project({ id: projectId, name: projectRef, teamId: "wrong" }, { teamRef }))
       .toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
+  });
+
+  it("reduces intended nameservers strictly and preserves current-versus-intended DNS authority", () => {
+    const page = (row: any) => reduceP11TeamDomainPage({ domains: [{ name: "pathcode.dk", teamId: teamRef, ...row }],
+      pagination: { count: 1, next: null, prev: null } }, teamRef);
+    expect(page({})).toMatchObject({ ok: true, domains: [{ intendedNameservers: [], currentNameservers: null }] });
+    expect(page({ intendedNameservers: [] })).toMatchObject({ ok: true, domains: [{ intendedNameservers: [] }] });
+    expect(page({ intendedNameservers: ["NS1.VERCEL-DNS.TEST.", "ns2.vercel-dns.test"],
+      nameservers: ["ns1.simply.com"], serviceType: "zeit.world" }))
+      .toMatchObject({ ok: true, domains: [{ intendedNameservers: ["ns1.vercel-dns.test", "ns2.vercel-dns.test"], dnsMode: "external" }] });
+    expect(page({ intendedNameservers: ["ns1.vercel-dns.test"], nameservers: ["ns1.vercel-dns.test"], serviceType: "zeit.world" }))
+      .toMatchObject({ ok: true, domains: [{ dnsMode: "vercel_managed" }] });
+    expect(page({ intendedNameservers: "ns1.vercel-dns.test" })).toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
+    expect(page({ intendedNameservers: ["bad hostname"] })).toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
+    expect(JSON.stringify(page({ intendedNameservers: [], creatorEmail: "private@example.com", accountDetails: { token: "secret" } })))
+      .not.toContain("private@example.com");
+  });
+
+  it("uses the exact provider apex plus exact scoped team row, never a suffix guess", async () => {
+    const responses: Record<string, any> = {
+      team_domains: { domains: [{ name: "pathcode.dk", teamId: teamRef, serviceType: "external", nameservers: ["ns.simply.com"],
+        intendedNameservers: ["ns1.provider-dns.test"] }, { name: "other.pathcode.dk", teamId: teamRef }],
+        pagination: { count: 2, next: null, prev: null } },
+      project: { id: projectId, name: projectRef, teamId: teamRef },
+      project_domains: { domains: [{ name: "p11-acceptance.pathcode.dk", apexName: "pathcode.dk", projectId, verified: true, verification: [] }],
+        pagination: { count: 1, next: null, prev: null } },
+      project_domain: { name: "p11-acceptance.pathcode.dk", apexName: "pathcode.dk", projectId, verified: true, verification: [] },
+      domain_config: { serviceType: "external", misconfigured: true }, certificates: { certs: [], pagination: {} },
+    };
+    const seen: string[] = [];
+    const result = await observeP11VercelDomain({ fqdn: "p11-acceptance.pathcode.dk", projectRef, teamRef }, { cwd: "/tmp",
+      execute: async (spec: any) => { const kind = spec.proofContext.kind; seen.push(kind); return { ok: true, raw: responses[kind] }; },
+      httpsProbe: async () => ({ ok: false, code: "P11_TLS_HANDSHAKE_FAILED" }) });
+    expect(result).toMatchObject({ ok: true, providerApexName: "pathcode.dk", intendedNameservers: ["ns1.provider-dns.test"],
+      providerZoneObservation: { zoneFqdn: "pathcode.dk", teamRef }, dnsMode: "external" });
+    expect(seen).toContain("project_domain");
+    const deceptive: Record<string, any> = { ...responses, team_domains: { ...responses.team_domains, domains: [responses.team_domains.domains[1]] } };
+    const missing = await observeP11VercelDomain({ fqdn: "p11-acceptance.pathcode.dk", projectRef, teamRef }, { cwd: "/tmp",
+      execute: async (spec: any) => ({ ok: true, raw: deceptive[spec.proofContext.kind] }),
+      httpsProbe: async () => ({ ok: false, code: "P11_TLS_HANDSHAKE_FAILED" }) });
+    expect(missing).toMatchObject({ ok: true, providerApexName: null, intendedNameservers: [], providerZoneObservation: null });
   });
 
   it("rejects wrong project, wrong target, missing identity, and redirects in project-domain evidence", () => {
@@ -226,6 +297,7 @@ describe("P11 Vercel structured provider boundary", () => {
         project: { id: projectId, name: projectRef, teamId: teamRef },
         project_domains: { domains: [{ name: "www.example.com", apexName: "example.com", projectId, verified: false, verification: [] }],
           pagination: { count: 1, next: null, prev: null } },
+        project_domain: { name: "www.example.com", apexName: "example.com", projectId, verified: false, verification: [] },
         domain_config: { serviceType: "zeit.world", misconfigured: false },
         dns_records: { records: [], pagination: { count: 0, next: null, prev: null } },
         certificates: { certs: [], pagination: {} },

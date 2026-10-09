@@ -37,7 +37,7 @@ import { executeProductionVercelCommand, makeProductionDeployCommand,
 import { executeProductionReleaseCommand, makeProductionServingEffectCommand,
   makeProductionReleaseInspectCommand, observeProductionServing } from "../vercel-release-adapter.mjs";
 import { emptyP11DomainAuthority, prepareP11DomainOperation, transitionP11DomainOperation,
-  readP11DomainAuthority, recordP11DomainObservation } from "../p11-domains.mjs";
+  readP11DomainAuthority, recordP11DomainObservation, p11ManagedDnsReady } from "../p11-domains.mjs";
 import { makeP11VercelApiCommand, executeP11VercelApi, observeP11VercelDomain } from "../vercel-domain-adapter.mjs";
 import { prepareDeploymentSource, cleanupDeploymentSource } from "../deploy-source.mjs";
 import { planVercelConfigProjection } from "../vercel-deploy-contract.mjs";
@@ -877,13 +877,13 @@ export async function createBuildCoordinatorService(options) {
     if (!fresh.ok || fresh.releaseId !== op.expectedProductionReleaseId || fresh.mapping.mappingId !== op.mappingId)
       return { ok: false, code: fresh.code || "P10_PRODUCTION_AUTHORITY_STALE" };
     let before = null;
-    if (op.kind === "apply_required_dns_record" || op.kind === "detach" || op.kind === "attach" || op.kind === "verify") {
+    if (["apply_required_dns_record", "detach", "attach", "verify", "enable_managed_dns"].includes(op.kind)) {
       before = await observeP11VercelDomain({ fqdn: op.fqdn, projectRef: op.projectRef, teamRef: op.teamRef },
         { cwd: packageRoot, execute: (spec, context) => runP11Command(spec, { cwd: packageRoot, context }),
           ...(p11HttpsProbe ? { httpsProbe: p11HttpsProbe } : {}) });
       if (!before.ok) return before;
     }
-    if (before?.dnsState === "conflict" && ["attach", "verify", "apply_required_dns_record"].includes(op.kind)) {
+    if (before?.dnsState === "conflict" && ["attach", "verify", "apply_required_dns_record", "enable_managed_dns"].includes(op.kind)) {
       return exclusive(buildId, () => {
         const record = readBuildRecord(runtimeRoot, buildId);
         if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
@@ -893,6 +893,37 @@ export async function createBuildCoordinatorService(options) {
         writeBuildRecord(runtimeRoot, transition.record);
         return { ok: false, code: "P11_DNS_CONFLICT", revision: transition.revision, retry: false };
       });
+    }
+    if (op.kind === "enable_managed_dns") {
+      const exactFreshTarget = before.providerApexName === op.zoneFqdn &&
+        before.providerZoneObservation?.zoneFqdn === op.zoneFqdn && before.providerZoneObservation?.teamRef === op.teamRef;
+      const authorityEligible = exactFreshTarget && before.teamClaimState === "claimed" &&
+        before.attachmentState === "attached" && before.dnsState !== "conflict";
+      if (authorityEligible && p11ManagedDnsReady(before, { zoneFqdn: op.zoneFqdn, teamRef: op.teamRef })) {
+        return exclusive(buildId, () => {
+          const record = readBuildRecord(runtimeRoot, buildId);
+          if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+          const transition = transitionP11DomainOperation(record, { operationId: op.operationId,
+            state: "completed", observation: before });
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          return { ok: true, revision: transition.revision, operationState: "completed", alreadyReady: true,
+            providerEffect: false, domain: transition.domain };
+        });
+      }
+      const eligible = authorityEligible && before.dnsMode === "external";
+      if (!exactFreshTarget || !eligible) {
+        const code = exactFreshTarget ? "P11_MANAGED_DNS_NOT_ELIGIBLE" : "P11_MANAGED_DNS_ZONE_STALE";
+        return exclusive(buildId, () => {
+          const record = readBuildRecord(runtimeRoot, buildId);
+          if (!p11Current(record, op)) return { ok: false, code: "P10_PRODUCTION_AUTHORITY_STALE" };
+          const transition = transitionP11DomainOperation(record, { operationId: op.operationId,
+            state: "failed_no_effect", observation: before, failureCode: code });
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          return { ok: false, code, retry: false, revision: transition.revision };
+        });
+      }
     }
     if (op.kind === "apply_required_dns_record") {
       const canonical = readBuildRecord(runtimeRoot, buildId)?.p11Domains?.domains?.find((item) => item.domainId === op.domainId);
@@ -947,8 +978,11 @@ export async function createBuildCoordinatorService(options) {
       return { ok: true };
     });
     if (!started.ok) return started;
-    const kind = { attach: "attach", verify: "verify", apply_required_dns_record: "dns_create", detach: "detach" }[op.kind];
-    const spec = makeP11VercelApiCommand(kind, { fqdn: op.fqdn, projectRef: op.projectRef, teamRef: op.teamRef,
+    const kind = { attach: "attach", verify: "verify", apply_required_dns_record: "dns_create", detach: "detach",
+      enable_managed_dns: "enable_managed_dns" }[op.kind];
+    const spec = op.kind === "enable_managed_dns"
+      ? makeP11VercelApiCommand(kind, { zoneFqdn: op.zoneFqdn, teamRef: op.teamRef })
+      : makeP11VercelApiCommand(kind, { fqdn: op.fqdn, projectRef: op.projectRef, teamRef: op.teamRef,
       ...(op.kind === "apply_required_dns_record" ? { record: op.record, teamClaimState: before.teamClaimState,
         dnsMode: before.dnsMode, dnsZone: before.dnsZone } : {}) });
     let effect;
@@ -983,6 +1017,7 @@ export async function createBuildCoordinatorService(options) {
     const fulfilled = op.kind === "attach" ? after.attachmentState.startsWith("attached") :
       op.kind === "verify" ? after.attachmentState.startsWith("attached") :
       op.kind === "detach" ? after.attachmentState === "detached" :
+      op.kind === "enable_managed_dns" ? p11ManagedDnsReady(after, { zoneFqdn: op.zoneFqdn, teamRef: op.teamRef }) :
       exactDnsMatches.length === 1;
     return exclusive(buildId, () => {
       const record = readBuildRecord(runtimeRoot, buildId);
@@ -993,7 +1028,8 @@ export async function createBuildCoordinatorService(options) {
         failureCode: fulfilled ? undefined : "P11_PROVIDER_STATE_NOT_ESTABLISHED" });
       if (!transition.ok) return transition;
       writeBuildRecord(runtimeRoot, transition.record);
-      return fulfilled ? { ok: true, revision: transition.revision, operationState: "completed", domain: transition.domain } :
+      return fulfilled ? { ok: true, revision: transition.revision, operationState: "completed", domain: transition.domain,
+        ...(op.kind === "enable_managed_dns" ? { managedDnsReadback: after.providerZoneObservation } : {}) } :
         { ok: false, code: "P11_PROVIDER_STATE_NOT_ESTABLISHED", revision: transition.revision, retry: false };
     });
   }
@@ -1027,6 +1063,7 @@ export async function createBuildCoordinatorService(options) {
         const matched = pending.kind === "attach" ? observed.attachmentState.startsWith("attached") :
           pending.kind === "verify" ? observed.verificationState === "verified" :
           pending.kind === "detach" ? observed.attachmentState === "detached" :
+          pending.kind === "enable_managed_dns" ? p11ManagedDnsReady(observed, { zoneFqdn: pending.zoneFqdn, teamRef: pending.teamRef }) :
           exactDnsMatches.length === 1;
         if (matched) {
           const transition = transitionP11DomainOperation(record, { operationId: pending.operationId, state: "completed", observation: observed,

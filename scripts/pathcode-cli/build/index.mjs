@@ -84,12 +84,12 @@ export { makeProductionDeployCommand, makeProductionInspectCommand,
 export { makeProductionAliasesCommand, makeProductionReleaseInspectCommand,
   makeProductionServingEffectCommand, parseProductionAliasPage, observeProductionServing,
   executeProductionReleaseCommand } from "./vercel-release-adapter.mjs";
-export { P11_DOMAINS_SCHEMA, P11_PROVIDER_PLATFORM_HOST_SUFFIXES, normalizeP11Fqdn, classifyP11Hostname, emptyP11DomainAuthority,
+export { P11_DOMAINS_SCHEMA, P11_PROVIDER_PLATFORM_HOST_SUFFIXES, normalizeP11Fqdn, normalizeP11Nameserver, p11ManagedDnsReady, classifyP11Hostname, emptyP11DomainAuthority,
   readP11DomainAuthority, prepareP11DomainOperation, transitionP11DomainOperation,
   recordP11DomainObservation, reduceP11DomainObservation, classifyP11Tls } from "./p11-domains.mjs";
 export { P11_PROVIDER_CONTRACTS, makeP11VercelApiCommand, executeP11VercelApi,
   reduceP11Project, reduceP11TeamDomainPage, reduceP11ProjectDomainPage, reduceP11DnsPage,
-  reduceP11Certificates, reduceP11DomainConfig, makeP11RequiredRecords,
+  reduceP11Certificates, reduceP11DomainConfig, reduceP11ProjectDomainDetail, makeP11RequiredRecords,
   observeP11VercelDomain } from "./vercel-domain-adapter.mjs";
 export { isPublicP11Address, probeP11Https } from "./p11-https-probe.mjs";
 export { captureBrowserEvidence } from "./runtime/browser-evidence.mjs";

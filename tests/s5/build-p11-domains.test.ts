@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createBuildRecordSkeleton, P11_DOMAINS_SCHEMA, normalizeP11Fqdn, classifyP11Hostname,
   emptyP11DomainAuthority, readP11DomainAuthority, prepareP11DomainOperation,
   transitionP11DomainOperation, recordP11DomainObservation, classifyP11Tls,
-  isPublicP11Address, probeP11Https } from "../../scripts/pathcode-cli/build/index.mjs";
+  isPublicP11Address, probeP11Https, normalizeP11Nameserver, p11ManagedDnsReady, reduceP11DomainObservation } from "../../scripts/pathcode-cli/build/index.mjs";
 
 const at = "2026-10-08T12:00:00.000Z";
 const providerId = "dpl_12345678";
@@ -119,6 +119,66 @@ describe("P11 canonical domain authority", () => {
     expect(observed.record!.deployments).toEqual(beforeP10);
     expect(observed.domain).toMatchObject({ attachmentState: "attached", verificationState: "verified", dnsState: "valid", tlsState: "ready" });
     expect(JSON.stringify(observed.record!.p11Domains)).not.toContain("must-not-persist");
+  });
+
+  it("keeps old P11 records readable without migration and reduces new provider apex evidence", () => {
+    const attach = prepareP11DomainOperation(releaseReady(), { kind: "attach", fqdn: "example.com", expectedRevision: 0 });
+    const old = transitionP11DomainOperation(attach.record!, { operationId: attach.operationId!, state: "completed", observation: observation() }).record!;
+    const domain = (old.p11Domains as any).domains[0];
+    delete domain.providerApexName; delete domain.intendedNameservers;
+    const before = structuredClone(old);
+    expect(readP11DomainAuthority(old).authority.domains[0]).not.toHaveProperty("providerApexName");
+    expect(old).toEqual(before);
+    const fresh = reduceP11DomainObservation(observation("example.com", { providerApexName: "example.com",
+      intendedNameservers: ["ns1.example.net"] }), { fqdn: "example.com", projectRef: "project-prod", teamRef: "team-nordic" });
+    expect(fresh.domain).toMatchObject({ providerApexName: "example.com", intendedNameservers: ["ns1.example.net"] });
+    expect(normalizeP11Nameserver("NS1.EXAMPLE.NET.")).toBe("ns1.example.net");
+  });
+
+  it("prepares managed DNS synchronously from observed apex only and freezes it", () => {
+    const attached = prepareP11DomainOperation(releaseReady(), { kind: "attach", fqdn: "p11.example.com", expectedRevision: 0 });
+    const completed = transitionP11DomainOperation(attached.record!, { operationId: attached.operationId!, state: "completed",
+      observation: observation("p11.example.com", { attachmentState: "attached", providerApexName: "example.com", intendedNameservers: [] }) });
+    const prep = prepareP11DomainOperation(completed.record!, { kind: "enable_managed_dns", fqdn: "p11.example.com", expectedRevision: completed.revision! });
+    expect(prep).toMatchObject({ ok: true, operation: { kind: "enable_managed_dns", zoneFqdn: "example.com", teamRef: "team-nordic" } });
+    const restarted = JSON.parse(JSON.stringify(prep.record));
+    expect(readP11DomainAuthority(restarted).authority.pendingOperation.zoneFqdn).toBe("example.com");
+    for (const target of ["zoneFqdn", "providerApexName", "apexName", "domainToPatch", "teamDomain"]) {
+      expect(prepareP11DomainOperation(completed.record!, { kind: "enable_managed_dns", fqdn: "p11.example.com",
+        expectedRevision: completed.revision!, [target]: "attacker.example" })).toMatchObject({ ok: false, code: "P11_OPERATION_INVALID" });
+    }
+    expect(typeof prep.then).toBe("undefined");
+  });
+
+  it.each([
+    ["missing provider apex", { providerApexName: null }, "P11_MANAGED_DNS_NOT_ELIGIBLE"],
+    ["unclaimed", { teamClaimState: "unknown" }, "P11_MANAGED_DNS_NOT_ELIGIBLE"],
+    ["detached", { attachmentState: "detached" }, "P11_MANAGED_DNS_NOT_ELIGIBLE"],
+    ["conflict", { dnsState: "conflict" }, "P11_MANAGED_DNS_NOT_ELIGIBLE"],
+    ["already managed", { dnsMode: "vercel_managed" }, "P11_MANAGED_DNS_NOT_ELIGIBLE"],
+    ["already ready", { intendedNameservers: ["ns1.example.net"] }, "P11_MANAGED_DNS_ALREADY_READY"],
+  ])("rejects managed DNS preparation when %s", (_label, changes, code) => {
+    const attach = prepareP11DomainOperation(releaseReady(), { kind: "attach", fqdn: "p11.example.com", expectedRevision: 0 });
+    const complete = transitionP11DomainOperation(attach.record!, { operationId: attach.operationId!, state: "completed",
+      observation: observation("p11.example.com", { attachmentState: "attached", providerApexName: "example.com", intendedNameservers: [], ...changes }) });
+    expect(prepareP11DomainOperation(complete.record!, { kind: "enable_managed_dns", fqdn: "p11.example.com", expectedRevision: complete.revision! }))
+      .toMatchObject({ ok: false, code });
+  });
+
+  it("requires exact managed-zone readback and leaves DNS mode external", () => {
+    const attach = prepareP11DomainOperation(releaseReady(), { kind: "attach", fqdn: "p11.example.com", expectedRevision: 0 });
+    const complete = transitionP11DomainOperation(attach.record!, { operationId: attach.operationId!, state: "completed",
+      observation: observation("p11.example.com", { attachmentState: "attached", providerApexName: "example.com", intendedNameservers: [] }) });
+    const prep = prepareP11DomainOperation(complete.record!, { kind: "enable_managed_dns", fqdn: "p11.example.com", expectedRevision: complete.revision! });
+    const started = transitionP11DomainOperation(prep.record!, { operationId: prep.operationId!, state: "effect_started" });
+    const readback = observation("p11.example.com", { attachmentState: "attached", providerApexName: "example.com",
+      intendedNameservers: ["ns1.vercel-dns.test"], providerZoneObservation: { zoneFqdn: "example.com", teamRef: "team-nordic",
+        intendedNameservers: ["ns1.vercel-dns.test"] } });
+    expect(p11ManagedDnsReady(readback, { zoneFqdn: "example.com", teamRef: "team-nordic" })).toBe(true);
+    expect(transitionP11DomainOperation(started.record!, { operationId: prep.operationId!, state: "completed", observation: readback }))
+      .toMatchObject({ ok: true, domain: { dnsMode: "external", intendedNameservers: ["ns1.vercel-dns.test"] } });
+    expect(p11ManagedDnsReady({ ...readback, providerZoneObservation: { ...(readback as any).providerZoneObservation, zoneFqdn: "sibling.example" } },
+      { zoneFqdn: "example.com", teamRef: "team-nordic" })).toBe(false);
   });
 
   it("rejects unsafe provider observation and stale/superseded P11 operation IDs", () => {
