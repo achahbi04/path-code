@@ -219,9 +219,16 @@ export function reduceP11DnsPage(raw) {
       !(raw.pagination.next === null || Number.isSafeInteger(raw.pagination.next)) || raw.records.some((r) => !validDnsRecord(r))) return fail("P11_PROVIDER_SHAPE_UNSAFE");
   return { ok: true, records: raw.records.map(reduceDnsRecord), next: raw.pagination.next };
 }
-function validDnsRecord(r) { return obj(r) && only(r, ["id", "name", "type", "value", "mxPriority", "priority", "createdAt", "creator", "ttl"]) &&
+const MAX_DNS_RECORD_COMMENT_LENGTH = 500;
+function validDnsRecord(r) { return obj(r) && only(r, ["id", "slug", "name", "type", "value", "mxPriority", "priority", "createdAt", "creator", "ttl", "created", "updated", "updatedAt", "comment"]) &&
   locator(r.id) && typeof r.name === "string" && ["TXT", "A", "AAAA", "CNAME", "ALIAS", "CAA", "MX", "SRV"].includes(r.type) &&
-  typeof r.value === "string" && (r.createdAt === undefined || time(r.createdAt)); }
+    typeof r.value === "string" &&
+    (r.slug === undefined || typeof r.slug === "string" && r.slug.length <= 160) &&
+    (r.createdAt === undefined || time(r.createdAt)) &&
+    (r.created === undefined || time(r.created)) &&
+    (r.updated === undefined || time(r.updated)) &&
+    (r.updatedAt === undefined || time(r.updatedAt)) &&
+    (r.comment === undefined || typeof r.comment === "string" && r.comment.length <= MAX_DNS_RECORD_COMMENT_LENGTH); }
 function reduceDnsRecord(r) { return { recordId: r.id, name: r.name, type: r.type, value: r.value,
   priority: r.mxPriority ?? r.priority ?? null, ttl: r.ttl ?? null }; }
 
@@ -273,6 +280,34 @@ export function makeP11RequiredRecords({ fqdn, apexName, verification = [], conf
   return { ok: true, requiredRecords: rows };
 }
 
+function sameNormalizedNameserverSet(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length === 0 || left.length !== right.length) return false;
+  const normalizedLeft = left.map(normalizeP11Nameserver);
+  const normalizedRight = right.map(normalizeP11Nameserver);
+  if (normalizedLeft.some((value) => value === null) || normalizedRight.some((value) => value === null)) return false;
+  const leftSet = new Set(normalizedLeft), rightSet = new Set(normalizedRight);
+  return leftSet.size === left.length && rightSet.size === right.length && normalizedLeft.every((value) => rightSet.has(value));
+}
+
+function composeP11DnsMode({ teamDomain, exactTeamApex, projectDomain, configRaw, config, fqdn, teamRef }) {
+  const corroboratedManaged = Boolean(exactTeamApex && teamDomain?.fqdn === exactTeamApex.fqdn &&
+    teamDomain.teamRef === teamRef && teamDomain.teamClaimState === "claimed" &&
+    projectDomain?.fqdn === fqdn && projectDomain.verified === true &&
+    projectDomain.apexName === exactTeamApex.fqdn &&
+    configRaw?.serviceType === "zeit.world" && configRaw.misconfigured === false &&
+    Array.isArray(configRaw.conflicts) && configRaw.conflicts.length === 0 &&
+    sameNormalizedNameserverSet(configRaw.nameservers, exactTeamApex.intendedNameservers));
+  if (corroboratedManaged) return "vercel_managed";
+
+  // A composed managed classification requires the full cross-provider proof
+  // above. Explicit external V6/V5 evidence remains external; incomplete or
+  // contradictory managed evidence is unknown rather than promoted.
+  if (configRaw?.serviceType !== undefined && configRaw.serviceType !== "zeit.world") return "external";
+  if (teamDomain?.dnsMode === "external") return "external";
+  if (!teamDomain && configRaw?.serviceType === undefined) return config.dnsMode;
+  return "unknown";
+}
+
 export async function observeP11VercelDomain(input, { execute = executeP11VercelApi, cwd, parentEnv, httpsProbe = probeP11Https } = {}) {
   if (isPlatformHost(input?.fqdn)) return fail("P11_PLATFORM_HOSTNAME_UNSUPPORTED");
   if (!safeBase(input) || typeof cwd !== "string") return fail("P11_PROVIDER_COMMAND_INVALID");
@@ -312,11 +347,14 @@ export async function observeP11VercelDomain(input, { execute = executeP11Vercel
   const exactTeamApex = projectDomain?.fqdn === input.fqdn && projectDomain.apexName &&
     team.domains.find((item) => item.fqdn === projectDomain.apexName && item.teamRef === input.teamRef) || null;
   const providerApexName = exactTeamApex ? projectDomain.apexName : null;
-  const dnsMode = teamDomain?.dnsMode ?? (config.dnsMode === "external" ? "external" : "unknown");
-  const dnsZoneEligible = teamDomain?.teamClaimState === "claimed" && teamDomain.dnsMode === "vercel_managed" &&
-    !isPlatformHost(teamDomain.fqdn) && zoneContains(input.fqdn, teamDomain.fqdn);
+  const dnsMode = composeP11DnsMode({ teamDomain, exactTeamApex, projectDomain, configRaw: configRaw.raw,
+    config, fqdn: input.fqdn, teamRef: input.teamRef });
+  const dnsZoneEligible = dnsMode === "vercel_managed" && teamDomain?.teamRef === input.teamRef &&
+    teamDomain?.teamClaimState === "claimed" && exactTeamApex?.fqdn === providerApexName &&
+    teamDomain.fqdn === providerApexName && !isPlatformHost(providerApexName) &&
+    zoneContains(input.fqdn, providerApexName);
   const dnsRaw = dnsZoneEligible ? await run("dns_records", { teamClaimState: teamDomain.teamClaimState,
-    dnsMode: teamDomain.dnsMode, dnsZone: teamDomain.fqdn }) :
+    dnsMode, dnsZone: providerApexName }) :
     { ok: true, raw: { records: [], pagination: { count: 0, next: null, prev: null } } };
   if (!dnsRaw.ok) return dnsRaw;
   const dns = reduceP11DnsPage(dnsRaw.raw);

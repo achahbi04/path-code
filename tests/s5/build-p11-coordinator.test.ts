@@ -395,10 +395,11 @@ describe("P11 explicit coordinator domain authority", () => {
       const initial = kind === "apply_required_dns_record" ? recordWithAttachedDomain({ managedDns: true }) : recordWithAttachedDomain();
       writeBuildRecord(root, initial);
       let attached = true;
-      let verified = false;
+      let verified = kind === "apply_required_dns_record";
       let dnsRows: any[] = [];
       const mutationMethods: string[] = [];
-      const provider = providerPages({ attached: () => attached, verified: () => verified, dnsRecords: () => dnsRows });
+      const provider = providerPages({ attached: () => attached, verified: () => verified, dnsRecords: () => dnsRows,
+        intendedNameservers: kind === "apply_required_dns_record" ? ["ns1.vercel-dns.com"] : [] });
       const executors = providerReleaseExecutors();
       const p11CommandExecutor = vi.fn(async (spec: any) => {
         const method = spec.argv[3];
@@ -452,10 +453,11 @@ describe("P11 explicit coordinator domain authority", () => {
         ? recordWithAttachedDomain({ managedDns: true }) : recordWithAttachedDomain();
       writeBuildRecord(root, initial);
       let attached = kind !== "attach";
-      let verified = false;
+      let verified = kind === "apply_required_dns_record";
       let dnsRows: any[] = [];
       const mutationMethods: string[] = [];
-      const provider = providerPages({ attached: () => attached, verified: () => verified, dnsRecords: () => dnsRows });
+      const provider = providerPages({ attached: () => attached, verified: () => verified, dnsRecords: () => dnsRows,
+        intendedNameservers: kind === "apply_required_dns_record" ? ["ns1.vercel-dns.com"] : [] });
       const p11CommandExecutor = vi.fn(async (spec: any) => {
         const method = spec.argv[3];
         const providerKind = spec.proofContext.kind;
@@ -522,7 +524,8 @@ describe("P11 explicit coordinator domain authority", () => {
     const initial = recordWithAttachedDomain({ managedDns: true }); writeBuildRecord(root, initial);
     let dnsRows: any[] = [];
     let createCount = 0;
-    const provider = providerPages({ attached: true, dnsRecords: () => dnsRows });
+    const provider = providerPages({ attached: true, verified: true, dnsRecords: () => dnsRows,
+      intendedNameservers: ["ns1.vercel-dns.com"] });
     const p11CommandExecutor = vi.fn(async (spec: any) => {
       if (spec.argv[3] !== "GET") {
         createCount++;
@@ -567,7 +570,8 @@ describe("P11 explicit coordinator domain authority", () => {
     const initial = recordWithAttachedDomain({ managedDns: true }); writeBuildRecord(root, initial);
     let dnsRows: any[] = [];
     let createCount = 0;
-    const provider = providerPages({ attached: true, dnsRecords: () => dnsRows });
+    const provider = providerPages({ attached: true, verified: true, dnsRecords: () => dnsRows,
+      intendedNameservers: ["ns1.vercel-dns.com"] });
     const p11CommandExecutor = vi.fn(async (spec: any) => {
       if (spec.argv[3] !== "GET") {
         createCount++;

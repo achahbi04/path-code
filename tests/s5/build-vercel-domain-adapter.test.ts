@@ -178,6 +178,63 @@ describe("P11 Vercel structured provider boundary", () => {
     expect(missing).toMatchObject({ ok: true, providerApexName: null, intendedNameservers: [], providerZoneObservation: null });
   });
 
+  it("composes managed DNS only from exact corroborating V5, project-domain, and V6 evidence", async () => {
+    const intended = ["ns1.vercel-dns.test", "ns2.vercel-dns.test"];
+    const host = "p11-acceptance.pathcode.dk";
+    const projectRow = { name: host, apexName: "pathcode.dk", projectId, verified: true, verification: [] };
+    const teamRow = { name: "pathcode.dk", teamId: teamRef, serviceType: "external",
+      nameservers: ["ns1.simply.test", "ns2.simply.test"], intendedNameservers: intended };
+    const config = { serviceType: "zeit.world", nameservers: ["NS2.VERCEL-DNS.TEST.", "ns1.vercel-dns.test"],
+      misconfigured: false, conflicts: [], recommendedIPv4: [], recommendedCNAME: [], acceptedChallenges: [] };
+    const makeResponses = (change: (rows: any) => any = (rows) => rows) => change({
+      team_domains: { domains: [teamRow], pagination: { count: 1, next: null, prev: null } },
+      project: { id: projectId, name: projectRef, teamId: teamRef },
+      project_domains: { domains: [projectRow], pagination: { count: 1, next: null, prev: null } },
+      project_domain: projectRow,
+      domain_config: config,
+      certificates: { certs: [], pagination: {} },
+      dns_records: { records: [], pagination: { count: 0, next: null, prev: null } },
+    });
+    const observe = async (responses: any) => {
+      const seen: any[] = [];
+      const result = await observeP11VercelDomain({ fqdn: host, projectRef, teamRef }, { cwd: "/tmp",
+        execute: async (spec: any) => { seen.push(spec); return { ok: true, raw: responses[spec.proofContext.kind] }; },
+        httpsProbe: async () => ({ ok: false, code: "P11_TLS_HANDSHAKE_FAILED" }) });
+      return { result, seen };
+    };
+
+    const positive = await observe(makeResponses());
+    expect(positive.result).toMatchObject({ ok: true, dnsMode: "vercel_managed", dnsZone: "pathcode.dk",
+      providerApexName: "pathcode.dk", teamClaimState: "claimed", attachmentState: "attached", verificationState: "verified" });
+    expect(positive.seen.map((spec) => spec.proofContext.kind)).toContain("dns_records");
+    expect(positive.seen.find((spec) => spec.proofContext.kind === "dns_records")?.argv[1])
+      .toBe(`/v5/domains/pathcode.dk/records?teamId=${teamRef}&limit=100`);
+
+    const negativeCases: Array<[string, (rows: any) => any]> = [
+      ["V6 nameserver mismatch", (rows) => ({ ...rows, domain_config: { ...config, nameservers: ["ns-other.test", intended[1]] } })],
+      ["V6 misconfigured", (rows) => ({ ...rows, domain_config: { ...config, misconfigured: true } })],
+      ["V6 conflict", (rows) => ({ ...rows, domain_config: { ...config, conflicts: [{ code: "conflict" }] } })],
+      ["unclaimed team apex", (rows) => ({ ...rows, team_domains: { ...rows.team_domains, domains: [] } })],
+      ["detached project domain", (rows) => ({ ...rows, project_domains: { domains: [], pagination: { count: 0, next: null, prev: null } } })],
+      ["unverified project domain", (rows) => ({ ...rows, project_domains: { domains: [{ ...projectRow, verified: false }], pagination: { count: 1, next: null, prev: null } },
+        project_domain: { ...projectRow, verified: false } })],
+      ["apex mismatch", (rows) => ({ ...rows, project_domains: { domains: [{ ...projectRow, apexName: "wrong.pathcode.dk" }], pagination: { count: 1, next: null, prev: null } },
+        project_domain: { ...projectRow, apexName: "wrong.pathcode.dk" } })],
+      ["missing intended nameservers", (rows) => ({ ...rows, team_domains: { ...rows.team_domains, domains: [{ ...teamRow, intendedNameservers: [] }] } })],
+      ["explicit external V6", (rows) => ({ ...rows, domain_config: { ...config, serviceType: "external" } })],
+      ["incomplete conflict evidence", (rows) => { const { conflicts: _conflicts, ...incomplete } = config; return { ...rows, domain_config: incomplete }; }],
+      ["V5 says managed but V6 does not corroborate", (rows) => ({ ...rows,
+        team_domains: { ...rows.team_domains, domains: [{ ...teamRow, serviceType: "zeit.world", nameservers: "vercel" }] },
+        domain_config: { ...config, nameservers: ["ns-other.test", intended[1]] } })],
+    ];
+    for (const [label, change] of negativeCases) {
+      const observed = await observe(makeResponses(change));
+      expect(observed.result, label).toMatchObject({ ok: true });
+      expect(observed.result.dnsMode, label).not.toBe("vercel_managed");
+      expect(observed.seen.map((spec) => spec.proofContext.kind), label).not.toContain("dns_records");
+    }
+  });
+
   it("rejects wrong project, wrong target, missing identity, and redirects in project-domain evidence", () => {
     const row = { name: "example.com", apexName: "example.com", projectId, verified: false, verification: [] };
     const page = (domains: unknown[]) => ({ domains, pagination: { count: domains.length, next: null, prev: null } });
@@ -226,6 +283,39 @@ describe("P11 Vercel structured provider boundary", () => {
       .toMatchObject({ ok: true, dnsMode: "vercel_managed", dnsState: "valid", hasConflict: false });
     expect(makeP11RequiredRecords({ fqdn: "example.com", apexName: "example.com", config: { recommendedIPv4: [{ rank: 1, value: ["192.0.2.1"] }] } }))
       .toMatchObject({ ok: true, requiredRecords: [{ type: "A", name: "", value: "192.0.2.1", purpose: "routing" }] });
+  });
+
+  it("accepts captured Vercel DNS metadata but reduces records to minimal authority", () => {
+    const created = 1_760_000_000_000;
+    const page = reduceP11DnsPage({ records: [
+      { id: "rec-caa-1", slug: "", name: "", type: "CAA", value: '0 issue "letsencrypt.org"', creator: "system",
+        created, updated: created, createdAt: created, updatedAt: created, ttl: 60 },
+      { id: "rec-alias-wildcard", slug: "", name: "*", type: "ALIAS", value: "cname.vercel-dns-016.com.", creator: "system",
+        created, updated: created, createdAt: created, updatedAt: created, ttl: 60,
+        comment: "Vercel automatically manages this record. It may change without notice." },
+      { id: "rec-alias-apex", slug: "", name: "", type: "ALIAS", value: "cname.vercel-dns-016.com.", creator: "system",
+        created, updated: created, createdAt: created, updatedAt: created, ttl: 60 },
+    ], pagination: { count: 3, next: null, prev: null } });
+    expect(page).toEqual({ ok: true, next: null, records: [
+      { recordId: "rec-caa-1", name: "", type: "CAA", value: '0 issue "letsencrypt.org"', priority: null, ttl: 60 },
+      { recordId: "rec-alias-wildcard", name: "*", type: "ALIAS", value: "cname.vercel-dns-016.com.", priority: null, ttl: 60 },
+      { recordId: "rec-alias-apex", name: "", type: "ALIAS", value: "cname.vercel-dns-016.com.", priority: null, ttl: 60 },
+    ] });
+    expect(JSON.stringify(page)).not.toMatch(/slug|creator|created|updated|comment|system manages/);
+  });
+
+  it("validates DNS metadata strictly and still rejects unknown provider fields", () => {
+    const base = { id: "rec-metadata", name: "", type: "CAA", value: '0 issue "letsencrypt.org"', ttl: 60 };
+    const reduce = (record: Record<string, unknown>) => reduceP11DnsPage({ records: [record], pagination: { count: 1, next: null, prev: null } });
+    expect(reduce({ ...base, slug: "" })).toMatchObject({ ok: true });
+    expect(reduce({ ...base, slug: 7 })).toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
+    expect(reduce({ ...base, created: -1 })).toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
+    expect(reduce({ ...base, created: 1.5 })).toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
+    expect(reduce({ ...base, updated: "1760000000000" })).toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
+    expect(reduce({ ...base, updatedAt: Number.MAX_SAFE_INTEGER + 1 })).toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
+    expect(reduce({ ...base, comment: 42 })).toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
+    expect(reduce({ ...base, comment: "x".repeat(501) })).toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
+    expect(reduce({ ...base, unknownFutureField: true })).toMatchObject({ ok: false, code: "P11_PROVIDER_SHAPE_UNSAFE" });
   });
 
   it("accepts the real structured config response shape and reduces conflicts without retaining raw entries", () => {
@@ -292,13 +382,14 @@ describe("P11 Vercel structured provider boundary", () => {
       const kind = spec.proofContext.kind;
       calls.push({ kind, endpoint: spec.argv[1] });
       const responses: Record<string, any> = {
-        team_domains: { domains: [{ name: "example.com", nameservers: "vercel", serviceType: "zeit.world", teamId: teamRef }],
+        team_domains: { domains: [{ name: "example.com", nameservers: ["ns1.vercel-dns.test"],
+          intendedNameservers: ["ns1.vercel-dns.test"], serviceType: "external", teamId: teamRef }],
           pagination: { count: 1, next: null, prev: null } },
         project: { id: projectId, name: projectRef, teamId: teamRef },
-        project_domains: { domains: [{ name: "www.example.com", apexName: "example.com", projectId, verified: false, verification: [] }],
+        project_domains: { domains: [{ name: "www.example.com", apexName: "example.com", projectId, verified: true, verification: [] }],
           pagination: { count: 1, next: null, prev: null } },
-        project_domain: { name: "www.example.com", apexName: "example.com", projectId, verified: false, verification: [] },
-        domain_config: { serviceType: "zeit.world", misconfigured: false },
+        project_domain: { name: "www.example.com", apexName: "example.com", projectId, verified: true, verification: [] },
+        domain_config: { serviceType: "zeit.world", nameservers: ["ns1.vercel-dns.test"], misconfigured: false, conflicts: [] },
         dns_records: { records: [], pagination: { count: 0, next: null, prev: null } },
         certificates: { certs: [], pagination: {} },
       };
