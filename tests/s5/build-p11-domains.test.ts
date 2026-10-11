@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EventEmitter } from "node:events";
 import { createBuildRecordSkeleton, P11_DOMAINS_SCHEMA, normalizeP11Fqdn, classifyP11Hostname,
   emptyP11DomainAuthority, readP11DomainAuthority, prepareP11DomainOperation,
   transitionP11DomainOperation, recordP11DomainObservation, classifyP11Tls,
@@ -215,5 +216,79 @@ describe("P11 bounded HTTPS probe", () => {
     expect(await probeP11Https("example.com", { resolveImpl: async () => [{ address: "10.0.0.1", family: 4 }], requestImpl }))
       .toMatchObject({ ok: false, code: "P11_PROBE_ADDRESS_UNSAFE" });
     expect(requests).toBe(0);
+  });
+
+  it("honors Node's all:true lookup callback while preserving legacy lookup and pinning", async () => {
+    const fqdn = "p11-acceptance.pathcode.dk";
+    const chosen = { address: "93.184.216.34", family: 4 };
+    const other = { address: "1.1.1.1", family: 4 };
+    let allResult: unknown[] = [];
+    let legacyResult: unknown[] = [];
+    let optionsCaptured: any;
+    let requests = 0;
+    const result = await probeP11Https(fqdn, {
+      resolveImpl: async (host: string, options: { all?: boolean; verbatim?: boolean }) => {
+        expect(host).toBe(fqdn);
+        expect(options).toMatchObject({ all: true, verbatim: true });
+        return [chosen, other];
+      },
+      requestImpl: (options: any, onResponse: (response: any) => void) => {
+        requests++;
+        optionsCaptured = options;
+        const req = new EventEmitter() as EventEmitter & { end: () => void; destroy: () => void };
+        req.end = () => {
+          options.lookup(fqdn, { all: true }, (...args: unknown[]) => { allResult = args; });
+          options.lookup(fqdn, {}, (...args: unknown[]) => { legacyResult = args; });
+          if (!Array.isArray(allResult[1])) {
+            const error = Object.assign(new Error("Invalid IP address: undefined"), { code: "ERR_INVALID_IP_ADDRESS" });
+            req.emit("error", error);
+            return;
+          }
+          onResponse({ statusCode: 302, socket: { getPeerCertificate: () => ({
+            subjectaltname: `DNS:${fqdn}`, valid_from: "Oct 11 17:13:23 2026 GMT", valid_to: "Jan  9 17:13:22 2027 GMT",
+          }) }, resume: () => {} });
+        };
+        req.destroy = () => {};
+        return req;
+      },
+    });
+
+    expect(allResult).toEqual([null, [chosen]]);
+    expect(legacyResult).toEqual([null, chosen.address, chosen.family]);
+    expect(optionsCaptured.hostname).toBe(fqdn);
+    expect(optionsCaptured.servername).toBe(fqdn);
+    expect(optionsCaptured.rejectUnauthorized).toBe(true);
+    expect(typeof optionsCaptured.checkServerIdentity).toBe("function");
+    expect(requests).toBe(1);
+    expect(result).toMatchObject({ ok: true, fqdn, handshakeOk: true, certificateHostnameValid: true, httpStatus: 302 });
+  });
+
+  it("fails DNS errors and unsafe mixed answers before opening a request", async () => {
+    let requests = 0;
+    const requestImpl = (() => { requests++; throw new Error("must not connect"); }) as any;
+    expect(await probeP11Https("example.com", { resolveImpl: async () => { throw new Error("DNS failed"); }, requestImpl }))
+      .toMatchObject({ ok: false, code: "P11_DNS_RESOLUTION_FAILED" });
+    expect(await probeP11Https("example.com", {
+      resolveImpl: async () => [{ address: "93.184.216.34", family: 4 }, { address: "127.0.0.1", family: 4 }], requestImpl,
+    })).toMatchObject({ ok: false, code: "P11_PROBE_ADDRESS_UNSAFE" });
+    expect(requests).toBe(0);
+  });
+
+  it("rejects a mismatched TLS certificate identity", async () => {
+    const fqdn = "p11-acceptance.pathcode.dk";
+    const result = await probeP11Https(fqdn, {
+      resolveImpl: async () => [{ address: "93.184.216.34", family: 4 }],
+      requestImpl: (options: any) => {
+        const req = new EventEmitter() as EventEmitter & { end: () => void; destroy: () => void };
+        req.end = () => {
+          const error = options.checkServerIdentity(options.servername, { subjectaltname: "DNS:wrong.example" });
+          Object.assign(error, { code: "ERR_TLS_CERT_ALTNAME_INVALID" });
+          req.emit("error", error);
+        };
+        req.destroy = () => {};
+        return req;
+      },
+    });
+    expect(result).toMatchObject({ ok: false, code: "P11_CERTIFICATE_NAME_INVALID" });
   });
 });

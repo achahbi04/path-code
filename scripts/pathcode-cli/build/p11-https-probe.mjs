@@ -42,6 +42,7 @@ export async function probeP11Https(fqdn, { resolveImpl = lookup, requestImpl = 
   if (!Array.isArray(addresses) || addresses.length === 0 || addresses.some((entry) => !entry || !isPublicP11Address(entry.address)))
     return { ok: false, code: "P11_PROBE_ADDRESS_UNSAFE" };
   const chosen = addresses[0];
+  const selected = { address: chosen.address, family: chosen.family };
   return new Promise((resolve) => {
     let done = false;
     let timer = null, req;
@@ -49,7 +50,13 @@ export async function probeP11Https(fqdn, { resolveImpl = lookup, requestImpl = 
     timer = setTimeout(() => { req?.destroy(); finish({ ok: false, code: "P11_TLS_PROBE_TIMEOUT" }); }, timeoutMs);
     try { req = requestImpl({ protocol: "https:", hostname: canonical, port: 443, path: "/", method: "GET",
       agent: false, servername: canonical, rejectUnauthorized: true,
-      lookup: (_host, _options, callback) => callback(null, chosen.address, chosen.family),
+      lookup: (_host, options, callback) => {
+        if (options?.all === true) {
+          callback(null, [selected]);
+          return;
+        }
+        callback(null, selected.address, selected.family);
+      },
       checkServerIdentity: (host, cert) => checkServerIdentity(host, cert) }, (res) => {
       const socket = res.socket;
       const cert = socket.getPeerCertificate?.() ?? {};
