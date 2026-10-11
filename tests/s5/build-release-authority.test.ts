@@ -287,6 +287,42 @@ describe("P10.3C bounded Production release authority", () => {
       spawnImpl: spawnImpl as any })).toMatchObject({ ok: false, code: "PROVIDER_COMMAND_INVALID" });
   });
 
+  it("accepts captured Vercel inspect metadata through the release inspect boundary and still rejects unknown fields", async () => {
+    const spec = makeProductionReleaseInspectCommand({ providerDeploymentId: ID1, teamRef: "team-a" }) as any;
+    const liveShape = {
+      id: ID1,
+      name: "production-project",
+      url: "one.vercel.app",
+      target: "production",
+      readyState: "READY",
+      createdAt: 1,
+      contextName: "team-a",
+      aliases: [],
+      builds: [],
+      duration: {
+        cpuTimeForBilling: 1, endTime: 8, endTimeCapped: 8, startTime: 2,
+        timeForBilling: 6, timeToContainerExit: 5, timeToContainerExitCapped: 5, timeToReady: 4,
+      },
+      buildMachine: { cores: 2, machine: "standard", memory: 4096,
+        selectionSource: "default", selectionType: "standard" },
+    };
+    const spawnFor = (raw: object) => vi.fn(() => {
+      const child = new EventEmitter() as EventEmitter & { stdout: PassThrough; stderr: PassThrough; kill: () => void };
+      child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.kill = vi.fn() as any;
+      queueMicrotask(() => { child.stdout.end(JSON.stringify(raw)); child.emit("close", 0); });
+      return child;
+    });
+    const context = { providerDeploymentId: ID1, projectName: "production-project",
+      projectRef: "production-project", teamRef: "team-a" };
+    expect(await executeProductionReleaseCommand(spec, { cwd: "/tmp", mode: "release_inspect", context,
+      spawnImpl: spawnFor(liveShape) as any })).toEqual({ ok: true, providerDeploymentId: ID1,
+      url: "https://one.vercel.app", providerState: "READY", target: "production", createdAt: 1,
+      projectRef: "production-project", teamRef: "team-a" });
+    expect(await executeProductionReleaseCommand(spec, { cwd: "/tmp", mode: "release_inspect", context,
+      spawnImpl: spawnFor({ ...liveShape, futureProviderField: true }) as any }))
+      .toMatchObject({ ok: false, code: "PROVIDER_SERVING_UNKNOWN" });
+  });
+
   it("requires a unique alias-to-Production-deployment correspondence and rejects wrong project/target", async () => {
     const base = { teamRef: "team-a", projectRef: "production-project", projectName: "production-project",
       executeAliases: vi.fn(async () => ({ ok: true, aliases: [{ alias: "production-project.vercel.app", providerDeploymentId: ID1 }], nextCursor: null })),

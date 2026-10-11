@@ -103,6 +103,62 @@ describe("P10.3B Production deployment provider boundary; mocked CLI only", () =
     ]) expect(parseProductionDeploymentStatus(invalid, { providerDeploymentId, projectName: "production-project", url })).toMatchObject({ ok: false });
   });
 
+  it("reduces the captured Vercel inspect shape while validating and discarding provider metadata", () => {
+    const liveShape = {
+      id: providerDeploymentId,
+      name: "production-project",
+      url: "path-production.vercel.app",
+      target: "production",
+      readyState: "READY",
+      createdAt: 1,
+      contextName: "team-a",
+      aliases: [],
+      builds: [],
+      duration: {
+        cpuTimeForBilling: 1,
+        endTime: 8,
+        endTimeCapped: 8,
+        startTime: 2,
+        timeForBilling: 6,
+        timeToContainerExit: 5,
+        timeToContainerExitCapped: 5,
+        timeToReady: 4,
+      },
+      buildMachine: {
+        cores: 2,
+        machine: "standard",
+        memory: 4096,
+        selectionSource: "default",
+        selectionType: "standard",
+      },
+    };
+    const context = { providerDeploymentId, projectName: "production-project", url };
+    expect(parseProductionDeploymentStatus(liveShape, context)).toEqual({ ok: true, providerDeploymentId,
+      url, providerState: "READY", target: "production", createdAt: 1 });
+
+    const invalid = [
+      { ...liveShape, futureProviderField: true },
+      { ...liveShape, duration: { ...liveShape.duration, futureTiming: 1 } },
+      { ...liveShape, buildMachine: { ...liveShape.buildMachine, futureMachineField: "x" } },
+      { ...liveShape, duration: null },
+      { ...liveShape, buildMachine: [] },
+      ...Object.keys(liveShape.duration).map((key) => ({ ...liveShape,
+        duration: { ...liveShape.duration, [key]: "invalid" } })),
+      ...["cores", "memory"].map((key) => ({ ...liveShape,
+        buildMachine: { ...liveShape.buildMachine, [key]: "invalid" } })),
+      ...["machine", "selectionSource", "selectionType"].map((key) => ({ ...liveShape,
+        buildMachine: { ...liveShape.buildMachine, [key]: 7 } })),
+      { ...liveShape, id: "dpl_87654321" },
+      { ...liveShape, name: "other-project" },
+      { ...liveShape, target: "preview" },
+      { ...liveShape, readyState: "UNKNOWN" },
+      { ...liveShape, createdAt: -1 },
+    ];
+    for (const row of invalid) expect(parseProductionDeploymentStatus(row, context)).toMatchObject({
+      ok: false, code: "PRODUCTION_STATUS_UNSAFE",
+    });
+  });
+
   it("correlates Production rows to the exact operation and fails closed on missing or duplicate evidence", () => {
     const input = { mode: "METADATA_FILTERED_OPERATION", projectName: "production-project", projectRef: "production-project",
       operationId, buildId, windowStart: "2026-10-06T00:00:00.000Z", windowEnd: "2026-10-06T00:05:00.000Z" };

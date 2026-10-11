@@ -12,6 +12,12 @@ const deploymentId = (v) => typeof v === "string" && /^dpl_[A-Za-z0-9]{8,100}$/.
 const providerUrl = (v) => typeof v === "string" && /^https:\/\/[A-Za-z0-9.-]+\.vercel\.app\/?$/.test(v);
 const states = new Set(["QUEUED", "INITIALIZING", "BUILDING", "DEPLOYING", "ANALYZING", "READY", "ERROR", "CANCELED"]);
 const inspectOptional = Object.freeze({ aliases: Array.isArray, builds: Array.isArray, routes: Array.isArray });
+const inspectDurationFields = Object.freeze([
+  "cpuTimeForBilling", "endTime", "endTimeCapped", "startTime", "timeForBilling",
+  "timeToContainerExit", "timeToContainerExitCapped", "timeToReady",
+]);
+const inspectBuildMachineIntegerFields = Object.freeze(["cores", "memory"]);
+const inspectBuildMachineStringFields = Object.freeze(["machine", "selectionSource", "selectionType"]);
 const scopeArgs = (teamRef) => teamRef === null ? [] : ["--scope", teamRef];
 const command = (argv, display) => ({ ok: true, executable: "vercel", argv, shell: false, display });
 
@@ -74,9 +80,22 @@ export function makeProductionReconciliationPageCommand({ mode, projectRef, team
 }
 
 function validCreatedAt(value) { return Number.isSafeInteger(value) && value >= 0; }
+function validInspectMetadata(raw) {
+  if (raw.duration !== undefined && (!object(raw.duration) ||
+      !only(raw.duration, inspectDurationFields) || Object.keys(raw.duration).length !== inspectDurationFields.length ||
+      !inspectDurationFields.every((key) => Object.hasOwn(raw.duration, key) && validCreatedAt(raw.duration[key])))) return false;
+  if (raw.buildMachine !== undefined && (!object(raw.buildMachine) ||
+      !only(raw.buildMachine, [...inspectBuildMachineIntegerFields, ...inspectBuildMachineStringFields]) ||
+      Object.keys(raw.buildMachine).length !== inspectBuildMachineIntegerFields.length + inspectBuildMachineStringFields.length ||
+      !inspectBuildMachineIntegerFields.every((key) => Object.hasOwn(raw.buildMachine, key) && validCreatedAt(raw.buildMachine[key])) ||
+      !inspectBuildMachineStringFields.every((key) => Object.hasOwn(raw.buildMachine, key) &&
+        typeof raw.buildMachine[key] === "string" && raw.buildMachine[key].length > 0 && raw.buildMachine[key].length <= 160))) return false;
+  return true;
+}
 function statusFacts(raw, { providerDeploymentId, url = null, projectName }) {
-  const allowed = ["id", "name", "url", "target", "readyState", "createdAt", "contextName", ...Object.keys(inspectOptional)];
-  if (!only(raw, allowed) || Object.entries(inspectOptional).some(([key, check]) => Object.hasOwn(raw, key) && !check(raw[key])) ||
+  const allowed = ["id", "name", "url", "target", "readyState", "createdAt", "contextName", ...Object.keys(inspectOptional), "duration", "buildMachine"];
+  if (!only(raw, allowed) || !validInspectMetadata(raw) ||
+      Object.entries(inspectOptional).some(([key, check]) => Object.hasOwn(raw, key) && !check(raw[key])) ||
       (raw.contextName !== undefined && typeof raw.contextName !== "string") || !deploymentId(raw.id) ||
       (providerDeploymentId && raw.id !== providerDeploymentId) || raw.name !== projectName ||
       typeof raw.url !== "string" || !providerUrl(`https://${raw.url}`) ||
