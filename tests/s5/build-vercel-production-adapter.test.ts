@@ -212,6 +212,20 @@ describe("P10.3B Production deployment provider boundary; mocked CLI only", () =
       nextCursor: null, completed: true });
   });
 
+  it("reduces current live-shaped whoami JSON through the Production auth boundary", async () => {
+    const teamRef = "team_SqWewpQeCPwU8WuZNHTGViOO";
+    const context = { teamRef };
+    const spec = { ok: true, executable: "vercel", argv: ["whoami", "--json", "--scope", teamRef], shell: false, display: "vercel whoami --json" };
+    const child = new EventEmitter() as any;
+    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough(); child.kill = vi.fn();
+    const resultPromise = executeProductionVercelCommand(spec, { cwd: "/tmp", mode: "production_auth", context,
+      spawnImpl: () => child });
+    child.stdout.end(JSON.stringify({ username: "meachahbi-8186", email: "synthetic@example.test", name: "Synthetic",
+      plan: "synthetic-plan", team: { id: teamRef, slug: "nordic-rain" } }));
+    child.emit("close", 0);
+    await expect(resultPromise).resolves.toEqual({ ok: true, authenticated: true, teamRef });
+  });
+
   it("uses the exact read-only Production list and inspect command forms", () => {
     expect(makeProductionInspectCommand({ providerDeploymentId, teamRef: "team-a" }).argv)
       .toEqual(["inspect", providerDeploymentId, "--json", "--scope", "team-a"]);

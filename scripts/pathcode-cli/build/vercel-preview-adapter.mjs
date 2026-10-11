@@ -88,7 +88,8 @@ export function makePreviewReconciliationPageCommand({ mode, projectRef, teamRef
 }
 
 export function parsePreviewAuth(raw, teamRef = null) {
-  if (!shape(raw, ["team", "username", "email", "name", "app", "localOverride", "globalTeam", "loggedIn"]) ||
+  if (!shape(raw, ["team", "username", "email", "name", "app", "localOverride", "globalTeam", "loggedIn", "plan"]) ||
+      (raw.plan !== undefined && (typeof raw.plan !== "string" || raw.plan.length < 1 || raw.plan.length > 160)) ||
       raw.loggedIn === false || !locator(raw.username) || raw.localOverride === true ||
       (teamRef !== null && (!object(raw.team) ||
         (raw.team.id !== teamRef && raw.team.slug !== teamRef)))) return fail("PROVIDER_AUTH_REQUIRED");

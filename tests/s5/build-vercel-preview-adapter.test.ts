@@ -101,6 +101,22 @@ describe("P10.2A installed CLI 59.10.0 preview contracts; no provider calls", ()
     expect(parsePreviewDeploymentStatus(status, "dpl_other123")).toMatchObject({ ok: false });
   });
 
+  it("accepts bounded provider plan metadata without changing auth or team authority", () => {
+    const liveShape = { username: "meachahbi-8186", email: "synthetic@example.test", name: "Synthetic",
+      plan: "synthetic-plan", team: { id: "team_SqWewpQeCPwU8WuZNHTGViOO", slug: "nordic-rain" } };
+    const expected = { ok: true, authenticated: true, teamRef: "team_SqWewpQeCPwU8WuZNHTGViOO" };
+    expect(parsePreviewAuth(liveShape, "team_SqWewpQeCPwU8WuZNHTGViOO")).toEqual(expected);
+    const { plan: _plan, ...withoutPlan } = liveShape;
+    expect(parsePreviewAuth(withoutPlan, "team_SqWewpQeCPwU8WuZNHTGViOO")).toEqual(expected);
+    expect(parsePreviewAuth({ ...liveShape, plan: {} }, "team_SqWewpQeCPwU8WuZNHTGViOO")).toMatchObject({ ok: false, code: "PROVIDER_AUTH_REQUIRED" });
+    expect(parsePreviewAuth({ ...liveShape, plan: "" }, "team_SqWewpQeCPwU8WuZNHTGViOO")).toMatchObject({ ok: false, code: "PROVIDER_AUTH_REQUIRED" });
+    expect(parsePreviewAuth({ ...liveShape, unexpected: true }, "team_SqWewpQeCPwU8WuZNHTGViOO")).toMatchObject({ ok: false, code: "PROVIDER_AUTH_REQUIRED" });
+    expect(parsePreviewAuth({ ...liveShape, loggedIn: false }, "team_SqWewpQeCPwU8WuZNHTGViOO")).toMatchObject({ ok: false, code: "PROVIDER_AUTH_REQUIRED" });
+    expect(parsePreviewAuth({ ...liveShape, localOverride: true }, "team_SqWewpQeCPwU8WuZNHTGViOO")).toMatchObject({ ok: false, code: "PROVIDER_AUTH_REQUIRED" });
+    expect(parsePreviewAuth({ ...liveShape, team: { id: "team-other", slug: "other" } }, "team_SqWewpQeCPwU8WuZNHTGViOO"))
+      .toMatchObject({ ok: false, code: "PROVIDER_AUTH_REQUIRED" });
+  });
+
   it("admits only installed inspect optional containers and keeps the safe projection unchanged", () => {
     const status = { id, name: projectRef, url: "example.vercel.app", target: "preview", readyState: "READY", createdAt: 7 };
     expect(parsePreviewDeploymentStatus(status, id)).toEqual({ ok: true, providerDeploymentId: id,
