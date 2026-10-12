@@ -235,6 +235,34 @@ describe("P11 Vercel structured provider boundary", () => {
     }
   });
 
+  it("classifies an exact unexpired certificate and successful TLS probe as ready", async () => {
+    const host = "p11-acceptance.pathcode.dk";
+    const observedAt = "2026-10-11T12:00:00.000Z";
+    const intended = ["ns1.vercel-dns.test", "ns2.vercel-dns.test"];
+    const projectRow = { name: host, apexName: "pathcode.dk", projectId, verified: true, verification: [] };
+    const responses: Record<string, any> = {
+      team_domains: { domains: [{ name: "pathcode.dk", teamId: teamRef, serviceType: "external",
+        nameservers: ["ns1.simply.test", "ns2.simply.test"], intendedNameservers: intended }],
+        pagination: { count: 1, next: null, prev: null } },
+      project: { id: projectId, name: projectRef, teamId: teamRef },
+      project_domains: { domains: [projectRow], pagination: { count: 1, next: null, prev: null } },
+      project_domain: projectRow,
+      domain_config: { serviceType: "zeit.world", nameservers: intended, misconfigured: false, conflicts: [],
+        recommendedIPv4: [], recommendedCNAME: [], acceptedChallenges: [] },
+      certificates: { certs: [{ uid: "cert_synthetic_p11_ready", cns: [host],
+        created: "2026-10-01T00:00:00.000Z", expiration: "2027-01-01T00:00:00.000Z", autoRenew: true }], pagination: {} },
+      dns_records: { records: [], pagination: { count: 0, next: null, prev: null } },
+    };
+    const result = await observeP11VercelDomain({ fqdn: host, projectRef, teamRef }, { cwd: "/tmp",
+      execute: async (spec: any) => ({ ok: true, raw: responses[spec.proofContext.kind] }),
+      httpsProbe: async () => ({ ok: true, fqdn: host, handshakeOk: true, certificateNames: [host],
+        validFrom: "2026-10-01T00:00:00.000Z", validTo: "2027-01-01T00:00:00.000Z",
+        certificateHostnameValid: true, httpStatus: 200, observedAt }),
+    });
+    expect(result).toMatchObject({ ok: true, certificateId: "cert_synthetic_p11_ready", tlsState: "ready",
+      tlsProbe: { handshakeOk: true, certificateExactName: true, certificateValid: true, observedAt } });
+  });
+
   it("rejects wrong project, wrong target, missing identity, and redirects in project-domain evidence", () => {
     const row = { name: "example.com", apexName: "example.com", projectId, verified: false, verification: [] };
     const page = (domains: unknown[]) => ({ domains, pagination: { count: domains.length, next: null, prev: null } });

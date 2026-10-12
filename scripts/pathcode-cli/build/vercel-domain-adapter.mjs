@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createVercelChildEnv } from "./vercel-preview-adapter.mjs";
-import { normalizeP11Fqdn, normalizeP11Nameserver, classifyP11Hostname } from "./p11-domains.mjs";
+import { normalizeP11Fqdn, normalizeP11Nameserver, classifyP11Hostname, classifyP11Tls } from "./p11-domains.mjs";
 import { probeP11Https } from "./p11-https-probe.mjs";
 
 const fail = (code, details = {}) => ({ ok: false, code, ...details });
