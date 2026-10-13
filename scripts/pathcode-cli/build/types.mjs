@@ -46,6 +46,39 @@
  * @property {string} [activeWorktreePath] Latest engineer task worktree when distinct from projectRoot
  * @property {string} [activeTaskBranch] Task branch carrying unmerged engineer commits (e.g. README)
  *
+ * @typedef {object} BuildIntegrationVerification
+ * @property {'unverified'|'ready'|'action_required'|'unavailable'} state
+ * @property {string|null} adapterVersion
+ * @property {string|null} providerAccountRef
+ * @property {string[]} capabilities
+ * @property {string|null} verifiedAt
+ * @property {string|null} failureCode
+ *
+ * @typedef {object} BuildIntegrationCredential
+ * @property {string} role
+ * @property {string} secretRef
+ *
+ * @typedef {object} BuildIntegrationBinding
+ * @property {string} bindingId
+ * @property {string} environmentId
+ * @property {BuildIntegrationCredential[]} credentials
+ * @property {BuildIntegrationVerification} verification
+ * @property {string} createdAt
+ * @property {string} updatedAt
+ *
+ * @typedef {object} BuildIntegration
+ * @property {string} integrationId
+ * @property {'github'} providerKey
+ * @property {string} label
+ * @property {string} createdAt
+ * @property {string} updatedAt
+ * @property {BuildIntegrationBinding[]} bindings
+ *
+ * @typedef {object} BuildIntegrations
+ * @property {'pathcode.p12.integrations.v1'} schema
+ * @property {number} revision
+ * @property {BuildIntegration[]} items
+ *
  * @typedef {object} ConversationMessage
  * @property {string} id
  * @property {'user'|'assistant'|'system'} role
@@ -122,6 +155,7 @@
  * @property {BuildHypotheses} hypotheses
  * @property {ProjectBinding[]} projectBindings
  * @property {object} [environments]
+ * @property {BuildIntegrations} [integrations] P12.1 typed integration and credential-reference authority (optional for legacy Builds)
  * @property {object} [deployments] P10.1 deployment/release authority (optional for legacy Builds)
  * @property {BuildChild[]} children
  * @property {BuildLoop} loop

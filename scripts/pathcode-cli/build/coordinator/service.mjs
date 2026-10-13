@@ -23,6 +23,8 @@ import {
   prepareBuildEnvironmentMutation,
   prepareBuildEnvironmentVerification,
 } from "../environments.mjs";
+import { listBuildIntegrationCatalog, listBuildIntegrations, readBuildIntegration,
+  prepareBuildIntegrationMutation } from "../integrations.mjs";
 import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
 import { listBuildDeployments, preflightDeployment, prepareDeploymentMappingMutation,
   prepareDeploymentOperation, prepareProductionDeploymentOperation, transitionDeploymentOperation,
@@ -1085,10 +1087,14 @@ export async function createBuildCoordinatorService(options) {
   async function dispatch(method, params = {}) {
     const buildId = String(params.buildId || "");
     if (scopedControlPlane && method !== BuildCoordinatorMethods.HELLO &&
+        method !== BuildCoordinatorMethods.BUILD_INTEGRATIONS_CATALOG &&
         (buildId !== scopedBuildId || !new Set([
           BuildCoordinatorMethods.BUILD_ENVIRONMENTS_LIST,
           BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ,
           BuildCoordinatorMethods.BUILD_ENVIRONMENT_MUTATE,
+          BuildCoordinatorMethods.BUILD_INTEGRATIONS_LIST,
+          BuildCoordinatorMethods.BUILD_INTEGRATION_READ,
+          BuildCoordinatorMethods.BUILD_INTEGRATION_MUTATE,
           BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_MAPPING_MUTATE,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE,
@@ -1148,6 +1154,31 @@ export async function createBuildCoordinatorService(options) {
         };
       case BuildCoordinatorMethods.BUILD_ENVIRONMENTS_LIST:
         return listBuildEnvironments(runtimeRoot, buildId);
+      case BuildCoordinatorMethods.BUILD_INTEGRATIONS_CATALOG:
+        if (Object.keys(params).length) return { ok: false, code: "INTEGRATION_REQUEST_INVALID" };
+        return { ok: true, providers: listBuildIntegrationCatalog() };
+      case BuildCoordinatorMethods.BUILD_INTEGRATIONS_LIST:
+        if (Object.keys(params).some((key) => key !== "buildId")) return { ok: false, code: "INTEGRATION_REQUEST_INVALID" };
+        return listBuildIntegrations(runtimeRoot, buildId);
+      case BuildCoordinatorMethods.BUILD_INTEGRATION_READ:
+        if (Object.keys(params).some((key) => !["buildId", "integrationId"].includes(key)) ||
+            typeof params.integrationId !== "string") return { ok: false, code: "INTEGRATION_REQUEST_INVALID" };
+        return readBuildIntegration(runtimeRoot, buildId, params.integrationId);
+      case BuildCoordinatorMethods.BUILD_INTEGRATION_MUTATE:
+        return exclusive(buildId, () => {
+          const { buildId: _buildId, ...request } = params;
+          const result = prepareBuildIntegrationMutation(runtimeRoot, buildId, request);
+          if (!result.ok) return result;
+          writeBuildRecord(runtimeRoot, result.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "integration.mutated", {
+            action: request.action, integrationId: result.integrationId,
+            ...(result.bindingId ? { bindingId: result.bindingId } : {}),
+            ...(result.providerKey ? { providerKey: result.providerKey } : {}),
+            ...(result.role ? { role: result.role } : {}), revision: result.revision,
+          }); } catch { /* Build record is authority. */ }
+          return { ok: true, integrationId: result.integrationId,
+            ...(result.bindingId ? { bindingId: result.bindingId } : {}), revision: result.revision };
+        });
       case BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST:
         return listBuildDeployments(runtimeRoot, buildId);
       case BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREFLIGHT:

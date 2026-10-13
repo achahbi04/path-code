@@ -157,6 +157,14 @@ export function createBuildCoordinatorClient(options) {
     verifyLocalEnvironmentBinding: (buildId, environmentId, variableName, expectedEnvironmentRevision) =>
       request(BuildCoordinatorMethods.BUILD_ENVIRONMENT_VERIFY_LOCAL,
         { buildId, environmentId, variableName, expectedEnvironmentRevision }),
+    listIntegrationCatalog: () =>
+      request(BuildCoordinatorMethods.BUILD_INTEGRATIONS_CATALOG),
+    listIntegrations: (buildId) =>
+      request(BuildCoordinatorMethods.BUILD_INTEGRATIONS_LIST, { buildId }),
+    readIntegration: (buildId, integrationId) =>
+      request(BuildCoordinatorMethods.BUILD_INTEGRATION_READ, { buildId, integrationId }),
+    mutateIntegration: (buildId, input) =>
+      request(BuildCoordinatorMethods.BUILD_INTEGRATION_MUTATE, { ...input, buildId }),
     messageBuild: (buildId, input) =>
       request(BuildCoordinatorMethods.BUILD_MESSAGE, { buildId, input }),
     stopBuild: (buildId) =>

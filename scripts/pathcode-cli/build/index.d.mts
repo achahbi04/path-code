@@ -61,6 +61,25 @@ export interface BuildEnvironments {
     updatedAt: string; variables: BuildEnvironmentVariable[] }>;
 }
 
+export interface BuildIntegrationVerification {
+  state: "unverified" | "ready" | "action_required" | "unavailable";
+  adapterVersion: string | null;
+  providerAccountRef: string | null;
+  capabilities: string[];
+  verifiedAt: string | null;
+  failureCode: string | null;
+}
+export interface BuildIntegrationCredential { role: string; secretRef: string }
+export interface BuildIntegrationBinding {
+  bindingId: string; environmentId: string; credentials: BuildIntegrationCredential[];
+  verification: BuildIntegrationVerification; createdAt: string; updatedAt: string;
+}
+export interface BuildIntegration {
+  integrationId: string; providerKey: "github"; label: string; createdAt: string; updatedAt: string;
+  bindings: BuildIntegrationBinding[];
+}
+export interface BuildIntegrations { schema: "pathcode.p12.integrations.v1"; revision: number; items: BuildIntegration[] }
+
 export interface BuildChild {
   taskId: string;
   bindingId: string;
@@ -167,6 +186,7 @@ export interface BuildRecord {
   };
   projectBindings: ProjectBinding[];
   environments?: BuildEnvironments;
+  integrations?: BuildIntegrations;
   deployments?: BuildDeployments;
   children: BuildChild[];
   loop: {
@@ -849,6 +869,10 @@ export interface BuildCoordinatorClient {
   verifyLocalEnvironmentBinding(buildId: string, environmentId: string, variableName: string,
     expectedEnvironmentRevision: number): Promise<{ ok: boolean; code?: string; revision?: number;
       presenceState?: string; safetyState?: string }>;
+  listIntegrationCatalog(): Promise<{ ok: boolean; code?: string; providers?: ReturnType<typeof listBuildIntegrationCatalog> }>;
+  listIntegrations(buildId: string): Promise<ReturnType<typeof listBuildIntegrations>>;
+  readIntegration(buildId: string, integrationId: string): Promise<ReturnType<typeof readBuildIntegration>>;
+  mutateIntegration(buildId: string, input: object): Promise<{ ok: boolean; code?: string; integrationId?: string; bindingId?: string; revision?: number }>;
   startRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   restartRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   startBuild(
@@ -1031,6 +1055,20 @@ export function readBuildEnvironment(runtimeRoot: string, buildId: string, envir
 export function readBuildSecretBinding(runtimeRoot: string, buildId: string, environmentId: string, secretRef: string):
   { ok: true; buildId: string; environmentId: string; binding: Extract<BuildEnvironmentVariable, { kind: "secret" }> } |
   { ok: false; code: string };
+export const INTEGRATIONS_SCHEMA: "pathcode.p12.integrations.v1";
+export function emptyBuildIntegrationAuthority(): BuildIntegrations;
+export function listBuildIntegrationCatalog(): Array<{ providerKey: "github"; displayName: "GitHub";
+  credentialRoles: Array<{ role: "token"; required: true }> }>;
+export function listBuildIntegrations(runtimeRoot: string, buildId: string):
+  ({ ok: true; buildId: string } & BuildIntegrations) | { ok: false; code: string };
+export function readBuildIntegration(runtimeRoot: string, buildId: string, integrationId: string):
+  { ok: true; buildId: string; revision: number; integration: BuildIntegration } | { ok: false; code: string };
+export function prepareBuildIntegrationMutation(runtimeRoot: string, buildId: string, request: {
+  action: "create_integration" | "rename_integration" | "delete_integration" | "bind_environment" |
+    "unbind_environment" | "bind_credential" | "unbind_credential";
+  expectedIntegrationRevision: number; input: Record<string, unknown>;
+}): { ok: true; record: BuildRecord; integrationId: string; bindingId?: string; providerKey?: string;
+  role?: string; revision: number } | { ok: false; code: string };
 export function createBuildCoordinatorService(options: {
   runtimeRoot: string; packageRoot: string; fakeMode?: boolean; preferredEngine?: string | null;
   scopedBuildId?: string; productionCommandExecutor?: (spec: any, options: any) => Promise<any>;

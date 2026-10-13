@@ -147,6 +147,8 @@ export {
   ENVIRONMENTS_SCHEMA, listBuildEnvironments, readBuildEnvironment,
   readBuildSecretBinding,
 } from "./environments.mjs";
+export { INTEGRATIONS_SCHEMA, emptyBuildIntegrationAuthority, listBuildIntegrationCatalog,
+  listBuildIntegrations, readBuildIntegration, prepareBuildIntegrationMutation } from "./integrations.mjs";
 export { createBuildCoordinatorService } from "./coordinator/service.mjs";
 export {
   startBuildCoordinatorServer,
