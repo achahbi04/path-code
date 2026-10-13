@@ -165,6 +165,9 @@ export function createBuildCoordinatorClient(options) {
       request(BuildCoordinatorMethods.BUILD_INTEGRATION_READ, { buildId, integrationId }),
     mutateIntegration: (buildId, input) =>
       request(BuildCoordinatorMethods.BUILD_INTEGRATION_MUTATE, { ...input, buildId }),
+    verifyIntegration: (buildId, integrationId, bindingId, expectedIntegrationRevision, expectedEnvironmentRevision) =>
+      request(BuildCoordinatorMethods.BUILD_INTEGRATION_VERIFY, { buildId, integrationId, bindingId,
+        expectedIntegrationRevision, expectedEnvironmentRevision }),
     messageBuild: (buildId, input) =>
       request(BuildCoordinatorMethods.BUILD_MESSAGE, { buildId, input }),
     stopBuild: (buildId) =>

@@ -320,7 +320,7 @@ describe("P12.1 Build integration authority", () => {
     expect(Object.values(COORD)).toEqual(["build.integrations.catalog", "build.integrations.list",
       "build.integrations.read", "build.integrations.mutate"]);
     const protocolText = readFileSync(new URL("../../scripts/pathcode-cli/build/coordinator/protocol.mjs", import.meta.url), "utf8");
-    expect(protocolText).not.toContain("build.integrations.verify");
+    expect(protocolText).toContain("build.integrations.verify");
     const moduleText = readFileSync(new URL("../../scripts/pathcode-cli/build/integrations.mjs", import.meta.url), "utf8");
     expect(moduleText).not.toMatch(/from\s+["']node:(?:http|https|child_process)|\bfetch\s*\(/);
     expect(existsSync(new URL("../../scripts/pathcode-cli/build/github-adapter.mjs", import.meta.url))).toBe(false);

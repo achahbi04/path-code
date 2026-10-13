@@ -17,6 +17,7 @@ export const BuildCoordinatorMethods = Object.freeze({
   BUILD_INTEGRATIONS_LIST: "build.integrations.list",
   BUILD_INTEGRATION_READ: "build.integrations.read",
   BUILD_INTEGRATION_MUTATE: "build.integrations.mutate",
+  BUILD_INTEGRATION_VERIFY: "build.integrations.verify",
   BUILD_DEPLOYMENTS_LIST: "build.deployments.list",
   BUILD_DEPLOYMENT_PREFLIGHT: "build.deployments.preflight",
   BUILD_DEPLOYMENT_MAPPING_MUTATE: "build.deployments.mappingMutate",

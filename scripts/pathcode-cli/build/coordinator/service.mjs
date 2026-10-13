@@ -24,7 +24,9 @@ import {
   prepareBuildEnvironmentVerification,
 } from "../environments.mjs";
 import { listBuildIntegrationCatalog, listBuildIntegrations, readBuildIntegration,
-  prepareBuildIntegrationMutation } from "../integrations.mjs";
+  prepareBuildIntegrationMutation, prepareBuildIntegrationVerificationMutation } from "../integrations.mjs";
+import { createIntegrationVerificationSnapshot, executeIntegrationVerification,
+  validIntegrationVerificationRequest } from "../integration-verification.mjs";
 import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
 import { listBuildDeployments, preflightDeployment, prepareDeploymentMappingMutation,
   prepareDeploymentOperation, prepareProductionDeploymentOperation, transitionDeploymentOperation,
@@ -66,6 +68,7 @@ export async function createBuildCoordinatorService(options) {
     p11CommandExecutor,
     p11SpawnImpl,
     p11HttpsProbe,
+    integrationVerificationAdapters = Object.freeze({}),
   } = options;
   const runProductionCommand = productionCommandExecutor ?? ((spec, executorOptions) =>
     executeProductionVercelCommand(spec, { ...executorOptions,
@@ -1095,6 +1098,7 @@ export async function createBuildCoordinatorService(options) {
           BuildCoordinatorMethods.BUILD_INTEGRATIONS_LIST,
           BuildCoordinatorMethods.BUILD_INTEGRATION_READ,
           BuildCoordinatorMethods.BUILD_INTEGRATION_MUTATE,
+          BuildCoordinatorMethods.BUILD_INTEGRATION_VERIFY,
           BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_MAPPING_MUTATE,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE,
@@ -1179,6 +1183,31 @@ export async function createBuildCoordinatorService(options) {
           return { ok: true, integrationId: result.integrationId,
             ...(result.bindingId ? { bindingId: result.bindingId } : {}), revision: result.revision };
         });
+      case BuildCoordinatorMethods.BUILD_INTEGRATION_VERIFY: {
+        if (!validIntegrationVerificationRequest(params, buildId)) return { ok: false, code: "INTEGRATION_VERIFICATION_INVALID" };
+        const prepared = await exclusive(buildId, () =>
+          createIntegrationVerificationSnapshot(runtimeRoot, buildId, params, integrationVerificationAdapters));
+        if (!prepared.ok) return prepared;
+        const outcome = prepared.verification
+          ? { ok: true, verification: prepared.verification }
+          : await executeIntegrationVerification(prepared);
+        if (!outcome.ok) return outcome;
+        return exclusive(buildId, () => {
+          const result = prepareBuildIntegrationVerificationMutation(runtimeRoot, buildId,
+            prepared.snapshot, outcome.verification);
+          if (!result.ok) return result;
+          writeBuildRecord(runtimeRoot, result.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "integration.verified", {
+            integrationId: result.integrationId, bindingId: result.bindingId,
+            providerKey: result.providerKey, state: result.verification.state,
+            ...(result.verification.adapterVersion ? { adapterVersion: result.verification.adapterVersion } : {}),
+            ...(result.verification.failureCode ? { failureCode: result.verification.failureCode } : {}),
+            revision: result.revision,
+          }); } catch { /* Build record is authority. */ }
+          return { ok: true, integrationId: result.integrationId, bindingId: result.bindingId,
+            revision: result.revision, verification: result.verification };
+        });
+      }
       case BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST:
         return listBuildDeployments(runtimeRoot, buildId);
       case BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREFLIGHT:

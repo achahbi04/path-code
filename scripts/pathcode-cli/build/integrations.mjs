@@ -1,7 +1,7 @@
 /** P12.1 typed integration identity and P9 credential-reference authority. */
 import { randomUUID } from "node:crypto";
 import { readBuildRecord } from "./record.mjs";
-import { listBuildEnvironments, readBuildSecretBinding } from "./environments.mjs";
+import { listBuildEnvironments, readBuildEnvironment, readBuildSecretBinding } from "./environments.mjs";
 
 export const INTEGRATIONS_SCHEMA = "pathcode.p12.integrations.v1";
 const PROVIDERS = Object.freeze({
@@ -203,4 +203,47 @@ export function prepareBuildIntegrationMutation(runtimeRoot, buildId, request) {
   const next = { ...found.record, integrations: authority };
   return { ok: true, record: next, integrationId, ...(bindingId ? { bindingId } : {}),
     ...(providerKey ? { providerKey } : {}), ...(role ? { role } : {}), revision: authority.revision };
+}
+
+/** Internal P12.2 transition. Only the coordinator verification workflow calls this. */
+export function prepareBuildIntegrationVerificationMutation(runtimeRoot, buildId, snapshot, verification) {
+  if (!plain(snapshot) || !validVerification(verification) || verification.state === "unverified" ||
+      verification.verifiedAt === null ||
+      (verification.adapterVersion !== null && verification.adapterVersion !== snapshot.adapterVersion) ||
+      (verification.state === "ready" && (verification.adapterVersion === null ||
+        verification.providerAccountRef === null || verification.failureCode !== null)) ||
+      (verification.state !== "ready" && (verification.providerAccountRef !== null ||
+        verification.capabilities.length !== 0 || verification.failureCode === null)))
+    return fail("INTEGRATION_VERIFICATION_INVALID");
+  const found = boundRecord(runtimeRoot, buildId);
+  if (!found.ok) return found;
+  if (found.authority.revision !== snapshot.integrationRevision) return fail("INTEGRATION_AUTHORITY_STALE");
+  const integration = found.authority.items.find((item) => item.integrationId === snapshot.integrationId);
+  const binding = integration?.bindings.find((item) => item.bindingId === snapshot.bindingId);
+  if (!integration || integration.providerKey !== snapshot.providerKey || !binding ||
+      binding.environmentId !== snapshot.environmentId) return fail("INTEGRATION_AUTHORITY_STALE");
+  const refs = binding.credentials.map(({ role, secretRef }) => ({ role, secretRef }));
+  if (JSON.stringify(refs) !== JSON.stringify(snapshot.credentials.map(({ role, secretRef }) => ({ role, secretRef }))))
+    return fail("INTEGRATION_AUTHORITY_STALE");
+  const environment = readBuildEnvironment(runtimeRoot, buildId, snapshot.environmentId);
+  if (!environment.ok || environment.revision !== snapshot.environmentRevision ||
+      environment.environment.environmentId !== snapshot.environmentId) return fail("INTEGRATION_ENVIRONMENT_STALE");
+  for (const expected of snapshot.credentials) {
+    const current = readBuildSecretBinding(runtimeRoot, buildId, snapshot.environmentId, expected.secretRef);
+    if (!current.ok || current.binding.variableName !== expected.variableName ||
+        current.binding.backend !== expected.backend || current.binding.bindingState !== expected.bindingState ||
+        current.binding.presenceState !== expected.presenceState || (current.binding.safetyState ?? null) !== expected.safetyState)
+      return fail("INTEGRATION_ENVIRONMENT_STALE");
+  }
+  const nextAuthority = structuredClone(found.authority);
+  const nextIntegration = nextAuthority.items.find((item) => item.integrationId === snapshot.integrationId);
+  const nextBinding = nextIntegration.bindings.find((item) => item.bindingId === snapshot.bindingId);
+  nextBinding.verification = structuredClone(verification);
+  nextBinding.updatedAt = new Date().toISOString();
+  nextIntegration.updatedAt = nextBinding.updatedAt;
+  nextAuthority.revision += 1;
+  return { ok: true, record: { ...found.record, integrations: nextAuthority },
+    integrationId: snapshot.integrationId, bindingId: snapshot.bindingId,
+    providerKey: snapshot.providerKey, revision: nextAuthority.revision,
+    verification: structuredClone(verification) };
 }

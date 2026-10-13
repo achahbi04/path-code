@@ -79,6 +79,14 @@ export interface BuildIntegration {
   bindings: BuildIntegrationBinding[];
 }
 export interface BuildIntegrations { schema: "pathcode.p12.integrations.v1"; revision: number; items: BuildIntegration[] }
+export interface BuildIntegrationVerificationAdapter {
+  providerKey: "github";
+  adapterVersion: string;
+  verify(input: { credentials: Readonly<Record<string, string>> }): Promise<
+    { ok: true; providerAccountRef: string; capabilities: string[] } |
+    { ok: false; code: "PROVIDER_CREDENTIAL_REJECTED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_RESPONSE_UNSAFE" }
+  >;
+}
 
 export interface BuildChild {
   taskId: string;
@@ -873,6 +881,10 @@ export interface BuildCoordinatorClient {
   listIntegrations(buildId: string): Promise<ReturnType<typeof listBuildIntegrations>>;
   readIntegration(buildId: string, integrationId: string): Promise<ReturnType<typeof readBuildIntegration>>;
   mutateIntegration(buildId: string, input: object): Promise<{ ok: boolean; code?: string; integrationId?: string; bindingId?: string; revision?: number }>;
+  verifyIntegration(buildId: string, integrationId: string, bindingId: string,
+    expectedIntegrationRevision: number, expectedEnvironmentRevision: number): Promise<{
+      ok: boolean; code?: string; revision?: number; integrationId?: string; bindingId?: string;
+      verification?: BuildIntegrationVerification }>;
   startRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   restartRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   startBuild(
@@ -1078,6 +1090,8 @@ export function createBuildCoordinatorService(options: {
   p11CommandExecutor?: (spec: any, options: any) => Promise<any>;
   p11SpawnImpl?: (...args: any[]) => any;
   p11HttpsProbe?: (fqdn: string) => Promise<any>;
+  integrationVerificationAdapters?: Readonly<Record<string, BuildIntegrationVerificationAdapter>> |
+    ReadonlyMap<string, BuildIntegrationVerificationAdapter>;
 }): Promise<{
   dispatch(method: string, params?: Record<string, unknown>): Promise<any>;
   listDomains(buildId: string): Promise<any>;
