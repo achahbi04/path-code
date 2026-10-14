@@ -149,6 +149,10 @@ export {
 } from "./environments.mjs";
 export { INTEGRATIONS_SCHEMA, emptyBuildIntegrationAuthority, listBuildIntegrationCatalog,
   listBuildIntegrations, readBuildIntegration, prepareBuildIntegrationMutation } from "./integrations.mjs";
+export { DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS } from "./integration-adapters.mjs";
+export { GITHUB_IDENTITY_ADAPTER_VERSION, GITHUB_IDENTITY_API_VERSION,
+  GITHUB_IDENTITY_RESPONSE_MAX_BYTES, GITHUB_IDENTITY_TIMEOUT_MS,
+  createGitHubIdentityAdapter, githubIdentityResponseReducer } from "./github-integration-adapter.mjs";
 export { createBuildCoordinatorService } from "./coordinator/service.mjs";
 export {
   startBuildCoordinatorServer,

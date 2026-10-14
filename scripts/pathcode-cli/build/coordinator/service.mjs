@@ -27,6 +27,7 @@ import { listBuildIntegrationCatalog, listBuildIntegrations, readBuildIntegratio
   prepareBuildIntegrationMutation, prepareBuildIntegrationVerificationMutation } from "../integrations.mjs";
 import { createIntegrationVerificationSnapshot, executeIntegrationVerification,
   validIntegrationVerificationRequest } from "../integration-verification.mjs";
+import { DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS } from "../integration-adapters.mjs";
 import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
 import { listBuildDeployments, preflightDeployment, prepareDeploymentMappingMutation,
   prepareDeploymentOperation, prepareProductionDeploymentOperation, transitionDeploymentOperation,
@@ -68,7 +69,7 @@ export async function createBuildCoordinatorService(options) {
     p11CommandExecutor,
     p11SpawnImpl,
     p11HttpsProbe,
-    integrationVerificationAdapters = Object.freeze({}),
+    integrationVerificationAdapters = DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS,
   } = options;
   const runProductionCommand = productionCommandExecutor ?? ((spec, executorOptions) =>
     executeProductionVercelCommand(spec, { ...executorOptions,

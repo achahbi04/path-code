@@ -87,6 +87,16 @@ export interface BuildIntegrationVerificationAdapter {
     { ok: false; code: "PROVIDER_CREDENTIAL_REJECTED" | "PROVIDER_UNAVAILABLE" | "PROVIDER_RESPONSE_UNSAFE" }
   >;
 }
+export const GITHUB_IDENTITY_ADAPTER_VERSION: "github.identity.v1";
+export const GITHUB_IDENTITY_API_VERSION: "2026-03-10";
+export const GITHUB_IDENTITY_RESPONSE_MAX_BYTES: number;
+export const GITHUB_IDENTITY_TIMEOUT_MS: number;
+export function createGitHubIdentityAdapter(options?: { requestImpl?: (options: any,
+  callback: (response: any) => void) => any }): BuildIntegrationVerificationAdapter;
+export function githubIdentityResponseReducer(value: unknown):
+  { ok: true; providerAccountRef: string; capabilities: string[] } | null;
+export const DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS: Readonly<
+  Record<"github", BuildIntegrationVerificationAdapter>>;
 
 export interface BuildChild {
   taskId: string;

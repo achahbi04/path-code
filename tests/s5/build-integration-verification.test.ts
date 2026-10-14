@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import {
   createBuildCoordinatorService, createBuildRecordSkeleton, readBuildEvents, readBuildRecord, writeBuildRecord,
+  createGitHubIdentityAdapter, DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS,
 } from "../../scripts/pathcode-cli/build/index.mjs";
+import { EventEmitter } from "node:events";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
 const METHODS = { BUILD_ENVIRONMENT_MUTATE: "build.environments.mutate", BUILD_ENVIRONMENT_VERIFY_LOCAL: "build.environments.verifyLocal",
   BUILD_INTEGRATION_MUTATE: "build.integrations.mutate", BUILD_INTEGRATION_VERIFY: "build.integrations.verify" };
@@ -31,7 +33,7 @@ async function setup(adapter?: { providerKey: "github"; adapterVersion: string; 
   build.loop.status = "paused";
   writeBuildRecord(runtimeRoot, build);
   const service = await createBuildCoordinatorService({ runtimeRoot, packageRoot: resolvePathPackageRoot(), fakeMode: true,
-    ...(adapter ? { integrationVerificationAdapters: { github: adapter } } : {}) });
+    integrationVerificationAdapters: adapter ? { github: adapter } : Object.freeze({}) });
   await service.whenReady; services.push(service);
   const dispatch = (method: string, params: Record<string, unknown> = {}) => service.dispatch(method, params);
   const mutateP9 = (action: string, expectedEnvironmentRevision: number, input: Record<string, unknown>) =>
@@ -244,7 +246,12 @@ describe("P12.2 credential bridge and verification boundary", () => {
     expect(calls).toBe(0);
   });
 
-  it("uses no default executable adapter and records adapter unavailable without reading local material", async () => {
+  it("exports the production GitHub default and preserves explicit empty-registry unavailability", async () => {
+    expect(Object.keys(DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS)).toEqual(["github"]);
+    expect(DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS.github).toMatchObject({
+      providerKey: "github", adapterVersion: "github.identity.v1",
+    });
+    expect(typeof DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS.github.verify).toBe("function");
     const x = await setup();
     const { secretRef, environmentRevision } = await makeLocalCredential(x, "opaque-token");
     const integration = await makeIntegration(x, secretRef);
@@ -252,6 +259,46 @@ describe("P12.2 credential bridge and verification boundary", () => {
     const result = await verify(x, integration, environmentRevision);
     expect(result).toMatchObject({ ok: true, verification: { state: "unavailable",
       adapterVersion: null, failureCode: "INTEGRATION_ADAPTER_UNAVAILABLE" } });
+  });
+
+  it("runs the real GitHub adapter through the coordinator with one injected synthetic transport", async () => {
+    const token = "P12_GITHUB_E2E_TOKEN_SENTINEL";
+    const requests: any[] = [];
+    const adapter = createGitHubIdentityAdapter({ requestImpl: (options, callback) => {
+      requests.push(options);
+      const request = new EventEmitter() as any;
+      request.setTimeout = (ms: number, onTimeout: () => void) => { request.timeoutMs = ms; request.onTimeout = onTimeout; };
+      request.destroy = () => {};
+      request.end = () => setImmediate(() => {
+        const response = new EventEmitter() as any;
+        response.statusCode = 200;
+        response.headers = { "content-length": "121" };
+        response.destroy = () => {};
+        response.resume = () => {};
+        callback(response);
+        response.emit("data", Buffer.from(JSON.stringify({ id: 12345, login: "synthetic-user",
+          name: "PRIVATE PROFILE FIELD", email: "private@example.test" })));
+        response.emit("end");
+      });
+      return request;
+    } });
+    const x = await setup(adapter);
+    const { secretRef, environmentRevision } = await makeLocalCredential(x, token);
+    const integration = await makeIntegration(x, secretRef);
+    const result = await verify(x, integration, environmentRevision);
+    expect(result).toMatchObject({ ok: true, revision: integration.revision + 1,
+      verification: { state: "ready", adapterVersion: "github.identity.v1",
+        providerAccountRef: "github:user:12345", capabilities: ["github.identity.read"], failureCode: null } });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ hostname: "api.github.com", port: 443, path: "/user", method: "GET" });
+    const persisted = JSON.stringify({ result, record: readBuildRecord(x.runtimeRoot, x.buildId),
+      events: readBuildEvents(x.runtimeRoot, x.buildId),
+      list: await x.dispatch("build.integrations.list", { buildId: x.buildId }),
+      read: await x.dispatch("build.integrations.read", { buildId: x.buildId, integrationId: integration.integrationId }) });
+    expect(persisted).not.toContain(token);
+    expect(persisted).not.toContain("synthetic-user");
+    expect(persisted).not.toContain("PRIVATE PROFILE FIELD");
+    expect(persisted).not.toContain("private@example.test");
   });
 
   it.each([
