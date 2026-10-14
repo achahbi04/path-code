@@ -3,6 +3,41 @@
  */
 
 import { structuredResultContractBlock } from "./cognitive-result.mjs";
+import { listBuildIntegrationCatalog } from "./integrations.mjs";
+import { DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS } from "./integration-adapters.mjs";
+
+function configuredIntegrationContext(record) {
+  const integrations = record?.integrations?.items;
+  if (!Array.isArray(integrations) || integrations.length === 0) return "";
+  const providers = new Map(listBuildIntegrationCatalog().map((item) => [item.providerKey, item.displayName]));
+  const environments = record?.environments?.items || [];
+  const lines = [];
+  for (const integration of integrations) {
+    for (const binding of integration.bindings || []) {
+      const environment = environments.find((item) => item.environmentId === binding.environmentId);
+      lines.push(`Integration: ${providers.get(integration.providerKey) || integration.providerKey}`);
+      lines.push(`Environment: ${environment?.name || "unresolved"}`);
+      for (const credential of binding.credentials || []) {
+        const secret = environment?.variables?.find((item) => item.kind === "secret" && item.secretRef === credential.secretRef);
+        lines.push(secret
+          ? `Credential role ${credential.role}: ${secret.variableName}`
+          : `Credential role ${credential.role}: unresolved`);
+      }
+      lines.push(`Verification: ${binding.verification?.state || "unverified"}`);
+      if (binding.verification?.state === "ready" && Array.isArray(binding.verification.capabilities) &&
+          binding.verification.capabilities.length) {
+        lines.push("Capabilities:");
+        lines.push(...binding.verification.capabilities.map((capability) => `- ${capability}`));
+      }
+      const currentVersion = DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS[integration.providerKey]?.adapterVersion;
+      if (binding.verification?.state === "ready" && binding.verification.adapterVersion &&
+          binding.verification.adapterVersion !== (currentVersion || null)) lines.push("Reverification: required");
+      lines.push("");
+    }
+  }
+  if (!lines.length) return "";
+  return ["CONFIGURED PRODUCT INTEGRATIONS", ...lines].join("\n").trimEnd();
+}
 
 /**
  * @param {import('./types.mjs').BuildRecord} record
@@ -117,6 +152,7 @@ export function frameEngineerObjective(record, gap) {
         "Do NOT run `git init`. Do NOT create a nested .git. Commit on the existing repo / task branch only.",
       ].join("\n")
     : "Commit on the existing task branch. Do not run git init or create a nested .git.";
+  const integrationsBlock = configuredIntegrationContext(record);
 
   if (followUp) {
     const controlling = request || step;
@@ -139,6 +175,7 @@ export function frameEngineerObjective(record, gap) {
       "Use existing project-native validation where it already applies.",
       "Do not create unrelated architecture, manifest, or test scaffolding merely because a greenfield build would.",
       workspaceContract,
+      integrationsBlock,
       selectionBlock,
       "",
       "Before you finish, inspect the diff this turn produced against the current creator request and the explicit constraints.",
@@ -165,6 +202,7 @@ export function frameEngineerObjective(record, gap) {
       : "- (none stated beyond the request itself)",
     "",
     workspaceContract,
+    integrationsBlock,
     selectionBlock,
     "",
     intentBlock(record),

@@ -80,7 +80,31 @@ const els = {
   confirmVersionRestoreDialog: document.getElementById("confirmVersionRestoreDialog"),
   confirmVersionRestoreCopy: document.getElementById("confirmVersionRestoreCopy"),
   openEnvironmentsBtn: document.getElementById("openEnvironmentsBtn"),
+  openIntegrationsBtn: document.getElementById("openIntegrationsBtn"),
   environmentsDialog: document.getElementById("environmentsDialog"),
+  integrationsDialog: document.getElementById("integrationsDialog"),
+  integrationsStatus: document.getElementById("integrationsStatus"),
+  createIntegrationForm: document.getElementById("createIntegrationForm"),
+  integrationProvider: document.getElementById("integrationProvider"),
+  newIntegrationLabel: document.getElementById("newIntegrationLabel"),
+  integrationsList: document.getElementById("integrationsList"),
+  integrationDetails: document.getElementById("integrationDetails"),
+  integrationProviderName: document.getElementById("integrationProviderName"),
+  integrationName: document.getElementById("integrationName"),
+  renameIntegrationBtn: document.getElementById("renameIntegrationBtn"),
+  deleteIntegrationBtn: document.getElementById("deleteIntegrationBtn"),
+  renameIntegrationForm: document.getElementById("renameIntegrationForm"),
+  renameIntegrationLabel: document.getElementById("renameIntegrationLabel"),
+  cancelRenameIntegrationBtn: document.getElementById("cancelRenameIntegrationBtn"),
+  integrationBindings: document.getElementById("integrationBindings"),
+  integrationEnvironmentSelect: document.getElementById("integrationEnvironmentSelect"),
+  bindIntegrationEnvironmentBtn: document.getElementById("bindIntegrationEnvironmentBtn"),
+  integrationCredentialSection: document.getElementById("integrationCredentialSection"),
+  integrationCredentialRole: document.getElementById("integrationCredentialRole"),
+  integrationCredentialSelect: document.getElementById("integrationCredentialSelect"),
+  bindIntegrationCredentialBtn: document.getElementById("bindIntegrationCredentialBtn"),
+  manageIntegrationEnvironmentsBtn: document.getElementById("manageIntegrationEnvironmentsBtn"),
+  closeIntegrationsBtn: document.getElementById("closeIntegrationsBtn"),
   environmentsStatus: document.getElementById("environmentsStatus"),
   environmentsList: document.getElementById("environmentsList"),
   environmentDetails: document.getElementById("environmentDetails"),
@@ -166,6 +190,12 @@ let environmentState = null;
 let selectedEnvironmentId = null;
 let runtimeEnvironmentId = null;
 let locatorVariableName = null;
+let integrationsBuildId = null;
+let integrationState = null;
+let integrationCatalog = [];
+let integrationEnvironmentState = null;
+let selectedIntegrationId = null;
+let selectedIntegrationBindingId = null;
 /** @type {HTMLIFrameElement | null} */
 let visibleFrame = els.previewFrame;
 /** @type {HTMLIFrameElement | null} */
@@ -617,6 +647,312 @@ els.environmentsDialog?.addEventListener("close", () => {
   environmentState = null;
   locatorVariableName = null;
 });
+
+const integrationMessages = {
+  CREDENTIAL_REQUIRED: "Choose a secret binding for the required credential role.",
+  CREDENTIAL_NOT_READY: "This credential needs local verification in Environments before PATH can use it.",
+  CREDENTIAL_MISSING: "The local credential is missing. Check the project's ignored .env.local file.",
+  CREDENTIAL_SOURCE_UNSAFE: "The local credential source is not safe to read. Review it in Environments.",
+  CREDENTIAL_SOURCE_UNAVAILABLE: "PATH could not safely check the local credential source.",
+  CREDENTIAL_MATERIAL_UNAVAILABLE: "PATH cannot verify this Vercel-managed credential locally.",
+  INTEGRATION_ADAPTER_UNAVAILABLE: "PATH does not currently have a verification adapter for this provider.",
+  PROVIDER_CREDENTIAL_REJECTED: "The provider rejected this credential. Check its value with the provider.",
+  PROVIDER_UNAVAILABLE: "The provider could not be reached. You can try verification again later.",
+  PROVIDER_RESPONSE_UNSAFE: "The provider response could not be verified safely.",
+  INTEGRATION_AUTHORITY_STALE: "This integration changed during verification. Review the latest state.",
+  INTEGRATION_ENVIRONMENT_STALE: "The environment or credential binding changed. Review the latest state.",
+  INTEGRATION_CREDENTIAL_CHANGED: "The local credential changed during verification. Review it before trying again.",
+  INTEGRATION_REVISION_STALE: "Integrations changed. The latest state has been loaded.",
+  INTEGRATION_SECRET_REF_NOT_FOUND: "That secret variable is no longer available in this environment.",
+  RESTORE_PENDING: "A version restore is pending. Try again after it is resolved.",
+  INTEGRATION_NOT_EMPTY: "Remove its environment bindings before deleting this integration.",
+  INTEGRATION_BINDING_NOT_EMPTY: "Remove the credential role before removing this environment.",
+};
+function integrationStatus(message, error = false) {
+  els.integrationsStatus.textContent = message || "";
+  els.integrationsStatus.dataset.error = String(error);
+}
+function integrationError(code) {
+  return integrationMessages[code] || "The integration change could not be completed. Review the latest state and try again.";
+}
+function selectedIntegration() {
+  return integrationState?.items?.find((item) => item.integrationId === selectedIntegrationId) || null;
+}
+function selectedIntegrationBinding() {
+  return selectedIntegration()?.bindings?.find((item) => item.bindingId === selectedIntegrationBindingId) || null;
+}
+function integrationVerificationLabel(binding) {
+  if (binding.needsReverification) return "Reverification required";
+  return ({ unverified: "Not verified", ready: "Connected", action_required: "Action required", unavailable: "Unavailable" })[binding.verification?.state] || "Not verified";
+}
+function integrationVerificationMessage(verification) {
+  if (verification?.failureCode) return integrationError(verification.failureCode);
+  return "";
+}
+function integrationReadiness(credential) {
+  if (!credential.resolved) return "Binding no longer resolves";
+  if (credential.backend === "vercel_env") return "Configured externally";
+  if (credential.bindingState !== "configured") return "Needs local setup";
+  if (credential.presenceState === "verified_missing") return "Missing";
+  if (credential.presenceState !== "verified_present") return "Needs local verification";
+  if (credential.safetyState === "verified_unsafe") return "Unsafe source";
+  if (credential.safetyState !== "verified_safe") return "Needs local verification";
+  return "Present / Safe";
+}
+function renderIntegrationCredentialOptions() {
+  const integration = selectedIntegration();
+  const binding = selectedIntegrationBinding();
+  const environment = integrationEnvironmentState?.items?.find((item) => item.environmentId === binding?.environmentId);
+  if (!integration || !binding || !environment) {
+    els.integrationCredentialSelect.replaceChildren(new Option("Choose an environment first", ""));
+    els.bindIntegrationCredentialBtn.disabled = true;
+    return;
+  }
+  const variables = environment.variables.filter((item) => item.kind === "secret");
+  const options = [new Option(variables.length ? "Choose a secret variable" : "No secret bindings in this environment", "")];
+  for (const item of variables) {
+    const ready = item.backend === "vercel_env" ? "Configured externally" :
+      item.presenceState === "verified_present" && item.safetyState === "verified_safe" ? "Present / Safe" :
+        item.presenceState === "verified_missing" ? "Missing" : "Needs local verification";
+    options.push(new Option(`${item.variableName} · ${item.backend} · ${ready}`, item.variableName));
+  }
+  els.integrationCredentialSelect.replaceChildren(...options);
+  const provider = integrationCatalog.find((item) => item.providerKey === integration.providerKey);
+  const roles = provider?.credentialRoles || [];
+  const hasUnboundRequiredRole = roles.some((role) => role.required && !binding.credentials.some((item) => item.role === role.role));
+  els.bindIntegrationCredentialBtn.disabled = !variables.length || !hasUnboundRequiredRole;
+  const role = roles.find((item) => item.required && !binding.credentials.some((entry) => entry.role === item.role)) || roles[0];
+  els.integrationCredentialRole.textContent = role?.role || "credential";
+}
+function renderIntegrations() {
+  if (!integrationState) return;
+  els.integrationsList.innerHTML = integrationState.items.length ? integrationState.items.map((item) => `
+    <button type="button" class="integration-item" data-integration-id="${escapeHtml(item.integrationId)}" aria-current="${item.integrationId === selectedIntegrationId}">
+      <strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.providerDisplayName)}</small>
+    </button>`).join("") : '<p class="hint">No integrations yet. Add one to connect a provider.</p>';
+  const integration = selectedIntegration();
+  els.integrationDetails.hidden = !integration;
+  if (!integration) {
+    els.integrationBindings.replaceChildren();
+    els.integrationCredentialSection.hidden = true;
+    return;
+  }
+  els.integrationProviderName.textContent = integration.providerDisplayName;
+  els.integrationName.textContent = integration.label;
+  els.deleteIntegrationBtn.disabled = integration.bindings.length > 0;
+  const boundEnvironmentIds = new Set(integration.bindings.map((item) => item.environmentId));
+  const environments = integrationEnvironmentState?.items || [];
+  const envOptions = [new Option(environments.length ? "Choose an environment" : "Create an environment first", "")];
+  for (const environment of environments.filter((item) => !boundEnvironmentIds.has(item.environmentId))) {
+    envOptions.push(new Option(environment.name, environment.environmentId));
+  }
+  els.integrationEnvironmentSelect.replaceChildren(...envOptions);
+  els.bindIntegrationEnvironmentBtn.disabled = envOptions.length < 2;
+  els.integrationBindings.innerHTML = integration.bindings.length ? integration.bindings.map((binding) => {
+    const credentialHtml = binding.credentials.length ? binding.credentials.map((credential) => `
+      <div class="integration-credential"><span><strong>${escapeHtml(credential.role)}</strong> · ${escapeHtml(credential.variableName || "Unresolved secret")}
+        <small>${escapeHtml(credential.variableName ? integrationReadiness(credential) : "Binding no longer resolves")}</small></span>
+        <button type="button" class="ghost tiny" data-unbind-role="${escapeHtml(credential.role)}" data-binding-id="${escapeHtml(binding.bindingId)}">Unbind</button></div>`).join("")
+      : '<p class="hint">No credential role is bound to this environment.</p>';
+    const verification = binding.verification || {};
+    const capabilityHtml = verification.capabilities?.length
+      ? `<p class="integration-capabilities">Capabilities: ${verification.capabilities.map(escapeHtml).join(", ")}</p>` : "";
+    const verifiedAt = verification.verifiedAt ? `<p class="hint">Last verified ${escapeHtml(new Date(verification.verifiedAt).toLocaleString())}</p>` : "";
+    const failure = integrationVerificationMessage(verification);
+    const verifyLabel = binding.verification?.state === "ready" || binding.needsReverification ? "Reverify" : "Verify";
+    return `<article class="integration-binding" data-binding-id="${escapeHtml(binding.bindingId)}" data-select-binding="${escapeHtml(binding.bindingId)}" aria-current="${binding.bindingId === selectedIntegrationBindingId}">
+      <div class="integration-binding-heading"><div><strong>${escapeHtml(binding.environmentName || "Environment unavailable")}</strong>
+        <small>${escapeHtml(integrationVerificationLabel(binding))}</small></div>
+        <div class="integration-actions"><button type="button" class="ghost tiny" data-verify-binding="${escapeHtml(binding.bindingId)}">${verifyLabel}</button>
+          <button type="button" class="ghost tiny" data-unbind-environment="${escapeHtml(binding.bindingId)}" ${binding.credentials.length ? "disabled" : ""}>Remove environment</button></div></div>
+      ${credentialHtml}${verifiedAt}${capabilityHtml}${failure ? `<p class="integration-failure">${escapeHtml(failure)}</p>` : ""}
+    </article>`;
+  }).join("") : '<p class="hint">No environments are connected yet.</p>';
+  const binding = selectedIntegrationBinding();
+  els.integrationCredentialSection.hidden = !binding;
+  if (binding) renderIntegrationCredentialOptions();
+}
+async function refreshIntegrations(buildId) {
+  try {
+    const [response, catalogResponse] = await Promise.all([
+      fetch(`/api/builds/${encodeURIComponent(buildId)}/integrations`),
+      fetch(`/api/builds/${encodeURIComponent(buildId)}/integrations/catalog`),
+    ]);
+    const [body, catalogBody] = await Promise.all([
+      response.json(), catalogResponse.json(),
+    ]);
+    if (activeBuildId !== buildId || integrationsBuildId !== buildId) return null;
+    if (!response.ok || !body?.ok) {
+      integrationStatus(integrationError(body?.code || "INTEGRATIONS_UNAVAILABLE"), true);
+      return null;
+    }
+    integrationState = { revision: body.revision, items: body.items || [] };
+    integrationCatalog = catalogBody?.ok ? catalogBody.items || [] : [];
+    integrationEnvironmentState = { revision: body.environmentRevision ?? null, items: body.environments || [] };
+    if (!integrationState.items.some((item) => item.integrationId === selectedIntegrationId)) {
+      selectedIntegrationId = integrationState.items[0]?.integrationId || null;
+    }
+    if (!selectedIntegration()?.bindings.some((item) => item.bindingId === selectedIntegrationBindingId)) {
+      selectedIntegrationBindingId = selectedIntegration()?.bindings[0]?.bindingId || null;
+    }
+    renderIntegrations();
+    return integrationState;
+  } catch {
+    if (activeBuildId === buildId && integrationsBuildId === buildId) integrationStatus("Could not load integrations.", true);
+    return null;
+  }
+}
+async function mutateIntegration(action, input) {
+  if (!activeBuildId || !integrationState) return false;
+  const buildId = activeBuildId;
+  try {
+    const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/integrations/mutate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, expectedIntegrationRevision: integrationState.revision, input }),
+    });
+    const body = await response.json();
+    if (activeBuildId !== buildId) return false;
+    if (!response.ok || !body?.ok) {
+      if (body?.code === "INTEGRATION_REVISION_STALE") await refreshIntegrations(buildId);
+      integrationStatus(integrationError(body?.code), true);
+      return false;
+    }
+    if (action === "create_integration") selectedIntegrationId = body.integrationId;
+    if (action === "bind_environment") selectedIntegrationBindingId = body.bindingId;
+    if (["delete_integration"].includes(action)) selectedIntegrationId = null;
+    if (action === "unbind_environment") selectedIntegrationBindingId = null;
+    const refreshed = await refreshIntegrations(buildId);
+    integrationStatus(refreshed ? "Integration settings saved." : "Saved, but the latest state could not be loaded.", !refreshed);
+    return Boolean(refreshed);
+  } catch {
+    integrationStatus("Could not save integration settings.", true);
+    return false;
+  }
+}
+async function verifyIntegrationBinding(bindingId) {
+  const binding = selectedIntegration()?.bindings.find((item) => item.bindingId === bindingId);
+  if (!activeBuildId || !integrationState || !binding || !Number.isSafeInteger(binding.environmentRevision)) return;
+  const buildId = activeBuildId;
+  integrationStatus("Verifying with the provider…");
+  try {
+    const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/integrations/verify`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ integrationId: selectedIntegrationId, bindingId,
+        expectedIntegrationRevision: integrationState.revision,
+        expectedEnvironmentRevision: binding.environmentRevision }),
+    });
+    const body = await response.json();
+    if (activeBuildId !== buildId) return;
+    if (!response.ok || !body?.ok) {
+      if (["INTEGRATION_REVISION_STALE", "INTEGRATION_AUTHORITY_STALE", "INTEGRATION_ENVIRONMENT_STALE"].includes(body?.code)) {
+        await refreshIntegrations(buildId);
+      }
+      integrationStatus(integrationError(body?.code), true);
+      return;
+    }
+    await refreshIntegrations(buildId);
+    integrationStatus(body.verification.state === "ready"
+      ? "Connected. PATH verified the provider identity."
+      : integrationError(body.verification.failureCode) || integrationVerificationLabel({ verification: body.verification }),
+      body.verification.state !== "ready");
+  } catch {
+    integrationStatus("Could not complete verification.", true);
+  }
+}
+function clearIntegrationsUi() {
+  if (els.integrationsDialog.open) els.integrationsDialog.close();
+  integrationsBuildId = null;
+  integrationState = null;
+  integrationCatalog = [];
+  integrationEnvironmentState = null;
+  selectedIntegrationId = null;
+  selectedIntegrationBindingId = null;
+  els.integrationsList.replaceChildren();
+  els.integrationBindings.replaceChildren();
+  integrationStatus("");
+}
+els.openIntegrationsBtn?.addEventListener("click", () => {
+  if (!activeBuildId || activeBuildId === "pending") return;
+  integrationsBuildId = activeBuildId;
+  els.integrationsDialog.showModal();
+  integrationStatus("Loading integrations…");
+  void refreshIntegrations(activeBuildId);
+});
+els.closeIntegrationsBtn?.addEventListener("click", () => els.integrationsDialog.close());
+els.integrationsDialog?.addEventListener("close", () => { integrationsBuildId = null; });
+els.createIntegrationForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const label = els.newIntegrationLabel.value.trim();
+  if (await mutateIntegration("create_integration", { providerKey: els.integrationProvider.value, label })) els.newIntegrationLabel.value = "";
+});
+els.integrationsList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-integration-id]");
+  if (!button) return;
+  selectedIntegrationId = button.dataset.integrationId;
+  selectedIntegrationBindingId = selectedIntegration()?.bindings[0]?.bindingId || null;
+  integrationStatus("");
+  renderIntegrations();
+});
+els.renameIntegrationBtn?.addEventListener("click", () => {
+  els.renameIntegrationLabel.value = selectedIntegration()?.label || "";
+  els.renameIntegrationForm.hidden = false;
+  els.renameIntegrationLabel.focus();
+});
+els.cancelRenameIntegrationBtn?.addEventListener("click", () => { els.renameIntegrationForm.hidden = true; });
+els.renameIntegrationForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const integration = selectedIntegration();
+  if (integration && await mutateIntegration("rename_integration", { integrationId: integration.integrationId, label: els.renameIntegrationLabel.value.trim() })) {
+    els.renameIntegrationForm.hidden = true;
+  }
+});
+els.deleteIntegrationBtn?.addEventListener("click", async () => {
+  const integration = selectedIntegration();
+  if (!integration || integration.bindings.length || !window.confirm(`Delete “${integration.label}”? This removes only the PATH integration record.`)) return;
+  await mutateIntegration("delete_integration", { integrationId: integration.integrationId });
+});
+els.bindIntegrationEnvironmentBtn?.addEventListener("click", () => {
+  const integration = selectedIntegration();
+  const environmentId = els.integrationEnvironmentSelect.value;
+  if (integration && environmentId) void mutateIntegration("bind_environment", { integrationId: integration.integrationId, environmentId });
+});
+els.integrationBindings?.addEventListener("click", (event) => {
+  const verify = event.target.closest("[data-verify-binding]");
+  if (verify) { void verifyIntegrationBinding(verify.dataset.verifyBinding); return; }
+  const unbindRole = event.target.closest("[data-unbind-role]");
+  if (unbindRole) {
+    void mutateIntegration("unbind_credential", { integrationId: selectedIntegrationId,
+      bindingId: unbindRole.dataset.bindingId, role: unbindRole.dataset.unbindRole });
+    return;
+  }
+  const unbindEnvironment = event.target.closest("[data-unbind-environment]");
+  if (unbindEnvironment) {
+    void mutateIntegration("unbind_environment", {
+      integrationId: selectedIntegrationId, bindingId: unbindEnvironment.dataset.unbindEnvironment,
+    });
+    return;
+  }
+  const card = event.target.closest("[data-select-binding]");
+  if (card) {
+    selectedIntegrationBindingId = card.dataset.selectBinding;
+    renderIntegrations();
+  }
+});
+els.bindIntegrationCredentialBtn?.addEventListener("click", () => {
+  const binding = selectedIntegrationBinding();
+  const integration = selectedIntegration();
+  const provider = integrationCatalog.find((item) => item.providerKey === integration?.providerKey);
+  const role = provider?.credentialRoles?.find((item) => item.required)?.role || provider?.credentialRoles?.[0]?.role;
+  const variableName = els.integrationCredentialSelect.value;
+  if (binding && integration && role && variableName) void mutateIntegration("bind_credential", {
+    integrationId: integration.integrationId, bindingId: binding.bindingId, role, variableName,
+  });
+});
+els.manageIntegrationEnvironmentsBtn?.addEventListener("click", () => {
+  els.integrationsDialog.close();
+  els.openEnvironmentsBtn?.click();
+});
+
 els.environmentsList?.addEventListener("click", (event) => {
   const item = event.target.closest("[data-environment-id]");
   if (!item) return;
@@ -1715,6 +2051,7 @@ function showComposer(pushHistory) {
   clearReferenceUi();
   clearVersionsUi();
   clearEnvironmentsUi();
+  clearIntegrationsUi();
   landingModelTouched = false;
   renderModelSelect(els.landingModel, null, els.landingPreferredEngine, landingModelControl, true);
   if (visibleFrame) {
@@ -2037,6 +2374,7 @@ async function openProject(buildId, mode, title) {
   clearReferenceUi();
   clearVersionsUi();
   clearEnvironmentsUi();
+  clearIntegrationsUi();
   worklogFollow = true;
   chatStick = true;
   heldPreview = null;

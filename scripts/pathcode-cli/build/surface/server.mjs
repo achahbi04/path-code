@@ -25,6 +25,7 @@ import {
   readPendingConversations,
   appendBuildEvent,
 } from "../index.mjs";
+import { DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS } from "../integration-adapters.mjs";
 import { projectBuildForSurface } from "./product-view.mjs";
 import { projectBuilderModelControl, writeBuilderModelPreference } from "./model-control.mjs";
 import { displayTitleFor, isCreatorProject, libraryRow } from "./project-library.mjs";
@@ -190,6 +191,52 @@ function environmentStatus(result) {
   if (["BUILD_NOT_FOUND", "BUILD_NOT_BOUND", "ENVIRONMENT_NOT_FOUND", "SECRET_BINDING_NOT_FOUND"].includes(result.code)) return 404;
   if (["ENVIRONMENT_REVISION_STALE", "STALE_ENVIRONMENT_AUTHORITY", "RESTORE_PENDING", "ENVIRONMENT_NOT_EMPTY", "VARIABLE_KIND_CONFLICT"].includes(result.code)) return 409;
   return 400;
+}
+
+function integrationStatus(result) {
+  if (result.ok) return 200;
+  if (["BUILD_NOT_FOUND", "INTEGRATION_NOT_FOUND", "INTEGRATION_BINDING_NOT_FOUND",
+    "INTEGRATION_ENVIRONMENT_NOT_FOUND"].includes(result.code)) return 404;
+  if (["INTEGRATION_REVISION_STALE", "INTEGRATION_AUTHORITY_STALE", "INTEGRATION_ENVIRONMENT_STALE",
+    "INTEGRATION_CREDENTIAL_CHANGED", "RESTORE_PENDING", "INTEGRATION_NOT_EMPTY",
+    "INTEGRATION_BINDING_NOT_EMPTY", "INTEGRATION_ENVIRONMENT_ALREADY_BOUND"].includes(result.code)) return 409;
+  return 400;
+}
+
+function projectIntegrationCatalog(items) {
+  return (Array.isArray(items) ? items : []).map((provider) => ({
+    providerKey: provider.providerKey,
+    displayName: provider.displayName,
+    credentialRoles: (provider.credentialRoles || []).map(({ role, required }) => ({ role, required })),
+  }));
+}
+
+function projectIntegrationVerification(verification) {
+  return {
+    state: verification.state,
+    adapterVersion: verification.adapterVersion,
+    capabilities: [...verification.capabilities],
+    verifiedAt: verification.verifiedAt,
+    failureCode: verification.failureCode,
+  };
+}
+
+function integrationRequestObject(value, keys) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) &&
+    (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null) &&
+    Object.keys(value).length === keys.length && Object.keys(value).every((key) => keys.includes(key));
+}
+
+function integrationInputKeys(action) {
+  return ({
+    create_integration: ["providerKey", "label"],
+    rename_integration: ["integrationId", "label"],
+    delete_integration: ["integrationId"],
+    bind_environment: ["integrationId", "environmentId"],
+    unbind_environment: ["integrationId", "bindingId"],
+    bind_credential: ["integrationId", "bindingId", "role", "variableName"],
+    unbind_credential: ["integrationId", "bindingId", "role"],
+  })[action] || null;
 }
 
 function versionStatus(result) {
@@ -744,6 +791,152 @@ export async function startPathBuildSurface(options) {
               releases: listed.releases, releaseOperations: listed.releaseOperations,
               currentProductionReleaseId: listed.currentProductionReleaseId, serving: listed.serving,
               revision: listed.revision } : listed);
+            return;
+          }
+        }
+
+        if (action === "integrations") {
+          if (method === "GET" && sub === "catalog") {
+            const catalog = await coordinator.listIntegrationCatalog();
+            sendJson(res, catalog?.ok === false ? 400 : 200, catalog?.ok === false
+              ? { ok: false, code: catalog.code }
+              : { ok: true, items: projectIntegrationCatalog(Array.isArray(catalog) ? catalog : catalog.providers || catalog.items) });
+            return;
+          }
+          if (method === "GET" && !sub) {
+            const listed = await coordinator.listIntegrations(buildId);
+            if (!listed?.ok) {
+              sendJson(res, integrationStatus(listed), { ok: false, code: listed.code });
+              return;
+            }
+            const environments = await coordinator.listEnvironments(buildId);
+            const environmentById = new Map((environments?.items || []).map((item) => [item.environmentId, item]));
+            const environmentOptions = (environments?.items || []).map((environment) => ({
+              environmentId: environment.environmentId,
+              name: environment.name,
+              variables: environment.variables.filter((entry) => entry.kind === "secret").map((entry) => ({
+                kind: "secret",
+                variableName: entry.variableName,
+                backend: entry.backend,
+                bindingState: entry.bindingState,
+                presenceState: entry.presenceState,
+                ...(entry.backend === "local_env_file" ? { safetyState: entry.safetyState } : {}),
+              })),
+            }));
+            const catalog = await coordinator.listIntegrationCatalog();
+            const providers = new Map(projectIntegrationCatalog(Array.isArray(catalog) ? catalog : catalog?.providers || catalog?.items)
+              .map((provider) => [provider.providerKey, provider]));
+            const items = await Promise.all(listed.items.map(async (integration) => ({
+              integrationId: integration.integrationId,
+              providerKey: integration.providerKey,
+              providerDisplayName: providers.get(integration.providerKey)?.displayName || integration.providerKey,
+              label: integration.label,
+              createdAt: integration.createdAt,
+              updatedAt: integration.updatedAt,
+              bindings: await Promise.all(integration.bindings.map(async (binding) => {
+                const environment = environmentById.get(binding.environmentId);
+                const credentials = await Promise.all(binding.credentials.map(async (credential) => {
+                  const read = await coordinator.readSecretBinding(buildId, binding.environmentId, credential.secretRef);
+                  if (!read?.ok || read.binding?.kind !== "secret") {
+                    return { role: credential.role, resolved: false, readiness: "unresolved" };
+                  }
+                  return {
+                    role: credential.role,
+                    variableName: read.binding.variableName,
+                    backend: read.binding.backend,
+                    bindingState: read.binding.bindingState,
+                    presenceState: read.binding.presenceState,
+                    ...(read.binding.backend === "local_env_file" ? { safetyState: read.binding.safetyState } : {}),
+                    resolved: true,
+                  };
+                }));
+                const verification = projectIntegrationVerification(binding.verification);
+                const currentAdapterVersion = DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS[integration.providerKey]?.adapterVersion ?? null;
+                return {
+                  bindingId: binding.bindingId,
+                  environmentId: binding.environmentId,
+                  environmentName: environment?.name || null,
+                  environmentRevision: environments?.revision ?? null,
+                  credentials,
+                  verification,
+                  needsReverification: verification.state === "ready" && verification.adapterVersion !== null &&
+                    verification.adapterVersion !== currentAdapterVersion,
+                  createdAt: binding.createdAt,
+                  updatedAt: binding.updatedAt,
+                };
+              })),
+            })));
+            sendJson(res, 200, { ok: true, revision: listed.revision,
+              environmentRevision: environments?.revision ?? 0, environments: environmentOptions, items });
+            return;
+          }
+          if (method === "POST" && sub === "mutate") {
+            if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) {
+              sendJson(res, 409, { ok: false, code: "RESTORE_PENDING" });
+              return;
+            }
+            let body;
+            try { body = await readJsonBody(req); } catch { body = null; }
+            const inputKeys = integrationInputKeys(body?.action);
+            if (!integrationRequestObject(body, ["action", "expectedIntegrationRevision", "input"]) ||
+                !Number.isSafeInteger(body.expectedIntegrationRevision) || body.expectedIntegrationRevision < 0 ||
+                !inputKeys || !integrationRequestObject(body.input, inputKeys)) {
+              sendJson(res, 400, { ok: false, code: "INTEGRATION_MUTATION_INVALID" });
+              return;
+            }
+            let input = { ...body.input };
+            if (body.action === "bind_credential") {
+              if (typeof input.integrationId !== "string" || typeof input.bindingId !== "string" ||
+                  typeof input.role !== "string" || typeof input.variableName !== "string") {
+                sendJson(res, 400, { ok: false, code: "INTEGRATION_MUTATION_INVALID" });
+                return;
+              }
+              const read = await coordinator.readIntegration(buildId, input.integrationId);
+              const binding = read?.ok && read.integration?.bindings.find((item) => item.bindingId === input.bindingId);
+              if (!binding) {
+                sendJson(res, integrationStatus(read), { ok: false, code: read?.ok ? "INTEGRATION_BINDING_NOT_FOUND" : read?.code });
+                return;
+              }
+              const environmentRead = await coordinator.readEnvironment(buildId, binding.environmentId);
+              const variable = environmentRead?.ok && environmentRead.environment?.environmentId === binding.environmentId
+                ? environmentRead.environment.variables.find((item) => item.kind === "secret" && item.variableName === input.variableName)
+                : null;
+              if (!variable || typeof variable.secretRef !== "string") {
+                sendJson(res, 404, { ok: false, code: "INTEGRATION_SECRET_REF_NOT_FOUND" });
+                return;
+              }
+              input = { integrationId: input.integrationId, bindingId: input.bindingId,
+                role: input.role, secretRef: variable.secretRef };
+            }
+            const result = await coordinator.mutateIntegration(buildId, {
+              action: body.action, expectedIntegrationRevision: body.expectedIntegrationRevision, input,
+            });
+            sendJson(res, integrationStatus(result), result.ok
+              ? { ok: true, revision: result.revision, integrationId: result.integrationId,
+                  ...(result.bindingId ? { bindingId: result.bindingId } : {}) }
+              : { ok: false, code: result.code });
+            return;
+          }
+          if (method === "POST" && sub === "verify") {
+            if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) {
+              sendJson(res, 409, { ok: false, code: "RESTORE_PENDING" });
+              return;
+            }
+            let body;
+            try { body = await readJsonBody(req); } catch { body = null; }
+            if (!integrationRequestObject(body, ["integrationId", "bindingId", "expectedIntegrationRevision", "expectedEnvironmentRevision"]) ||
+                typeof body.integrationId !== "string" || typeof body.bindingId !== "string" ||
+                !Number.isSafeInteger(body.expectedIntegrationRevision) || body.expectedIntegrationRevision < 0 ||
+                !Number.isSafeInteger(body.expectedEnvironmentRevision) || body.expectedEnvironmentRevision < 0) {
+              sendJson(res, 400, { ok: false, code: "INTEGRATION_VERIFICATION_INVALID" });
+              return;
+            }
+            const result = await coordinator.verifyIntegration(buildId, body.integrationId, body.bindingId,
+              body.expectedIntegrationRevision, body.expectedEnvironmentRevision);
+            sendJson(res, integrationStatus(result), result.ok
+              ? { ok: true, revision: result.revision, integrationId: result.integrationId,
+                  bindingId: result.bindingId, verification: projectIntegrationVerification(result.verification) }
+              : { ok: false, code: result.code });
             return;
           }
         }

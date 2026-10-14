@@ -74,6 +74,16 @@
                 <button type="button" class="ghost rail-action" id="openEnvironmentsBtn">Manage environments…</button>
               </div>
             </section>
+            <section class="rail-row" data-rail="integrations">
+              <button type="button" class="rail-row-head" id="integrationsRowHead" aria-expanded="false" aria-controls="integrationsRowBody">
+                <span class="rail-chevron" aria-hidden="true"></span>
+                <span class="rail-row-label">Integrations</span>
+                <span class="rail-row-value" aria-hidden="true"></span>
+              </button>
+              <div class="rail-row-body" id="integrationsRowBody" hidden>
+                <button type="button" class="ghost rail-action" id="openIntegrationsBtn">Manage integrations…</button>
+              </div>
+            </section>
             <section class="rail-row" data-rail="details">
               <button type="button" class="rail-row-head" id="detailsRowHead" aria-expanded="false" aria-controls="detailsRowBody">
                 <span class="rail-chevron" aria-hidden="true"></span>
@@ -369,6 +379,50 @@
         </div>
       </section>
       <div class="dialog-actions"><button type="button" class="ghost" id="closeEnvironmentsBtn">Close</button></div>
+    </dialog>
+
+    <dialog class="choice-dialog integrations-dialog" id="integrationsDialog" aria-labelledby="integrationsTitle">
+      <h2 id="integrationsTitle">Integrations</h2>
+      <p class="hint">Connect a provider using an existing environment and credential binding. PATH stores references; it does not store secret values.</p>
+      <p id="integrationsStatus" class="integrations-status" role="status"></p>
+      <form id="createIntegrationForm" class="integration-form">
+        <label>Provider <select id="integrationProvider"><option value="github">GitHub</option></select></label>
+        <label>Name <input id="newIntegrationLabel" name="label" autocomplete="off" maxlength="80" required /></label>
+        <button type="submit" class="ghost">Add integration</button>
+      </form>
+      <div class="integration-layout">
+        <nav id="integrationsList" class="integrations-list" aria-label="Configured integrations"></nav>
+        <section id="integrationDetails" class="integration-details" hidden>
+          <div class="integration-heading">
+            <div><p class="hint" id="integrationProviderName"></p><h3 id="integrationName"></h3></div>
+            <div class="integration-actions">
+              <button type="button" class="ghost tiny" id="renameIntegrationBtn">Rename</button>
+              <button type="button" class="ghost tiny" id="deleteIntegrationBtn">Delete</button>
+            </div>
+          </div>
+          <form id="renameIntegrationForm" class="integration-form" hidden>
+            <label>New name <input id="renameIntegrationLabel" maxlength="80" required /></label>
+            <button type="submit" class="ghost">Save name</button>
+            <button type="button" class="ghost tiny" id="cancelRenameIntegrationBtn">Cancel</button>
+          </form>
+          <section class="integration-bind-section">
+            <h4>Environments</h4>
+            <div id="integrationBindings"></div>
+            <div class="integration-form integration-bind-controls">
+              <label>Environment <select id="integrationEnvironmentSelect"></select></label>
+              <button type="button" class="ghost" id="bindIntegrationEnvironmentBtn">Add environment</button>
+            </div>
+          </section>
+          <section class="integration-bind-section" id="integrationCredentialSection" hidden>
+            <h4>Credential for <span id="integrationCredentialRole"></span></h4>
+            <label>Secret variable <select id="integrationCredentialSelect"></select></label>
+            <button type="button" class="ghost" id="bindIntegrationCredentialBtn">Use this credential</button>
+            <p class="hint">Only secret bindings in the selected environment are available. Manage values in Environments or the credential’s provider.</p>
+            <button type="button" class="ghost tiny" id="manageIntegrationEnvironmentsBtn">Manage in Environments</button>
+          </section>
+        </section>
+      </div>
+      <div class="dialog-actions"><button type="button" class="ghost" id="closeIntegrationsBtn">Close</button></div>
     </dialog>
 
     <dialog class="choice-dialog" id="confirmVersionRestoreDialog" aria-labelledby="confirmVersionRestoreTitle">
