@@ -28,6 +28,7 @@ import { listBuildIntegrationCatalog, listBuildIntegrations, readBuildIntegratio
 import { createIntegrationVerificationSnapshot, executeIntegrationVerification,
   validIntegrationVerificationRequest } from "../integration-verification.mjs";
 import { DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS } from "../integration-adapters.mjs";
+import { listBuildDatabaseCatalog, listBuildDatabases, readBuildDatabase, prepareBuildDatabaseMutation } from "../databases.mjs";
 import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
 import { listBuildDeployments, preflightDeployment, prepareDeploymentMappingMutation,
   prepareDeploymentOperation, prepareProductionDeploymentOperation, transitionDeploymentOperation,
@@ -1092,6 +1093,7 @@ export async function createBuildCoordinatorService(options) {
     const buildId = String(params.buildId || "");
     if (scopedControlPlane && method !== BuildCoordinatorMethods.HELLO &&
         method !== BuildCoordinatorMethods.BUILD_INTEGRATIONS_CATALOG &&
+        method !== BuildCoordinatorMethods.BUILD_DATABASES_CATALOG &&
         (buildId !== scopedBuildId || !new Set([
           BuildCoordinatorMethods.BUILD_ENVIRONMENTS_LIST,
           BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ,
@@ -1100,6 +1102,9 @@ export async function createBuildCoordinatorService(options) {
           BuildCoordinatorMethods.BUILD_INTEGRATION_READ,
           BuildCoordinatorMethods.BUILD_INTEGRATION_MUTATE,
           BuildCoordinatorMethods.BUILD_INTEGRATION_VERIFY,
+          BuildCoordinatorMethods.BUILD_DATABASES_LIST,
+          BuildCoordinatorMethods.BUILD_DATABASE_READ,
+          BuildCoordinatorMethods.BUILD_DATABASE_MUTATE,
           BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_MAPPING_MUTATE,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE,
@@ -1209,6 +1214,30 @@ export async function createBuildCoordinatorService(options) {
             revision: result.revision, verification: result.verification };
         });
       }
+      case BuildCoordinatorMethods.BUILD_DATABASES_CATALOG:
+        if (Object.keys(params).length) return { ok: false, code: "DATABASE_REQUEST_INVALID" };
+        return { ok: true, providers: listBuildDatabaseCatalog() };
+      case BuildCoordinatorMethods.BUILD_DATABASES_LIST:
+        if (Object.keys(params).some((key) => key !== "buildId")) return { ok: false, code: "DATABASE_REQUEST_INVALID" };
+        return listBuildDatabases(runtimeRoot, buildId);
+      case BuildCoordinatorMethods.BUILD_DATABASE_READ:
+        if (Object.keys(params).some((key) => !["buildId", "databaseId"].includes(key)) ||
+            typeof params.databaseId !== "string") return { ok: false, code: "DATABASE_REQUEST_INVALID" };
+        return readBuildDatabase(runtimeRoot, buildId, params.databaseId);
+      case BuildCoordinatorMethods.BUILD_DATABASE_MUTATE:
+        return exclusive(buildId, () => {
+          const { buildId: _buildId, ...request } = params;
+          const result = prepareBuildDatabaseMutation(runtimeRoot, buildId, request);
+          if (!result.ok) return result;
+          writeBuildRecord(runtimeRoot, result.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "database.mutated", {
+            action: request.action, databaseId: result.databaseId,
+            provider: result.provider, revision: result.revision,
+          }); } catch { /* Build record is authority. */ }
+          return { ok: true, databaseId: result.databaseId, revision: result.revision,
+            ...(result.providerResourceChanged !== undefined ? { providerResourceChanged: result.providerResourceChanged } : {}),
+            ...(result.credentialMaterialChanged !== undefined ? { credentialMaterialChanged: result.credentialMaterialChanged } : {}) };
+        });
       case BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST:
         return listBuildDeployments(runtimeRoot, buildId);
       case BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREFLIGHT:

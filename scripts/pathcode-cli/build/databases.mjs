@@ -1,0 +1,269 @@
+/** P13.1 local database identity and credential-reference authority. */
+import { randomUUID } from "node:crypto";
+import { readBuildEnvironment, readBuildSecretBinding } from "./environments.mjs";
+import { readBuildRecord } from "./record.mjs";
+
+export const DATABASES_SCHEMA = "pathcode.p13.databases.v1";
+const PROVIDER = "supabase";
+const ENGINE = "postgres";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
+const SAFE_TARGET = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
+const FAILURE = /^[A-Z][A-Z0-9_]{0,63}$/;
+const SECRET_LIKE = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\bBearer\s+\S+|\b(?:ghp|github_pat)_[A-Za-z0-9_]{10,}|\bsk_(?:live|test)_[A-Za-z0-9]{8,}|^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+:[^/@\s]+@/i;
+const fail = (code) => ({ ok: false, code });
+const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value) &&
+  (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+const exact = (value, keys) => plain(value) && Object.keys(value).length === keys.length && keys.every((key) => own(value, key));
+const iso = (value) => typeof value === "string" && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+const safeText = (value, max = 120) => typeof value === "string" && value.trim() === value && value.length > 0 &&
+  value.length <= max && !/[\u0000-\u001f\u007f-\u009f]/.test(value);
+const safeCode = (value) => typeof value === "string" && FAILURE.test(value);
+const safeId = (value) => typeof value === "string" && SAFE_ID.test(value);
+const nullable = (value, validator) => value === null || validator(value);
+const nonnegative = (value) => Number.isSafeInteger(value) && value >= 0;
+const EMPTY_PROVIDER_OBSERVATION = () => ({ state: "unverified", projectStatus: null, observedAt: null, failureCode: null });
+const EMPTY_CONNECTION_OBSERVATION = () => ({ state: "unverified", adapterVersion: null, serverVersion: null, observedAt: null, failureCode: null });
+const EMPTY_MIGRATION_OBSERVATION = () => ({ state: "unknown", sourceSha: null, localDigest: null, localCount: 0,
+  localHeadVersion: null, remoteCount: null, remoteHeadVersion: null, observedAt: null, failureCode: null });
+
+export function emptyBuildDatabaseAuthority() {
+  return { schema: DATABASES_SCHEMA, revision: 0, items: [], pendingOperation: null, operationHistory: [] };
+}
+
+export function listBuildDatabaseCatalog() {
+  return [{ provider: PROVIDER, displayName: "Supabase", engine: ENGINE, credentialRoles: [
+    { role: "management_token", required: false }, { role: "database_url", required: false },
+  ] }];
+}
+
+function validLabel(value) {
+  return typeof value === "string" && value.trim() === value && value.length >= 1 && value.length <= 80 &&
+    !/[\u0000-\u001f\u007f-\u009f]/.test(value) && !SECRET_LIKE.test(value);
+}
+function validTarget(value) { return value === null || typeof value === "string" && SAFE_TARGET.test(value); }
+function safeTarget(value) { return typeof value === "string" && SAFE_TARGET.test(value); }
+function validMigrationVersion(value) { return value === null || safeText(value, 80) && SAFE_TARGET.test(value); }
+
+function validProviderObservation(value) {
+  if (!exact(value, ["state", "projectStatus", "observedAt", "failureCode"]) ||
+      !["unverified", "ready", "action_required", "unavailable"].includes(value.state) ||
+      !nullable(value.projectStatus, (item) => safeText(item, 80)) ||
+      !nullable(value.observedAt, iso) || !nullable(value.failureCode, safeCode)) return false;
+  if (value.state === "unverified") return value.observedAt === null && value.failureCode === null && value.projectStatus === null;
+  if (value.state === "ready") return value.observedAt !== null && value.failureCode === null;
+  return value.observedAt !== null && value.failureCode !== null;
+}
+
+function validConnectionObservation(value) {
+  if (!exact(value, ["state", "adapterVersion", "serverVersion", "observedAt", "failureCode"]) ||
+      !["unverified", "ready", "action_required", "unavailable"].includes(value.state) ||
+      !nullable(value.adapterVersion, safeId) ||
+      !nullable(value.serverVersion, (item) => safeText(item, 120)) ||
+      !nullable(value.observedAt, iso) || !nullable(value.failureCode, safeCode)) return false;
+  if (value.state === "unverified") return value.adapterVersion === null && value.serverVersion === null && value.observedAt === null && value.failureCode === null;
+  if (value.state === "ready") return value.adapterVersion !== null && value.observedAt !== null && value.failureCode === null;
+  return value.observedAt !== null && value.failureCode !== null && value.serverVersion === null;
+}
+
+function validMigrationObservation(value) {
+  if (!exact(value, ["state", "sourceSha", "localDigest", "localCount", "localHeadVersion", "remoteCount",
+    "remoteHeadVersion", "observedAt", "failureCode"]) ||
+      !["unknown", "none", "in_sync", "pending", "diverged", "unavailable"].includes(value.state) ||
+      !nullable(value.sourceSha, (item) => typeof item === "string" && /^[0-9a-f]{40}$/i.test(item)) ||
+      !nullable(value.localDigest, (item) => typeof item === "string" && /^[0-9a-f]{64}$/i.test(item)) ||
+      !nonnegative(value.localCount) || !validMigrationVersion(value.localHeadVersion) ||
+      !(value.remoteCount === null || nonnegative(value.remoteCount)) || !validMigrationVersion(value.remoteHeadVersion) ||
+      !nullable(value.observedAt, iso) || !nullable(value.failureCode, safeCode)) return false;
+  if (value.state === "unknown") return value.observedAt === null && value.failureCode === null;
+  if (value.state === "unavailable") return value.observedAt !== null && value.failureCode !== null;
+  return value.observedAt !== null && value.failureCode === null;
+}
+
+const OP_STATES = ["prepared", "effect_started", "uncertain", "observed", "completed", "safe_stop", "failed_no_effect"];
+function validProvisionOperation(value) {
+  return exact(value, ["operationId", "kind", "databaseId", "provider", "state", "expectedDatabaseRevision", "environmentId",
+    "managementSecretRef", "provisionPasswordSecretRef", "organizationSlug", "region", "providerProjectName",
+    "createdAt", "updatedAt", "failureCode"]) && UUID.test(value.operationId) && value.kind === "provision" &&
+    UUID.test(value.databaseId) && value.provider === PROVIDER && OP_STATES.includes(value.state) &&
+    nonnegative(value.expectedDatabaseRevision) && UUID.test(value.environmentId) &&
+    safeId(value.managementSecretRef) && safeId(value.provisionPasswordSecretRef) &&
+    safeTarget(value.organizationSlug) && safeTarget(value.region) &&
+    safeText(value.providerProjectName, 80) && !SECRET_LIKE.test(value.providerProjectName) &&
+    iso(value.createdAt) && iso(value.updatedAt) && nullable(value.failureCode, safeCode);
+}
+
+function validHistoryEntry(value) {
+  return exact(value, ["operationId", "kind", "databaseId", "provider", "providerProjectName", "organizationSlug", "region",
+    "state", "providerProjectRef", "createdAt", "completedAt", "failureCode"]) && UUID.test(value.operationId) &&
+    value.kind === "provision" && UUID.test(value.databaseId) && value.provider === PROVIDER &&
+    safeText(value.providerProjectName, 80) && !SECRET_LIKE.test(value.providerProjectName) &&
+    safeTarget(value.organizationSlug) && safeTarget(value.region) && OP_STATES.includes(value.state) &&
+    nullable(value.providerProjectRef, safeId) && iso(value.createdAt) &&
+    nullable(value.completedAt, iso) && (value.state === "completed" ? value.completedAt !== null : value.completedAt === null) &&
+    nullable(value.failureCode, safeCode);
+}
+
+function validDatabase(item) {
+  return exact(item, ["databaseId", "provider", "engine", "label", "environmentId", "source", "providerTarget", "credentials",
+    "providerObservation", "connectionObservation", "migrationObservation", "createdAt", "updatedAt"]) &&
+    UUID.test(item.databaseId) && item.provider === PROVIDER && item.engine === ENGINE && validLabel(item.label) &&
+    UUID.test(item.environmentId) && ["existing", "path_provisioned"].includes(item.source) &&
+    exact(item.providerTarget, ["organizationSlug", "projectRef", "region"]) &&
+    validTarget(item.providerTarget.organizationSlug) && validTarget(item.providerTarget.projectRef) && validTarget(item.providerTarget.region) &&
+    exact(item.credentials, ["managementSecretRef", "databaseUrlSecretRef"]) &&
+    nullable(item.credentials.managementSecretRef, safeId) &&
+    nullable(item.credentials.databaseUrlSecretRef, safeId) &&
+    validProviderObservation(item.providerObservation) && validConnectionObservation(item.connectionObservation) &&
+    validMigrationObservation(item.migrationObservation) && iso(item.createdAt) && iso(item.updatedAt);
+}
+
+function validAuthority(value) {
+  if (!exact(value, ["schema", "revision", "items", "pendingOperation", "operationHistory"]) ||
+      value.schema !== DATABASES_SCHEMA || !nonnegative(value.revision) || !Array.isArray(value.items) ||
+      !(value.pendingOperation === null || validProvisionOperation(value.pendingOperation)) || !Array.isArray(value.operationHistory)) return false;
+  const databases = new Set(), labels = new Set(), operations = new Set();
+  for (const item of value.items) {
+    if (!validDatabase(item) || databases.has(item.databaseId) || labels.has(item.label.toLowerCase())) return false;
+    databases.add(item.databaseId); labels.add(item.label.toLowerCase());
+  }
+  if (value.pendingOperation) {
+    const database = value.items.find((item) => item.databaseId === value.pendingOperation.databaseId);
+    if (operations.has(value.pendingOperation.operationId) || !database || database.source !== "path_provisioned" ||
+        database.environmentId !== value.pendingOperation.environmentId) return false;
+    operations.add(value.pendingOperation.operationId);
+  }
+  for (const entry of value.operationHistory) {
+    if (!validHistoryEntry(entry) || operations.has(entry.operationId)) return false;
+    operations.add(entry.operationId);
+  }
+  return true;
+}
+
+function authorityFor(record) {
+  if (!own(record, "databases")) return { ok: true, authority: emptyBuildDatabaseAuthority() };
+  return validAuthority(record.databases) ? { ok: true, authority: record.databases } : fail("DATABASES_INVALID");
+}
+
+function readAuthority(runtimeRoot, buildId) {
+  if (typeof buildId !== "string" || !buildId) return fail("BUILD_NOT_FOUND");
+  const record = readBuildRecord(runtimeRoot, buildId);
+  if (!record || record.buildId !== buildId) return fail("BUILD_NOT_FOUND");
+  const result = authorityFor(record);
+  return result.ok ? { ok: true, record, authority: result.authority } : result;
+}
+
+export function listBuildDatabases(runtimeRoot, buildId) {
+  const found = readAuthority(runtimeRoot, buildId);
+  return found.ok ? { ok: true, buildId, ...structuredClone(found.authority) } : found;
+}
+
+export function readBuildDatabase(runtimeRoot, buildId, databaseId) {
+  const listed = listBuildDatabases(runtimeRoot, buildId);
+  if (!listed.ok) return listed;
+  const database = listed.items.find((item) => item.databaseId === databaseId);
+  return database ? { ok: true, buildId, revision: listed.revision, database: structuredClone(database) } : fail("DATABASE_NOT_FOUND");
+}
+
+function inputKeys(action) {
+  return ({
+    create_database: ["provider", "label", "environmentId", "source"],
+    rename_database: ["databaseId", "label"],
+    delete_database: ["databaseId", "acknowledgeExternalResourceRetained"],
+    set_provider_target: ["databaseId", "organizationSlug", "projectRef", "region"],
+    bind_management_credential: ["databaseId", "secretRef"],
+    unbind_management_credential: ["databaseId"],
+    bind_database_url: ["databaseId", "secretRef"],
+    unbind_database_url: ["databaseId"],
+  })[action];
+}
+
+function validateCredentialRef(runtimeRoot, buildId, environmentId, secretRef) {
+  const environment = readBuildEnvironment(runtimeRoot, buildId, environmentId);
+  if (!environment.ok) return fail("DATABASE_ENVIRONMENT_NOT_FOUND");
+  const binding = readBuildSecretBinding(runtimeRoot, buildId, environmentId, secretRef);
+  if (!binding.ok || binding.binding.kind !== "secret") return fail("DATABASE_SECRET_REF_NOT_FOUND");
+  return { ok: true };
+}
+
+export function prepareBuildDatabaseMutation(runtimeRoot, buildId, request) {
+  if (!exact(request, ["action", "expectedDatabaseRevision", "input"]) || !nonnegative(request.expectedDatabaseRevision))
+    return fail("DATABASE_MUTATION_INVALID");
+  const keys = inputKeys(request.action);
+  if (!keys || !exact(request.input, keys)) return fail("DATABASE_MUTATION_INVALID");
+  const found = readAuthority(runtimeRoot, buildId);
+  if (!found.ok) return found;
+  if (found.record.pendingRestore) return fail("RESTORE_PENDING");
+  const authority = structuredClone(found.authority);
+  if (authority.revision !== request.expectedDatabaseRevision) return fail("DATABASE_REVISION_STALE");
+  const input = request.input;
+  const now = new Date().toISOString();
+  let databaseId = input.databaseId;
+  let provider = PROVIDER;
+  if (request.action === "create_database") {
+    if (input.provider !== PROVIDER) return fail("DATABASE_PROVIDER_UNSUPPORTED");
+    if (!validLabel(input.label)) return fail("DATABASE_LABEL_INVALID");
+    if (authority.items.some((item) => item.label.toLowerCase() === input.label.toLowerCase())) return fail("DATABASE_LABEL_CONFLICT");
+    if (!["existing", "path_provisioned"].includes(input.source)) return fail("DATABASE_SOURCE_INVALID");
+    const environment = readBuildEnvironment(runtimeRoot, buildId, input.environmentId);
+    if (!environment.ok) return fail("DATABASE_ENVIRONMENT_NOT_FOUND");
+    databaseId = randomUUID();
+    authority.items.push({ databaseId, provider: PROVIDER, engine: ENGINE, label: input.label,
+      environmentId: input.environmentId, source: input.source,
+      providerTarget: { organizationSlug: null, projectRef: null, region: null },
+      credentials: { managementSecretRef: null, databaseUrlSecretRef: null },
+      providerObservation: EMPTY_PROVIDER_OBSERVATION(), connectionObservation: EMPTY_CONNECTION_OBSERVATION(),
+      migrationObservation: EMPTY_MIGRATION_OBSERVATION(), createdAt: now, updatedAt: now });
+  } else {
+    const item = authority.items.find((entry) => entry.databaseId === databaseId);
+    if (!item) return fail("DATABASE_NOT_FOUND");
+    if (request.action === "rename_database") {
+      if (!validLabel(input.label)) return fail("DATABASE_LABEL_INVALID");
+      if (item.label === input.label) return fail("DATABASE_UNCHANGED");
+      if (authority.items.some((entry) => entry.databaseId !== item.databaseId && entry.label.toLowerCase() === input.label.toLowerCase()))
+        return fail("DATABASE_LABEL_CONFLICT");
+      item.label = input.label;
+    } else if (request.action === "delete_database") {
+      if (input.acknowledgeExternalResourceRetained !== true) return fail("DATABASE_EXTERNAL_RESOURCE_ACK_REQUIRED");
+      if (authority.pendingOperation?.databaseId === item.databaseId) return fail("DATABASE_OPERATION_PENDING");
+      authority.items = authority.items.filter((entry) => entry.databaseId !== item.databaseId);
+    } else if (request.action === "set_provider_target") {
+      if (item.source === "path_provisioned") return fail("DATABASE_PROVIDER_TARGET_MANAGED_BY_PROVISIONING");
+      for (const key of ["organizationSlug", "projectRef", "region"]) {
+        const value = input[key];
+        if (value !== null && (typeof value !== "string" || !SAFE_TARGET.test(value))) return fail("DATABASE_PROVIDER_TARGET_INVALID");
+      }
+      if (input.projectRef === null) return fail("DATABASE_PROJECT_REF_REQUIRED");
+      item.providerTarget = { organizationSlug: input.organizationSlug, projectRef: input.projectRef, region: input.region };
+      item.providerObservation = EMPTY_PROVIDER_OBSERVATION();
+      item.connectionObservation = EMPTY_CONNECTION_OBSERVATION();
+      item.migrationObservation = EMPTY_MIGRATION_OBSERVATION();
+    } else if (request.action === "bind_management_credential" || request.action === "bind_database_url") {
+      const field = request.action === "bind_management_credential" ? "managementSecretRef" : "databaseUrlSecretRef";
+      if (item.credentials[field] !== null) return fail("DATABASE_CREDENTIAL_ALREADY_BOUND");
+      const validRef = validateCredentialRef(runtimeRoot, buildId, item.environmentId, input.secretRef);
+      if (!validRef.ok) return validRef;
+      item.credentials[field] = input.secretRef;
+      if (field === "managementSecretRef") item.providerObservation = EMPTY_PROVIDER_OBSERVATION();
+      else {
+        item.connectionObservation = EMPTY_CONNECTION_OBSERVATION();
+        item.migrationObservation = EMPTY_MIGRATION_OBSERVATION();
+      }
+    } else {
+      const field = request.action === "unbind_management_credential" ? "managementSecretRef" : "databaseUrlSecretRef";
+      if (item.credentials[field] === null) return fail("DATABASE_CREDENTIAL_NOT_BOUND");
+      item.credentials[field] = null;
+      if (field === "managementSecretRef") item.providerObservation = EMPTY_PROVIDER_OBSERVATION();
+      else {
+        item.connectionObservation = EMPTY_CONNECTION_OBSERVATION();
+        item.migrationObservation = EMPTY_MIGRATION_OBSERVATION();
+      }
+    }
+    item.updatedAt = now;
+  }
+  authority.revision += 1;
+  return { ok: true, record: { ...found.record, databases: authority }, databaseId, provider,
+    revision: authority.revision,
+    ...(request.action === "delete_database" ? { providerResourceChanged: false, credentialMaterialChanged: false } : {}) };
+}

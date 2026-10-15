@@ -79,6 +79,44 @@ export interface BuildIntegration {
   bindings: BuildIntegrationBinding[];
 }
 export interface BuildIntegrations { schema: "pathcode.p12.integrations.v1"; revision: number; items: BuildIntegration[] }
+export interface BuildDatabaseProviderObservation {
+  state: "unverified" | "ready" | "action_required" | "unavailable";
+  projectStatus: string | null; observedAt: string | null; failureCode: string | null;
+}
+export interface BuildDatabaseConnectionObservation {
+  state: "unverified" | "ready" | "action_required" | "unavailable";
+  adapterVersion: string | null; serverVersion: string | null; observedAt: string | null; failureCode: string | null;
+}
+export interface BuildDatabaseMigrationObservation {
+  state: "unknown" | "none" | "in_sync" | "pending" | "diverged" | "unavailable";
+  sourceSha: string | null; localDigest: string | null; localCount: number; localHeadVersion: string | null;
+  remoteCount: number | null; remoteHeadVersion: string | null; observedAt: string | null; failureCode: string | null;
+}
+export interface BuildDatabase {
+  databaseId: string; provider: "supabase"; engine: "postgres"; label: string; environmentId: string;
+  source: "existing" | "path_provisioned";
+  providerTarget: { organizationSlug: string | null; projectRef: string | null; region: string | null };
+  credentials: { managementSecretRef: string | null; databaseUrlSecretRef: string | null };
+  providerObservation: BuildDatabaseProviderObservation;
+  connectionObservation: BuildDatabaseConnectionObservation;
+  migrationObservation: BuildDatabaseMigrationObservation;
+  createdAt: string; updatedAt: string;
+}
+export type BuildDatabaseOperationState = "prepared" | "effect_started" | "uncertain" | "observed" | "completed" | "safe_stop" | "failed_no_effect";
+export interface BuildDatabaseProvisionOperation {
+  operationId: string; kind: "provision"; databaseId: string; provider: "supabase"; state: BuildDatabaseOperationState;
+  expectedDatabaseRevision: number; environmentId: string; managementSecretRef: string; provisionPasswordSecretRef: string;
+  organizationSlug: string; region: string; providerProjectName: string; createdAt: string; updatedAt: string; failureCode: string | null;
+}
+export interface BuildDatabaseOperationHistory {
+  operationId: string; kind: "provision"; databaseId: string; provider: "supabase"; providerProjectName: string;
+  organizationSlug: string; region: string; state: BuildDatabaseOperationState; providerProjectRef: string | null;
+  createdAt: string; completedAt: string | null; failureCode: string | null;
+}
+export interface BuildDatabases {
+  schema: "pathcode.p13.databases.v1"; revision: number; items: BuildDatabase[];
+  pendingOperation: BuildDatabaseProvisionOperation | null; operationHistory: BuildDatabaseOperationHistory[];
+}
 export interface BuildIntegrationVerificationAdapter {
   providerKey: "github";
   adapterVersion: string;
@@ -205,6 +243,7 @@ export interface BuildRecord {
   projectBindings: ProjectBinding[];
   environments?: BuildEnvironments;
   integrations?: BuildIntegrations;
+  databases?: BuildDatabases;
   deployments?: BuildDeployments;
   children: BuildChild[];
   loop: {
@@ -895,6 +934,11 @@ export interface BuildCoordinatorClient {
     expectedIntegrationRevision: number, expectedEnvironmentRevision: number): Promise<{
       ok: boolean; code?: string; revision?: number; integrationId?: string; bindingId?: string;
       verification?: BuildIntegrationVerification }>;
+  listDatabaseCatalog(): Promise<{ ok: boolean; code?: string; providers?: ReturnType<typeof listBuildDatabaseCatalog> }>;
+  listDatabases(buildId: string): Promise<ReturnType<typeof listBuildDatabases>>;
+  readDatabase(buildId: string, databaseId: string): Promise<ReturnType<typeof readBuildDatabase>>;
+  mutateDatabase(buildId: string, input: object): Promise<{ ok: boolean; code?: string; databaseId?: string;
+    revision?: number; providerResourceChanged?: boolean; credentialMaterialChanged?: boolean }>;
   startRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   restartRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   startBuild(
@@ -1091,6 +1135,20 @@ export function prepareBuildIntegrationMutation(runtimeRoot: string, buildId: st
   expectedIntegrationRevision: number; input: Record<string, unknown>;
 }): { ok: true; record: BuildRecord; integrationId: string; bindingId?: string; providerKey?: string;
   role?: string; revision: number } | { ok: false; code: string };
+export const DATABASES_SCHEMA: "pathcode.p13.databases.v1";
+export function emptyBuildDatabaseAuthority(): BuildDatabases;
+export function listBuildDatabaseCatalog(): Array<{ provider: "supabase"; displayName: "Supabase"; engine: "postgres";
+  credentialRoles: Array<{ role: "management_token" | "database_url"; required: false }> }>;
+export function listBuildDatabases(runtimeRoot: string, buildId: string):
+  ({ ok: true; buildId: string } & BuildDatabases) | { ok: false; code: string };
+export function readBuildDatabase(runtimeRoot: string, buildId: string, databaseId: string):
+  { ok: true; buildId: string; revision: number; database: BuildDatabase } | { ok: false; code: string };
+export function prepareBuildDatabaseMutation(runtimeRoot: string, buildId: string, request: {
+  action: "create_database" | "rename_database" | "delete_database" | "set_provider_target" |
+    "bind_management_credential" | "unbind_management_credential" | "bind_database_url" | "unbind_database_url";
+  expectedDatabaseRevision: number; input: Record<string, unknown>;
+}): { ok: true; record: BuildRecord; databaseId: string; provider: "supabase"; revision: number;
+  providerResourceChanged?: false; credentialMaterialChanged?: false } | { ok: false; code: string };
 export function createBuildCoordinatorService(options: {
   runtimeRoot: string; packageRoot: string; fakeMode?: boolean; preferredEngine?: string | null;
   scopedBuildId?: string; productionCommandExecutor?: (spec: any, options: any) => Promise<any>;

@@ -150,6 +150,8 @@ export {
 export { INTEGRATIONS_SCHEMA, emptyBuildIntegrationAuthority, listBuildIntegrationCatalog,
   listBuildIntegrations, readBuildIntegration, prepareBuildIntegrationMutation } from "./integrations.mjs";
 export { DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS } from "./integration-adapters.mjs";
+export { DATABASES_SCHEMA, emptyBuildDatabaseAuthority, listBuildDatabaseCatalog,
+  listBuildDatabases, readBuildDatabase, prepareBuildDatabaseMutation } from "./databases.mjs";
 export { GITHUB_IDENTITY_ADAPTER_VERSION, GITHUB_IDENTITY_API_VERSION,
   GITHUB_IDENTITY_RESPONSE_MAX_BYTES, GITHUB_IDENTITY_TIMEOUT_MS,
   createGitHubIdentityAdapter, githubIdentityResponseReducer } from "./github-integration-adapter.mjs";

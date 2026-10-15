@@ -79,6 +79,85 @@
  * @property {number} revision
  * @property {BuildIntegration[]} items
  *
+ * @typedef {'unverified'|'ready'|'action_required'|'unavailable'} DatabaseConnectionState
+ * @typedef {'unknown'|'none'|'in_sync'|'pending'|'diverged'|'unavailable'} DatabaseMigrationState
+ * @typedef {object} BuildDatabaseProviderObservation
+ * @property {'unverified'|'ready'|'action_required'|'unavailable'} state
+ * @property {string|null} projectStatus
+ * @property {string|null} observedAt
+ * @property {string|null} failureCode
+ *
+ * @typedef {object} BuildDatabaseConnectionObservation
+ * @property {DatabaseConnectionState} state
+ * @property {string|null} adapterVersion
+ * @property {string|null} serverVersion
+ * @property {string|null} observedAt
+ * @property {string|null} failureCode
+ *
+ * @typedef {object} BuildDatabaseMigrationObservation
+ * @property {DatabaseMigrationState} state
+ * @property {string|null} sourceSha
+ * @property {string|null} localDigest
+ * @property {number} localCount
+ * @property {string|null} localHeadVersion
+ * @property {number|null} remoteCount
+ * @property {string|null} remoteHeadVersion
+ * @property {string|null} observedAt
+ * @property {string|null} failureCode
+ *
+ * @typedef {object} BuildDatabaseProvisionOperation
+ * @property {string} operationId
+ * @property {'provision'} kind
+ * @property {string} databaseId
+ * @property {'supabase'} provider
+ * @property {'prepared'|'effect_started'|'uncertain'|'observed'|'completed'|'safe_stop'|'failed_no_effect'} state
+ * @property {number} expectedDatabaseRevision
+ * @property {string} environmentId
+ * @property {string} managementSecretRef
+ * @property {string} provisionPasswordSecretRef
+ * @property {string} organizationSlug
+ * @property {string} region
+ * @property {string} providerProjectName
+ * @property {string} createdAt
+ * @property {string} updatedAt
+ * @property {string|null} failureCode
+ *
+ * @typedef {object} BuildDatabaseOperationHistory
+ * @property {string} operationId
+ * @property {'provision'} kind
+ * @property {string} databaseId
+ * @property {'supabase'} provider
+ * @property {string} providerProjectName
+ * @property {string} organizationSlug
+ * @property {string} region
+ * @property {'prepared'|'effect_started'|'uncertain'|'observed'|'completed'|'safe_stop'|'failed_no_effect'} state
+ * @property {string|null} providerProjectRef
+ * @property {string} createdAt
+ * @property {string|null} completedAt
+ * @property {string|null} failureCode
+ *
+ * @typedef {object} BuildDatabase
+ * @property {string} databaseId
+ * @property {'supabase'} provider
+ * @property {'postgres'} engine
+ * @property {string} label
+ * @property {string} environmentId
+ * @property {'existing'|'path_provisioned'} source
+ * @property {{ organizationSlug: string|null, projectRef: string|null, region: string|null }} providerTarget
+ * @property {{ managementSecretRef: string|null, databaseUrlSecretRef: string|null }} credentials
+ * @property {BuildDatabaseProviderObservation} providerObservation
+ * @property {BuildDatabaseConnectionObservation} connectionObservation
+ * @property {BuildDatabaseMigrationObservation} migrationObservation
+ * @property {string} createdAt
+ * @property {string} updatedAt
+ *
+ * @typedef {object} BuildDatabases
+ * @property {'pathcode.p13.databases.v1'} schema
+ * @property {number} revision
+ * @property {BuildDatabase[]} items
+ * @property {BuildDatabaseProvisionOperation|null} pendingOperation
+ * @property {BuildDatabaseOperationHistory[]} operationHistory
+ *
  * @typedef {object} ConversationMessage
  * @property {string} id
  * @property {'user'|'assistant'|'system'} role
@@ -156,6 +235,7 @@
  * @property {ProjectBinding[]} projectBindings
  * @property {object} [environments]
  * @property {BuildIntegrations} [integrations] P12.1 typed integration and credential-reference authority (optional for legacy Builds)
+ * @property {BuildDatabases} [databases] P13.1 typed database resource authority (optional for legacy Builds)
  * @property {object} [deployments] P10.1 deployment/release authority (optional for legacy Builds)
  * @property {BuildChild[]} children
  * @property {BuildLoop} loop

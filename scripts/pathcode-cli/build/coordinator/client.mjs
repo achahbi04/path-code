@@ -168,6 +168,10 @@ export function createBuildCoordinatorClient(options) {
     verifyIntegration: (buildId, integrationId, bindingId, expectedIntegrationRevision, expectedEnvironmentRevision) =>
       request(BuildCoordinatorMethods.BUILD_INTEGRATION_VERIFY, { buildId, integrationId, bindingId,
         expectedIntegrationRevision, expectedEnvironmentRevision }),
+    listDatabaseCatalog: () => request(BuildCoordinatorMethods.BUILD_DATABASES_CATALOG),
+    listDatabases: (buildId) => request(BuildCoordinatorMethods.BUILD_DATABASES_LIST, { buildId }),
+    readDatabase: (buildId, databaseId) => request(BuildCoordinatorMethods.BUILD_DATABASE_READ, { buildId, databaseId }),
+    mutateDatabase: (buildId, input) => request(BuildCoordinatorMethods.BUILD_DATABASE_MUTATE, { ...input, buildId }),
     messageBuild: (buildId, input) =>
       request(BuildCoordinatorMethods.BUILD_MESSAGE, { buildId, input }),
     stopBuild: (buildId) =>
