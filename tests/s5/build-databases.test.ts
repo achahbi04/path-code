@@ -336,12 +336,14 @@ describe("P13.1 database authority", () => {
     expect(readBuildEvents(root, buildId).filter((item) => item.type === "database.mutated")).toHaveLength(0);
   });
 
-  it("exposes no observation/provision/query/migration method and contains no network, SQL, or database client", async () => {
+  it("exposes only P13.2 verification methods and no provisioning/query/migration method", async () => {
     const buildId = setupBuild(); const c = await coordinator();
-    for (const absentMethod of ["build.databases.verify", "build.databases.provision", "build.databases.query", "build.databases.migrate"])
+    for (const absentMethod of ["build.databases.verify", "build.databases.provision", "build.databases.query", "build.databases.migrate", "build.databases.health"])
       expect(await c.dispatch(absentMethod, { buildId })).toMatchObject({ ok: false, code: "METHOD_NOT_FOUND" });
     const protocol = readFileSync(new URL("../../scripts/pathcode-cli/build/coordinator/protocol.mjs", import.meta.url), "utf8");
-    expect(protocol).not.toMatch(/build\.databases\.(?:verify|provision|query|migrate)/);
+    expect(protocol).toContain("build.databases.verifyProvider");
+    expect(protocol).toContain("build.databases.verifyConnection");
+    expect(protocol).not.toMatch(/build\.databases\.(?:provision|query|migrate|health)/);
     const source = readFileSync(new URL("../../scripts/pathcode-cli/build/databases.mjs", import.meta.url), "utf8");
     expect(source).not.toMatch(/\bfetch\s*\(|from\s+["']node:(?:http|https|net|child_process)/i);
     expect(source).not.toMatch(/from\s+["'](?:pg|postgres|@supabase\/supabase-js)/i);

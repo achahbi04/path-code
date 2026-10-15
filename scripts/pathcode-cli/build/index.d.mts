@@ -87,6 +87,14 @@ export interface BuildDatabaseConnectionObservation {
   state: "unverified" | "ready" | "action_required" | "unavailable";
   adapterVersion: string | null; serverVersion: string | null; observedAt: string | null; failureCode: string | null;
 }
+export interface BuildDatabaseVerificationAdapter {
+  provider: "supabase"; adapterVersion: string;
+  verify(input: { credential: string; projectRef: string } | { databaseUrl: string; projectRef: string }): Promise<unknown>;
+}
+export interface BuildDatabaseVerificationAdapterPair {
+  provider?: BuildDatabaseVerificationAdapter;
+  connection?: BuildDatabaseVerificationAdapter;
+}
 export interface BuildDatabaseMigrationObservation {
   state: "unknown" | "none" | "in_sync" | "pending" | "diverged" | "unavailable";
   sourceSha: string | null; localDigest: string | null; localCount: number; localHeadVersion: string | null;
@@ -939,6 +947,12 @@ export interface BuildCoordinatorClient {
   readDatabase(buildId: string, databaseId: string): Promise<ReturnType<typeof readBuildDatabase>>;
   mutateDatabase(buildId: string, input: object): Promise<{ ok: boolean; code?: string; databaseId?: string;
     revision?: number; providerResourceChanged?: boolean; credentialMaterialChanged?: boolean }>;
+  verifyDatabaseProvider(buildId: string, databaseId: string, expectedDatabaseRevision: number,
+    expectedEnvironmentRevision: number): Promise<{ ok: boolean; code?: string; databaseId?: string; provider?: "supabase";
+      revision?: number; providerObservation?: BuildDatabaseProviderObservation; providerTarget?: BuildDatabase["providerTarget"] }>;
+  verifyDatabaseConnection(buildId: string, databaseId: string, expectedDatabaseRevision: number,
+    expectedEnvironmentRevision: number): Promise<{ ok: boolean; code?: string; databaseId?: string; provider?: "supabase";
+      revision?: number; connectionObservation?: BuildDatabaseConnectionObservation }>;
   startRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   restartRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   startBuild(
@@ -1160,6 +1174,8 @@ export function createBuildCoordinatorService(options: {
   p11HttpsProbe?: (fqdn: string) => Promise<any>;
   integrationVerificationAdapters?: Readonly<Record<string, BuildIntegrationVerificationAdapter>> |
     ReadonlyMap<string, BuildIntegrationVerificationAdapter>;
+  databaseVerificationAdapters?: Readonly<Record<string, BuildDatabaseVerificationAdapterPair>> |
+    ReadonlyMap<string, BuildDatabaseVerificationAdapterPair>;
 }): Promise<{
   dispatch(method: string, params?: Record<string, unknown>): Promise<any>;
   listDomains(buildId: string): Promise<any>;

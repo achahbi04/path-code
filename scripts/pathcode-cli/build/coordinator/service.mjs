@@ -28,7 +28,10 @@ import { listBuildIntegrationCatalog, listBuildIntegrations, readBuildIntegratio
 import { createIntegrationVerificationSnapshot, executeIntegrationVerification,
   validIntegrationVerificationRequest } from "../integration-verification.mjs";
 import { DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS } from "../integration-adapters.mjs";
-import { listBuildDatabaseCatalog, listBuildDatabases, readBuildDatabase, prepareBuildDatabaseMutation } from "../databases.mjs";
+import { listBuildDatabaseCatalog, listBuildDatabases, readBuildDatabase, prepareBuildDatabaseMutation,
+  prepareBuildDatabaseProviderObservationMutation, prepareBuildDatabaseConnectionObservationMutation } from "../databases.mjs";
+import { createBuildDatabaseVerificationSnapshot, executeBuildDatabaseVerification } from "../database-verification.mjs";
+import { DEFAULT_DATABASE_VERIFICATION_ADAPTERS } from "../database-adapters.mjs";
 import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
 import { listBuildDeployments, preflightDeployment, prepareDeploymentMappingMutation,
   prepareDeploymentOperation, prepareProductionDeploymentOperation, transitionDeploymentOperation,
@@ -71,6 +74,7 @@ export async function createBuildCoordinatorService(options) {
     p11SpawnImpl,
     p11HttpsProbe,
     integrationVerificationAdapters = DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS,
+    databaseVerificationAdapters = DEFAULT_DATABASE_VERIFICATION_ADAPTERS,
   } = options;
   const runProductionCommand = productionCommandExecutor ?? ((spec, executorOptions) =>
     executeProductionVercelCommand(spec, { ...executorOptions,
@@ -1105,6 +1109,8 @@ export async function createBuildCoordinatorService(options) {
           BuildCoordinatorMethods.BUILD_DATABASES_LIST,
           BuildCoordinatorMethods.BUILD_DATABASE_READ,
           BuildCoordinatorMethods.BUILD_DATABASE_MUTATE,
+          BuildCoordinatorMethods.BUILD_DATABASE_VERIFY_PROVIDER,
+          BuildCoordinatorMethods.BUILD_DATABASE_VERIFY_CONNECTION,
           BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_MAPPING_MUTATE,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE,
@@ -1238,6 +1244,35 @@ export async function createBuildCoordinatorService(options) {
             ...(result.providerResourceChanged !== undefined ? { providerResourceChanged: result.providerResourceChanged } : {}),
             ...(result.credentialMaterialChanged !== undefined ? { credentialMaterialChanged: result.credentialMaterialChanged } : {}) };
         });
+      case BuildCoordinatorMethods.BUILD_DATABASE_VERIFY_PROVIDER:
+      case BuildCoordinatorMethods.BUILD_DATABASE_VERIFY_CONNECTION: {
+        const plane = method === BuildCoordinatorMethods.BUILD_DATABASE_VERIFY_PROVIDER ? "provider" : "connection";
+        const prepared = await exclusive(buildId, () => {
+          if (Object.keys(params).some((key) => !["buildId", "databaseId", "expectedDatabaseRevision", "expectedEnvironmentRevision"].includes(key)))
+            return { ok: false, code: "DATABASE_VERIFICATION_INVALID" };
+          if (readBuildRecord(runtimeRoot, buildId)?.pendingRestore) return { ok: false, code: "RESTORE_PENDING" };
+          return createBuildDatabaseVerificationSnapshot(runtimeRoot, buildId, params, plane, databaseVerificationAdapters);
+        });
+        if (!prepared.ok) return prepared;
+        const outcome = await executeBuildDatabaseVerification(prepared);
+        if (!outcome.ok) return outcome;
+        return exclusive(buildId, () => {
+          const transition = plane === "provider"
+            ? prepareBuildDatabaseProviderObservationMutation(runtimeRoot, buildId, prepared.snapshot, outcome.observation)
+            : prepareBuildDatabaseConnectionObservationMutation(runtimeRoot, buildId, prepared.snapshot, outcome.observation);
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          try { appendBuildEvent(runtimeRoot, buildId, plane === "provider" ? "database.provider_verified" : "database.connection_verified", {
+            databaseId: transition.databaseId, provider: transition.provider, state: transition.observation.state,
+            failureCode: transition.observation.failureCode, revision: transition.revision,
+            ...(plane === "connection" && transition.observation.adapterVersion ? { adapterVersion: transition.observation.adapterVersion } : {}),
+          }); } catch { /* Build record is authority. */ }
+          return { ok: true, databaseId: transition.databaseId, provider: transition.provider,
+            revision: transition.revision,
+            ...(plane === "provider" ? { providerObservation: transition.observation, providerTarget: transition.providerTarget }
+              : { connectionObservation: transition.observation }) };
+        });
+      }
       case BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST:
         return listBuildDeployments(runtimeRoot, buildId);
       case BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREFLIGHT:

@@ -172,6 +172,12 @@ export function createBuildCoordinatorClient(options) {
     listDatabases: (buildId) => request(BuildCoordinatorMethods.BUILD_DATABASES_LIST, { buildId }),
     readDatabase: (buildId, databaseId) => request(BuildCoordinatorMethods.BUILD_DATABASE_READ, { buildId, databaseId }),
     mutateDatabase: (buildId, input) => request(BuildCoordinatorMethods.BUILD_DATABASE_MUTATE, { ...input, buildId }),
+    verifyDatabaseProvider: (buildId, databaseId, expectedDatabaseRevision, expectedEnvironmentRevision) =>
+      request(BuildCoordinatorMethods.BUILD_DATABASE_VERIFY_PROVIDER, { buildId, databaseId,
+        expectedDatabaseRevision, expectedEnvironmentRevision }),
+    verifyDatabaseConnection: (buildId, databaseId, expectedDatabaseRevision, expectedEnvironmentRevision) =>
+      request(BuildCoordinatorMethods.BUILD_DATABASE_VERIFY_CONNECTION, { buildId, databaseId,
+        expectedDatabaseRevision, expectedEnvironmentRevision }),
     messageBuild: (buildId, input) =>
       request(BuildCoordinatorMethods.BUILD_MESSAGE, { buildId, input }),
     stopBuild: (buildId) =>

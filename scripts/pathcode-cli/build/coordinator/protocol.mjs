@@ -22,6 +22,8 @@ export const BuildCoordinatorMethods = Object.freeze({
   BUILD_DATABASES_LIST: "build.databases.list",
   BUILD_DATABASE_READ: "build.databases.read",
   BUILD_DATABASE_MUTATE: "build.databases.mutate",
+  BUILD_DATABASE_VERIFY_PROVIDER: "build.databases.verifyProvider",
+  BUILD_DATABASE_VERIFY_CONNECTION: "build.databases.verifyConnection",
   BUILD_DEPLOYMENTS_LIST: "build.deployments.list",
   BUILD_DEPLOYMENT_PREFLIGHT: "build.deployments.preflight",
   BUILD_DEPLOYMENT_MAPPING_MUTATE: "build.deployments.mappingMutate",

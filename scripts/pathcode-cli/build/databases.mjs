@@ -267,3 +267,81 @@ export function prepareBuildDatabaseMutation(runtimeRoot, buildId, request) {
     revision: authority.revision,
     ...(request.action === "delete_database" ? { providerResourceChanged: false, credentialMaterialChanged: false } : {}) };
 }
+
+function databaseSnapshotMatches(database, snapshot) {
+  return database && database.databaseId === snapshot.databaseId && database.provider === snapshot.provider &&
+    database.engine === snapshot.engine && database.environmentId === snapshot.environmentId &&
+    database.credentials.managementSecretRef === snapshot.managementSecretRef &&
+    database.credentials.databaseUrlSecretRef === snapshot.databaseUrlSecretRef &&
+    database.providerTarget.projectRef === snapshot.projectRef &&
+    (snapshot.plane !== "provider" || database.providerTarget.organizationSlug === snapshot.organizationSlug &&
+      database.providerTarget.region === snapshot.region);
+}
+
+/** Internal P13.2 transition. Not part of the public P13.1 mutation vocabulary. */
+export function prepareBuildDatabaseProviderObservationMutation(runtimeRoot, buildId, snapshot, observation) {
+  return prepareDatabaseObservation(runtimeRoot, buildId, snapshot, observation, "provider");
+}
+
+/** Internal P13.2 transition. Not part of the public P13.1 mutation vocabulary. */
+export function prepareBuildDatabaseConnectionObservationMutation(runtimeRoot, buildId, snapshot, observation) {
+  return prepareDatabaseObservation(runtimeRoot, buildId, snapshot, observation, "connection");
+}
+
+function prepareDatabaseObservation(runtimeRoot, buildId, snapshot, observation, plane) {
+  const found = readAuthority(runtimeRoot, buildId);
+  if (!found.ok) return found;
+  if (found.record.pendingRestore) return fail("RESTORE_PENDING");
+  if (!snapshot || snapshot.buildId !== buildId || snapshot.plane !== plane ||
+      found.authority.revision !== snapshot.databaseRevision) return fail("DATABASE_AUTHORITY_STALE");
+  const database = found.authority.items.find((item) => item.databaseId === snapshot.databaseId);
+  if (!databaseSnapshotMatches(database, snapshot)) return fail("DATABASE_AUTHORITY_STALE");
+  const environment = readBuildEnvironment(runtimeRoot, buildId, snapshot.environmentId);
+  if (!environment.ok || environment.revision !== snapshot.environmentRevision) return fail("DATABASE_ENVIRONMENT_STALE");
+  const secretRef = plane === "provider" ? snapshot.managementSecretRef : snapshot.databaseUrlSecretRef;
+  if (snapshot.variableName !== null && snapshot.variableName !== undefined) {
+    const p9 = readBuildSecretBinding(runtimeRoot, buildId, snapshot.environmentId, secretRef);
+    if (!p9.ok || p9.binding.kind !== "secret" || p9.binding.variableName !== snapshot.variableName ||
+        p9.binding.backend !== snapshot.backend || p9.binding.bindingState !== snapshot.bindingState ||
+        p9.binding.presenceState !== snapshot.presenceState || (p9.binding.safetyState ?? null) !== snapshot.safetyState)
+      return fail("DATABASE_ENVIRONMENT_STALE");
+  }
+  const now = new Date().toISOString();
+  const next = structuredClone(found.authority);
+  const item = next.items.find((entry) => entry.databaseId === snapshot.databaseId);
+  if (plane === "provider") {
+    if (!exact(observation, ["state", "projectStatus", "failureCode", "organizationSlug", "region"]) ||
+        !["ready", "action_required", "unavailable"].includes(observation.state) ||
+        !nullable(observation.projectStatus, (value) => safeText(value, 80)) ||
+        !nullable(observation.failureCode, safeCode) ||
+        !nullable(observation.organizationSlug, safeTarget) || !nullable(observation.region, safeTarget) ||
+        (observation.state === "ready" ? observation.failureCode !== null : observation.failureCode === null))
+      return fail("DATABASE_OBSERVATION_INVALID");
+    if (observation.state === "ready" &&
+        ((item.providerTarget.organizationSlug !== null && item.providerTarget.organizationSlug !== observation.organizationSlug) ||
+         (item.providerTarget.region !== null && item.providerTarget.region !== observation.region)))
+      return fail("DATABASE_PROVIDER_TARGET_MISMATCH");
+    item.providerObservation = { state: observation.state, projectStatus: observation.projectStatus,
+      observedAt: now, failureCode: observation.failureCode };
+    if (observation.state === "ready") {
+      if (item.providerTarget.organizationSlug === null) item.providerTarget.organizationSlug = observation.organizationSlug;
+      if (item.providerTarget.region === null) item.providerTarget.region = observation.region;
+    }
+  } else {
+    if (!exact(observation, ["state", "adapterVersion", "serverVersion", "failureCode"]) ||
+        !["ready", "action_required", "unavailable"].includes(observation.state) ||
+        !nullable(observation.adapterVersion, safeId) || !nullable(observation.serverVersion, (value) => safeText(value, 120)) ||
+        !nullable(observation.failureCode, safeCode) ||
+        (observation.state === "ready" ? observation.adapterVersion === null || observation.serverVersion === null || observation.failureCode !== null :
+          observation.serverVersion !== null || observation.failureCode === null)) return fail("DATABASE_OBSERVATION_INVALID");
+    item.connectionObservation = { state: observation.state, adapterVersion: observation.adapterVersion,
+      serverVersion: observation.serverVersion, observedAt: now, failureCode: observation.failureCode };
+  }
+  item.updatedAt = now;
+  next.revision += 1;
+  const record = { ...found.record, databases: next };
+  if (!validAuthority(record.databases)) return fail("DATABASES_INVALID");
+  return { ok: true, record, databaseId: item.databaseId, provider: item.provider,
+    revision: next.revision, observation: structuredClone(plane === "provider" ? item.providerObservation : item.connectionObservation),
+    ...(plane === "provider" ? { providerTarget: structuredClone(item.providerTarget) } : {}) };
+}
