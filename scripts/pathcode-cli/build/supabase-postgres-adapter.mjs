@@ -6,7 +6,7 @@ const fail = (state, code) => ({ ok: false, state, code });
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/;
 
-function parseDatabaseUrl(raw, expectedProjectRef) {
+export function parseSupabaseDatabaseUrl(raw, expectedProjectRef) {
   if (typeof raw !== "string" || raw.length < 1 || raw.length > 4096 || CONTROL.test(raw))
     return { error: "DATABASE_URL_UNSAFE" };
   let url;
@@ -53,7 +53,7 @@ export function createSupabasePostgresAdapter({ Client = pg.Client } = {}) {
     async verify(input) {
       if (!input || Object.getPrototypeOf(input) !== Object.prototype || Object.keys(input).sort().join(",") !== "databaseUrl,projectRef")
         return fail("action_required", "DATABASE_URL_UNSAFE");
-      const parsed = parseDatabaseUrl(input.databaseUrl, input.projectRef);
+      const parsed = parseSupabaseDatabaseUrl(input.databaseUrl, input.projectRef);
       if (parsed.error) return fail("action_required", parsed.error);
       let client;
       try {

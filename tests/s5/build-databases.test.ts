@@ -336,14 +336,17 @@ describe("P13.1 database authority", () => {
     expect(readBuildEvents(root, buildId).filter((item) => item.type === "database.mutated")).toHaveLength(0);
   });
 
-  it("exposes only P13.2 verification methods and no provisioning/query/migration method", async () => {
+  it("exposes the frozen P13.2/P13.3 coordinator vocabulary without generic database execution", async () => {
     const buildId = setupBuild(); const c = await coordinator();
-    for (const absentMethod of ["build.databases.verify", "build.databases.provision", "build.databases.query", "build.databases.migrate", "build.databases.health"])
+    for (const absentMethod of ["build.databases.verify", "build.databases.query", "build.databases.sql", "build.databases.migrate",
+      "build.databases.pushMigrations", "build.databases.seed", "build.databases.resize", "build.databases.deleteProvider"])
       expect(await c.dispatch(absentMethod, { buildId })).toMatchObject({ ok: false, code: "METHOD_NOT_FOUND" });
     const protocol = readFileSync(new URL("../../scripts/pathcode-cli/build/coordinator/protocol.mjs", import.meta.url), "utf8");
     expect(protocol).toContain("build.databases.verifyProvider");
     expect(protocol).toContain("build.databases.verifyConnection");
-    expect(protocol).not.toMatch(/build\.databases\.(?:provision|query|migrate|health)/);
+    for (const method of ["availableRegions", "provisionPrepare", "provisionExecute", "provisionObserve", "observeMigrations"])
+      expect(protocol).toContain(`build.databases.${method}`);
+    expect(protocol).not.toMatch(/build\.databases\.(?:query|sql|migrate|pushMigrations|seed|resize|deleteProvider)/);
     const source = readFileSync(new URL("../../scripts/pathcode-cli/build/databases.mjs", import.meta.url), "utf8");
     expect(source).not.toMatch(/\bfetch\s*\(|from\s+["']node:(?:http|https|net|child_process)/i);
     expect(source).not.toMatch(/from\s+["'](?:pg|postgres|@supabase\/supabase-js)/i);

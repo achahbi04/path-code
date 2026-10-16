@@ -268,6 +268,46 @@ export function prepareBuildDatabaseMutation(runtimeRoot, buildId, request) {
     ...(request.action === "delete_database" ? { providerResourceChanged: false, credentialMaterialChanged: false } : {}) };
 }
 
+export function prepareBuildDatabaseProvisionPreparation(runtimeRoot, buildId, request) {
+  if (!exact(request, ["databaseId", "expectedDatabaseRevision", "expectedEnvironmentRevision", "organizationSlug", "region",
+    "provisionPasswordSecretRef", "acknowledgeProviderBilling"]) || !nonnegative(request.expectedDatabaseRevision) ||
+      !nonnegative(request.expectedEnvironmentRevision) || request.acknowledgeProviderBilling !== true ||
+      !safeTarget(request.organizationSlug) || !safeTarget(request.region) || !safeId(request.provisionPasswordSecretRef))
+    return fail("DATABASE_PROVISION_REQUEST_INVALID");
+  const found = readAuthority(runtimeRoot, buildId);
+  if (!found.ok) return found;
+  if (found.record.pendingRestore) return fail("RESTORE_PENDING");
+  if (found.authority.revision !== request.expectedDatabaseRevision) return fail("DATABASE_REVISION_STALE");
+  const database = found.authority.items.find((item) => item.databaseId === request.databaseId);
+  if (!database) return fail("DATABASE_NOT_FOUND");
+  if (database.provider !== PROVIDER || database.engine !== ENGINE || database.source !== "path_provisioned" ||
+      database.providerTarget.projectRef !== null) return fail("DATABASE_PROVISION_PRECONDITION_FAILED");
+  if (found.authority.pendingOperation !== null) return fail("DATABASE_OPERATION_PENDING");
+  const managementSecretRef = database.credentials.managementSecretRef;
+  if (!managementSecretRef) return fail("DATABASE_CREDENTIAL_REQUIRED");
+  const environment = readBuildEnvironment(runtimeRoot, buildId, database.environmentId);
+  if (!environment.ok || environment.revision !== request.expectedEnvironmentRevision) return fail("DATABASE_ENVIRONMENT_STALE");
+  const management = readBuildSecretBinding(runtimeRoot, buildId, database.environmentId, managementSecretRef);
+  const password = readBuildSecretBinding(runtimeRoot, buildId, database.environmentId, request.provisionPasswordSecretRef);
+  if (!management.ok || management.binding.kind !== "secret" || !password.ok || password.binding.kind !== "secret")
+    return fail("DATABASE_SECRET_REF_NOT_FOUND");
+  if (managementSecretRef === request.provisionPasswordSecretRef) return fail("DATABASE_PROVISION_CREDENTIALS_MUST_DIFFER");
+  const next = structuredClone(found.authority);
+  const operationId = randomUUID(); const now = new Date().toISOString();
+  const slug = database.label.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "database";
+  const providerProjectName = `${slug}-${operationId.replaceAll("-", "").slice(0, 12)}`.slice(0, 80);
+  next.revision += 1;
+  next.pendingOperation = { operationId, kind: "provision", databaseId: database.databaseId, provider: PROVIDER,
+    state: "prepared", expectedDatabaseRevision: next.revision, environmentId: database.environmentId,
+    managementSecretRef, provisionPasswordSecretRef: request.provisionPasswordSecretRef,
+    organizationSlug: request.organizationSlug, region: request.region, providerProjectName,
+    createdAt: now, updatedAt: now, failureCode: null };
+  const record = { ...found.record, databases: next };
+  if (!validAuthority(next)) return fail("DATABASES_INVALID");
+  return { ok: true, record, operationId, databaseId: database.databaseId, provider: PROVIDER, state: "prepared",
+    revision: next.revision, providerProjectName };
+}
+
 function databaseSnapshotMatches(database, snapshot) {
   return database && database.databaseId === snapshot.databaseId && database.provider === snapshot.provider &&
     database.engine === snapshot.engine && database.environmentId === snapshot.environmentId &&
@@ -286,6 +326,101 @@ export function prepareBuildDatabaseProviderObservationMutation(runtimeRoot, bui
 /** Internal P13.2 transition. Not part of the public P13.1 mutation vocabulary. */
 export function prepareBuildDatabaseConnectionObservationMutation(runtimeRoot, buildId, snapshot, observation) {
   return prepareDatabaseObservation(runtimeRoot, buildId, snapshot, observation, "connection");
+}
+
+/** Internal P13.3 observation transition; provider execution remains coordinator-owned. */
+export function prepareBuildDatabaseMigrationObservationMutation(runtimeRoot, buildId, snapshot, observation) {
+  const found = readAuthority(runtimeRoot, buildId);
+  if (!found.ok) return found;
+  if (found.record.pendingRestore) return fail("RESTORE_PENDING");
+  if (!snapshot || snapshot.buildId !== buildId || found.authority.revision !== snapshot.databaseRevision)
+    return fail("DATABASE_AUTHORITY_STALE");
+  if (found.record.authoritativeSha !== snapshot.authoritativeSha) return fail("DATABASE_MIGRATION_SOURCE_STALE");
+  const database = found.authority.items.find((item) => item.databaseId === snapshot.databaseId);
+  if (!database || database.provider !== snapshot.provider || database.engine !== snapshot.engine ||
+      database.environmentId !== snapshot.environmentId || database.providerTarget.projectRef !== snapshot.projectRef ||
+      database.credentials.databaseUrlSecretRef !== snapshot.databaseUrlSecretRef) return fail("DATABASE_AUTHORITY_STALE");
+  const environment = readBuildEnvironment(runtimeRoot, buildId, snapshot.environmentId);
+  if (!environment.ok || environment.revision !== snapshot.environmentRevision) return fail("DATABASE_ENVIRONMENT_STALE");
+  if (!exact(observation, ["state", "sourceSha", "localDigest", "localCount", "localHeadVersion", "remoteCount",
+    "remoteHeadVersion", "failureCode"])) return fail("DATABASE_OBSERVATION_INVALID");
+  const next = structuredClone(found.authority);
+  const item = next.items.find((entry) => entry.databaseId === snapshot.databaseId);
+  const reduced = { ...observation, observedAt: new Date().toISOString() };
+  if (!validMigrationObservation(reduced)) return fail("DATABASE_OBSERVATION_INVALID");
+  item.migrationObservation = reduced;
+  item.updatedAt = reduced.observedAt;
+  next.revision += 1;
+  const record = { ...found.record, databases: next };
+  if (!validAuthority(next)) return fail("DATABASES_INVALID");
+  return { ok: true, record, databaseId: item.databaseId, provider: item.provider, revision: next.revision,
+    observation: structuredClone(item.migrationObservation) };
+}
+
+/** Internal transition for the already-frozen provision operation. */
+export function transitionBuildDatabaseProvision(runtimeRoot, buildId, input) {
+  const found = readAuthority(runtimeRoot, buildId);
+  if (!found.ok) return found;
+  if (found.record.pendingRestore) return fail("RESTORE_PENDING");
+  if (!exact(input, ["operationId", "expectedDatabaseRevision", "expectedEnvironmentRevision", "state", "failureCode", "projectRef",
+    "projectName", "organizationSlug", "region", "projectStatus"])) return fail("DATABASE_PROVISION_INVALID");
+  const authority = structuredClone(found.authority);
+  const operation = authority.pendingOperation;
+  if (!operation || operation.operationId !== input.operationId || authority.revision !== input.expectedDatabaseRevision)
+    return fail("DATABASE_AUTHORITY_STALE");
+  const environment = readBuildEnvironment(runtimeRoot, buildId, operation.environmentId);
+  if (!environment.ok || environment.revision !== input.expectedEnvironmentRevision) return fail("DATABASE_ENVIRONMENT_STALE");
+  const database = authority.items.find((item) => item.databaseId === operation.databaseId);
+  if (!database) return fail("DATABASE_AUTHORITY_STALE");
+  const now = new Date().toISOString();
+  if (input.state === "effect_started" && operation.state === "prepared") {
+    operation.state = "effect_started"; operation.expectedDatabaseRevision = authority.revision + 1;
+    operation.updatedAt = now;
+  } else if (input.state === "observed" && input.failureCode !== null &&
+      ["effect_started", "uncertain", "observed"].includes(operation.state) && safeTarget(input.projectRef) &&
+      input.projectName === operation.providerProjectName && input.organizationSlug === operation.organizationSlug &&
+      input.region === operation.region && nullable(input.projectStatus, (v) => safeText(v, 80)) && safeCode(input.failureCode)) {
+    operation.state = "observed"; operation.failureCode = input.failureCode; operation.updatedAt = now;
+    database.providerTarget = { organizationSlug: input.organizationSlug, projectRef: input.projectRef, region: input.region };
+    const actionRequired = ["DATABASE_PROVIDER_CREDENTIAL_REJECTED", "DATABASE_PROVIDER_PERMISSION_REQUIRED"].includes(input.failureCode);
+    database.providerObservation = { state: actionRequired ? "action_required" : "unavailable", projectStatus: null,
+      observedAt: now, failureCode: input.failureCode };
+  } else if (input.state === "observed" && ["effect_started", "uncertain", "observed"].includes(operation.state) &&
+      safeTarget(input.projectRef) && input.organizationSlug === operation.organizationSlug && input.region === operation.region &&
+      input.projectName === operation.providerProjectName && nullable(input.projectStatus, (v) => safeText(v, 80))) {
+    operation.state = "observed"; operation.failureCode = null; operation.updatedAt = now;
+    database.providerTarget = { organizationSlug: input.organizationSlug, projectRef: input.projectRef, region: input.region };
+    database.providerObservation = input.projectStatus === "ACTIVE_HEALTHY"
+      ? { state: "unverified", projectStatus: null, observedAt: null, failureCode: null }
+      : { state: "unavailable", projectStatus: input.projectStatus || "UNKNOWN", observedAt: now, failureCode: "DATABASE_PROVIDER_NOT_READY" };
+  } else if (input.state === "uncertain" && ["effect_started", "uncertain"].includes(operation.state) && safeCode(input.failureCode)) {
+    operation.state = "uncertain"; operation.failureCode = input.failureCode; operation.updatedAt = now;
+  } else if (input.state === "failed_no_effect" && ["effect_started", "uncertain"].includes(operation.state) && safeCode(input.failureCode)) {
+    authority.operationHistory.push({ operationId: operation.operationId, kind: operation.kind, databaseId: operation.databaseId,
+      provider: operation.provider, providerProjectName: operation.providerProjectName, organizationSlug: operation.organizationSlug,
+      region: operation.region, state: "failed_no_effect", providerProjectRef: null, createdAt: operation.createdAt,
+      completedAt: null, failureCode: input.failureCode });
+    authority.pendingOperation = null;
+  } else if (input.state === "safe_stop" && ["effect_started", "uncertain", "observed"].includes(operation.state) && safeCode(input.failureCode)) {
+    operation.state = "safe_stop"; operation.failureCode = input.failureCode; operation.updatedAt = now;
+  } else if (input.state === "completed" && ["effect_started", "uncertain", "observed"].includes(operation.state) &&
+      safeTarget(input.projectRef) && input.organizationSlug === operation.organizationSlug && input.region === operation.region &&
+      input.projectStatus === "ACTIVE_HEALTHY") {
+    database.providerTarget = { organizationSlug: operation.organizationSlug, projectRef: input.projectRef, region: operation.region };
+    database.providerObservation = { state: "ready", projectStatus: "ACTIVE_HEALTHY", observedAt: now, failureCode: null };
+    authority.operationHistory.push({ operationId: operation.operationId, kind: operation.kind, databaseId: operation.databaseId,
+      provider: operation.provider, providerProjectName: operation.providerProjectName, organizationSlug: operation.organizationSlug,
+      region: operation.region, state: "completed", providerProjectRef: database.providerTarget.projectRef,
+      createdAt: operation.createdAt, completedAt: now, failureCode: null });
+    authority.pendingOperation = null;
+  } else return fail("DATABASE_PROVISION_TRANSITION_INVALID");
+  authority.revision += 1;
+  if (authority.pendingOperation) authority.pendingOperation.expectedDatabaseRevision = authority.revision;
+  const record = { ...found.record, databases: authority };
+  if (!validAuthority(authority)) return fail("DATABASES_INVALID");
+  return { ok: true, record, operationId: input.operationId, databaseId: database.databaseId, provider: PROVIDER,
+    state: input.state, revision: authority.revision, providerTarget: structuredClone(database.providerTarget),
+    ...(input.state === "completed" ? { providerProjectRef: database.providerTarget.projectRef } : {}) };
 }
 
 function prepareDatabaseObservation(runtimeRoot, buildId, snapshot, observation, plane) {

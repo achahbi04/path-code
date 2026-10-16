@@ -953,6 +953,17 @@ export interface BuildCoordinatorClient {
   verifyDatabaseConnection(buildId: string, databaseId: string, expectedDatabaseRevision: number,
     expectedEnvironmentRevision: number): Promise<{ ok: boolean; code?: string; databaseId?: string; provider?: "supabase";
       revision?: number; connectionObservation?: BuildDatabaseConnectionObservation }>;
+  listDatabaseRegions(buildId: string, databaseId: string, organizationSlug: string, expectedDatabaseRevision: number,
+    expectedEnvironmentRevision: number): Promise<{ ok: boolean; code?: string; regions?: Array<{ code: string; name: string; provider: string; status: string | null }> }>;
+  prepareDatabaseProvision(buildId: string, input: object): Promise<{ ok: boolean; code?: string; operationId?: string;
+    databaseId?: string; state?: string; revision?: number; providerProjectName?: string }>;
+  executeDatabaseProvision(buildId: string, operationId: string, expectedDatabaseRevision: number,
+    expectedEnvironmentRevision: number): Promise<{ ok: boolean; code?: string; state?: string; revision?: number }>;
+  observeDatabaseProvision(buildId: string, operationId: string, expectedDatabaseRevision: number,
+    expectedEnvironmentRevision: number): Promise<{ ok: boolean; code?: string; state?: string; revision?: number }>;
+  observeDatabaseMigrations(buildId: string, databaseId: string, expectedDatabaseRevision: number,
+    expectedEnvironmentRevision: number, expectedAuthoritativeSha: string): Promise<{ ok: boolean; code?: string;
+      migrationObservation?: BuildDatabaseMigrationObservation; revision?: number }>;
   startRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   restartRuntime(buildId: string, environmentId?: string | null): Promise<RuntimeStartResult>;
   startBuild(
@@ -1176,6 +1187,7 @@ export function createBuildCoordinatorService(options: {
     ReadonlyMap<string, BuildIntegrationVerificationAdapter>;
   databaseVerificationAdapters?: Readonly<Record<string, BuildDatabaseVerificationAdapterPair>> |
     ReadonlyMap<string, BuildDatabaseVerificationAdapterPair>;
+  databaseOperationAdapters?: Readonly<Record<string, Record<string, any>>>;
 }): Promise<{
   dispatch(method: string, params?: Record<string, unknown>): Promise<any>;
   listDomains(buildId: string): Promise<any>;

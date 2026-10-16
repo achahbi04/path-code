@@ -178,6 +178,17 @@ export function createBuildCoordinatorClient(options) {
     verifyDatabaseConnection: (buildId, databaseId, expectedDatabaseRevision, expectedEnvironmentRevision) =>
       request(BuildCoordinatorMethods.BUILD_DATABASE_VERIFY_CONNECTION, { buildId, databaseId,
         expectedDatabaseRevision, expectedEnvironmentRevision }),
+    listDatabaseRegions: (buildId, databaseId, organizationSlug, expectedDatabaseRevision, expectedEnvironmentRevision) =>
+      request(BuildCoordinatorMethods.BUILD_DATABASE_AVAILABLE_REGIONS, { buildId, databaseId, organizationSlug,
+        expectedDatabaseRevision, expectedEnvironmentRevision }),
+    prepareDatabaseProvision: (buildId, input) => request(BuildCoordinatorMethods.BUILD_DATABASE_PROVISION_PREPARE, { ...input, buildId }),
+    executeDatabaseProvision: (buildId, operationId, expectedDatabaseRevision, expectedEnvironmentRevision) =>
+      request(BuildCoordinatorMethods.BUILD_DATABASE_PROVISION_EXECUTE, { buildId, operationId, expectedDatabaseRevision, expectedEnvironmentRevision }),
+    observeDatabaseProvision: (buildId, operationId, expectedDatabaseRevision, expectedEnvironmentRevision) =>
+      request(BuildCoordinatorMethods.BUILD_DATABASE_PROVISION_OBSERVE, { buildId, operationId, expectedDatabaseRevision, expectedEnvironmentRevision }),
+    observeDatabaseMigrations: (buildId, databaseId, expectedDatabaseRevision, expectedEnvironmentRevision, expectedAuthoritativeSha) =>
+      request(BuildCoordinatorMethods.BUILD_DATABASE_MIGRATIONS_OBSERVE, { buildId, databaseId, expectedDatabaseRevision,
+        expectedEnvironmentRevision, expectedAuthoritativeSha }),
     messageBuild: (buildId, input) =>
       request(BuildCoordinatorMethods.BUILD_MESSAGE, { buildId, input }),
     stopBuild: (buildId) =>

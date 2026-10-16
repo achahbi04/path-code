@@ -32,6 +32,13 @@ import { listBuildDatabaseCatalog, listBuildDatabases, readBuildDatabase, prepar
   prepareBuildDatabaseProviderObservationMutation, prepareBuildDatabaseConnectionObservationMutation } from "../databases.mjs";
 import { createBuildDatabaseVerificationSnapshot, executeBuildDatabaseVerification } from "../database-verification.mjs";
 import { DEFAULT_DATABASE_VERIFICATION_ADAPTERS } from "../database-adapters.mjs";
+import { DEFAULT_DATABASE_OPERATION_ADAPTERS } from "../database-operation-adapters.mjs";
+import { prepareBuildDatabaseProvisionPreparation, transitionBuildDatabaseProvision,
+  prepareBuildDatabaseMigrationObservationMutation } from "../databases.mjs";
+import { createDatabaseProvisionSnapshot, executeDatabaseRegionDiscovery, createDatabaseProvisionExecuteSnapshot,
+  resolveDatabaseProvisionCredentials, executeDatabaseProvision, createDatabaseMigrationSnapshot,
+  executeDatabaseMigrationObservation, createDatabaseProvisionObserveSnapshot,
+  executeDatabaseProvisionObservation } from "../database-provisioning.mjs";
 import { resolveExactLocalEnvValues } from "../runtime/local-env-resolve.mjs";
 import { listBuildDeployments, preflightDeployment, prepareDeploymentMappingMutation,
   prepareDeploymentOperation, prepareProductionDeploymentOperation, transitionDeploymentOperation,
@@ -75,6 +82,7 @@ export async function createBuildCoordinatorService(options) {
     p11HttpsProbe,
     integrationVerificationAdapters = DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS,
     databaseVerificationAdapters = DEFAULT_DATABASE_VERIFICATION_ADAPTERS,
+    databaseOperationAdapters = DEFAULT_DATABASE_OPERATION_ADAPTERS,
   } = options;
   const runProductionCommand = productionCommandExecutor ?? ((spec, executorOptions) =>
     executeProductionVercelCommand(spec, { ...executorOptions,
@@ -1111,6 +1119,11 @@ export async function createBuildCoordinatorService(options) {
           BuildCoordinatorMethods.BUILD_DATABASE_MUTATE,
           BuildCoordinatorMethods.BUILD_DATABASE_VERIFY_PROVIDER,
           BuildCoordinatorMethods.BUILD_DATABASE_VERIFY_CONNECTION,
+          BuildCoordinatorMethods.BUILD_DATABASE_AVAILABLE_REGIONS,
+          BuildCoordinatorMethods.BUILD_DATABASE_PROVISION_PREPARE,
+          BuildCoordinatorMethods.BUILD_DATABASE_PROVISION_EXECUTE,
+          BuildCoordinatorMethods.BUILD_DATABASE_PROVISION_OBSERVE,
+          BuildCoordinatorMethods.BUILD_DATABASE_MIGRATIONS_OBSERVE,
           BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_MAPPING_MUTATE,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE,
@@ -1271,6 +1284,135 @@ export async function createBuildCoordinatorService(options) {
             revision: transition.revision,
             ...(plane === "provider" ? { providerObservation: transition.observation, providerTarget: transition.providerTarget }
               : { connectionObservation: transition.observation }) };
+        });
+      }
+      case BuildCoordinatorMethods.BUILD_DATABASE_AVAILABLE_REGIONS: {
+        const prepared = await exclusive(buildId, () => createDatabaseProvisionSnapshot(runtimeRoot, buildId, params, databaseOperationAdapters.supabase));
+        if (!prepared.ok) return prepared;
+        if (prepared.result) return prepared.result;
+        const result = await executeDatabaseRegionDiscovery(prepared);
+        if (!result.ok) return result;
+        return exclusive(buildId, () => {
+          const current = createDatabaseProvisionSnapshot(runtimeRoot, buildId, params, databaseOperationAdapters.supabase);
+          if (!current.ok || current.snapshot.databaseRevision !== prepared.snapshot.databaseRevision ||
+              current.snapshot.environmentRevision !== prepared.snapshot.environmentRevision ||
+              current.snapshot.managementSecretRef !== prepared.snapshot.managementSecretRef ||
+              current.snapshot.organizationSlug !== prepared.snapshot.organizationSlug) return { ok: false, code: "DATABASE_AUTHORITY_STALE" };
+          return { ok: true, databaseId: prepared.snapshot.databaseId, provider: "supabase", regions: result.regions };
+        });
+      }
+      case BuildCoordinatorMethods.BUILD_DATABASE_PROVISION_PREPARE:
+        return exclusive(buildId, () => {
+          const { buildId: _buildId, ...request } = params;
+          const result = prepareBuildDatabaseProvisionPreparation(runtimeRoot, buildId, request);
+          if (!result.ok) return result;
+          writeBuildRecord(runtimeRoot, result.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "database.provision_prepared", { operationId: result.operationId,
+            databaseId: result.databaseId, provider: result.provider, state: result.state, revision: result.revision }); } catch {}
+          return { ok: true, operationId: result.operationId, databaseId: result.databaseId, state: result.state,
+            revision: result.revision, providerProjectName: result.providerProjectName };
+        });
+      case BuildCoordinatorMethods.BUILD_DATABASE_PROVISION_EXECUTE: {
+        const prepared = await exclusive(buildId, () => createDatabaseProvisionExecuteSnapshot(runtimeRoot, buildId, params, databaseOperationAdapters));
+        if (!prepared.ok) return prepared;
+        const credentials = resolveDatabaseProvisionCredentials(prepared);
+        if (!credentials.ok) return credentials;
+        const started = await exclusive(buildId, () => {
+          const current = createDatabaseProvisionExecuteSnapshot(runtimeRoot, buildId, params, databaseOperationAdapters);
+          if (!current.ok || current.snapshot.databaseRevision !== prepared.snapshot.databaseRevision ||
+              current.snapshot.environmentRevision !== prepared.snapshot.environmentRevision ||
+              current.snapshot.operation.managementSecretRef !== prepared.snapshot.operation.managementSecretRef ||
+              current.snapshot.operation.provisionPasswordSecretRef !== prepared.snapshot.operation.provisionPasswordSecretRef)
+            return { ok: false, code: "DATABASE_AUTHORITY_STALE" };
+          const transition = transitionBuildDatabaseProvision(runtimeRoot, buildId, { operationId: params.operationId,
+            expectedDatabaseRevision: params.expectedDatabaseRevision, expectedEnvironmentRevision: params.expectedEnvironmentRevision,
+            state: "effect_started", failureCode: null,
+            projectRef: null, projectName: null, organizationSlug: null, region: null, projectStatus: null });
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "database.provision_effect_started", { operationId: transition.operationId,
+            databaseId: transition.databaseId, provider: transition.provider, state: transition.state, revision: transition.revision }); } catch {}
+          return { ok: true, revision: transition.revision };
+        });
+        if (!started.ok) return started;
+        const outcome = await executeDatabaseProvision(prepared, credentials.values);
+        if (!outcome.ok) return outcome;
+        const value = outcome.result;
+        const finalState = value?.ok === true ? "observed" :
+          value?.state === "action_required" && ["DATABASE_PROVIDER_CREDENTIAL_REJECTED", "DATABASE_PROVIDER_PERMISSION_REQUIRED", "DATABASE_PROVISION_REJECTED"].includes(value.code)
+            ? "failed_no_effect" : "uncertain";
+        const failureCode = value?.ok === true ? null : (typeof value?.code === "string" ? value.code : "DATABASE_PROVIDER_UNAVAILABLE");
+        return exclusive(buildId, () => {
+          const transition = transitionBuildDatabaseProvision(runtimeRoot, buildId, { operationId: params.operationId,
+            expectedDatabaseRevision: started.revision, expectedEnvironmentRevision: params.expectedEnvironmentRevision,
+            state: finalState, failureCode,
+            projectRef: value?.projectRef ?? null, projectName: value?.projectName ?? null,
+            organizationSlug: value?.organizationSlug ?? null, region: value?.region ?? null, projectStatus: value?.projectStatus ?? null });
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          try { appendBuildEvent(runtimeRoot, buildId, finalState === "observed" ? "database.provision_observed" : "database.provision_failed_no_effect",
+            { operationId: transition.operationId, databaseId: transition.databaseId, provider: transition.provider,
+              state: transition.state, revision: transition.revision, ...(failureCode ? { failureCode } : {}) }); } catch {}
+          return { ok: true, operationId: transition.operationId, databaseId: transition.databaseId,
+            state: transition.state, revision: transition.revision };
+        });
+      }
+      case BuildCoordinatorMethods.BUILD_DATABASE_PROVISION_OBSERVE: {
+        const prepared = await exclusive(buildId, () => createDatabaseProvisionObserveSnapshot(runtimeRoot, buildId, params, databaseOperationAdapters));
+        if (!prepared.ok) return prepared;
+        const outcome = await executeDatabaseProvisionObservation(prepared);
+        if (!outcome.ok) return outcome;
+        const value = outcome.result;
+        const state = value?.ok === true ? (value.projectStatus === "ACTIVE_HEALTHY" ? "completed" : "observed") :
+          value?.state === "safe_stop" ? "safe_stop" : value?.projectRef ? "observed" : "uncertain";
+        const failureCode = value?.ok === true ? null : (typeof value?.code === "string" ? value.code : "DATABASE_PROVIDER_UNAVAILABLE");
+        return exclusive(buildId, () => {
+          const result = transitionBuildDatabaseProvision(runtimeRoot, buildId, { operationId: params.operationId,
+            expectedDatabaseRevision: params.expectedDatabaseRevision, expectedEnvironmentRevision: params.expectedEnvironmentRevision,
+            state, failureCode,
+            projectRef: value?.projectRef ?? prepared.snapshot.projectRef ?? null,
+            projectName: value?.projectName ?? prepared.snapshot.operation.providerProjectName,
+            organizationSlug: value?.organizationSlug ?? prepared.snapshot.operation.organizationSlug,
+            region: value?.region ?? prepared.snapshot.operation.region, projectStatus: value?.projectStatus ?? null });
+          if (!result.ok) return result;
+          writeBuildRecord(runtimeRoot, result.record);
+          if (state === "completed") {
+            try { appendBuildEvent(runtimeRoot, buildId, "database.provision_completed", { operationId: result.operationId,
+              databaseId: result.databaseId, provider: result.provider, state: result.state, revision: result.revision }); } catch {}
+          } else {
+            try { appendBuildEvent(runtimeRoot, buildId, "database.provision_observed", { operationId: result.operationId,
+              databaseId: result.databaseId, provider: result.provider, state: result.state, revision: result.revision,
+              ...(failureCode ? { failureCode } : {}) }); } catch {}
+          }
+          return { ok: true, operationId: result.operationId, databaseId: result.databaseId,
+            state: result.state, revision: result.revision };
+        });
+      }
+      case BuildCoordinatorMethods.BUILD_DATABASE_MIGRATIONS_OBSERVE: {
+        const prepared = await exclusive(buildId, () => createDatabaseMigrationSnapshot(runtimeRoot, buildId, params));
+        if (!prepared.ok) return prepared;
+        const input = { ...prepared, adapter: databaseOperationAdapters?.supabase?.migrations };
+        if (!input.adapter) return { ok: false, code: "DATABASE_MIGRATION_ADAPTER_UNAVAILABLE" };
+        const outcome = await executeDatabaseMigrationObservation(input);
+        if (!outcome.ok) return outcome;
+        return exclusive(buildId, () => {
+          const current = createDatabaseMigrationSnapshot(runtimeRoot, buildId, params);
+          if (!current.ok) return current.code === "DATABASE_REVISION_STALE"
+            ? { ok: false, code: "DATABASE_AUTHORITY_STALE" } : current;
+          if (current.snapshot.databaseRevision !== prepared.snapshot.databaseRevision ||
+              current.snapshot.environmentRevision !== prepared.snapshot.environmentRevision ||
+              current.snapshot.databaseUrlSecretRef !== prepared.snapshot.databaseUrlSecretRef) return { ok: false, code: "DATABASE_AUTHORITY_STALE" };
+          if (current.snapshot.authoritativeSha !== prepared.snapshot.authoritativeSha)
+            return { ok: false, code: "DATABASE_MIGRATION_SOURCE_STALE" };
+          const transition = prepareBuildDatabaseMigrationObservationMutation(runtimeRoot, buildId, prepared.snapshot, outcome.observation);
+          if (!transition.ok) return transition;
+          writeBuildRecord(runtimeRoot, transition.record);
+          try { appendBuildEvent(runtimeRoot, buildId, "database.migrations_observed", { databaseId: transition.databaseId,
+            provider: transition.provider, state: transition.observation.state, revision: transition.revision,
+            sourceSha: transition.observation.sourceSha, localCount: transition.observation.localCount,
+            remoteCount: transition.observation.remoteCount }); } catch {}
+          return { ok: true, databaseId: transition.databaseId, provider: transition.provider,
+            revision: transition.revision, migrationObservation: transition.observation };
         });
       }
       case BuildCoordinatorMethods.BUILD_DEPLOYMENTS_LIST:
