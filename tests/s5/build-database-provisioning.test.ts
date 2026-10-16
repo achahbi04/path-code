@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createBuildCoordinatorService, createBuildRecordSkeleton, readBuildEvents, writeBuildRecord } from "../../scripts/pathcode-cli/build/index.mjs";
+import { createBuildCoordinatorService, createBuildRecordSkeleton, listBuildDatabases, readBuildEvents, writeBuildRecord } from "../../scripts/pathcode-cli/build/index.mjs";
 import { resolvePathPackageRoot } from "../../scripts/pathcode-cli/paths.mjs";
 
 describe("P13.3 provisioning intent", () => {
@@ -74,6 +74,53 @@ describe("P13.3 provisioning intent", () => {
       managementSecretRef: management.secretRef, provisionPasswordSecretRef: password.secretRef });
     expect(listed.pendingOperation.providerProjectName).toContain("inventory-db-");
     expect(providerCalls).toBe(0);
+  });
+
+  it("discovers regions through the full operation-adapter registry without mutating P13", async () => {
+    root = mkdtempSync(join(tmpdir(), "path-p13-regions-registry-"));
+    const project = join(root, "project"); (await import("node:fs")).mkdirSync(project);
+    execFileSync("git", ["init", "-q", project]); writeFileSync(join(project, ".gitignore"), ".env.local\n");
+    writeFileSync(join(project, ".env.local"), "MANAGEMENT_TOKEN=synthetic-management\n");
+    const record = createBuildRecordSkeleton({ outcome: "synthetic" }); record.projectBindings.push({ bindingId: "test", projectRoot: project });
+    record.loop.status = "paused"; writeBuildRecord(root, record);
+    const regions = [{ code: "eu-north-1", name: "North Europe", provider: "aws", status: "AVAILABLE" }];
+    let availableRegionsCalls = 0; let otherProviderCalls = 0;
+    service = await createBuildCoordinatorService({ runtimeRoot: root, packageRoot: resolvePathPackageRoot(), fakeMode: true,
+      databaseOperationAdapters: { supabase: {
+        availableRegions: async (input: any) => {
+          availableRegionsCalls++;
+          expect(Object.keys(input).sort()).toEqual(["credential", "organizationSlug"]);
+          expect(input.credential).toBe("synthetic-management");
+          expect(input.organizationSlug).toBe("org-synthetic");
+          return { ok: true, regions };
+        },
+        createProject: async () => { otherProviderCalls++; return { ok: false }; },
+        listProjects: async () => { otherProviderCalls++; return { ok: false }; },
+        health: async () => { otherProviderCalls++; return { ok: false }; },
+      } } }); await service.whenReady;
+    const env = await service.dispatch("build.environments.mutate", { buildId: record.buildId, action: "create_environment",
+      expectedEnvironmentRevision: 0, input: { name: "synthetic" } });
+    const boundCredential = await service.dispatch("build.environments.mutate", { buildId: record.buildId, action: "bind_secret",
+      expectedEnvironmentRevision: env.revision, input: { environmentId: env.environmentId,
+        variableName: "MANAGEMENT_TOKEN", backend: "local_env_file" } });
+    const verified = await service.dispatch("build.environments.verifyLocal", { buildId: record.buildId,
+      environmentId: env.environmentId, variableName: "MANAGEMENT_TOKEN", expectedEnvironmentRevision: boundCredential.revision });
+    expect(verified.ok).toBe(true);
+    const made = await service.dispatch("build.databases.mutate", { buildId: record.buildId, action: "create_database",
+      expectedDatabaseRevision: 0, input: { provider: "supabase", label: "Regions DB", environmentId: env.environmentId, source: "path_provisioned" } });
+    const boundDatabase = await service.dispatch("build.databases.mutate", { buildId: record.buildId, action: "bind_management_credential",
+      expectedDatabaseRevision: made.revision, input: { databaseId: made.databaseId, secretRef: boundCredential.secretRef } });
+    expect(boundDatabase.ok).toBe(true);
+    const before = listBuildDatabases(root, record.buildId);
+    if (!before.ok) throw new Error("Synthetic database authority was unavailable");
+    const discovered = await service.dispatch("build.databases.availableRegions", { buildId: record.buildId,
+      databaseId: made.databaseId, organizationSlug: "org-synthetic", expectedDatabaseRevision: before.revision,
+      expectedEnvironmentRevision: verified.revision });
+    const after = listBuildDatabases(root, record.buildId);
+    if (!after.ok) throw new Error("Synthetic database authority was unavailable after region discovery");
+    expect(discovered).toMatchObject({ ok: true, databaseId: made.databaseId, provider: "supabase", regions });
+    expect(availableRegionsCalls).toBe(1); expect(otherProviderCalls).toBe(0);
+    expect(after).toEqual(before);
   });
 
   it("persists effect_started before exactly one synthetic project creation and records only reduced identity", async () => {

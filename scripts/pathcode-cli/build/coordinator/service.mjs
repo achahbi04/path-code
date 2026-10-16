@@ -1287,13 +1287,13 @@ export async function createBuildCoordinatorService(options) {
         });
       }
       case BuildCoordinatorMethods.BUILD_DATABASE_AVAILABLE_REGIONS: {
-        const prepared = await exclusive(buildId, () => createDatabaseProvisionSnapshot(runtimeRoot, buildId, params, databaseOperationAdapters.supabase));
+        const prepared = await exclusive(buildId, () => createDatabaseProvisionSnapshot(runtimeRoot, buildId, params, databaseOperationAdapters));
         if (!prepared.ok) return prepared;
         if (prepared.result) return prepared.result;
         const result = await executeDatabaseRegionDiscovery(prepared);
         if (!result.ok) return result;
         return exclusive(buildId, () => {
-          const current = createDatabaseProvisionSnapshot(runtimeRoot, buildId, params, databaseOperationAdapters.supabase);
+          const current = createDatabaseProvisionSnapshot(runtimeRoot, buildId, params, databaseOperationAdapters);
           if (!current.ok || current.snapshot.databaseRevision !== prepared.snapshot.databaseRevision ||
               current.snapshot.environmentRevision !== prepared.snapshot.environmentRevision ||
               current.snapshot.managementSecretRef !== prepared.snapshot.managementSecretRef ||
