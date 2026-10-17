@@ -17,27 +17,42 @@ function fakeClient(result: any, error: any = null) {
 }
 
 describe("Supabase PostgreSQL fixed probe adapter", () => {
-  it("validates direct Supabase URL, forces verified TLS, and issues one fixed query", async () => {
+  it("validates a direct URL with sslmode=require, enables encrypted TLS, and issues one fixed query", async () => {
     const fake = fakeClient({ rows: [{ ok: 1, server_version: "PostgreSQL 17.4" }] });
     const adapter = createSupabasePostgresAdapter({ Client: fake.Client as any });
-    await expect(adapter.verify({ databaseUrl: direct, projectRef: ref })).resolves.toEqual({ ok: true, serverVersion: "PostgreSQL 17.4" });
+    const result = await adapter.verify({ databaseUrl: direct, projectRef: ref });
+    expect(result).toEqual({ ok: true, serverVersion: "PostgreSQL 17.4" });
     expect(adapter.adapterVersion).toBe(SUPABASE_POSTGRES_ADAPTER_VERSION);
     expect(fake.state.options).toMatchObject({ host: `db.${ref}.supabase.co`, port: 5432,
-      database: "postgres", ssl: { rejectUnauthorized: true }, connectionTimeoutMillis: 10_000,
+      database: "postgres", ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 10_000,
       query_timeout: 10_000, statement_timeout: 10_000 });
     expect(fake.state.options.password).toBe("pass@word");
     expect(fake.state.queries).toEqual([SUPABASE_READ_ONLY_PROBE]);
     expect(fake.state.connects).toBe(1);
     expect(fake.state.ends).toBe(1);
-    expect(JSON.stringify(await adapter.verify({ databaseUrl: direct, projectRef: ref }))).not.toContain(secret);
+    expect(JSON.stringify(result)).not.toContain(secret);
+    expect(JSON.stringify(result)).not.toContain(direct);
+    expect(JSON.stringify(result)).not.toContain("pass@word");
   });
 
-  it("accepts the project-bound shared pooler username and port 6543", async () => {
+  it("accepts a project-bound Session pooler username on port 5432 and defaults to encrypted require", async () => {
     const fake = fakeClient({ rows: [{ ok: "1", server_version: "PostgreSQL 16" }] });
     const adapter = createSupabasePostgresAdapter({ Client: fake.Client as any });
-    const databaseUrl = `postgres://role.${ref}:pw@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`;
+    const databaseUrl = `postgres://role.${ref}:pw@aws-1-eu-central-1.pooler.supabase.com:5432/postgres`;
     await expect(adapter.verify({ databaseUrl, projectRef: ref })).resolves.toEqual({ ok: true, serverVersion: "PostgreSQL 16" });
-    expect(fake.state.options).toMatchObject({ port: 6543, user: `role.${ref}`, ssl: { rejectUnauthorized: true } });
+    expect(fake.state.options).toMatchObject({ host: "aws-1-eu-central-1.pooler.supabase.com", port: 5432,
+      user: `role.${ref}`, ssl: { rejectUnauthorized: false } });
+    expect(fake.state.connects).toBe(1);
+    expect(fake.state.queries).toEqual([SUPABASE_READ_ONLY_PROBE]);
+  });
+
+  it("rejects verify-full before constructing a client when no CA binding exists", async () => {
+    let constructed = 0;
+    class Client { constructor() { constructed++; } }
+    const result = await createSupabasePostgresAdapter({ Client: Client as any }).verify({
+      databaseUrl: `postgresql://postgres:pw@db.${ref}.supabase.co:5432/postgres?sslmode=verify-full`, projectRef: ref });
+    expect(result).toEqual({ ok: false, state: "action_required", code: "DATABASE_SSL_CA_REQUIRED" });
+    expect(constructed).toBe(0);
   });
 
   it.each([
@@ -49,7 +64,10 @@ describe("Supabase PostgreSQL fixed probe adapter", () => {
     [`postgres://@db.${ref}.supabase.co:5432/postgres`, "DATABASE_URL_UNSAFE"],
     [`postgres://postgres:pw@db.${ref}.supabase.co:5432/other`, "DATABASE_URL_UNSAFE"],
     [`postgres://postgres:pw@db.${ref}.supabase.co:5432/postgres?sslmode=disable`, "DATABASE_URL_UNSAFE"],
+    [`postgres://postgres:pw@db.${ref}.supabase.co:5432/postgres?sslmode=allow`, "DATABASE_URL_UNSAFE"],
+    [`postgres://postgres:pw@db.${ref}.supabase.co:5432/postgres?sslmode=prefer`, "DATABASE_URL_UNSAFE"],
     [`postgres://postgres:pw@db.${ref}.supabase.co:5432/postgres?application_name=x`, "DATABASE_URL_UNSAFE"],
+    [`postgres://postgres:pw@db.${ref}.supabase.co:5432/postgres?sslmode=require&sslmode=require`, "DATABASE_URL_UNSAFE"],
     [`postgres://postgres:pw%ZZ@db.${ref}.supabase.co:5432/postgres`, "DATABASE_URL_UNSAFE"],
   ])("rejects unsafe URL forms", async (databaseUrl, code) => {
     let created = 0;

@@ -8,7 +8,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 const PROVIDER_FAILURES = new Set(["DATABASE_PROVIDER_CREDENTIAL_REJECTED", "DATABASE_PROVIDER_PERMISSION_REQUIRED",
   "DATABASE_PROVIDER_PROJECT_NOT_FOUND", "DATABASE_PROVIDER_UNAVAILABLE", "DATABASE_PROVIDER_RESPONSE_UNSAFE"]);
 const CONNECTION_FAILURES = new Set(["DATABASE_URL_UNSAFE", "DATABASE_URL_PROJECT_MISMATCH", "DATABASE_CREDENTIAL_REJECTED",
-  "DATABASE_RESPONSE_UNSAFE", "DATABASE_CONNECTION_UNAVAILABLE"]);
+  "DATABASE_RESPONSE_UNSAFE", "DATABASE_CONNECTION_UNAVAILABLE", "DATABASE_SSL_CA_REQUIRED"]);
 const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value) &&
   (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 const exact = (value, keys) => plain(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
@@ -107,7 +107,7 @@ function reduceOutcome(plane, value, adapterVersion) {
   const allowedFailure = plane === "provider" ? PROVIDER_FAILURES : CONNECTION_FAILURES;
   const actionFailures = plane === "provider"
     ? new Set(["DATABASE_PROVIDER_CREDENTIAL_REJECTED", "DATABASE_PROVIDER_PERMISSION_REQUIRED", "DATABASE_PROVIDER_PROJECT_NOT_FOUND"])
-    : new Set(["DATABASE_URL_UNSAFE", "DATABASE_URL_PROJECT_MISMATCH", "DATABASE_CREDENTIAL_REJECTED"]);
+    : new Set(["DATABASE_URL_UNSAFE", "DATABASE_URL_PROJECT_MISMATCH", "DATABASE_CREDENTIAL_REJECTED", "DATABASE_SSL_CA_REQUIRED"]);
   if (value.ok === false && exact(value, ["ok", "state", "code"]) && allowedFailure.has(value.code) &&
       value.state === (actionFailures.has(value.code) ? "action_required" : "unavailable"))
     return plane === "provider"

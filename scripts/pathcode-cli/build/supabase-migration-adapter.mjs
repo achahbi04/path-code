@@ -1,5 +1,5 @@
 import pg from "pg";
-import { parseSupabaseDatabaseUrl } from "./supabase-postgres-adapter.mjs";
+import { parseSupabaseDatabaseUrl, supabasePostgresTlsOptions } from "./supabase-postgres-adapter.mjs";
 
 export const SUPABASE_MIGRATION_QUERY = "SELECT version::text AS version FROM supabase_migrations.schema_migrations ORDER BY version LIMIT 5001";
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
@@ -17,9 +17,11 @@ export function createSupabaseMigrationAdapter({ Client = pg.Client } = {}) {
       return fail("DATABASE_URL_UNSAFE");
     const parsed = parseSupabaseDatabaseUrl(input.databaseUrl, input.projectRef);
     if (parsed.error) return fail(parsed.error);
+    const ssl = supabasePostgresTlsOptions(parsed.sslMode);
+    if (!ssl) return fail("DATABASE_SSL_CA_REQUIRED");
     let client;
     try { client = new Client({ host: parsed.host, port: parsed.port, user: parsed.user, password: parsed.password,
-      database: parsed.database, ssl: { rejectUnauthorized: true }, connectionTimeoutMillis: 10_000,
+      database: parsed.database, ssl, connectionTimeoutMillis: 10_000,
       query_timeout: 10_000, statement_timeout: 10_000, application_name: "PATH-Code" }); }
     catch { return fail("DATABASE_CONNECTION_UNAVAILABLE"); }
     let timer;

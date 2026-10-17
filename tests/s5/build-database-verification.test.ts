@@ -157,6 +157,15 @@ describe("P13.2 database credential and observation boundary", () => {
       adapterVersion: "synthetic.postgres.v1", failureCode: "DATABASE_CONNECTION_UNAVAILABLE", serverVersion: null } });
   });
 
+  it("preserves missing-CA verify-full as a bounded action-required connection failure", async () => {
+    const x = await setup({ supabase: { connection: { provider: "supabase", adapterVersion: "synthetic.postgres.v1",
+      verify: async () => ({ ok: false, state: "action_required", code: "DATABASE_SSL_CA_REQUIRED" }) } } });
+    const result = await x.call("build.databases.verifyConnection", { databaseId: x.databaseId,
+      expectedDatabaseRevision: x.databaseRevision, expectedEnvironmentRevision: x.envRevision });
+    expect(result).toMatchObject({ ok: true, connectionObservation: { state: "action_required",
+      adapterVersion: "synthetic.postgres.v1", failureCode: "DATABASE_SSL_CA_REQUIRED", serverVersion: null } });
+  });
+
   it("admits only the exact P13-bound local credential and maps unrelated assignments safely", async () => {
     let calls = 0;
     const x = await setup({ supabase: { provider: { provider: "supabase", adapterVersion: "synthetic.management.v1",

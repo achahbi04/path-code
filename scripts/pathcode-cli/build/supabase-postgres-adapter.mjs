@@ -17,10 +17,12 @@ export function parseSupabaseDatabaseUrl(raw, expectedProjectRef) {
   try { username = decodeURIComponent(url.username); password = decodeURIComponent(url.password); }
   catch { return { error: "DATABASE_URL_UNSAFE" }; }
   if (!username || !password || CONTROL.test(username) || CONTROL.test(password)) return { error: "DATABASE_URL_UNSAFE" };
+  let sslMode = "require";
   if (url.search) {
     const params = [...url.searchParams.entries()];
     if (params.length !== 1 || params[0][0] !== "sslmode" || !["require", "verify-full"].includes(params[0][1]))
       return { error: "DATABASE_URL_UNSAFE" };
+    sslMode = params[0][1];
   }
   const port = url.port ? Number(url.port) : 5432;
   if (![5432, 6543].includes(port)) return { error: "DATABASE_URL_UNSAFE" };
@@ -34,7 +36,12 @@ export function parseSupabaseDatabaseUrl(raw, expectedProjectRef) {
   if (pooler && !(username === `postgres.${expectedProjectRef}` || username.endsWith(`.${expectedProjectRef}`)))
     return { error: "DATABASE_URL_PROJECT_MISMATCH" };
   if (!PROJECT.test(expectedProjectRef)) return { error: "DATABASE_URL_UNSAFE" };
-  return { host, port, user: username, password, database: "postgres" };
+  return { host, port, user: username, password, database: "postgres", sslMode };
+}
+
+/** P13 V1 supports encrypted TLS without certificate verification; verify-full needs an unbound CA. */
+export function supabasePostgresTlsOptions(sslMode) {
+  return sslMode === "require" ? { rejectUnauthorized: false } : null;
 }
 
 function authFailure(error) {
@@ -55,10 +62,12 @@ export function createSupabasePostgresAdapter({ Client = pg.Client } = {}) {
         return fail("action_required", "DATABASE_URL_UNSAFE");
       const parsed = parseSupabaseDatabaseUrl(input.databaseUrl, input.projectRef);
       if (parsed.error) return fail("action_required", parsed.error);
+      const ssl = supabasePostgresTlsOptions(parsed.sslMode);
+      if (!ssl) return fail("action_required", "DATABASE_SSL_CA_REQUIRED");
       let client;
       try {
         client = new Client({ host: parsed.host, port: parsed.port, user: parsed.user, password: parsed.password,
-          database: parsed.database, ssl: { rejectUnauthorized: true }, connectionTimeoutMillis: 10_000,
+          database: parsed.database, ssl, connectionTimeoutMillis: 10_000,
           query_timeout: 10_000, statement_timeout: 10_000, application_name: "PATH-Code" });
       } catch { return fail("unavailable", "DATABASE_CONNECTION_UNAVAILABLE"); }
       let timeout;

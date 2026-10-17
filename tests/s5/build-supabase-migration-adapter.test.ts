@@ -51,7 +51,7 @@ async function migrationFixture(migrationFiles: Array<[string, string]>, remote:
         expectedDatabaseRevision: revision, expectedEnvironmentRevision: envRevision, expectedAuthoritativeSha }) };
 }
 describe("Supabase migration history adapter", () => {
-  it("uses forced TLS and exactly one fixed read-only migration query", async () => {
+  it("uses encrypted require TLS and exactly one fixed read-only migration query", async () => {
     const seen: any = { options: null, queries: [] };
     class Client {
       constructor(options: any) { seen.options = options; }
@@ -62,10 +62,34 @@ describe("Supabase migration history adapter", () => {
     const adapter = createSupabaseMigrationAdapter({ Client: Client as any });
     expect(await adapter.observe({ databaseUrl: url, projectRef: "project123" })).toEqual({ ok: true, versions: ["20260101000000"] });
     expect(seen.connects).toBe(1); expect(seen.queries).toEqual([SUPABASE_MIGRATION_QUERY]);
-    expect(seen.options.ssl).toEqual({ rejectUnauthorized: true });
+    expect(seen.options.ssl).toEqual({ rejectUnauthorized: false });
     expect(seen.options).toMatchObject({ connectionTimeoutMillis: 10_000, query_timeout: 10_000, statement_timeout: 10_000,
       application_name: "PATH-Code" });
     expect(seen.ends).toBe(1);
+  });
+  it("accepts a project-bound Session pooler on 5432 with encrypted require TLS", async () => {
+    const seen: any = { connects: 0, queries: [] };
+    class Client {
+      constructor(options: any) { seen.options = options; }
+      async connect() { seen.connects++; }
+      async query(query: string) { seen.queries.push(query); return { rows: [] }; }
+      async end() {}
+    }
+    const poolerUrl = "postgresql://postgres.project123:pw@aws-1-eu-central-1.pooler.supabase.com:5432/postgres";
+    const result = await createSupabaseMigrationAdapter({ Client: Client as any }).observe({ databaseUrl: poolerUrl, projectRef: "project123" });
+    expect(result).toEqual({ ok: true, versions: [] });
+    expect(seen.connects).toBe(1);
+    expect(seen.queries).toEqual([SUPABASE_MIGRATION_QUERY]);
+    expect(seen.options).toMatchObject({ host: "aws-1-eu-central-1.pooler.supabase.com", port: 5432,
+      user: "postgres.project123", ssl: { rejectUnauthorized: false } });
+  });
+  it("rejects verify-full before constructing a client when no CA binding exists", async () => {
+    let constructed = 0;
+    class Client { constructor() { constructed++; } }
+    const verifyFullUrl = "postgresql://postgres:pw@db.project123.supabase.co:5432/postgres?sslmode=verify-full";
+    expect(await createSupabaseMigrationAdapter({ Client: Client as any }).observe({ databaseUrl: verifyFullUrl, projectRef: "project123" }))
+      .toEqual({ ok: false, code: "DATABASE_SSL_CA_REQUIRED" });
+    expect(constructed).toBe(0);
   });
   it("treats only undefined relation as empty and rejects excessive rows", async () => {
     class Missing { async connect() {} async query() { throw Object.assign(new Error("private"), { code: "42P01" }); } async end() {} }
@@ -78,6 +102,8 @@ describe("Supabase migration history adapter", () => {
   it("keeps URL material out of bounded results", async () => {
     const result = await createSupabaseMigrationAdapter({ Client: class {} as any }).observe({ databaseUrl: "not-a-url", projectRef: "project123" });
     expect(JSON.stringify(result)).not.toContain("not-a-url");
+    expect(JSON.stringify(result)).not.toContain(url);
+    expect(JSON.stringify(result)).not.toContain("synthetic-password");
   });
   it("reduces malformed history rows and authentication failures without leaking driver errors", async () => {
     class Malformed { async connect() {} async query() { return { rows: [{ version: "2026\nprivate" }] }; } async end() {} }
