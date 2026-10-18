@@ -29,12 +29,13 @@ export function resolveSelectedProductEnvironment(input) {
   const config = Object.create(null);
   const local = [];
   for (const entry of selected.environment.variables) {
+    if (input.planKind === "build" && ["HTTP_PROXY","HTTPS_PROXY","NO_PROXY","NODE_EXTRA_CA_CERTS","SSL_CERT_FILE","NPM_CONFIG_CACHE","XDG_CACHE_HOME"].includes(entry.variableName.toUpperCase())) return fail("CONFIG_RUNTIME_COLLISION");
     if (PROTECTED.has(entry.variableName.toUpperCase())) return fail("CONFIG_RUNTIME_COLLISION");
     if (entry.kind === "config") config[entry.variableName] = entry.value;
     else if (entry.backend === "local_env_file") local.push(entry.variableName);
     else return fail("SECRET_BACKEND_UNAVAILABLE");
   }
-  if (input.planKind !== "spawn") {
+  if (!["spawn", "build"].includes(input.planKind)) {
     if (selected.environment.variables.length) return fail("SECRET_CONSUMER_FORBIDDEN");
     return { ok: true, config, secrets: Object.create(null) };
   }

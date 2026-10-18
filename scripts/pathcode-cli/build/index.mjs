@@ -166,3 +166,9 @@ export { ensureBuildCoordinator } from "./coordinator/ensure.mjs";
 export { formatBuildStatus, formatBuildCard } from "./format.mjs";
 export { projectBuildForSurface } from "./surface/product-view.mjs";
 export { startPathBuildSurface } from "./surface/server.mjs";
+
+export * from "./auth.mjs";
+
+export * from "./payments.mjs";
+
+export * from "./native.mjs";

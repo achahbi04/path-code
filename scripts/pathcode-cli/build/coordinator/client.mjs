@@ -117,6 +117,22 @@ export function createBuildCoordinatorClient(options) {
     latestBuild: () => request(BuildCoordinatorMethods.BUILD_LATEST),
     getBuildEvents: (buildId, options = {}) =>
       request(BuildCoordinatorMethods.BUILD_EVENTS, { buildId, ...options }),
+    listAuth: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_AUTH_LIST, { ...input, buildId }),
+    readAuth: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_AUTH_READ, { ...input, buildId }),
+    mutateAuth: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_AUTH_MUTATE, { ...input, buildId }),
+    observeAuth: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_AUTH_OBSERVE, { ...input, buildId }),
+    prepareAuthApply: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_AUTH_APPLY_PREPARE, { ...input, buildId }),
+    executeAuthApply: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_AUTH_APPLY_EXECUTE, { ...input, buildId }),
+    observeAuthApply: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_AUTH_APPLY_OBSERVE, { ...input, buildId }),
+    listPayments: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_PAYMENTS_LIST, { ...input, buildId }),
+    readPayment: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_PAYMENT_READ, { ...input, buildId }),
+    mutatePayment: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_PAYMENT_MUTATE, { ...input, buildId }),
+    listNative: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_NATIVE_LIST, { ...input, buildId }),
+    readNative: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_NATIVE_READ, { ...input, buildId }),
+    mutateNative: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_NATIVE_MUTATE, { ...input, buildId }),
+    prepareNative: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_NATIVE_PREPARE, { ...input, buildId }),
+    executeNative: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_NATIVE_EXECUTE, { ...input, buildId }),
+    observeNative: (buildId, input = {}) => request(BuildCoordinatorMethods.BUILD_NATIVE_OBSERVE, { ...input, buildId }),
     listEnvironments: (buildId) =>
       request(BuildCoordinatorMethods.BUILD_ENVIRONMENTS_LIST, { buildId }),
     listDeployments: (buildId) =>

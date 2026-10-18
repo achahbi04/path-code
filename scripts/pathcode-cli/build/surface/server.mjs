@@ -3,6 +3,8 @@
  * Drives createBuildController over Gateway + product runtime/preview.
  */
 
+import { guardBuilderApiRequest } from "./ingress.mjs";
+import { handleOperationSurface } from "./operations-surface.mjs";
 import { createServer } from "node:http";
 import {
   readFileSync,
@@ -113,6 +115,7 @@ function slugifyOutcome(outcome) {
  * @param {import('node:http').IncomingMessage} req
  */
 function readJsonBody(req) {
+  if (typeof req.builderJsonBody === "string") return Promise.resolve().then(() => req.builderJsonBody.trim() ? JSON.parse(req.builderJsonBody) : {});
   return new Promise((resolveBody, reject) => {
     const chunks = [];
     req.on("data", (c) => chunks.push(c));
@@ -534,6 +537,10 @@ export async function startPathBuildSurface(options) {
     const method = req.method || "GET";
 
     try {
+      if (path.startsWith("/api/")) {
+        const guarded = await guardBuilderApiRequest(req, { referenceUpload: /^\/api\/builds\/[^/]+\/references\/upload$/.test(path) });
+        if (!guarded.ok) { sendJson(res, guarded.status, {ok:false,code:guarded.code}); return; }
+      }
       const candidateMatch = path.match(/^\/preview-candidate\/([^/]+)(?:\/(.*))?$/);
       if (candidateMatch && (method === "GET" || method === "HEAD")) {
         const buildId = decodeURIComponent(candidateMatch[1]);
@@ -793,6 +800,13 @@ export async function startPathBuildSurface(options) {
               revision: listed.revision } : listed);
             return;
           }
+        }
+
+        if (["databases","auth","payments","native"].includes(action)) {
+          let body = null;
+          if (method === "POST") { try { body = await readJsonBody(req); } catch { sendJson(res,400,{ok:false,code:"OPERATION_JSON_INVALID"}); return; } }
+          await handleOperationSurface({ coordinator, buildId, action, sub, method, body, send: (code,value) => sendJson(res,code,value) });
+          return;
         }
 
         if (action === "integrations") {

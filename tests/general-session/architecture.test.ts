@@ -84,7 +84,7 @@ describe("5G-E: the scope profile is provider-neutral", () => {
       pathcode: "./scripts/pathcode.mjs",
       "path-build": "./scripts/path-build.mjs",
     });
-    expect(pkg.dependencies ?? {}).toEqual({});
+    expect(pkg.dependencies ?? {}).toEqual({ pg: "^8.23.1" });
     expect(pkg.exports).toEqual({
       ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
     });

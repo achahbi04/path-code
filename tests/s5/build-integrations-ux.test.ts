@@ -54,6 +54,7 @@ describe("P12.4 Builder integrations", () => {
     const catalog = await request(base, `${integrationRoute(f.buildId)}/catalog`);
     expect(catalog).toMatchObject({ status: 200, body: { ok: true, items: [
       { providerKey: "github", displayName: "GitHub", credentialRoles: [{ role: "token", required: true }] },
+      { providerKey: "stripe", displayName: "Stripe", credentialRoles: [{ role: "secret_key", required: true }] },
     ] } });
     expect(JSON.stringify(catalog.body)).not.toMatch(/https?:|origin|endpoint|authorization/i);
     const empty = await request(base, integrationRoute(f.buildId));

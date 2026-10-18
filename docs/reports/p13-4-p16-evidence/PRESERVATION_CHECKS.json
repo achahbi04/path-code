@@ -1,0 +1,19 @@
+{
+  "codeCheckpoint": "5387e0845d2ce4b469b9cd959e4085b7e5f17d59",
+  "unchangedProtectedPaths": [
+    "package.json",
+    "package-lock.json",
+    "scripts/pathcode-cli/ag10/engine-contract.mjs",
+    "scripts/pathcode-cli/ag10/engine-readiness.mjs",
+    "scripts/pathcode-cli/ag9/collaborate.mjs",
+    "scripts/pathcode-cli/gateway/runtime.mjs",
+    "scripts/pathcode-cli/build/historical-restore.mjs",
+    "scripts/pathcode-cli/build/versions.mjs"
+  ],
+  "protectedPathsDiffEmpty": true,
+  "branch": "work",
+  "verbatimGoverningSpecCommit": "d344070f63cf49dcddcfbf75f1f9b86307899811",
+  "closureDocumentationFormatting": "Six Markdown two-space breaks converted to equivalent <br> breaks, with wording unchanged; verbatim upload remains in first commit.",
+  "governingSpecMatchesUploadAtCodeCheckpoint": true,
+  "verbatimSpecSha256": "d0b37c229c0b6dbaaef6e70ea969a5f40ebc8938b44a3d6f8fc57e8d379e1a0b"
+}

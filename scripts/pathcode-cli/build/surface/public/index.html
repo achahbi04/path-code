@@ -84,6 +84,26 @@
                 <button type="button" class="ghost rail-action" id="openIntegrationsBtn">Manage integrations…</button>
               </div>
             </section>
+            <section class="rail-row" data-rail="databases">
+              <button type="button" class="rail-row-head" data-product-plane="databases" aria-haspopup="dialog">
+                <span class="rail-row-label">Database</span><span class="rail-row-value" id="operation-summary-databases">Needs setup</span>
+              </button>
+            </section>
+            <section class="rail-row" data-rail="auth">
+              <button type="button" class="rail-row-head" data-product-plane="auth" aria-haspopup="dialog">
+                <span class="rail-row-label">Authentication</span><span class="rail-row-value" id="operation-summary-auth">Needs setup</span>
+              </button>
+            </section>
+            <section class="rail-row" data-rail="payments">
+              <button type="button" class="rail-row-head" data-product-plane="payments" aria-haspopup="dialog">
+                <span class="rail-row-label">Payments</span><span class="rail-row-value" id="operation-summary-payments">Needs setup</span>
+              </button>
+            </section>
+            <section class="rail-row" data-rail="native">
+              <button type="button" class="rail-row-head" data-product-plane="native" aria-haspopup="dialog">
+                <span class="rail-row-label">Mobile</span><span class="rail-row-value" id="operation-summary-native">Needs setup</span>
+              </button>
+            </section>
             <section class="rail-row" data-rail="details">
               <button type="button" class="rail-row-head" id="detailsRowHead" aria-expanded="false" aria-controls="detailsRowBody">
                 <span class="rail-chevron" aria-hidden="true"></span>
@@ -438,5 +458,9 @@
     </dialog>
 
     <script src="/assets/app.js" type="module"></script>
-  </body>
+  <dialog id="productOperationsDialog" class="product-operations-dialog" aria-labelledby="productOperationsTitle">
+ <div class="operation-heading"><h2 id="productOperationsTitle">Product operations</h2><button type="button" class="ghost" id="refreshProductOperations">Refresh</button><button type="button" class="ghost" id="closeProductOperations" aria-label="Close product operations">Close</button></div>
+ <p id="productOperationsStatus" role="status" aria-live="polite"></p><div id="productOperationsContent"></div>
+</dialog>
+</body>
 </html>
