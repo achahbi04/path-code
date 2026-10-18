@@ -319,3 +319,20 @@ describe('Final readiness and Stripe transport regression',()=>{
   const result=await adapter.verify({credentials:{secret_key:`rk_${mode}_synthetic123`}});expect(result).toEqual({ok:true,providerAccountRef:'acct_synthetic123',capabilities:['stripe.account.read',`stripe.mode.${mode}`]});expect(calls).toBe(1);expect(JSON.stringify(result)).not.toContain('PROVIDER_SECRET_SENTINEL');
  });
 });
+describe('Contextual credential and artifact freshness',()=>{
+ it('degrades social management readiness after P9 unbind and requires a client key in the native build environment',async()=>{
+  const f=await authFixture();const config={...f.config,redirectUrls:['com.example.app://auth-callback'],socialProviders:[{provider:'google',enabled:true,clientId:'synthetic-client',clientSecretRef:f.refs.GOOGLE_SECRET}]};
+  expect(await f.call('auth.mutate',{action:'update_auth',expectedAuthRevision:1,input:{authId:f.auth.authId,label:'Sign in',databaseId:f.databaseId,environmentId:f.environmentId,config}})).toMatchObject({ok:true});
+  Object.assign(f.raw,{uri_allow_list:'com.example.app://auth-callback',external_google_enabled:true,external_google_client_id:'synthetic-client'});await f.call('auth.observe',await f.parameters());
+  expect((await f.call('auth.list')).items[0].readiness.state).toBe('ready');
+  const p=await f.parameters();await f.call('environments.mutate',{action:'unbind_secret',expectedEnvironmentRevision:p.expectedEnvironmentRevision,input:{environmentId:f.environmentId,variableName:'GOOGLE_SECRET'}});
+  expect((await f.call('auth.list')).items[0].readiness.problems).toContain('social_credential_action_required');
+  const e=await f.call('environments.mutate',{action:'create_environment',expectedEnvironmentRevision:p.expectedEnvironmentRevision+1,input:{name:'Native build'}});
+  const {nativeReadiness}=await load('native');const r:any=readBuildRecord(f.root,f.record.buildId);expect(nativeReadiness(r,{buildEnvironmentId:e.environmentId,authId:f.auth.authId,authCallbackScheme:'com.example.app',platforms:['android']}).problems).toContain('auth_publishable_key_missing');
+ });
+ it('marks retained artifacts stale when their profile identity changes at the same source SHA',async()=>{
+  const f=await nativeFixture(async(input:any)=>{mkdirSync(join(input.workspace,'.path-native-package'));writeFileSync(join(input.workspace,'.path-native-package','index.html'),'scaffold');return{ok:true};});
+  await f.call('native.prepare',await f.parameters());await f.call('native.execute',await f.parameters());const listed=await f.call('native.list');
+  expect(await f.call('native.mutate',{action:'update_profile',expectedNativeRevision:listed.revision,input:{...f.config,nativeId:f.profile.nativeId,appId:'com.example.changed'}})).toMatchObject({ok:true});expect((await f.call('native.list')).artifacts[0].state).toBe('stale');
+ });
+});

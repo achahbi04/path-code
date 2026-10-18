@@ -63,6 +63,11 @@ export function authReadiness(record, item) {
   if (!expected || item.config.publishableKeyVariableName !== expected) problems.push('publishable_variable_framework_mismatch');
   const key = environment?.variables?.find(v => v.kind === 'secret' && v.variableName === item.config.publishableKeyVariableName);
   if (!key || key.bindingState !== 'configured' || key.presenceState !== 'verified_present') problems.push('publishable_key_missing');
+  for (const social of item.config.socialProviders) {
+    if (!social.enabled) continue;
+    const credential = environment?.variables?.find(v => v.kind === 'secret' && v.secretRef === social.clientSecretRef);
+    if (!credential || credential.backend !== 'local_env_file' || credential.bindingState !== 'configured' || credential.presenceState !== 'verified_present' || credential.safetyState !== 'verified_safe') problems.push('social_credential_action_required');
+  }
   if (item.observation.state !== 'ready') problems.push('provider_config_unverified');
   else if (item.observation.matchesDesired !== true) problems.push('auth_configuration_differs');
   return { state: problems.length ? 'action_required' : 'ready', problems, projectUrl: database?.providerTarget?.projectRef ? `https://${database.providerTarget.projectRef}.supabase.co` : null, publishableKeyVariableName: item.config.publishableKeyVariableName, localMaterialReady: !!key && key.backend === 'local_env_file' && key.safetyState === 'verified_safe' && key.presenceState === 'verified_present' };

@@ -41,6 +41,7 @@ export function nativeReadiness(record, p) {
   const callback = p.authCallbackScheme ? `${p.authCallbackScheme}://auth-callback` : null;
   if (p.authId && !auth) problems.push('dependency_missing');
   if (p.authId && (!callback || !auth?.config?.redirectUrls?.includes(callback) || auth?.observation?.state !== 'ready' || auth?.observation?.matchesDesired !== true)) problems.push('auth_callback_action_required');
+  if (auth && !e?.variables?.some(v => v.kind === 'secret' && v.variableName === auth.config.publishableKeyVariableName && v.backend === 'local_env_file' && v.bindingState === 'configured' && v.presenceState === 'verified_present' && v.safetyState === 'verified_safe')) problems.push('auth_publishable_key_missing');
   return { state: problems.length ? 'action_required' : 'ready', problems, buildEnvironmentId: p.buildEnvironmentId, buildEnvironmentState: !e ? 'dependency_missing' : problems.includes('build_environment_unusable') ? 'build_environment_unusable' : 'usable', webArtifactState: 'build_verification_required', callbackUrl: callback, signing: 'owner_gate', toolchains: p.platforms.map(platform => ({ platform, state: 'local_toolchain_required' })), hostedCheckoutCompatibility: 'return_deep_link_acceptance_pending' };
 }
 export function listBuildNative(runtimeRoot, buildId) {
@@ -72,6 +73,7 @@ export function prepareBuildNativeMutation(runtimeRoot, buildId, request) {
     if (request.action === 'update_profile' && !old) return fail('NATIVE_NOT_FOUND');
     if (!old && a.profiles.length >= 16) return fail('NATIVE_LIMIT');
     nativeId = old?.nativeId || randomUUID();
+    if (old) a.artifacts = a.artifacts.map(x => x.nativeId === nativeId ? {...x,state:'stale'} : x);
     a.profiles = [...a.profiles.filter(p => p.nativeId !== nativeId), { nativeId, ...structuredClone(config), createdAt: old?.createdAt || now(), updatedAt: now() }];
   } else return fail('NATIVE_MUTATION_INVALID');
   a.revision++;
