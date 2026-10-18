@@ -1,4 +1,5 @@
 /** P16 profile and source-bound artifact authority; generated files are not source. */
+import { readAuthAuthority } from './auth.mjs';
 import { randomUUID } from 'node:crypto';
 import { readBuildRecord } from './record.mjs';
 import { exact, integer, id, text, iso, fail, now } from './operation-validation.mjs';
@@ -32,13 +33,15 @@ export function nativeReadiness(record, p) {
   const e = record.environments?.items?.find(e => e.environmentId === p.buildEnvironmentId);
   if (!e) problems.push('dependency_missing');
   else if (e.variables.some(v => v.kind === 'secret' && (v.backend !== 'local_env_file' || v.bindingState !== 'configured' || v.presenceState !== 'verified_present' || v.safetyState !== 'verified_safe'))) problems.push('build_environment_unusable');
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(record.authoritativeSha || '')) problems.push('source_unresolved');
   if (record.pendingRestore) problems.push('restore_pending');
   if (record.pendingCandidate) problems.push('candidate_pending');
-  const auth = p.authId && record.auth?.items?.find(a => a.authId === p.authId);
+  const authAuthority = readAuthAuthority(record);
+  const auth = p.authId && authAuthority.ok && authAuthority.authority.items.find(a => a.authId === p.authId);
   const callback = p.authCallbackScheme ? `${p.authCallbackScheme}://auth-callback` : null;
   if (p.authId && !auth) problems.push('dependency_missing');
   if (p.authId && (!callback || !auth?.config?.redirectUrls?.includes(callback) || auth?.observation?.state !== 'ready' || auth?.observation?.matchesDesired !== true)) problems.push('auth_callback_action_required');
-  return { state: problems.length ? 'action_required' : 'ready', problems, buildEnvironmentId: p.buildEnvironmentId, callbackUrl: callback, signing: 'owner_gate', toolchains: p.platforms.map(platform => ({ platform, state: 'local_toolchain_required' })), hostedCheckoutCompatibility: 'return_deep_link_acceptance_pending' };
+  return { state: problems.length ? 'action_required' : 'ready', problems, buildEnvironmentId: p.buildEnvironmentId, buildEnvironmentState: !e ? 'dependency_missing' : problems.includes('build_environment_unusable') ? 'build_environment_unusable' : 'usable', webArtifactState: 'build_verification_required', callbackUrl: callback, signing: 'owner_gate', toolchains: p.platforms.map(platform => ({ platform, state: 'local_toolchain_required' })), hostedCheckoutCompatibility: 'return_deep_link_acceptance_pending' };
 }
 export function listBuildNative(runtimeRoot, buildId) {
   const record = readBuildRecord(runtimeRoot, buildId), r = readNativeAuthority(record);

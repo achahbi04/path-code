@@ -28,7 +28,7 @@ function snapshot(runtimeRoot,buildId,p) {
   const profile = read.authority.profiles.find(x => x.nativeId === p.nativeId);
   if (!profile) return fail('NATIVE_NOT_FOUND');
   const readiness = nativeReadiness(record,profile);
-  if (readiness.problems.length) return fail(readiness.problems.includes('build_environment_unusable') ? 'NATIVE_BUILD_ENVIRONMENT_UNUSABLE' : readiness.problems.includes('dependency_missing') ? 'NATIVE_DEPENDENCY_MISSING' : 'NATIVE_AUTH_CALLBACK_NOT_READY');
+  if (readiness.problems.length) return fail(readiness.problems.includes('build_environment_unusable') ? 'NATIVE_BUILD_ENVIRONMENT_UNUSABLE' : readiness.problems.includes('dependency_missing') ? 'NATIVE_DEPENDENCY_MISSING' : readiness.problems.includes('source_unresolved') ? 'NATIVE_SOURCE_UNRESOLVED' : 'NATIVE_AUTH_CALLBACK_NOT_READY');
   let env;
   try { env = createProductRuntimeEnv({kind:'build',env:{}},process.env,{runtimeRoot,buildId,environmentId:profile.buildEnvironmentId,projectRoot:record.projectBindings?.[0]?.projectRoot}); }
   catch { return fail('NATIVE_BUILD_ENVIRONMENT_UNUSABLE'); }

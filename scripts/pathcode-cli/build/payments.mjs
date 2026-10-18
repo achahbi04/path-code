@@ -1,7 +1,7 @@
 /** P15 hosted Checkout configuration. Stripe owns payment truth and fulfillment. */
 import { randomUUID } from 'node:crypto';
 import { STRIPE_ADAPTER_VERSION } from './stripe-integration-adapter.mjs';
-import { authReadiness } from './auth.mjs';
+import { authReadiness, readAuthAuthority } from './auth.mjs';
 import { readBuildRecord } from './record.mjs';
 import { exact, integer, id, text, iso, variable, stableBase, fail, now } from './operation-validation.mjs';
 export const PAYMENTS_SCHEMA = 'pathcode.p15.payments.v1';
@@ -34,8 +34,9 @@ export function paymentReadiness(record, i) {
   const binding = integration?.bindings?.find(b => b.bindingId === i.verificationBindingId);
   const environment = record.environments?.items?.find(e => e.environmentId === i.runtimeEnvironmentId);
   if (!integration || !binding || !environment) problems.push('dependency_missing');
-  if (i.dependencies.authId && !record.auth?.items?.some(a => a.authId === i.dependencies.authId) || i.dependencies.databaseId && !record.databases?.items?.some(d => d.databaseId === i.dependencies.databaseId)) problems.push('dependency_missing');
-  const auth = record.auth?.items?.find(a => a.authId === i.dependencies.authId);
+  const authAuthority = readAuthAuthority(record);
+  if (i.dependencies.authId && (!authAuthority.ok || !authAuthority.authority.items.some(a => a.authId === i.dependencies.authId)) || i.dependencies.databaseId && !record.databases?.items?.some(d => d.databaseId === i.dependencies.databaseId)) problems.push('dependency_missing');
+  const auth = authAuthority.ok && authAuthority.authority.items.find(a => a.authId === i.dependencies.authId);
   const database = record.databases?.items?.find(d => d.databaseId === i.dependencies.databaseId);
   if (auth && authReadiness(record,auth).state !== 'ready') problems.push('auth_dependency_not_ready');
   if (database && (database.providerObservation?.state !== 'ready' || database.connectionObservation?.state !== 'ready')) problems.push('database_dependency_not_ready');

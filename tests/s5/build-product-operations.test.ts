@@ -302,3 +302,20 @@ describe('Native artifact secret roles',()=>{
   const recordText=JSON.stringify(readBuildRecord(f.root,f.record.buildId));expect(recordText).not.toContain('PRIVATE_RUNTIME_SENTINEL');expect(recordText).not.toContain('PUBLIC_RUNTIME_SENTINEL');
  });
 });
+describe('Final readiness and Stripe transport regression',()=>{
+ it('reports missing canonical source before attempting native materialization',async()=>{
+  const f=await nativeFixture();const r:any=readBuildRecord(f.root,f.record.buildId);r.authoritativeSha=null;writeBuildRecord(f.root,r);
+  expect((await f.call('native.list')).profiles[0].readiness).toMatchObject({state:'action_required',buildEnvironmentState:'usable',webArtifactState:'build_verification_required',problems:expect.arrayContaining(['source_unresolved'])});
+  expect(await f.call('native.prepare',await f.parameters())).toMatchObject({ok:false,code:'NATIVE_SOURCE_UNRESOLVED'});
+ });
+ it('degrades a malformed referenced Auth authority in payment/native projections',async()=>{
+  const f=await paymentFixture();const p=await f.call('native.mutate',{action:'create_profile',expectedNativeRevision:0,input:{appId:'com.example.app',appName:'Example',platforms:['android'],buildEnvironmentId:f.environmentId,packagePolicy:{capacitorVersion:'8.5.3',webDir:'public',iosPackageManager:'SPM'},authId:null,authCallbackScheme:null}});expect(p.ok).toBe(true);
+  const r:any=readBuildRecord(f.root,f.record.buildId);r.payments.items[0].dependencies.authId='damaged-auth';r.native.profiles[0].authId='damaged-auth';r.auth={schema:'pathcode.p14.auth.v1',revision:1,items:[{authId:'damaged-auth'}],pendingOperation:null,operationHistory:[]};writeBuildRecord(f.root,r);
+  expect((await f.call('payments.list')).items[0].readiness.problems).toContain('dependency_missing');expect((await f.call('native.list')).profiles[0].readiness.problems).toContain('dependency_missing');
+ });
+ it.each(['test','live'])('makes one fixed read-only Stripe identity request for %s mode',async(mode)=>{
+  const {EventEmitter}=await import('node:events');const {createStripeIdentityAdapter}=await load('stripe-integration-adapter');let calls=0;
+  const adapter=createStripeIdentityAdapter({requestImpl:(options:any,callback:any)=>{calls++;expect(options).toMatchObject({hostname:'api.stripe.com',path:'/v1/account',method:'GET',rejectUnauthorized:true});const req:any=new EventEmitter();req.destroy=()=>{};req.end=()=>queueMicrotask(()=>{const res:any=new EventEmitter();res.statusCode=200;callback(res);res.emit('data',Buffer.from(JSON.stringify({object:'account',id:'acct_synthetic123',secret:'PROVIDER_SECRET_SENTINEL'})));res.emit('end');});return req;}});
+  const result=await adapter.verify({credentials:{secret_key:`rk_${mode}_synthetic123`}});expect(result).toEqual({ok:true,providerAccountRef:'acct_synthetic123',capabilities:['stripe.account.read',`stripe.mode.${mode}`]});expect(calls).toBe(1);expect(JSON.stringify(result)).not.toContain('PROVIDER_SECRET_SENTINEL');
+ });
+});
