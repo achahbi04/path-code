@@ -172,8 +172,9 @@
     {
       "file": "tests/s5/build.test.ts",
       "test": "S5 PATH Build mechanical probe: README on task branch via git show satisfies req-readme",
-      "classification": "CONFIRMED_DEFECT",
-      "reason": "AssertionError: expected true to be false // Object.is equality\n    at /workspace/path-code/tests/s5/build.test.ts:529:49\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///workspace/path-code/node_modules/@vitest/ru"
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected true to be false // Object.is equality\n    at /workspace/path-code/tests/s5/build.test.ts:529:49\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///workspace/path-code/node_modules/@vitest/ru",
+      "diagnosis": "Disposable origin defaults to master on this host; the pre-existing test assumes main and ignores the failed checkout."
     },
     {
       "file": "tests/s5/build.test.ts",

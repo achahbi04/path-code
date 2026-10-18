@@ -1,11 +1,11 @@
 # PATH Builder — P13.4 → P16 Master Architecture & Codex Cloud Implementation Specification — Version 2.1
 
-**Status:** **FINAL GOVERNING SPECIFICATION — owner architecture decisions frozen for Codex Cloud implementation**  
-**Date:** 2026-10-18  
-**Product:** **PATH Builder**  
-**Repository:** `achahbi04/path-code`  
-**Authoritative implementation baseline:** `5638ac85bf7edfbca9eb1f1df8da223ee033be03`  
-**Current roadmap boundary:** P13.3 is **CLOSED / ACCEPTED / PROTECTED**. This document begins at P13.4 and stops at the end of P16.  
+**Status:** **FINAL GOVERNING SPECIFICATION — owner architecture decisions frozen for Codex Cloud implementation**<br>
+**Date:** 2026-10-18<br>
+**Product:** **PATH Builder**<br>
+**Repository:** `achahbi04/path-code`<br>
+**Authoritative implementation baseline:** `5638ac85bf7edfbca9eb1f1df8da223ee033be03`<br>
+**Current roadmap boundary:** P13.3 is **CLOSED / ACCEPTED / PROTECTED**. This document begins at P13.4 and stops at the end of P16.<br>
 **Explicitly out of scope:** **P17 — PATH Studio + Engine Expansion**, including the deliberate Codex-primary Engine Fabric migration across PATH Code, PATH Builder, and PATH Studio. P17 is preserved, not implemented here.
 
 **Supersession:** This Version 2.1 supersedes the earlier master draft, Version 2, the first repository addendum, and the V2 mini-addendum. All owner-approved repository findings are integrated directly here. Codex Cloud receives **this document only** as governing implementation authority.

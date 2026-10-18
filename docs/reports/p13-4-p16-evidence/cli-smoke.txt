@@ -1,0 +1,23 @@
+
+> path-code@1.0.1 cli:smoke
+> node -e "import { readFileSync } from 'node:fs'; const t=readFileSync('dist/cli/entry.js','utf8'); if(!t.startsWith('#!/usr/bin/env node\n')) { console.error('missing shebang'); process.exit(1); }" && node dist/cli/entry.js --help && node dist/cli/entry.js && node -e "import { spawnSync } from 'node:child_process'; const r=spawnSync(process.execPath,['dist/cli/entry.js','build-something'],{encoding:'utf8'}); if(r.status===0){console.error('expected non-zero'); process.exit(1);} process.stdout.write(r.stderr);"
+
+Path Code
+
+Usage:
+  pathcode [--help]
+
+Path Code engineering task execution is not enabled in the Foundation Kernel.
+Path Code
+
+Usage:
+  pathcode [--help]
+
+Path Code engineering task execution is not enabled in the Foundation Kernel.
+Unknown argument: build-something
+Run "pathcode --help" for usage.
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

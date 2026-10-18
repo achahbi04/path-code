@@ -1,0 +1,10 @@
+{
+  "readmeFixtureHostDiagnosis": {
+    "observedGitInitialBranch": "master",
+    "testAssumes": "main",
+    "originImplementationUses": "git init --template= without branch override",
+    "consequence": "The baseline fixture ignores the failed checkout of main and remains on its README task branch; README still exists. No product source was changed to hide this host setup assumption."
+  },
+  "identityFixtureDiagnosis": "Baseline copied-checkout coordinator cannot resolve approved pg because that disposable copied checkout has no installed runtime dependencies. This is retained as a pre-existing fixture defect.",
+  "gc1FixtureDiagnosis": "Baseline mock cloud session integration omits the expected session.artifacts.saving event. No Engine Fabric change was made in this tranche."
+}
