@@ -336,3 +336,19 @@ describe('Contextual credential and artifact freshness',()=>{
   expect(await f.call('native.mutate',{action:'update_profile',expectedNativeRevision:listed.revision,input:{...f.config,nativeId:f.profile.nativeId,appId:'com.example.changed'}})).toMatchObject({ok:true});expect((await f.call('native.list')).artifacts[0].state).toBe('stale');
  });
 });
+describe('Native coordinator crash containment',()=>{
+ it('terminates the real creator command when its coordinator process is killed',async()=>{
+  const {spawn}=await import('node:child_process');const f=await fixture();const pidfile=join(f.root,'owned-child.pid'),parentfile=join(f.root,'coordinator-probe.mjs');
+  const code=`require('node:fs').writeFileSync(${JSON.stringify(pidfile)},String(process.pid));setInterval(()=>{},1000)`;
+  const executorUrl=new URL('../../scripts/pathcode-cli/build/native-executor.mjs',import.meta.url).href;
+  writeFileSync(parentfile,`import {executeNativeCommand} from ${JSON.stringify(executorUrl)};await executeNativeCommand([process.execPath,'-e',${JSON.stringify(code)}],{cwd:${JSON.stringify(f.project)},env:{},limits:{timeoutMs:15000,outputBytes:1024,diskBytes:1048576}});`);
+  const parent=spawn(process.execPath,[parentfile],{stdio:'ignore'});let child=0;
+  const running=(pid:number)=>{try{return !execFileSync('ps',['-p',String(pid),'-o','stat='],{encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim().startsWith('Z');}catch{return false;}};
+  try{
+   for(let n=0;n<120;n++){try{child=Number(readFileSync(pidfile,'utf8'));break;}catch{await new Promise(r=>setTimeout(r,25));}}
+   expect(child).toBeGreaterThan(0);expect(running(child)).toBe(true);parent.kill('SIGKILL');
+   for(let n=0;n<120&&running(child);n++)await new Promise(r=>setTimeout(r,25));
+   expect(running(child)).toBe(false);
+  }finally{parent.kill('SIGKILL');if(child){try{process.kill(child,'SIGKILL');}catch{}}}
+ });
+});

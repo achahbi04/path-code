@@ -1,5 +1,7 @@
 /** P16 bounded argv executor. Only reduced codes leave this module. */
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const NATIVE_COMMAND_GUARD = fileURLToPath(new URL('./native-command-guard.mjs',import.meta.url));
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync, cpSync, rmSync, realpathSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -55,7 +57,12 @@ export function executeNativeCommand(argv, { cwd, env, limits = NATIVE_LIMITS, s
       killTimer = setTimeout(() => { try { process.kill(-processHandle.pid, 'SIGKILL'); } catch { processHandle.kill?.('SIGKILL'); } }, 1000);
     };
     try {
-      processHandle = spawnImpl(argv[0], argv.slice(1), { cwd, env, shell: false, detached: true, stdio: ['ignore','pipe','pipe'] });
+      processHandle = spawnImpl(process.execPath, [NATIVE_COMMAND_GUARD, ...argv], { cwd, env, shell: false, detached: true, stdio: ['ignore','pipe','pipe','ipc'] });
+      processHandle.on('message', message => {
+        if (message?.kind === 'native.ready') {
+          try { processHandle.send({kind:'native.start'}); } catch { kill('NATIVE_INTERRUPTED'); }
+        } else if (message?.kind === 'native.error' && message.code === 'NATIVE_TOOL_UNAVAILABLE') failure = message.code;
+      });
       const capture = chunk => { size += chunk.length; if (size > limits.outputBytes) kill('NATIVE_OUTPUT_LIMIT'); };
       processHandle.stdout?.on('data',capture); processHandle.stderr?.on('data',capture);
       processHandle.on('error', () => finish(fail('NATIVE_TOOL_UNAVAILABLE')));
