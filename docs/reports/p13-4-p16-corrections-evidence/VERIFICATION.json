@@ -1,0 +1,123 @@
+{
+  "testedImplementationHead": "8d46171eea159f642afc7d9b846d7a576fa5d8e1",
+  "typecheck": "PASS",
+  "build": "PASS",
+  "diffCheck": "PASS",
+  "focused": {
+    "passed": 103,
+    "failed": 0,
+    "skipped": 0,
+    "total": 103
+  },
+  "protected": {
+    "passed": 319,
+    "failed": 0,
+    "skipped": 0,
+    "total": 319
+  },
+  "protectedStages": {
+    "P9": {
+      "files": 4,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    "P10": {
+      "files": 7,
+      "passed": 79,
+      "failed": 0,
+      "skipped": 0
+    },
+    "P11": {
+      "files": 3,
+      "passed": 83,
+      "failed": 0,
+      "skipped": 0
+    },
+    "P12": {
+      "files": 4,
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0
+    },
+    "P13": {
+      "files": 8,
+      "passed": 101,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "protectedStageFiles": {
+    "P9": [
+      "tests/s5/build-environments.test.ts",
+      "tests/s5/build-environments-ux.test.ts",
+      "tests/s5/build-environment-consumption.test.ts",
+      "tests/s5/build-runtime-security.test.ts"
+    ],
+    "P10": [
+      "tests/s5/build-deployments.test.ts",
+      "tests/s5/build-deployment-coordinator.test.ts",
+      "tests/s5/build-deployment-unobserved.test.ts",
+      "tests/s5/build-production-deployment-authority.test.ts",
+      "tests/s5/build-release-authority.test.ts",
+      "tests/s5/build-vercel-preview-adapter.test.ts",
+      "tests/s5/build-vercel-production-adapter.test.ts"
+    ],
+    "P11": [
+      "tests/s5/build-p11-domains.test.ts",
+      "tests/s5/build-p11-coordinator.test.ts",
+      "tests/s5/build-vercel-domain-adapter.test.ts"
+    ],
+    "P12": [
+      "tests/s5/build-integrations.test.ts",
+      "tests/s5/build-integrations-ux.test.ts",
+      "tests/s5/build-integration-verification.test.ts",
+      "tests/s5/build-github-integration-adapter.test.ts"
+    ],
+    "P13": [
+      "tests/s5/build-databases.test.ts",
+      "tests/s5/build-database-verification.test.ts",
+      "tests/s5/build-database-provisioning.test.ts",
+      "tests/s5/build-database-migrations.test.ts",
+      "tests/s5/build-supabase-management-adapter.test.ts",
+      "tests/s5/build-supabase-postgres-adapter.test.ts",
+      "tests/s5/build-supabase-provisioning-adapter.test.ts",
+      "tests/s5/build-supabase-migration-adapter.test.ts"
+    ]
+  },
+  "full": {
+    "passed": 2175,
+    "failed": 30,
+    "skipped": 0,
+    "total": 2205
+  },
+  "newCorrectionCases": 48,
+  "newFailures": 0,
+  "correctionRelatedFailures": 0,
+  "skipped": 0,
+  "sourceDelta": [
+    "scripts/pathcode-cli/build/native-executor.mjs"
+  ],
+  "nativeLimitsUnchanged": {
+    "timeoutMs": 300000,
+    "outputBytes": 1048576,
+    "diskBytes": 1073741824,
+    "artifactBytes": 268435456,
+    "workspaceEntries": 200000,
+    "artifactChecksums": 20000
+  },
+  "traversalBudget": {
+    "directoryHandles": 128,
+    "overBudgetOutcome": "NATIVE_WORKSPACE_UNAVAILABLE, never measured NATIVE_DISK_LIMIT"
+  },
+  "reproduction": {
+    "scanner": {
+      "before": "NATIVE_SECRET_OUTPUT_UNSAFE",
+      "after": "accepted"
+    },
+    "monitor": {
+      "beforeTransientErrors": 22,
+      "afterTransientErrors": 0
+    }
+  }
+}

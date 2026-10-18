@@ -1,0 +1,19 @@
+{
+  "baseline": "5638ac85bf7edfbca9eb1f1df8da223ee033be03",
+  "originalFixture": {
+    "passed": 0,
+    "failed": 1,
+    "skipped": 0,
+    "errorCode": "ERR_MODULE_NOT_FOUND",
+    "missingDependency": "pg"
+  },
+  "changedPath": "tests/s5/build-running-identity.test.ts",
+  "correction": "Share installed node_modules via a Git-ignored directory symlink in the disposable package checkout; keep all real coordinator and running-code identity assertions.",
+  "acceptedBaselineWithOnlyFixtureCorrection": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "total": 1
+  },
+  "productionWorkaround": false
+}
