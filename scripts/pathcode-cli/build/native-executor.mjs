@@ -44,7 +44,7 @@ export function inspectNativeFiles(root, { maxBytes = NATIVE_LIMITS.artifactByte
   }
   visit(root); return { bytes, checksums: checksums.sort((a,b) => a.path.localeCompare(b.path)) };
 }
-export function executeNativeCommand(argv, { cwd, env, limits = NATIVE_LIMITS, spawnImpl = spawn } = {}) {
+export function executeNativeCommand(argv, { cwd, env, limits = NATIVE_LIMITS, spawnImpl = spawn, diskRoot = cwd } = {}) {
   return new Promise(resolve => {
     let processHandle, size = 0, finished = false, failure = null, deadline, diskTimer, killTimer;
     const finish = result => { if (!finished) { finished = true; clearTimeout(deadline); clearInterval(diskTimer); clearTimeout(killTimer); resolve(result); } };
@@ -59,15 +59,18 @@ export function executeNativeCommand(argv, { cwd, env, limits = NATIVE_LIMITS, s
       const capture = chunk => { size += chunk.length; if (size > limits.outputBytes) kill('NATIVE_OUTPUT_LIMIT'); };
       processHandle.stdout?.on('data',capture); processHandle.stderr?.on('data',capture);
       processHandle.on('error', () => finish(fail('NATIVE_TOOL_UNAVAILABLE')));
-      processHandle.on('close', code => finish(failure ? fail(failure) : code === 0 ? { ok: true } : fail('NATIVE_COMMAND_FAILED')));
+      processHandle.on('close', code => {
+        if (failure) { try { process.kill(-processHandle.pid,'SIGKILL'); } catch { /* group already exited */ } }
+        finish(failure ? fail(failure) : code === 0 ? { ok: true } : fail('NATIVE_COMMAND_FAILED'));
+      });
       deadline = setTimeout(() => kill('NATIVE_TIMEOUT'), limits.timeoutMs);
-      diskTimer = setInterval(() => { try { inspectNativeFiles(cwd, { maxBytes: limits.diskBytes, allowLinks: true, checksum: false }); } catch { kill('NATIVE_DISK_LIMIT'); } }, 1000);
+      diskTimer = setInterval(() => { try { inspectNativeFiles(diskRoot, { maxBytes: limits.diskBytes, allowLinks: true, checksum: false }); } catch { kill('NATIVE_DISK_LIMIT'); } }, 1000);
     } catch { finish(fail('NATIVE_TOOL_UNAVAILABLE')); }
   });
 }
 export async function executeNativePackage({ workspace, profile, env, plan, limits = NATIVE_LIMITS, commandExecutor = executeNativeCommand }) {
   const run = async (argv, cwd) => {
-    const r = await commandExecutor(argv, { cwd, env: { ...env, NPM_CONFIG_CACHE: join(workspace,'.path-native-cache'), XDG_CACHE_HOME: join(workspace,'.path-native-cache') }, limits });
+    const r = await commandExecutor(argv, { cwd, diskRoot: workspace, env: { ...env, NPM_CONFIG_CACHE: join(workspace,'.path-native-cache'), XDG_CACHE_HOME: join(workspace,'.path-native-cache') }, limits });
     if (!r?.ok) throw new Error(/^NATIVE_[A-Z_]+$/.test(r?.code) ? r.code : 'NATIVE_COMMAND_FAILED');
     inspectNativeFiles(workspace, { maxBytes: limits.diskBytes, allowLinks: true, checksum: false });
   };

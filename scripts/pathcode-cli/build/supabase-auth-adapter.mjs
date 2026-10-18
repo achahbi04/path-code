@@ -24,7 +24,7 @@ export function validReducedAuthConfig(c) {
   if (!exact(c, ['site_url','uri_allow_list','disable_signup','external_email_enabled','mailer_autoconfirm','external_google_enabled','external_github_enabled','external_google_client_id','external_google_secret_present','external_github_client_id','external_github_secret_present']) || typeof c.external_google_secret_present !== 'boolean' || typeof c.external_github_secret_present !== 'boolean') return false;
   return !!reduceAuthConfig({...c, external_google_secret:c.external_google_secret_present ? 'present' : null, external_github_secret:c.external_github_secret_present ? 'present' : null});
 }
-export const authConfigDigest = reduced => digest(reduced);
+export const authConfigDigest = reduced => digest(Object.fromEntries(Object.keys(reduced).sort().map(k => [k,reduced[k]])));
 export function desiredAuthPatch(config, socialSecrets = {}) {
   const result = { site_url: config.siteUrl, uri_allow_list: config.redirectUrls.join(','), disable_signup: !config.signupEnabled,
     external_email_enabled: config.emailEnabled, mailer_autoconfirm: !config.emailConfirmationRequired };

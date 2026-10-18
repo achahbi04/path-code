@@ -279,3 +279,13 @@ describe('Prepared operation recovery',()=>{
   expect(await f.call('auth.applyObserve',await f.parameters())).toMatchObject({ok:true,state:'failed_no_effect'});expect((await f.call('auth.list')).pendingOperation).toBeNull();expect(f.counts().patches).toBe(0);
  });
 });
+describe('Deterministic provider state and workspace caps',()=>{
+ it('makes provider digests independent of property order',async()=>{
+  const {authConfigDigest}=await load('supabase-auth-adapter');expect(authConfigDigest({a:1,b:2})).toBe(authConfigDigest({b:2,a:1}));
+ });
+ it('checks the entire native workspace while running a nested packaging command',async()=>{
+  const f=await fixture();const nested=join(f.project,'package');mkdirSync(nested);writeFileSync(join(f.project,'excess.bin'),Buffer.alloc(1000));
+  const {executeNativeCommand,NATIVE_LIMITS}=await load('native-executor');
+  expect(await executeNativeCommand([process.execPath,'-e','setInterval(()=>{},1000)'],{cwd:nested,diskRoot:f.project,env:{},limits:{...NATIVE_LIMITS,diskBytes:100,timeoutMs:5000}})).toMatchObject({ok:false,code:'NATIVE_DISK_LIMIT'});
+ });
+});
