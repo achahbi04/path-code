@@ -6,8 +6,8 @@ export async function guardBuilderApiRequest(req, { port = req.socket.localPort,
   const site = req.headers['sec-fetch-site'];
   if (site !== undefined && !['same-origin','none'].includes(site)) return {ok:false,status:403,code:'BUILDER_FETCH_SITE_FORBIDDEN'};
   const method = req.method || 'GET';
+  if (method !== 'GET' && req.headers.origin !== undefined && req.headers.origin !== `http://${host}`) return {ok:false,status:403,code:'BUILDER_ORIGIN_FORBIDDEN'};
   if (!['GET','HEAD'].includes(method)) {
-    if (req.headers.origin !== undefined && req.headers.origin !== `http://${host}`) return {ok:false,status:403,code:'BUILDER_ORIGIN_FORBIDDEN'};
     if (referenceUpload) return {ok:true};
     let bytes = 0; const chunks = []; let tooLarge = Number(req.headers['content-length']) > BUILDER_JSON_LIMIT;
     if (tooLarge) { req.resume(); return {ok:false,status:413,code:'BUILDER_JSON_TOO_LARGE'}; }

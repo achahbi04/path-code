@@ -68,7 +68,7 @@ export function executeNativeCommand(argv, { cwd, env, limits = NATIVE_LIMITS, s
     } catch { finish(fail('NATIVE_TOOL_UNAVAILABLE')); }
   });
 }
-export async function executeNativePackage({ workspace, profile, env, plan, limits = NATIVE_LIMITS, commandExecutor = executeNativeCommand }) {
+export async function executeNativePackage({ workspace, profile, env, plan, secretValues = [], limits = NATIVE_LIMITS, commandExecutor = executeNativeCommand }) {
   const run = async (argv, cwd) => {
     const r = await commandExecutor(argv, { cwd, diskRoot: workspace, env: { ...env, NPM_CONFIG_CACHE: join(workspace,'.path-native-cache'), XDG_CACHE_HOME: join(workspace,'.path-native-cache') }, limits });
     if (!r?.ok) throw new Error(/^NATIVE_[A-Z_]+$/.test(r?.code) ? r.code : 'NATIVE_COMMAND_FAILED');
@@ -80,7 +80,7 @@ export async function executeNativePackage({ workspace, profile, env, plan, limi
     const webRoot = join(workspace,profile.packagePolicy.webDir);
     if (!existsSync(join(webRoot,'index.html')) || lstatSync(webRoot).isSymbolicLink() || !lstatSync(join(webRoot,'index.html')).isFile()) return fail('NATIVE_STATIC_EXPORT_REQUIRED');
     if (!realpathSync(webRoot).startsWith(realpathSync(workspace)+sep)) return fail('NATIVE_ARTIFACT_UNSAFE');
-    const sentinels = Object.entries(env).filter(([k]) => !['PATH','HOME','USER','TMPDIR','TMP','TEMP','LANG','LC_ALL','LC_CTYPE','CI','BROWSER','FORCE_COLOR','HTTP_PROXY','HTTPS_PROXY','http_proxy','https_proxy','NO_PROXY','no_proxy','NODE_EXTRA_CA_CERTS','SSL_CERT_FILE'].includes(k)).map(([,v]) => v).filter(v => v.length >= 4);
+    const sentinels = secretValues;
     inspectNativeFiles(webRoot,{ sentinels, maxBytes: limits.artifactBytes });
     const packaging = join(workspace,'.path-native-package');
     if (existsSync(packaging)) return fail('NATIVE_ARTIFACT_UNSAFE');

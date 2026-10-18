@@ -32,7 +32,12 @@ function snapshot(runtimeRoot,buildId,p) {
   let env;
   try { env = createProductRuntimeEnv({kind:'build',env:{}},process.env,{runtimeRoot,buildId,environmentId:profile.buildEnvironmentId,projectRoot:record.projectBindings?.[0]?.projectRoot}); }
   catch { return fail('NATIVE_BUILD_ENVIRONMENT_UNUSABLE'); }
-  return {ok:true,record,authority:read.authority,profile,env};
+  const buildEnvironment = record.environments.items.find(e => e.environmentId === profile.buildEnvironmentId);
+  // Publishable Supabase keys are intentionally public in the client artifact;
+  // their P9 binding still keeps values out of authority, events and objectives.
+  const publishableNames = new Set(['VITE_SUPABASE_PUBLISHABLE_KEY','NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY','PUBLIC_SUPABASE_PUBLISHABLE_KEY']);
+  const secretValues = buildEnvironment.variables.filter(v => v.kind === 'secret' && !publishableNames.has(v.variableName)).map(v => env[v.variableName]).filter(v => typeof v === 'string' && v.length > 0);
+  return {ok:true,record,authority:read.authority,profile,env,secretValues};
 }
 export async function runNativeOperation({runtimeRoot,buildId,action,params,exclusive,executor = executeNativePackage,activeOperations}) {
   if (action === 'observe') {
@@ -89,7 +94,7 @@ export async function runNativeOperation({runtimeRoot,buildId,action,params,excl
   });
   if (!started.ok) return started;
   let result;
-  try { result = await executor({workspace,profile:s.profile,env:s.env,plan:op}); } catch { result = fail('NATIVE_PACKAGE_FAILED'); }
+  try { result = await executor({workspace,profile:s.profile,env:s.env,secretValues:s.secretValues,plan:op}); } catch { result = fail('NATIVE_PACKAGE_FAILED'); }
   try {
     return await exclusive(buildId,() => {
       const record = readBuildRecord(runtimeRoot,buildId), read = readNativeAuthority(record);
@@ -101,7 +106,7 @@ export async function runNativeOperation({runtimeRoot,buildId,action,params,excl
       const stale = record.pendingRestore || record.pendingCandidate || record.authoritativeSha !== op.sourceSha || (record.environments?.revision ?? 0) !== op.environmentRevision || a.revision !== started.revision || !environmentUnchanged || digest(a.profiles.find(p => p.nativeId === op.nativeId)) !== op.profileDigest;
       let inspected = null;
       if (result?.ok && !stale) {
-        try { inspected = inspectNativeFiles(join(workspace,'.path-native-package'),{maxBytes:NATIVE_LIMITS.artifactBytes,sentinels:Object.entries(s.env).filter(([k,v])=>!['PATH','HOME','USER','TMPDIR','TMP','TEMP','LANG','LC_ALL','LC_CTYPE','CI','BROWSER','FORCE_COLOR','HTTP_PROXY','HTTPS_PROXY','http_proxy','https_proxy','NO_PROXY','no_proxy','NODE_EXTRA_CA_CERTS','SSL_CERT_FILE'].includes(k) && v.length >= 4).map(([,v])=>v)}); } catch { result = fail('NATIVE_ARTIFACT_UNSAFE'); }
+        try { inspected = inspectNativeFiles(join(workspace,'.path-native-package'),{maxBytes:NATIVE_LIMITS.artifactBytes,sentinels:s.secretValues}); } catch { result = fail('NATIVE_ARTIFACT_UNSAFE'); }
       }
       const state = stale ? 'stale' : inspected ? 'completed' : 'failed';
       const terminal = {...op,state,failureCode:stale ? 'NATIVE_AUTHORITY_STALE' : inspected ? null : /^NATIVE_[A-Z_]+$/.test(result?.code) ? result.code : 'NATIVE_PACKAGE_FAILED',updatedAt:now()};

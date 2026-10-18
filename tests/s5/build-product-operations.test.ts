@@ -289,3 +289,16 @@ describe('Deterministic provider state and workspace caps',()=>{
   expect(await executeNativeCommand([process.execPath,'-e','setInterval(()=>{},1000)'],{cwd:nested,diskRoot:f.project,env:{},limits:{...NATIVE_LIMITS,diskBytes:100,timeoutMs:5000}})).toMatchObject({ok:false,code:'NATIVE_DISK_LIMIT'});
  });
 });
+describe('Native artifact secret roles',()=>{
+ it('allows ordinary config and public client keys while rejecting private secret values',async()=>{
+  let leakPrivate=false;let observedSecrets:string[]=[];
+  const f=await nativeFixture(async(input:any)=>{observedSecrets=input.secretValues;mkdirSync(join(input.workspace,'.path-native-package'));writeFileSync(join(input.workspace,'.path-native-package','index.html'),'production PUBLIC_RUNTIME_SENTINEL'+(leakPrivate?' PRIVATE_RUNTIME_SENTINEL':''));return{ok:true};});
+  writeFileSync(join(f.project,'.env.local'),'PRODUCT_SECRET=PRIVATE_RUNTIME_SENTINEL\nVITE_SUPABASE_PUBLISHABLE_KEY=PUBLIC_RUNTIME_SENTINEL\n');
+  let rev=1;for(const variableName of ['PRODUCT_SECRET','VITE_SUPABASE_PUBLISHABLE_KEY'])expect(await f.call('environments.mutate',{action:'bind_secret',expectedEnvironmentRevision:rev++,input:{environmentId:f.environmentId,variableName,backend:'local_env_file'}})).toMatchObject({ok:true});
+  for(const variableName of ['PRODUCT_SECRET','VITE_SUPABASE_PUBLISHABLE_KEY'])expect(await f.call('environments.verifyLocal',{environmentId:f.environmentId,variableName,expectedEnvironmentRevision:rev++})).toMatchObject({ok:true});
+  expect(await f.call('environments.mutate',{action:'set_config',expectedEnvironmentRevision:rev,input:{environmentId:f.environmentId,variableName:'NODE_ENV',value:'production'}})).toMatchObject({ok:true});
+  await f.call('native.prepare',await f.parameters());expect(await f.call('native.execute',await f.parameters())).toMatchObject({ok:true,state:'completed'});expect(observedSecrets).toEqual(['PRIVATE_RUNTIME_SENTINEL']);
+  leakPrivate=true;await f.call('native.prepare',await f.parameters());expect(await f.call('native.execute',await f.parameters())).toMatchObject({ok:true,state:'failed'});
+  const recordText=JSON.stringify(readBuildRecord(f.root,f.record.buildId));expect(recordText).not.toContain('PRIVATE_RUNTIME_SENTINEL');expect(recordText).not.toContain('PUBLIC_RUNTIME_SENTINEL');
+ });
+});

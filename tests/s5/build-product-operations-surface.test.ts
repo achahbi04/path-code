@@ -15,6 +15,7 @@ describe('Builder shared foreign-origin protection',()=>{
   const foreign:any=await new Promise((resolve,reject)=>{const req=httpRequest(new URL(path,f.base),{method:'POST',headers:{Host:'foreign.example','Content-Type':'application/json'}},res=>{const chunks:Buffer[]=[];res.on('data',c=>chunks.push(c));res.on('end',()=>resolve({status:res.statusCode,body:JSON.parse(Buffer.concat(chunks).toString())}));});req.on('error',reject);req.end(JSON.stringify(body));});
   expect(foreign).toMatchObject({status:403,body:{code:'BUILDER_HOST_FORBIDDEN'}});
   expect(await f.request(path,body,{Origin:'https://foreign.example'})).toMatchObject({status:403,body:{code:'BUILDER_ORIGIN_FORBIDDEN'}});
+  expect((await fetch(new URL(path,f.base),{method:'HEAD',headers:{Origin:'https://foreign.example'}})).status).toBe(403);
   expect(await f.request(path,body,{'Sec-Fetch-Site':'cross-site'})).toMatchObject({status:403,body:{code:'BUILDER_FETCH_SITE_FORBIDDEN'}});
   expect(await f.request(path,body,{'Content-Type':'text/plain'})).toMatchObject({status:415});
   expect(await f.request(path,{padding:'a'.repeat(256*1024)})).toMatchObject({status:413});

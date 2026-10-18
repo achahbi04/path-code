@@ -1208,7 +1208,7 @@ export function createBuildCoordinatorService(options: {
     ReadonlyMap<string, BuildDatabaseVerificationAdapterPair>;
   databaseOperationAdapters?: Readonly<Record<string, Record<string, any>>>;
   authAdapter?: {adapterVersion?: string; observe(input:{credential:string;projectRef:string}):Promise<any>; patch(input:{credential:string;projectRef:string}, fields:Record<string,string|boolean>):Promise<any>};
-  nativeExecutor?: (input:{workspace:string;profile:import('./operation-types.mjs').BuildNativeProfile;env:Record<string,string>;plan:import('./operation-types.mjs').NativeOperation}) => Promise<{ok:boolean;code?:string}>;
+  nativeExecutor?: (input:{workspace:string;profile:import('./operation-types.mjs').BuildNativeProfile;env:Record<string,string>;secretValues:string[];plan:import('./operation-types.mjs').NativeOperation}) => Promise<{ok:boolean;code?:string}>;
 }): Promise<{
   dispatch(method: string, params?: Record<string, unknown>): Promise<any>;
   listDomains(buildId: string): Promise<any>;
