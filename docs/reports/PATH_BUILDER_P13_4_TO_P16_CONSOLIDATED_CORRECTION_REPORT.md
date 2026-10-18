@@ -7,7 +7,7 @@
 - Exact starting parent: `e7dac89edcfb0eca2b219df019c014cb191d2bcc`.
 - Correction branch: `codex/path-builder-p13-4-p16-corrections`, created directly from that parent.
 - Protected accepted baseline: `5638ac85bf7edfbca9eb1f1df8da223ee033be03`.
-- Preserved review branch, `work`, accepted branch and `main` are not changed by this mission. Protected remote heads were captured before implementation and must match at delivery; final push/PR receipts are supplied in the completion report.
+- Preserved review branch, `work`, accepted branch and `main` are not changed by this mission. Protected remote heads were captured before implementation and verified unchanged after the correction/evidence push. The final completion report supplies final remote-head equality; draft PR creation is blocked by the Cloud egress policy described in J/K.
 
 ## B. RC-1 — Native disk monitor
 
@@ -105,13 +105,15 @@ No new authority, worker/service architecture, P17 implementation, Engine Fabric
 ## J. Git preservation
 
 - Implementation correction commit: `8d46171eea159f642afc7d9b846d7a576fa5d8e1` — `fix(builder): harden native monitoring and prove frozen tranche invariants`.
-- A normal documentation/evidence closure commit follows; its exact final HEAD and draft PR URL are reported after push verification in the completion report.
+- Evidence closure commit: `79c7353186f1593572411c1db65ad73fa41c52a3` — `docs(builder): record consolidated correction verification and invariant evidence`. A final documentation-only delivery-gate record follows; its exact SHA is supplied in the completion report.
 - Delivery branch: `codex/path-builder-p13-4-p16-corrections`.
-- New draft PR target: `cursor/pathcode-antigravity-v1`; **REVIEW ONLY — DO NOT MERGE**.
-- Original review branch remains `e7dac89edcfb0eca2b219df019c014cb191d2bcc`; accepted branch remains `5638ac85bf7edfbca9eb1f1df8da223ee033be03`; main remains its preflight SHA. Protected refs must compare equal at delivery.
-- No amend, rebase, squash, force push, accepted-branch update, repository merge or deployment. Final clean-worktree and remote-head equality checks are performed after the closure commit.
+- Draft PR target: `cursor/pathcode-antigravity-v1`; title: **PATH Builder P13.4–P16 corrections (review only — do not merge)**. **Not created**: the Cloud proxy blocks HTTPS CONNECT to `api.github.com` with HTTP 403 before GitHub can receive either GraphQL or REST requests. Exact REST error: `Post "https://api.github.com/repos/achahbi04/path-code/pulls": Forbidden`. Expanded network permission and approved escalated execution did not remove this egress block. No GitHub token or authentication was changed.
+- Original review branch remains `e7dac89edcfb0eca2b219df019c014cb191d2bcc`; accepted branch remains `5638ac85bf7edfbca9eb1f1df8da223ee033be03`; main remains `5a1784d8f033251caf9c0c3be102c9eb2f0cd345`. All three protected remote refs were compared equal after push.
+- No amend, rebase, squash, force push, accepted-branch update, repository merge or deployment. The source/evidence push was verified by fetch and exact local/remote HEAD equality. Final clean-worktree and remote-head checks are repeated after the delivery-gate documentation commit.
 
 ## K. Remaining acceptance gates
+
+- **Delivery gate:** the owner/platform must allow HTTPS CONNECT to `api.github.com` in this Cloud environment’s outbound network policy, then create the authorized draft PR. This is a verified network-layer block, not evidence that the already-granted repository or pull-request permissions are insufficient. Git transport to `github.com` works and the correction branch is preserved. All RC-1 through RC-4 implementation and verification work is complete; the mission remains blocked solely on the required draft PR. See [GITHUB_DELIVERY.json](p13-4-p16-corrections-evidence/GITHUB_DELIVERY.json).
 
 - P13.4 live/local final database UX acceptance.
 - P14 live Auth/social/runtime acceptance.
@@ -120,4 +122,4 @@ No new authority, worker/service architecture, P17 implementation, Engine Fabric
 
 ## L. Final status
 
-`CORRECTIONS_COMPLETE — READY_FOR_FINAL_LOCAL_VERIFICATION`
+`BLOCKED — CORRECTIONS_NOT_COMPLETE`
