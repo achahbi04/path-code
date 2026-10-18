@@ -48,6 +48,7 @@ export function sanitizeBuildEventValue(value, depth = 0, limits = undefined) {
     return value
       .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
       .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]")
+      .replace(/\b(?:(?:sk|rk)_(?:test|live)|whsec|sb_secret|ghp|github_pat)_[A-Za-z0-9_]+/gi, "[redacted]")
       .replace(
         /\b(api[_-]?key|token|password|secret)\s*[:=]\s*[^\s,;]+/gi,
         "$1=[redacted]",

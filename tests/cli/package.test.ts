@@ -19,7 +19,7 @@ describe("CLI package and entry foundation", () => {
       pathcode: "./scripts/pathcode.mjs",
       "path-build": "./scripts/path-build.mjs",
     });
-    expect(packageJson.dependencies ?? {}).toEqual({});
+    expect(packageJson.dependencies ?? {}).toEqual({ pg: "^8.23.1" });
   });
 
   it("preserves the foundation CLI compiled entry for legacy smoke/delegation", () => {

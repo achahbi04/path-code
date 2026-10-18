@@ -1,0 +1,17 @@
+{
+  "created": true,
+  "prepared": true,
+  "executed": true,
+  "state": "completed",
+  "canonicalSourceShaMatches": true,
+  "bytes": 330665,
+  "files": 69,
+  "androidScaffold": true,
+  "operationHistory": [
+    {
+      "state": "completed",
+      "capacitorVersion": "8.5.3",
+      "framework": "static"
+    }
+  ]
+}

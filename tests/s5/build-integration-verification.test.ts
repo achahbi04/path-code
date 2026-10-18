@@ -246,8 +246,8 @@ describe("P12.2 credential bridge and verification boundary", () => {
     expect(calls).toBe(0);
   });
 
-  it("exports the production GitHub default and preserves explicit empty-registry unavailability", async () => {
-    expect(Object.keys(DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS)).toEqual(["github"]);
+  it("exports production GitHub and Stripe defaults and preserves explicit empty-registry unavailability", async () => {
+    expect(Object.keys(DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS)).toEqual(["github", "stripe"]);
     expect(DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS.github).toMatchObject({
       providerKey: "github", adapterVersion: "github.identity.v1",
     });

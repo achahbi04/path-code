@@ -1,0 +1,25 @@
+{
+  "results": [
+    {
+      "plane": "databases",
+      "heading": "Database",
+      "fields": 3
+    },
+    {
+      "plane": "auth",
+      "heading": "Authentication",
+      "fields": 16
+    },
+    {
+      "plane": "payments",
+      "heading": "Payments",
+      "fields": 15
+    },
+    {
+      "plane": "native",
+      "heading": "Mobile",
+      "fields": 8
+    }
+  ],
+  "errors": []
+}

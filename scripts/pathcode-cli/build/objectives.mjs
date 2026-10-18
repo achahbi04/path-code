@@ -2,6 +2,7 @@
  * S5 — Build child task objective framing (engineer / evaluate / challenge).
  */
 
+import { configuredProductOperationContext } from "./operation-context.mjs";
 import { structuredResultContractBlock } from "./cognitive-result.mjs";
 import { listBuildIntegrationCatalog } from "./integrations.mjs";
 import { DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS } from "./integration-adapters.mjs";
@@ -152,7 +153,7 @@ export function frameEngineerObjective(record, gap) {
         "Do NOT run `git init`. Do NOT create a nested .git. Commit on the existing repo / task branch only.",
       ].join("\n")
     : "Commit on the existing task branch. Do not run git init or create a nested .git.";
-  const integrationsBlock = configuredIntegrationContext(record);
+  const integrationsBlock = [configuredIntegrationContext(record), configuredProductOperationContext(record)].filter(Boolean).join("\n\n");
 
   if (followUp) {
     const controlling = request || step;

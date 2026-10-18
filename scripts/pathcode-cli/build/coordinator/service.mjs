@@ -5,6 +5,8 @@
  * runtime synchronization. Browser/HTTP processes are clients only.
  */
 
+import { createSupabaseAuthAdapter } from "../supabase-auth-adapter.mjs";
+import { PRODUCT_OPERATION_METHODS, dispatchProductOperation, guardProductReferences } from "../coordinator-operations.mjs";
 import { createBuildController, syncConversationLifecycle } from "../controller.mjs";
 import {
   findLatestActiveBuild,
@@ -83,7 +85,10 @@ export async function createBuildCoordinatorService(options) {
     integrationVerificationAdapters = DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS,
     databaseVerificationAdapters = DEFAULT_DATABASE_VERIFICATION_ADAPTERS,
     databaseOperationAdapters = DEFAULT_DATABASE_OPERATION_ADAPTERS,
+    authAdapter = createSupabaseAuthAdapter(),
+    nativeExecutor,
   } = options;
+  const activeNativeOperations = new Set();
   const runProductionCommand = productionCommandExecutor ?? ((spec, executorOptions) =>
     executeProductionVercelCommand(spec, { ...executorOptions,
       ...(productionSpawnImpl ? { spawnImpl: productionSpawnImpl } : {}) }));
@@ -1107,6 +1112,7 @@ export async function createBuildCoordinatorService(options) {
         method !== BuildCoordinatorMethods.BUILD_INTEGRATIONS_CATALOG &&
         method !== BuildCoordinatorMethods.BUILD_DATABASES_CATALOG &&
         (buildId !== scopedBuildId || !new Set([
+          ...PRODUCT_OPERATION_METHODS,
           BuildCoordinatorMethods.BUILD_ENVIRONMENTS_LIST,
           BuildCoordinatorMethods.BUILD_ENVIRONMENT_READ,
           BuildCoordinatorMethods.BUILD_ENVIRONMENT_MUTATE,
@@ -1129,6 +1135,7 @@ export async function createBuildCoordinatorService(options) {
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_PREPARE,
           BuildCoordinatorMethods.BUILD_DEPLOYMENT_TRANSITION,
         ]).has(method))) return { ok: false, code: "COORDINATOR_SCOPE_FORBIDDEN" };
+    if (PRODUCT_OPERATION_METHODS.includes(method)) return dispatchProductOperation({method,params,runtimeRoot,exclusive,authAdapter,nativeExecutor,activeOperations:activeNativeOperations});
     switch (method) {
       case BuildCoordinatorMethods.HELLO:
         return {
@@ -1196,6 +1203,8 @@ export async function createBuildCoordinatorService(options) {
       case BuildCoordinatorMethods.BUILD_INTEGRATION_MUTATE:
         return exclusive(buildId, () => {
           const { buildId: _buildId, ...request } = params;
+          const referenceGuard = guardProductReferences(readBuildRecord(runtimeRoot, buildId), "integrations", request);
+          if (!referenceGuard.ok) return referenceGuard;
           const result = prepareBuildIntegrationMutation(runtimeRoot, buildId, request);
           if (!result.ok) return result;
           writeBuildRecord(runtimeRoot, result.record);
@@ -1246,6 +1255,8 @@ export async function createBuildCoordinatorService(options) {
       case BuildCoordinatorMethods.BUILD_DATABASE_MUTATE:
         return exclusive(buildId, () => {
           const { buildId: _buildId, ...request } = params;
+          const referenceGuard = guardProductReferences(readBuildRecord(runtimeRoot, buildId), "databases", request);
+          if (!referenceGuard.ok) return referenceGuard;
           const result = prepareBuildDatabaseMutation(runtimeRoot, buildId, request);
           if (!result.ok) return result;
           writeBuildRecord(runtimeRoot, result.record);

@@ -97,10 +97,11 @@ export function inspectDeploymentSource({ runtimeRoot, buildId }) {
 }
 
 /** Caller must call cleanupDeploymentSource when finished. No provider action here. */
-export function prepareDeploymentSource({ runtimeRoot, buildId }) {
+export function prepareDeploymentSource({ runtimeRoot, buildId, namespace = "deployment-snapshots" }) {
+  if (!["deployment-snapshots", "native-snapshots"].includes(namespace)) return fail("DEPLOY_WORKSPACE_ESCAPE");
   const source = inspectDeploymentSource({ runtimeRoot, buildId });
   if (!source.ok) return source;
-  const parent = join(resolve(runtimeRoot), "deployment-snapshots", buildId);
+  const parent = join(resolve(runtimeRoot), namespace, buildId);
   let workspace;
   let canonicalParent;
   try {
@@ -111,7 +112,7 @@ export function prepareDeploymentSource({ runtimeRoot, buildId }) {
     workspace = join(canonicalParent, randomUUID());
     mkdirSync(workspace, { mode: 0o700 });
   } catch { return fail("DEPLOY_WORKSPACE_FAILED"); }
-  const abort = (code) => { cleanupDeploymentSource({ runtimeRoot, workspace }); return fail(code); };
+  const abort = (code) => { cleanupDeploymentSource({ runtimeRoot, workspace, namespace }); return fail(code); };
   try {
     const real = realpathSync(workspace);
     if (relative(canonicalParent, real).startsWith("..") || !real.startsWith(`${canonicalParent}${sep}`)) {
@@ -141,13 +142,26 @@ export function prepareDeploymentSource({ runtimeRoot, buildId }) {
   } catch { return abort("DEPLOY_WORKSPACE_FAILED"); }
 }
 
-export function cleanupDeploymentSource({ runtimeRoot, workspace }) {
+export function cleanupDeploymentSource({ runtimeRoot, workspace, namespace = "deployment-snapshots" }) {
+  if (!["deployment-snapshots", "native-snapshots"].includes(namespace)) return fail("DEPLOY_WORKSPACE_ESCAPE");
   if (!workspace || !existsSync(workspace)) return { ok: true };
   try {
-    const parent = realpathSync(join(resolve(runtimeRoot), "deployment-snapshots", dirname(workspace).split(sep).pop()));
+    const parent = realpathSync(join(resolve(runtimeRoot), namespace, dirname(workspace).split(sep).pop()));
     if (!/^[0-9a-f-]{36}$/i.test(workspace.split(sep).pop()) ||
         dirname(realpathSync(workspace)) !== parent) return fail("DEPLOY_WORKSPACE_ESCAPE");
     rmSync(workspace, { recursive: true, force: true });
     return { ok: true };
   } catch { return fail("DEPLOY_WORKSPACE_CLEANUP_FAILED"); }
+}
+
+/** Revalidate a retained materialization before executing creator build scripts. */
+export function verifyDeploymentSourceWorkspace({runtimeRoot, buildId, workspace}) {
+  const source = inspectDeploymentSource({runtimeRoot,buildId});
+  if (!source.ok) return source;
+  try {
+    if (!realpathSync(workspace).startsWith(realpathSync(runtimeRoot) + sep)) return fail("DEPLOY_WORKSPACE_ESCAPE");
+    if (JSON.stringify(workspaceFiles(workspace)) !== JSON.stringify([...source.entries].sort()) ||
+      source.entries.some(path => !lstatSync(join(workspace,path)).isFile() || output(git(source.root,["hash-object","--stdin"],readFileSync(join(workspace,path)))) !== source.objects[path])) return fail("DEPLOY_TREE_MISMATCH");
+    return {ok:true,sha:source.sha,treeSha:source.treeSha};
+  } catch { return fail("DEPLOY_TREE_MISMATCH"); }
 }
