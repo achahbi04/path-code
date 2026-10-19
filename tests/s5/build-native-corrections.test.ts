@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, realpathSync, existsSync } from 'node:fs';
 import * as fsAsync from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,26 +9,31 @@ const { executeNativeCommand, inspectNativeFiles, measureNativeWorkspace, NATIVE
 
 vi.mock('node:fs/promises', async importOriginal => ({...await importOriginal<typeof import('node:fs/promises')>()}));
 const roots: string[] = [];
-function workspace() { const root=mkdtempSync(join(tmpdir(),'path-native-correction-'));roots.push(root);return root; }
+function workspace() { const root=realpathSync(mkdtempSync(join(tmpdir(),'path-native-correction-')));roots.push(root);return root; }
 afterEach(()=>{vi.restoreAllMocks();for(const root of roots.splice(0))rmSync(root,{recursive:true,force:true});});
 
 describe('RC-1 bounded native disk monitoring',()=>{
  it('tolerates an actual transient ENOENT between directory enumeration and lstat',async()=>{
   const root=workspace(),file=join(root,'disappearing');writeFileSync(file,'transient');
-  const actual=fsAsync.lstat;
+  const actual=fsAsync.lstat;let removals=0,missingStats=0;
   vi.spyOn(fsAsync,'lstat').mockImplementation(async(path:any,...args:any[])=>{
-   if(String(path)===file)rmSync(file,{force:true});return (actual as any)(path,...args);
+   if(String(path)===file){expect(existsSync(file)).toBe(true);rmSync(file);removals++;expect(existsSync(file)).toBe(false);}
+   try { return await (actual as any)(path,...args); }
+   catch(error:any){if(String(path)===file && error.code==='ENOENT')missingStats++;throw error;}
   });
   expect(await measureNativeWorkspace(root)).toMatchObject({bytes:0,count:1});
+  expect(removals).toBe(1);expect(missingStats).toBe(1);expect(existsSync(file)).toBe(false);
  });
  it('tolerates a directory removed while traversal is opening it',async()=>{
   const root=workspace(),dir=join(root,'disappearing');mkdirSync(dir);
-  const actual=fsAsync.opendir;
+  const actual=fsAsync.opendir;let removals=0,missingOpens=0;
   vi.spyOn(fsAsync,'opendir').mockImplementation(async(path:any,...args:any[])=>{
-   if(String(path)===dir)rmSync(dir,{recursive:true});
-   return (actual as any)(path,...args);
+   if(String(path)===dir){expect(existsSync(dir)).toBe(true);rmSync(dir,{recursive:true});removals++;expect(existsSync(dir)).toBe(false);}
+   try { return await (actual as any)(path,...args); }
+   catch(error:any){if(String(path)===dir && error.code==='ENOENT')missingOpens++;throw error;}
   });
   expect(await measureNativeWorkspace(root)).toMatchObject({bytes:0});
+  expect(removals).toBe(1);expect(missingOpens).toBe(1);expect(existsSync(dir)).toBe(false);
  });
  it('does not classify permission failure as a measured disk overflow',async()=>{
   const root=workspace();writeFileSync(join(root,'unreadable'),'data');
