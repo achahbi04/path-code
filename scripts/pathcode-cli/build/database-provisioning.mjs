@@ -47,10 +47,19 @@ export function createDatabaseProvisionSnapshot(runtimeRoot, buildId, params, ad
   const p9 = bindings(runtimeRoot, buildId, database, [database.credentials.managementSecretRef], params.expectedEnvironmentRevision);
   if (!p9.ok) return p9;
   const root = projectRoot(record); if (!root) return fail("BUILD_NOT_BOUND");
+  // The resolver validates every parsed .env.local name against this set, but
+  // exactNames below remains the only material this operation may consume.
+  // Allow only local secret bindings from this same, revision-checked P9
+  // environment that have already passed the existing presence/safety checks.
+  const allowedNativeNames = p9.environment.environment.variables
+    .filter((binding) => binding.kind === "secret" && binding.backend === "local_env_file" &&
+      binding.bindingState === "configured" && binding.presenceState === "verified_present" &&
+      binding.safetyState === "verified_safe")
+    .map((binding) => binding.variableName);
   return { ok: true, snapshot: Object.freeze({ buildId, databaseId: database.databaseId, databaseRevision: authority.revision,
     environmentId: database.environmentId, environmentRevision: p9.environment.revision, organizationSlug: params.organizationSlug,
     managementSecretRef: database.credentials.managementSecretRef, binding: Object.freeze(p9.items[0]), projectRoot: root }),
-    adapter, exactNames: Object.freeze([p9.items[0].variableName]), allowedNativeNames: Object.freeze([p9.items[0].variableName]) };
+    adapter, exactNames: Object.freeze([p9.items[0].variableName]), allowedNativeNames: Object.freeze(allowedNativeNames) };
 }
 
 export async function executeDatabaseRegionDiscovery(input) {
