@@ -80,7 +80,7 @@ describe("P13.3 provisioning intent", () => {
     root = mkdtempSync(join(tmpdir(), "path-p13-regions-registry-"));
     const project = join(root, "project"); (await import("node:fs")).mkdirSync(project);
     execFileSync("git", ["init", "-q", project]); writeFileSync(join(project, ".gitignore"), ".env.local\n");
-    writeFileSync(join(project, ".env.local"), "MANAGEMENT_TOKEN=synthetic-management\n");
+    writeFileSync(join(project, ".env.local"), "MANAGEMENT_TOKEN=synthetic-management\nPROVISION_PASSWORD=synthetic-password\nUNRELATED_SECRET=synthetic-unrelated\n");
     const record = createBuildRecordSkeleton({ outcome: "synthetic" }); record.projectBindings.push({ bindingId: "test", projectRoot: project });
     record.loop.status = "paused"; writeBuildRecord(root, record);
     const regions = [{ code: "eu-north-1", name: "North Europe", provider: "aws", status: "AVAILABLE" }];
@@ -91,6 +91,7 @@ describe("P13.3 provisioning intent", () => {
           availableRegionsCalls++;
           expect(Object.keys(input).sort()).toEqual(["credential", "organizationSlug"]);
           expect(input.credential).toBe("synthetic-management");
+          expect(input.credential).not.toBe("synthetic-password");
           expect(input.organizationSlug).toBe("org-synthetic");
           return { ok: true, regions };
         },
@@ -100,27 +101,94 @@ describe("P13.3 provisioning intent", () => {
       } } }); await service.whenReady;
     const env = await service.dispatch("build.environments.mutate", { buildId: record.buildId, action: "create_environment",
       expectedEnvironmentRevision: 0, input: { name: "synthetic" } });
-    const boundCredential = await service.dispatch("build.environments.mutate", { buildId: record.buildId, action: "bind_secret",
-      expectedEnvironmentRevision: env.revision, input: { environmentId: env.environmentId,
-        variableName: "MANAGEMENT_TOKEN", backend: "local_env_file" } });
-    const verified = await service.dispatch("build.environments.verifyLocal", { buildId: record.buildId,
-      environmentId: env.environmentId, variableName: "MANAGEMENT_TOKEN", expectedEnvironmentRevision: boundCredential.revision });
-    expect(verified.ok).toBe(true);
+    let envRevision = env.revision; const secretRefs: Record<string, string> = {};
+    for (const variableName of ["MANAGEMENT_TOKEN", "PROVISION_PASSWORD", "UNRELATED_SECRET"]) {
+      const boundCredential = await service.dispatch("build.environments.mutate", { buildId: record.buildId, action: "bind_secret",
+        expectedEnvironmentRevision: envRevision++, input: { environmentId: env.environmentId, variableName, backend: "local_env_file" } });
+      secretRefs[variableName] = boundCredential.secretRef;
+    }
+    for (const variableName of Object.keys(secretRefs)) {
+      const verified = await service.dispatch("build.environments.verifyLocal", { buildId: record.buildId,
+        environmentId: env.environmentId, variableName, expectedEnvironmentRevision: envRevision++ });
+      expect(verified.ok).toBe(true);
+    }
     const made = await service.dispatch("build.databases.mutate", { buildId: record.buildId, action: "create_database",
       expectedDatabaseRevision: 0, input: { provider: "supabase", label: "Regions DB", environmentId: env.environmentId, source: "path_provisioned" } });
     const boundDatabase = await service.dispatch("build.databases.mutate", { buildId: record.buildId, action: "bind_management_credential",
-      expectedDatabaseRevision: made.revision, input: { databaseId: made.databaseId, secretRef: boundCredential.secretRef } });
+      expectedDatabaseRevision: made.revision, input: { databaseId: made.databaseId, secretRef: secretRefs.MANAGEMENT_TOKEN } });
     expect(boundDatabase.ok).toBe(true);
     const before = listBuildDatabases(root, record.buildId);
     if (!before.ok) throw new Error("Synthetic database authority was unavailable");
     const discovered = await service.dispatch("build.databases.availableRegions", { buildId: record.buildId,
       databaseId: made.databaseId, organizationSlug: "org-synthetic", expectedDatabaseRevision: before.revision,
-      expectedEnvironmentRevision: verified.revision });
+      expectedEnvironmentRevision: envRevision });
     const after = listBuildDatabases(root, record.buildId);
     if (!after.ok) throw new Error("Synthetic database authority was unavailable after region discovery");
     expect(discovered).toMatchObject({ ok: true, databaseId: made.databaseId, provider: "supabase", regions });
     expect(availableRegionsCalls).toBe(1); expect(otherProviderCalls).toBe(0);
     expect(after).toEqual(before);
+  });
+
+  it("rejects unbound names and unverified or unsafe local bindings during region discovery", async () => {
+    let adapterCalls = 0;
+    const fixture = await localProvisionFixture({ availableRegions: async () => { adapterCalls++; return { ok: true, regions: [] }; } });
+    const dispatchRegions = (expectedEnvironmentRevision: number) => {
+      const before = listBuildDatabases(root, fixture.record.buildId);
+      if (!before.ok) throw new Error("Synthetic database authority was unavailable");
+      return service!.dispatch("build.databases.availableRegions", { buildId: fixture.record.buildId,
+        databaseId: fixture.databaseId, organizationSlug: "org-1", expectedDatabaseRevision: before.revision,
+        expectedEnvironmentRevision });
+    };
+
+    writeFileSync(join(fixture.project, ".env.local"),
+      "MANAGEMENT_TOKEN=synthetic-management\nPROVISION_PASSWORD=synthetic-password\nUNBOUND_EXTRA=synthetic-extra\n");
+    expect(await dispatchRegions(fixture.envRevision)).toMatchObject({ ok: false, code: "DATABASE_CREDENTIAL_SOURCE_UNSAFE" });
+    expect(adapterCalls).toBe(0);
+
+    const unverified = await service!.dispatch("build.environments.mutate", { buildId: fixture.record.buildId, action: "bind_secret",
+      expectedEnvironmentRevision: fixture.envRevision, input: { environmentId: fixture.env.environmentId,
+        variableName: "UNVERIFIED_SECRET", backend: "local_env_file" } });
+    writeFileSync(join(fixture.project, ".env.local"),
+      "MANAGEMENT_TOKEN=synthetic-management\nPROVISION_PASSWORD=synthetic-password\nUNVERIFIED_SECRET=synthetic-unverified\n");
+    expect(await dispatchRegions(unverified.revision)).toMatchObject({ ok: false, code: "DATABASE_CREDENTIAL_SOURCE_UNSAFE" });
+    expect(adapterCalls).toBe(0);
+
+    const unsafe = await service!.dispatch("build.environments.mutate", { buildId: fixture.record.buildId, action: "bind_secret",
+      expectedEnvironmentRevision: unverified.revision, input: { environmentId: fixture.env.environmentId,
+        variableName: "UNSAFE_SECRET", backend: "local_env_file" } });
+    writeFileSync(join(fixture.project, ".env.local"),
+      "MANAGEMENT_TOKEN=synthetic-management\nPROVISION_PASSWORD=synthetic-password\nUNVERIFIED_SECRET=synthetic-unverified\nUNSAFE_SECRET=synthetic-unsafe\n");
+    writeFileSync(join(fixture.project, ".gitignore"), "");
+    const rejectedUnsafe = await service!.dispatch("build.environments.verifyLocal", { buildId: fixture.record.buildId,
+      environmentId: fixture.env.environmentId, variableName: "UNSAFE_SECRET", expectedEnvironmentRevision: unsafe.revision });
+    expect(rejectedUnsafe).toMatchObject({ ok: true, safetyState: "verified_unsafe" });
+    writeFileSync(join(fixture.project, ".gitignore"), ".env.local\n");
+    expect(await dispatchRegions(rejectedUnsafe.revision)).toMatchObject({ ok: false, code: "DATABASE_CREDENTIAL_SOURCE_UNSAFE" });
+    expect(adapterCalls).toBe(0);
+  });
+
+  it("fails closed when management material is missing and detects credential changes across the provider call", async () => {
+    let adapterCalls = 0; let project = "";
+    const fixture = await localProvisionFixture({ availableRegions: async () => {
+      adapterCalls++;
+      writeFileSync(join(project, ".env.local"), "MANAGEMENT_TOKEN=synthetic-management-changed\nPROVISION_PASSWORD=synthetic-password\n");
+      return { ok: true, regions: [] };
+    } });
+    project = fixture.project;
+    const dispatchRegions = (expectedEnvironmentRevision: number) => {
+      const before = listBuildDatabases(root, fixture.record.buildId);
+      if (!before.ok) throw new Error("Synthetic database authority was unavailable");
+      return service!.dispatch("build.databases.availableRegions", { buildId: fixture.record.buildId,
+        databaseId: fixture.databaseId, organizationSlug: "org-1", expectedDatabaseRevision: before.revision,
+        expectedEnvironmentRevision });
+    };
+    writeFileSync(join(project, ".env.local"), "PROVISION_PASSWORD=synthetic-password\n");
+    expect(await dispatchRegions(fixture.envRevision)).toMatchObject({ ok: false, code: "DATABASE_CREDENTIAL_MISSING" });
+    expect(adapterCalls).toBe(0);
+
+    writeFileSync(join(project, ".env.local"), "MANAGEMENT_TOKEN=synthetic-management\nPROVISION_PASSWORD=synthetic-password\n");
+    expect(await dispatchRegions(fixture.envRevision)).toMatchObject({ ok: false, code: "DATABASE_CREDENTIAL_CHANGED" });
+    expect(adapterCalls).toBe(1);
   });
 
   it("persists effect_started before exactly one synthetic project creation and records only reduced identity", async () => {
