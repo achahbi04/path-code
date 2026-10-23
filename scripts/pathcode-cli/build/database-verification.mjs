@@ -3,6 +3,7 @@ import { listBuildDatabases } from "./databases.mjs";
 import { readBuildEnvironment, readBuildSecretBinding } from "./environments.mjs";
 import { readBuildRecord } from "./record.mjs";
 import { resolveExactLocalEnvValues } from "./runtime/local-env-resolve.mjs";
+import { verifiedSafeLocalSecretNames } from "./runtime/local-env-coexistence.mjs";
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 const PROVIDER_FAILURES = new Set(["DATABASE_PROVIDER_CREDENTIAL_REJECTED", "DATABASE_PROVIDER_PERMISSION_REQUIRED",
@@ -87,7 +88,8 @@ function snapshot(runtimeRoot, buildId, params, plane, registry) {
   const projectRoot = record.projectBindings?.[0]?.projectRoot;
   if (typeof projectRoot !== "string" || !projectRoot) return fail("BUILD_NOT_BOUND");
   return { ok: true, snapshot: full, adapter, projectRoot,
-    exactNames: Object.freeze([binding.variableName]), allowedNativeNames: Object.freeze([binding.variableName]) };
+    exactNames: Object.freeze([binding.variableName]),
+    allowedNativeNames: Object.freeze(verifiedSafeLocalSecretNames(environment.environment.variables)) };
 }
 
 export function createBuildDatabaseVerificationSnapshot(runtimeRoot, buildId, params, plane, registry) {

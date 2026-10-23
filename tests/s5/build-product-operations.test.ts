@@ -511,3 +511,65 @@ describe('RC-3 frozen invariant regression proofs', () => {
   expect(await f.call('environments.mutate',{action:'bind_secret',expectedEnvironmentRevision:1,input:{environmentId:f.environmentId,variableName,backend:'local_env_file'}})).toMatchObject({ok:false,code:'SECRET_PUBLIC_NAME_REJECTED'});
  });
 });
+describe('OAC pass 0 — Auth local-secret coexistence', () => {
+ const siblings = ['MGMT', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'GOOGLE_SECRET'];
+ const base = () => siblings.map(n => n + '=SYNTHETIC_' + n + '\n').join('');
+ async function observeWith(extra: (f: any) => Promise<void>, line: string) {
+  const inputs: any[] = []; const { reduceAuthConfig } = await load('supabase-auth-adapter');
+  let f: any; f = await authFixture({ observe: async (input: any) => { inputs.push(input); return { ok: true, config: reduceAuthConfig(f.raw) }; }, patch: async () => ({ ok: false }) });
+  writeFileSync(join(f.project, '.env.local'), base());
+  const verified = await f.call('auth.observe', await f.parameters()); expect(verified).toMatchObject({ ok: true }); expect(inputs).toHaveLength(1);
+  expect(JSON.stringify(inputs)).not.toContain('SYNTHETIC_GOOGLE_SECRET'); expect(JSON.stringify(inputs)).not.toContain('SYNTHETIC_VITE_SUPABASE_PUBLISHABLE_KEY');
+  await extra(f); writeFileSync(join(f.project, '.env.local'), base() + line);
+  const result = await f.call('auth.observe', await f.parameters());
+  expect(inputs).toHaveLength(1); expect(JSON.stringify(result)).not.toContain('SYNTHETIC_');
+  return { f, result };
+ }
+ it('rejects an unbound extra name before the Auth adapter', async () => {
+  expect((await observeWith(async () => {}, 'UNBOUND_EXTRA=x\n')).result).toMatchObject({ ok: false });
+ });
+ it('rejects a bound but unverified sibling, which the previous allow-list admitted', async () => {
+  const { result } = await observeWith(async f => { expect((await f.call('environments.mutate', { action: 'bind_secret', expectedEnvironmentRevision: (await f.call('environments.list')).revision, input: { environmentId: f.environmentId, variableName: 'UNVERIFIED_EXTRA', backend: 'local_env_file' } })).ok).toBe(true); }, 'UNVERIFIED_EXTRA=x\n');
+  expect(result).toMatchObject({ ok: false });
+ });
+ it('rejects a verified-unsafe sibling before the Auth adapter', async () => {
+  const { result } = await observeWith(async f => {
+   const bound = await f.call('environments.mutate', { action: 'bind_secret', expectedEnvironmentRevision: (await f.call('environments.list')).revision, input: { environmentId: f.environmentId, variableName: 'UNSAFE_EXTRA', backend: 'local_env_file' } }); expect(bound.ok).toBe(true);
+   writeFileSync(join(f.project, '.env.local'), base() + 'UNSAFE_EXTRA=x\n'); writeFileSync(join(f.project, '.gitignore'), '');
+   expect(await f.call('environments.verifyLocal', { environmentId: f.environmentId, variableName: 'UNSAFE_EXTRA', expectedEnvironmentRevision: (await f.call('environments.list')).revision })).toMatchObject({ ok: true, safetyState: 'verified_unsafe' });
+   writeFileSync(join(f.project, '.gitignore'), '.env.local\n');
+  }, 'UNSAFE_EXTRA=x\n');
+  expect(result).toMatchObject({ ok: false });
+ });
+});
+describe('OAC pass 0 — P15 unknown versus missing runtime-secret presence', () => {
+ it('reports a P9-valid Vercel binding as unknown, never missing, without fetching any value', async () => {
+  const f = await paymentFixture(); const { paymentReadiness } = await load('payments');
+  const bind = async (variableName: string) => f.call('environments.mutate', { action: 'bind_secret', expectedEnvironmentRevision: (await f.call('environments.list')).revision, input: { environmentId: f.environmentId, variableName, backend: 'vercel_env' } });
+  expect((await f.call('payments.list')).items[0].readiness).toMatchObject({ runtimeSecret: 'missing', webhookSecret: 'missing' });
+  expect((await f.call('payments.list')).items[0].readiness.problems).toEqual(expect.arrayContaining(['runtime_secret_missing', 'webhook_secret_missing']));
+  expect((await bind('STRIPE_SECRET_KEY')).ok).toBe(true); expect((await bind('STRIPE_WEBHOOK_SECRET')).ok).toBe(true);
+  const readiness = (await f.call('payments.list')).items[0].readiness;
+  const stored: any = readBuildRecord(f.root, f.record.buildId);
+  expect(stored.environments.items[0].variables.filter((v: any) => v.backend === 'vercel_env').map((v: any) => v.presenceState)).toEqual(['unknown', 'unknown']);
+  expect(readiness).toMatchObject({ runtimeSecret: 'unknown', webhookSecret: 'unknown', crossBackendIdentityProven: false, webhookEndpointVerification: 'acceptance_pending' });
+  expect(readiness.problems).toEqual(expect.arrayContaining(['runtime_secret_presence_unverified', 'webhook_secret_presence_unverified']));
+  expect(readiness.problems).not.toContain('runtime_secret_missing'); expect(readiness.problems).not.toContain('webhook_secret_missing');
+  // A fact PATH cannot prove never becomes ready on its own.
+  expect(readiness.state).toBe('action_required');
+  const missing = JSON.parse(JSON.stringify(stored)); missing.environments.items[0].variables.find((v: any) => v.variableName === 'STRIPE_WEBHOOK_SECRET').presenceState = 'verified_missing';
+  const mixed = paymentReadiness(missing, { ...f.config, paymentId: f.payment.paymentId, webhook: { endpointId: null } });
+  expect(mixed).toMatchObject({ runtimeSecret: 'unknown', webhookSecret: 'missing' });
+  expect(mixed.problems).toEqual(expect.arrayContaining(['runtime_secret_presence_unverified', 'webhook_secret_missing']));
+ });
+ it('keeps the real Stripe webhook endpoint ID requirement even when runtime presence is verified', async () => {
+  const f = await paymentFixture(); const { paymentReadiness } = await load('payments');
+  const r: any = readBuildRecord(f.root, f.record.buildId); const env = r.environments.items[0];
+  for (const variableName of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET']) env.variables.push({ kind: 'secret', variableName, backend: 'vercel_env', bindingState: 'configured', presenceState: 'verified_present' });
+  const item = r.payments.items[0]; expect(item.webhook.endpointId).toBeNull();
+  const without = paymentReadiness(r, item);
+  expect(without).toMatchObject({ runtimeSecret: 'present', webhookSecret: 'present' }); expect(without.problems).toContain('webhook_endpoint_owner_action_required'); expect(without.state).toBe('action_required');
+  const withId = paymentReadiness(r, { ...item, webhook: { ...item.webhook, endpointId: 'we_synthetic123' } });
+  expect(withId.problems).not.toContain('webhook_endpoint_owner_action_required'); expect(withId).toMatchObject({ webhookEndpointVerification: 'acceptance_pending', crossBackendIdentityProven: false });
+ });
+});

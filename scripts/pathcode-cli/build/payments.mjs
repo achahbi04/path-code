@@ -53,8 +53,9 @@ export function paymentReadiness(record, i) {
     return v?.bindingState === 'configured' && v.presenceState === 'verified_present' ? 'present' : v?.presenceState === 'verified_missing' || !v ? 'missing' : 'unknown';
   };
   const runtimeSecret = presence('STRIPE_SECRET_KEY'); const webhookSecret = presence('STRIPE_WEBHOOK_SECRET');
-  if (runtimeSecret !== 'present') problems.push('runtime_secret_missing');
-  if (webhookSecret !== 'present') problems.push('webhook_secret_missing');
+  // Vercel presence is never readable by PATH: an unverifiable binding is 'unknown', not 'missing'.
+  if (runtimeSecret === 'missing') problems.push('runtime_secret_missing'); else if (runtimeSecret !== 'present') problems.push('runtime_secret_presence_unverified');
+  if (webhookSecret === 'missing') problems.push('webhook_secret_missing'); else if (webhookSecret !== 'present') problems.push('webhook_secret_presence_unverified');
   const baseUrl = stableBase(record, i.urlSource);
   if (!baseUrl) problems.push('production_callback_webhook_base_missing');
   if (!i.webhook.endpointId) problems.push('webhook_endpoint_owner_action_required');

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { readBuildRecord, writeBuildRecord } from './record.mjs';
 import { readAuthAuthority, emptyAuthObservation } from './auth.mjs';
 import { resolveExactLocalEnvValues } from './runtime/local-env-resolve.mjs';
+import { verifiedSafeLocalSecretNames } from './runtime/local-env-coexistence.mjs';
 import { desiredAuthPatch, authConfigDigest, validReducedAuthConfig, AUTH_ADAPTER_VERSION } from './supabase-auth-adapter.mjs';
 import { exact, integer, digest, fail, now, stableBase } from './operation-validation.mjs';
 
@@ -29,7 +30,7 @@ function snapshot(runtimeRoot, buildId, p) {
     names[role] = v.variableName;
   }
   return { ok: true, record, authority: read.authority, item, database, names, projectRoot: record.projectBindings?.[0]?.projectRoot,
-    allowedNativeNames: environment.variables.filter(v => v.kind === 'secret' && v.backend === 'local_env_file').map(v => v.variableName), domainRevision: record.p11Domains?.revision ?? 0 };
+    allowedNativeNames: verifiedSafeLocalSecretNames(environment.variables), domainRevision: record.p11Domains?.revision ?? 0 };
 }
 function material(s) {
   try {
