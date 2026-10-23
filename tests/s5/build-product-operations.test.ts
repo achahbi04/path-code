@@ -544,7 +544,7 @@ describe('OAC pass 0 — Auth local-secret coexistence', () => {
 });
 describe('OAC pass 0 — P15 unknown versus missing runtime-secret presence', () => {
  it('reports a P9-valid Vercel binding as unknown, never missing, without fetching any value', async () => {
-  const f = await paymentFixture(); const { paymentReadiness } = await load('payments');
+  const f = await paymentFixture();
   const bind = async (variableName: string) => f.call('environments.mutate', { action: 'bind_secret', expectedEnvironmentRevision: (await f.call('environments.list')).revision, input: { environmentId: f.environmentId, variableName, backend: 'vercel_env' } });
   expect((await f.call('payments.list')).items[0].readiness).toMatchObject({ runtimeSecret: 'missing', webhookSecret: 'missing' });
   expect((await f.call('payments.list')).items[0].readiness.problems).toEqual(expect.arrayContaining(['runtime_secret_missing', 'webhook_secret_missing']));
@@ -557,19 +557,117 @@ describe('OAC pass 0 — P15 unknown versus missing runtime-secret presence', ()
   expect(readiness.problems).not.toContain('runtime_secret_missing'); expect(readiness.problems).not.toContain('webhook_secret_missing');
   // A fact PATH cannot prove never becomes ready on its own.
   expect(readiness.state).toBe('action_required');
-  const missing = JSON.parse(JSON.stringify(stored)); missing.environments.items[0].variables.find((v: any) => v.variableName === 'STRIPE_WEBHOOK_SECRET').presenceState = 'verified_missing';
-  const mixed = paymentReadiness(missing, { ...f.config, paymentId: f.payment.paymentId, webhook: { endpointId: null } });
-  expect(mixed).toMatchObject({ runtimeSecret: 'unknown', webhookSecret: 'missing' });
-  expect(mixed.problems).toEqual(expect.arrayContaining(['runtime_secret_presence_unverified', 'webhook_secret_missing']));
  });
- it('keeps the real Stripe webhook endpoint ID requirement even when runtime presence is verified', async () => {
-  const f = await paymentFixture(); const { paymentReadiness } = await load('payments');
-  const r: any = readBuildRecord(f.root, f.record.buildId); const env = r.environments.items[0];
-  for (const variableName of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET']) env.variables.push({ kind: 'secret', variableName, backend: 'vercel_env', bindingState: 'configured', presenceState: 'verified_present' });
-  const item = r.payments.items[0]; expect(item.webhook.endpointId).toBeNull();
-  const without = paymentReadiness(r, item);
-  expect(without).toMatchObject({ runtimeSecret: 'present', webhookSecret: 'present' }); expect(without.problems).toContain('webhook_endpoint_owner_action_required'); expect(without.state).toBe('action_required');
-  const withId = paymentReadiness(r, { ...item, webhook: { ...item.webhook, endpointId: 'we_synthetic123' } });
-  expect(withId.problems).not.toContain('webhook_endpoint_owner_action_required'); expect(withId).toMatchObject({ webhookEndpointVerification: 'acceptance_pending', crossBackendIdentityProven: false });
+ it('keeps real Stripe webhook endpoint identity independent of unverifiable Vercel presence, using only valid P9 authority', async () => {
+  const f = await paymentFixture();
+  const bind = async (variableName: string) => f.call('environments.mutate', { action: 'bind_secret', expectedEnvironmentRevision: (await f.call('environments.list')).revision, input: { environmentId: f.environmentId, variableName, backend: 'vercel_env' } });
+  expect((await bind('STRIPE_SECRET_KEY')).ok).toBe(true); expect((await bind('STRIPE_WEBHOOK_SECRET')).ok).toBe(true);
+  // Round trip through durable record and normal P9 reads: PATH never manufactured verified_present.
+  const durable: any = readBuildRecord(f.root, f.record.buildId);
+  const listed: any = await f.call('environments.list'); const read: any = await f.call('environments.read', { environmentId: f.environmentId });
+  expect(listed.ok).toBe(true); expect(read.ok).toBe(true);
+  for (const environment of [durable.environments.items.find((e: any) => e.environmentId === f.environmentId), read.environment]) {
+   const vercel = environment.variables.filter((v: any) => v.backend === 'vercel_env');
+   expect(vercel.map((v: any) => v.variableName).sort()).toEqual(['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET']);
+   for (const v of vercel) expect(v).toMatchObject({ kind: 'secret', backend: 'vercel_env', bindingState: 'configured', presenceState: 'unknown' });
+  }
+  const readiness = async () => (await f.call('payments.list')).items[0].readiness;
+  const absent = await readiness();
+  expect(absent).toMatchObject({ runtimeSecret: 'unknown', webhookSecret: 'unknown', webhookEndpointVerification: 'acceptance_pending', crossBackendIdentityProven: false, state: 'action_required' });
+  expect(absent.problems).toEqual(expect.arrayContaining(['runtime_secret_presence_unverified', 'webhook_secret_presence_unverified', 'webhook_endpoint_owner_action_required']));
+  const environmentsBefore = JSON.stringify((readBuildRecord(f.root, f.record.buildId) as any).environments);
+  const updated = await f.call('payments.mutate', { action: 'update_payment', expectedPaymentRevision: 1, input: { ...f.config, paymentId: f.payment.paymentId, webhook: { ...f.config.webhook, endpointId: 'we_synthetic123' } } });
+  expect(updated).toMatchObject({ ok: true });
+  expect(JSON.stringify((readBuildRecord(f.root, f.record.buildId) as any).environments)).toBe(environmentsBefore);
+  const withId = await readiness();
+  expect(withId.problems).not.toContain('webhook_endpoint_owner_action_required');
+  expect(withId.problems).toEqual(expect.arrayContaining(['runtime_secret_presence_unverified', 'webhook_secret_presence_unverified']));
+  expect(withId).toMatchObject({ runtimeSecret: 'unknown', webhookSecret: 'unknown', webhookEndpointVerification: 'acceptance_pending', crossBackendIdentityProven: false, state: 'action_required' });
+ });
+});
+describe('OAC pass 0 — Auth enabled social credential consumption', () => {
+ const VALUES: Record<string, string> = { MGMT: 'SYNTHETIC_MANAGEMENT_SENTINEL_X', VITE_SUPABASE_PUBLISHABLE_KEY: 'SYNTHETIC_PUBLIC_SENTINEL_X', GOOGLE_SECRET: 'SYNTHETIC_GOOGLE_SECRET_SENTINEL_X', UNRELATED_SAFE_SECRET: 'SYNTHETIC_UNRELATED_SENTINEL_X' };
+ const NAMES = Object.keys(VALUES); const CLIENT_ID = 'synthetic-google-client-id.apps.example';
+ const envText = (names: string[] = NAMES) => names.map(n => n + '=' + VALUES[n] + '\n').join('');
+ async function socialFixture(googleVerification: 'verified' | 'unverified' | 'unsafe') {
+  const { reduceAuthConfig } = await load('supabase-auth-adapter');
+  // The provider starts with Google DISABLED and no stored Google secret.
+  const raw: any = { site_url: 'https://app.example.com', uri_allow_list: 'https://app.example.com/callback', disable_signup: false, external_email_enabled: true, mailer_autoconfirm: false, external_google_enabled: false, external_github_enabled: false, external_google_client_id: '', external_github_client_id: '', external_google_secret: '', external_github_secret: '' };
+  const observeInputs: any[] = [], patchCalls: any[] = [];
+  const adapter = { observe: async (input: any) => { observeInputs.push(structuredClone(input)); return { ok: true, config: reduceAuthConfig(raw) }; },
+   patch: async (input: any, patch: any) => { patchCalls.push({ input: structuredClone(input), patch: structuredClone(patch) }); Object.assign(raw, patch); return { ok: true, config: reduceAuthConfig(raw) }; } };
+  const f: any = await fixture({ authAdapter: adapter, databaseVerificationAdapters: { supabase: { provider: { provider: 'supabase', adapterVersion: 'synthetic.v1', verify: async () => ({ ok: true, projectRef: 'projectref', organizationSlug: null, region: null, projectStatus: 'ACTIVE_HEALTHY' }) } } } });
+  writeFileSync(join(f.project, 'package.json'), JSON.stringify({ dependencies: { vite: '1.0.0' } }));
+  const refs: any = {};
+  for (const variableName of NAMES) {
+   const b = await f.call('environments.mutate', { action: 'bind_secret', expectedEnvironmentRevision: (await f.call('environments.list')).revision, input: { environmentId: f.environmentId, variableName, backend: 'local_env_file' } });
+   expect(b.ok).toBe(true); refs[variableName] = b.secretRef;
+  }
+  const verify = async (variableName: string) => f.call('environments.verifyLocal', { environmentId: f.environmentId, variableName, expectedEnvironmentRevision: (await f.call('environments.list')).revision });
+  const others = NAMES.filter(n => n !== 'GOOGLE_SECRET');
+  writeFileSync(join(f.project, '.env.local'), envText(others));
+  for (const n of others) expect(await verify(n)).toMatchObject({ ok: true, presenceState: 'verified_present', safetyState: 'verified_safe' });
+  // Provider verification runs before the enabled social secret exists in .env.local, as in a real setup order.
+  const db = await f.call('databases.mutate', { action: 'create_database', expectedDatabaseRevision: 0, input: { provider: 'supabase', label: 'Primary database', environmentId: f.environmentId, source: 'existing' } });
+  await f.call('databases.mutate', { action: 'set_provider_target', expectedDatabaseRevision: 1, input: { databaseId: db.databaseId, projectRef: 'projectref', organizationSlug: null, region: null } });
+  await f.call('databases.mutate', { action: 'bind_management_credential', expectedDatabaseRevision: 2, input: { databaseId: db.databaseId, secretRef: refs.MGMT } });
+  { const r = { db: (await f.call('databases.list')).revision, env: (await f.call('environments.list')).revision };
+    expect((await f.call('databases.verifyProvider', { databaseId: db.databaseId, expectedDatabaseRevision: r.db, expectedEnvironmentRevision: r.env })).ok).toBe(true); }
+  writeFileSync(join(f.project, '.env.local'), envText());
+  if (googleVerification === 'verified') expect(await verify('GOOGLE_SECRET')).toMatchObject({ ok: true, presenceState: 'verified_present', safetyState: 'verified_safe' });
+  if (googleVerification === 'unsafe') {
+   writeFileSync(join(f.project, '.gitignore'), '');
+   expect(await verify('GOOGLE_SECRET')).toMatchObject({ ok: true, safetyState: 'verified_unsafe' });
+   writeFileSync(join(f.project, '.gitignore'), '.env.local\n');
+  }
+  const config = { siteUrlSource: 'explicit', domainId: null, siteUrl: 'https://app.example.com', redirectUrls: ['https://app.example.com/callback'], signupEnabled: true, emailEnabled: true, emailConfirmationRequired: true, publishableKeyVariableName: 'VITE_SUPABASE_PUBLISHABLE_KEY', socialProviders: [{ provider: 'google', enabled: true, clientId: CLIENT_ID, clientSecretRef: refs.GOOGLE_SECRET }] };
+  const auth = await f.call('auth.mutate', { action: 'create_auth', expectedAuthRevision: 0, input: { label: 'Customer sign-in', databaseId: db.databaseId, environmentId: f.environmentId, config } });
+  expect(auth.ok).toBe(true);
+  const parameters = async () => ({ authId: auth.authId, expectedAuthRevision: (await f.call('auth.list')).revision, expectedDatabaseRevision: (await f.call('databases.list')).revision, expectedEnvironmentRevision: (await f.call('environments.list')).revision });
+  return { ...f, raw, refs, auth, parameters, observeInputs, patchCalls, config };
+ }
+ const evidence = (f: any, ...responses: unknown[]) => JSON.stringify({ responses, record: readBuildRecord(f.root, f.record.buildId), events: readBuildEvents(f.root, f.record.buildId) });
+ it('reads with the management credential only, then PATCHes Google enabled with management plus the Google secret and nothing else', async () => {
+  const f = await socialFixture('verified');
+  expect(f.raw.external_google_enabled).toBe(false); expect(f.raw.external_google_secret).toBe('');
+  const observed = await f.call('auth.observe', await f.parameters());
+  expect(observed).toMatchObject({ ok: true, observation: { state: 'ready' } });
+  expect(f.observeInputs).toHaveLength(1);
+  expect(f.observeInputs[0]).toEqual({ credential: VALUES.MGMT, projectRef: 'projectref' });
+  expect(f.patchCalls).toHaveLength(0);
+  const prepared = await f.call('auth.applyPrepare', await f.parameters()); expect(prepared).toMatchObject({ ok: true, state: 'prepared' });
+  expect(f.patchCalls).toHaveLength(0);
+  const executed = await f.call('auth.applyExecute', await f.parameters()); expect(executed).toMatchObject({ ok: true, state: 'completed' });
+  expect(f.patchCalls).toHaveLength(1);
+  const { input, patch } = f.patchCalls[0];
+  expect(input).toEqual({ credential: VALUES.MGMT, projectRef: 'projectref' });
+  expect(patch).toMatchObject({ external_google_enabled: true, external_google_client_id: CLIENT_ID, external_google_secret: VALUES.GOOGLE_SECRET });
+  const { AUTH_PATCH_FIELDS } = await load('supabase-auth-adapter'); expect(Object.keys(patch).every(k => AUTH_PATCH_FIELDS.includes(k))).toBe(true);
+  expect(Object.keys(patch)).not.toContain('external_github_secret');
+  // Neither provider-facing channel ever carried the publishable key or the unrelated secret.
+  const outbound = JSON.stringify({ observes: f.observeInputs, patches: f.patchCalls });
+  expect(outbound).not.toContain(VALUES.VITE_SUPABASE_PUBLISHABLE_KEY); expect(outbound).not.toContain(VALUES.UNRELATED_SAFE_SECRET);
+  expect(f.observeInputs.every((i: any) => JSON.stringify(i) === JSON.stringify({ credential: VALUES.MGMT, projectRef: 'projectref' }))).toBe(true);
+  // Exactly one PATCH even if execution is retried; the Google secret is not retained anywhere.
+  expect(await f.call('auth.applyExecute', await f.parameters())).toMatchObject({ ok: false }); expect(f.patchCalls).toHaveLength(1);
+  const stored = evidence(f, observed, prepared, executed, await f.call('auth.list'), await f.call('auth.read', { authId: f.auth.authId }));
+  for (const n of NAMES) expect(stored).not.toContain(VALUES[n]!);
+  expect((await f.call('auth.list')).items[0].observation).toMatchObject({ state: 'ready', matchesDesired: true, enabledMethods: ['email', 'google'] });
+  const final = await f.call('auth.list'); expect(final.pendingOperation).toBeNull(); expect(final.operationHistory.map((o: any) => o.state)).toEqual(['completed']);
+ });
+ it('keeps drift protection and the no-retry rule with an enabled social provider', async () => {
+  const f = await socialFixture('verified');
+  await f.call('auth.observe', await f.parameters()); await f.call('auth.applyPrepare', await f.parameters()); f.raw.disable_signup = true;
+  expect(await f.call('auth.applyExecute', await f.parameters())).toMatchObject({ ok: false, code: 'AUTH_PROVIDER_CONFIG_DRIFTED' });
+  expect(f.patchCalls).toHaveLength(0);
+ });
+ it.each(['unverified', 'unsafe'] as const)('fails before any provider call when the enabled Google secret is %s', async state => {
+  const f = await socialFixture(state);
+  expect((await f.call('auth.list')).items[0].readiness.problems).toContain('social_credential_action_required');
+  for (const action of ['observe', 'applyPrepare', 'applyExecute']) {
+   expect(await f.call('auth.' + action, await f.parameters())).toMatchObject({ ok: false, code: 'AUTH_CREDENTIAL_MATERIAL_UNAVAILABLE' });
+  }
+  expect(f.observeInputs).toHaveLength(0); expect(f.patchCalls).toHaveLength(0);
+  const stored = evidence(f); for (const n of NAMES) expect(stored).not.toContain(VALUES[n]!);
  });
 });
