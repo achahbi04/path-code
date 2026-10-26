@@ -23,6 +23,7 @@ const RESERVED_EXACT = new Set([
   "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 ]);
 const SECRET_KEYS = new Set(["variableName", "backend", "replace"]);
+export const APPROVED_PUBLIC_SUPABASE_KEY_NAMES = Object.freeze(new Set(["VITE_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "PUBLIC_SUPABASE_PUBLISHABLE_KEY"]));
 const CONFIG_KEYS = new Set(["variableName", "value", "replace"]);
 const ACTIONS = new Set([
   "create_environment", "rename_environment", "delete_environment",
@@ -116,8 +117,7 @@ function validVariableName(name, kind) {
   }
   // P14 requires publishable Supabase keys to stay behind P9 references even
   // though client bundlers intentionally expose these exact public variables.
-  const publishable = new Set(["VITE_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "PUBLIC_SUPABASE_PUBLISHABLE_KEY"]);
-  if (kind === "secret" && /^(?:NEXT_PUBLIC_|VITE_|PUBLIC_)/i.test(name) && !publishable.has(name)) {
+  if (kind === "secret" && /^(?:NEXT_PUBLIC_|VITE_|PUBLIC_)/i.test(name) && !APPROVED_PUBLIC_SUPABASE_KEY_NAMES.has(name)) {
     return "SECRET_PUBLIC_NAME_REJECTED";
   }
   return null;

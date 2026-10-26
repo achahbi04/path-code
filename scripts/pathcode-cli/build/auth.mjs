@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { readBuildRecord } from './record.mjs';
 import { listBuildDatabases } from './databases.mjs';
-import { readBuildEnvironment, readBuildSecretBinding } from './environments.mjs';
+import { readBuildEnvironment, readBuildSecretBinding, APPROVED_PUBLIC_SUPABASE_KEY_NAMES } from './environments.mjs';
 import { detectBuildArtifact } from './runtime/artifact.mjs';
 import { exact, integer, id, text, variable, safeUrl, stableBase, iso, fail, now } from './operation-validation.mjs';
 export const AUTH_SCHEMA = 'pathcode.p14.auth.v1';
@@ -59,10 +59,14 @@ export function authReadiness(record, item) {
   if (!stableBase(record, source) || item.config.siteUrlSource === 'p11_domain' && stableBase(record, source) !== new URL(item.config.siteUrl).origin) problems.push('site_url_action_required');
   let framework = null;
   try { framework = detectBuildArtifact(record.projectBindings?.[0]?.projectRoot).framework; } catch { /* unavailable */ }
-  const expected = { vite: 'VITE_SUPABASE_PUBLISHABLE_KEY', next: 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', astro: 'PUBLIC_SUPABASE_PUBLISHABLE_KEY' }[framework];
-  if (!expected || item.config.publishableKeyVariableName !== expected) problems.push('publishable_variable_framework_mismatch');
+  const frameworkNames = { vite: 'VITE_SUPABASE_PUBLISHABLE_KEY', next: 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', astro: 'PUBLIC_SUPABASE_PUBLISHABLE_KEY' };
+  // Static products have no framework-specific build prefix, so any approved public name is acceptable; other frameworks keep their exact mapping.
+  const variableName = item.config.publishableKeyVariableName;
+  const nameMatches = framework === 'static' ? APPROVED_PUBLIC_SUPABASE_KEY_NAMES.has(variableName)
+    : Object.hasOwn(frameworkNames, framework) && variableName === frameworkNames[framework];
+  if (!nameMatches) problems.push('publishable_variable_framework_mismatch');
   const key = environment?.variables?.find(v => v.kind === 'secret' && v.variableName === item.config.publishableKeyVariableName);
-  if (!key || key.bindingState !== 'configured' || key.presenceState !== 'verified_present') problems.push('publishable_key_missing');
+  if (!key || key.bindingState !== 'configured' || key.presenceState !== 'verified_present' || key.backend === 'local_env_file' && key.safetyState !== 'verified_safe') problems.push('publishable_key_missing');
   for (const social of item.config.socialProviders) {
     if (!social.enabled) continue;
     const credential = environment?.variables?.find(v => v.kind === 'secret' && v.secretRef === social.clientSecretRef);
