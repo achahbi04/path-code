@@ -1,0 +1,26 @@
+{
+  "repository": "achahbi04/path-code",
+  "branch": "codex/path-builder-p13-4-p16-corrections",
+  "implementationHead": "8d46171eea159f642afc7d9b846d7a576fa5d8e1",
+  "firstVerifiedPushedHead": "79c7353186f1593572411c1db65ad73fa41c52a3",
+  "pushResult": "success; non-force; local and fetched remote HEAD equal",
+  "draftPR": {
+    "created": false,
+    "title": "PATH Builder P13.4\u2013P16 corrections (review only \u2014 do not merge)",
+    "base": "cursor/pathcode-antigravity-v1",
+    "head": "codex/path-builder-p13-4-p16-corrections",
+    "graphQLError": "Post \"https://api.github.com/graphql\": Forbidden",
+    "restError": "Post \"https://api.github.com/repos/achahbi04/path-code/pulls\": Forbidden",
+    "diagnostic": "curl to https://api.github.com/ fails during proxy CONNECT with HTTP 403, before GitHub receives the request",
+    "expandedNetworkPermissionGranted": true,
+    "escalatedExecutionApprovedButStillBlocked": true,
+    "requiredOwnerPlatformAction": "Allow outbound HTTPS CONNECT to api.github.com for this Cloud environment, then create the authorized draft PR. No change to GitHub credentials was attempted."
+  },
+  "protectedRemoteRefs": {
+    "codex/path-builder-p13-4-p16": "e7dac89edcfb0eca2b219df019c014cb191d2bcc",
+    "cursor/pathcode-antigravity-v1": "5638ac85bf7edfbca9eb1f1df8da223ee033be03",
+    "main": "5a1784d8f033251caf9c0c3be102c9eb2f0cd345"
+  },
+  "allCorrectionCodeAndVerificationComplete": true,
+  "remainingMissionBlocker": "required draft PR cannot be created through the blocked API destination"
+}

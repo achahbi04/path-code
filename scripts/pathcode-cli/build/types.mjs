@@ -222,6 +222,9 @@
  * @property {string} [blockedReason]
  *
  * @typedef {object} BuildRecord
+ * @property {import('./operation-types.mjs').BuildAuthAuthority} [auth]
+ * @property {import('./operation-types.mjs').BuildPaymentAuthority} [payments]
+ * @property {import('./operation-types.mjs').BuildNativeAuthority} [native]
  * @property {string} schema
  * @property {string} buildId
  * @property {{

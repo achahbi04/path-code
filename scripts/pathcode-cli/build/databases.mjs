@@ -10,7 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 const SAFE_TARGET = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 const FAILURE = /^[A-Z][A-Z0-9_]{0,63}$/;
-const SECRET_LIKE = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\bBearer\s+\S+|\b(?:ghp|github_pat)_[A-Za-z0-9_]{10,}|\bsk_(?:live|test)_[A-Za-z0-9]{8,}|^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+:[^/@\s]+@/i;
+const SECRET_LIKE = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\bBearer\s+\S+|\b(?:ghp|github_pat)_[A-Za-z0-9_]{10,}|\b(?:(?:sk|rk)_(?:live|test)|whsec|sb_secret)_[A-Za-z0-9]{8,}|^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+:[^/@\s]+@/i;
 const fail = (code) => ({ ok: false, code });
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value) &&

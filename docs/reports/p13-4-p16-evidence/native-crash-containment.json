@@ -1,0 +1,11 @@
+{
+  "before": {
+    "orphanSurvived": true
+  },
+  "after": {
+    "orphanSurvived": false,
+    "state": "Z"
+  },
+  "interpretation": "The creator command is terminated after coordinator death. The Linux container may retain an unreaped zombie, which cannot execute or write to the workspace. The versioned test accepts only absent or zombie state, never a running process.",
+  "regressionTest": "Native coordinator crash containment > terminates the real creator command when its coordinator process is killed"
+}

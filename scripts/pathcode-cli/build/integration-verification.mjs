@@ -3,6 +3,7 @@ import { listBuildIntegrations, listBuildIntegrationCatalog } from "./integratio
 import { readBuildEnvironment, readBuildSecretBinding } from "./environments.mjs";
 import { readBuildRecord } from "./record.mjs";
 import { resolveExactLocalEnvValues } from "./runtime/local-env-resolve.mjs";
+import { verifiedSafeLocalSecretNames } from "./runtime/local-env-coexistence.mjs";
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 const FAILURE_CODES = new Set(["PROVIDER_CREDENTIAL_REJECTED", "PROVIDER_UNAVAILABLE", "PROVIDER_RESPONSE_UNSAFE"]);
@@ -110,7 +111,7 @@ function buildSnapshot(runtimeRoot, buildId, params, registry) {
   const exactNames = Object.freeze(credentials.map((item) => item.variableName));
   return { ok: true, snapshot, projectRoot, adapter,
     exactNames,
-    allowedNativeNames: exactNames };
+    allowedNativeNames: Object.freeze(verifiedSafeLocalSecretNames(environment.environment.variables)) };
 }
 
 function resolveValues(projectRoot, exactNames, allowedNativeNames) {

@@ -3,7 +3,7 @@
  * and flags stale code once the checkout moves past it.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { cpSync, mkdtempSync, rmSync, appendFileSync, copyFileSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync, appendFileSync, copyFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -56,6 +56,11 @@ describe("running Build identity", () => {
     temps.push(pkg, runtimeRoot, target);
     cpSync(join(REPO, "scripts"), join(pkg, "scripts"), { recursive: true });
     copyFileSync(join(REPO, "package.json"), join(pkg, "package.json"));
+    // The copied runtime imports real package dependencies (including pg).
+    // Share the installed dependency context without mocking the coordinator or
+    // committing dependencies into the disposable identity checkout.
+    symlinkSync(join(REPO, "node_modules"), join(pkg, "node_modules"), "dir");
+    writeFileSync(join(pkg, ".gitignore"), "node_modules\n");
     const template = mkdtempSync(join(tmpdir(), "identity-git-template-"));
     temps.push(template);
     const git = (...args: string[]) =>

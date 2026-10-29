@@ -1536,6 +1536,7 @@ function render(view) {
 
   setWorkspaceVisible(true);
   activeBuildId = view.buildId;
+  void refreshProductOperationSummaries(view.buildId);
   projectRoot = view.projectRoot || null;
   const canAttach = Boolean(view.buildId && view.buildId !== "pending" && projectRoot);
   els.referenceUploadBtn.disabled = !canAttach;
@@ -2645,3 +2646,181 @@ bindRailRows();
     if (activeBuildId) setWorkspaceVisible(true);
   }
 })();
+
+/* P13.4–P16 product operations. The browser sends variable identities, never credentials. */
+function initializeProductOperations() {
+  const names = {databases:'Database',auth:'Authentication',payments:'Payments',native:'Mobile'};
+  const dialog = document.getElementById('productOperationsDialog');
+  if (!dialog) return;
+  const content = document.getElementById('productOperationsContent');
+  const status = document.getElementById('productOperationsStatus');
+  const title = document.getElementById('productOperationsTitle');
+  let plane = null, buildId = null, state = null, selected = null, supporting = {}, busy = false;
+  const safe = v => String(v ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const label = v => String(v || 'Not checked').replace(/_/g,' ');
+  const options = (items,idKey,labelKey,value) => items.map(i => `<option value="${safe(i[idKey])}" ${i[idKey] === value ? 'selected' : ''}>${safe(i[labelKey])}</option>`).join('');
+  const select = (name,caption,items,value,empty = false) => `<label>${caption}<select name="${name}">${empty ? '<option value="">None</option>' : ''}${items.map(([v,l])=>`<option value="${safe(v)}" ${v === value ? 'selected' : ''}>${safe(l)}</option>`).join('')}</select></label>`;
+  const field = (name,caption,value = '',required = true) => `<label>${caption}<input name="${name}" value="${safe(value)}" ${required ? 'required' : ''} maxlength="2048"></label>`;
+  const check = (name,caption,on) => `<label class="operation-check"><input type="checkbox" name="${name}" ${on ? 'checked' : ''}>${caption}</label>`;
+  const envSelect = (value,name='environmentId',caption='Environment') => select(name,caption,state.environments.map(e=>[e.environmentId,e.name]),value);
+  const itemId = i => i?.[{databases:'databaseId',auth:'authId',payments:'paymentId',native:'nativeId'}[plane]];
+  const urlSource = (kind='explicit',domainId=null,base='') => select('urlKind','Stable URL source',[['explicit','Explicit URL'],['p11_domain','Verified PATH Builder domain']],kind) + select('domainId','Verified domain',(state.domains || []).map(d=>[d.domainId,d.fqdn]),domainId,true) + field('baseUrl','Explicit URL',base,false) + (!(state.domains || []).length ? '<p class="hint">No verified PATH Builder domain is available. Configure and verify a domain outside this dialog or use an explicit URL.</p>' : '');
+  const secretSelect = (name,caption,env,value) => select(name,caption,(state.environments.find(e=>e.environmentId===env)?.variables || []).map(v=>[v.variableName,`${v.variableName} · ${label(v.backend)} · ${label(v.presenceState)}`]),value,true);
+  function detail(i) {
+    if (!i) return '';
+    let facts = '';
+    if (plane === 'databases') facts = `<dl><dt>Provider</dt><dd>Supabase / PostgreSQL</dd><dt>Environment</dt><dd>${safe(i.environmentName)}</dd><dt>Source</dt><dd>${safe(label(i.source))}</dd><dt>Provider health</dt><dd>${safe(label(i.providerObservation.state))}</dd><dt>Connection</dt><dd>${i.readiness?.credentialActionRequired ? 'Needs credential · last observation: ' : ''}${safe(label(i.connectionObservation.state))} ${safe(i.connectionObservation.serverVersion)}</dd><dt>Migrations</dt><dd>${safe(label(i.migrationObservation.state))} · local ${safe(i.migrationObservation.localCount)} / remote ${safe(i.migrationObservation.remoteCount ?? 'not checked')}</dd></dl>`;
+    else if (plane === 'auth') facts = `<p>Provider configuration: ${safe(label(i.observation.state))}</p><p>Client key: ${safe(i.config.publishableKeyVariableName)}</p><p>Project: ${safe(i.readiness?.projectUrl)}</p><p>${safe((i.readiness?.problems || []).map(label).join(' · '))}</p>`;
+    else if (plane === 'payments') facts = `<dl><dt>Stripe verification identity</dt><dd>${safe(label(i.readiness?.verificationIdentity))}</dd><dt>Verified mode</dt><dd>${safe(label(i.readiness?.verifiedMode))}</dd><dt>Production runtime secret</dt><dd>${safe(label(i.readiness?.runtimeSecret))}</dd><dt>Webhook runtime secret</dt><dd>${safe(label(i.readiness?.webhookSecret))}</dd><dt>Expected webhook URL</dt><dd>${safe(i.readiness?.webhookUrl || 'Production callback/webhook base missing')}</dd></dl><p class="hint">Configure this endpoint and the listed events in Stripe. Local verification and runtime-secret presence do not prove that the keys are identical. Browser success redirects are not payment truth.</p><p>${safe(i.checkout.requiredWebhookEvents.join(', '))}</p>`;
+    else facts = `<p>Source: ${safe(state.authoritativeSha || supporting.sourceSha || 'Not configured')}</p><p>Build environment: ${safe(label(i.readiness?.buildEnvironmentState))}</p><p>Web artifact: ${safe(label(i.readiness?.webArtifactState))}</p><p>${(i.readiness?.problems || []).map(p=>safe(label(p))).join(' · ')}</p><p>Auth callback: ${safe(i.readiness?.callbackUrl || 'Not configured')}</p><p>iOS: ${i.platforms.includes('ios') ? 'Local Xcode / signing acceptance required' : 'Not configured'}</p><p>Android: ${i.platforms.includes('android') ? 'Local Android SDK / signing acceptance required' : 'Not configured'}</p><p class="hint">Hosted Checkout stays web-based. Return links require product acceptance.</p>`;
+    return `<section class="operation-summary">${facts}${state.pendingOperation ? `<p>Operation: ${safe(label(state.pendingOperation.state))} ${safe(state.pendingOperation.providerProjectName || '')}</p>` : ''}</section>`;
+  }
+  function form(i) {
+    if (plane === 'databases') return field('label','Database name',i?.label || '') + (i ? '' : envSelect(state.environments[0]?.environmentId) + select('source','Source',[['existing','Existing Supabase project'],['path_provisioned','Create through PATH Builder']],'existing')) + (i ? field('organizationSlug','Organization',i.providerTarget.organizationSlug || '',false)+field('projectRef','Project reference',i.providerTarget.projectRef || '',false)+field('region','Region',i.providerTarget.region || '',false) : '');
+    if (plane === 'auth') {
+      const c = i?.config || {}; const database = supporting.databases?.items.find(d=>d.databaseId===i?.databaseId) || supporting.databases?.items[0];
+      const env = database?.environmentId;
+      return field('label','Authentication name',i?.label || '') + select('databaseId','Linked Supabase database',(supporting.databases?.items || []).map(d=>[d.databaseId,`${d.label} · ${d.environmentName}`]),database?.databaseId) + urlSource(c.siteUrlSource,c.domainId,c.siteUrl) + field('redirectUrls','Allowed redirects (comma separated)',c.redirectUrls?.join(', ') || '',false) + field('publishableKeyVariableName','Client publishable-key variable',c.publishableKeyVariableName || '') + check('signupEnabled','Allow signup',c.signupEnabled ?? true) + check('emailEnabled','Email sign-in',c.emailEnabled ?? true) + check('emailConfirmationRequired','Require email confirmation',c.emailConfirmationRequired ?? true) + ['google','github'].map(p=>{
+        const s = c.socialProviders?.find(s=>s.provider===p);
+        return `<details><summary>${p === 'google' ? 'Google' : 'GitHub'} sign-in</summary>${check(p+'Enabled','Enabled',s?.enabled)}${field(p+'ClientId','Client ID',s?.clientId || '',false)}${secretSelect(p+'SecretVariable','Client-secret variable',env,s?.credential?.variableName)}</details>`;
+      }).join('');
+    }
+    if (plane === 'payments') {
+      const c = i?.checkout || {};
+      return field('label','Payment configuration name',i?.label || '') + select('integrationBinding','Stripe verification connection',(supporting.integrations?.items || []).filter(i=>i.providerKey==='stripe').flatMap(i=>i.bindings.map(b=>[`${i.integrationId}/${b.bindingId}`,`${i.label} · ${b.environmentName} · ${label(b.verification?.state)}`])),i ? `${i.integrationId}/${i.verificationBindingId}` : '') + envSelect(i?.runtimeEnvironmentId,'runtimeEnvironmentId','Production runtime environment') + select('expectedMode','Expected mode',[['test','Test'],['live','Live']],i?.expectedMode || 'test') + select('checkoutMode','Checkout mode',[['payment','One-time payment'],['subscription','Subscription']],c.mode || 'payment') + field('priceIds','Existing Stripe Price IDs (comma separated)',c.priceIds?.join(', ') || '') + field('successPath','Success path',c.successPath || '/billing/success') + field('cancelPath','Cancel path',c.cancelPath || '/pricing') + field('webhookPath','Webhook path',c.webhookPath || '/api/stripe/webhook') + urlSource(i?.urlSource.kind,i?.urlSource.domainId,i?.urlSource.explicitBaseUrl || '') + field('endpointId','Stripe endpoint ID',i?.webhook.endpointId || '',false) + select('authId','Authentication dependency',(supporting.auth?.items || []).map(a=>[a.authId,a.label]),i?.dependencies.authId,true) + select('databaseId','Database dependency',(supporting.databases?.items || []).map(d=>[d.databaseId,d.label]),i?.dependencies.databaseId,true) + '<p class="hint">Store STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET in the production environment. No key values belong in this dialog.</p>';
+    }
+    const p = i || {};
+    return field('appName','App name',p.appName || '') + field('appId','App ID (reverse domain)',p.appId || '') + check('ios','iOS',p.platforms?.includes('ios') ?? true) + check('android','Android',p.platforms?.includes('android') ?? true) + envSelect(p.buildEnvironmentId,'buildEnvironmentId','Dedicated build environment') + '<p class="hint">Use config and verified local secret bindings only. An environment containing Vercel secrets cannot be used for packaging.</p>' + field('webDir','Static build output directory',p.packagePolicy?.webDir || 'dist') + select('authId','Authentication dependency',(supporting.auth?.items || []).map(a=>[a.authId,a.label]),p.authId,true) + field('authCallbackScheme','Auth callback scheme',p.authCallbackScheme || '',false) + '<p class="hint">Capacitor 8.5.3 · generated native projects remain artifacts. No store upload or signing is performed.</p>';
+  }
+  function render() {
+    const i = state.items.find(i=>itemId(i)===selected);
+    const actions = !i ? '' : plane === 'databases' ? `<button class="ghost" data-op="verify-provider">Verify provider</button><button class="ghost" data-op="verify-connection">Verify connection</button><button class="ghost" data-op="migrations-observe">Observe migrations</button>${i.source === 'path_provisioned' ? '<button class="ghost" data-op="regions">Discover regions</button><button class="ghost" data-op="provision-prepare">Prepare provider project</button><button class="ghost" data-op="provision-execute">Create provider project…</button><button class="ghost" data-op="provision-observe">Observe provisioning</button>' : ''}` : plane === 'auth' ? '<button class="ghost" data-op="observe">Observe provider</button><button class="ghost" data-op="apply-prepare">Prepare apply</button><button class="ghost" data-op="apply-execute">Execute apply…</button><button class="ghost" data-op="apply-observe">Reconcile / cancel preparation</button>' : plane === 'native' ? '<button class="ghost" data-op="prepare">Prepare package</button><button class="ghost" data-op="execute">Package…</button><button class="ghost" data-op="observe">Observe / recover</button>' : '';
+    content.innerHTML = `<div class="operation-layout"><nav aria-label="Configurations"><button type="button" class="ghost" data-select="">Add ${names[plane].toLowerCase()}</button>${state.items.map(x=>`<button type="button" class="ghost" data-select="${safe(itemId(x))}" aria-current="${itemId(x)===selected}">${safe(x.label || x.appName)}</button>`).join('')}</nav><section>${detail(i)}<form id="productOperationForm" class="operation-form">${form(i)}<button class="cta compact" type="submit">${i ? 'Save changes' : 'Add configuration'}</button></form>${plane === 'databases' && i ? `<details><summary>Credentials</summary>${secretSelect('managementVariable','Management-token variable',i.environmentId,i.credentials.management.variableName)}<button class="ghost" data-bind="bind_management_credential">Bind management variable</button><button class="ghost" data-unbind="unbind_management_credential">Remove management binding</button>${secretSelect('databaseUrlVariable','Database URL variable',i.environmentId,i.credentials.databaseUrl.variableName)}<button class="ghost" data-bind="bind_database_url">Bind database URL variable</button><button class="ghost" data-unbind="unbind_database_url">Remove database URL binding</button>${secretSelect('provisionVariable','Provision-password variable',i.environmentId,null)}</details>` : ''}<div class="operation-actions">${actions}${i ? '<button data-delete="true" class="ghost">Remove configuration…</button>' : ''}</div>${plane === 'native' ? `<details><summary>Generated artifacts</summary>${(state.artifacts || []).filter(a=>a.nativeId===selected).map(a=>`<p>${safe(a.artifactId)} · ${safe(a.state)} · ${safe(a.sourceSha.slice(0,12))} · ${safe(a.bytes)} bytes</p>`).join('') || '<p>No packages yet.</p>'}<p class="hint">Artifacts are retained under native-snapshots / build ID / artifact ID / .path-native-package in the PATH runtime. Open the ios project in Xcode or the android directory in Android Studio after review. Signing and store submission remain local acceptance gates.</p></details>` : ''}</section></div>`;
+    content.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>{ selected=b.dataset.select || null; render(); });
+    content.querySelector('form').onsubmit=save;
+    content.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>operate(b.dataset.op));
+    content.querySelectorAll('[data-bind]').forEach(b=>b.onclick=()=>bind(b.dataset.bind));
+    content.querySelectorAll('[data-unbind]').forEach(b=>b.onclick=()=>mutation(b.dataset.unbind,{databaseId:selected}));
+    content.querySelector('[data-delete]')?.addEventListener('click',remove);
+    content.querySelector('[name="databaseId"]')?.addEventListener('change',e=>{
+      if (plane !== 'auth') return;
+      const database = supporting.databases?.items.find(d=>d.databaseId===e.target.value);
+      for (const p of ['google','github']) {
+        const selector = content.querySelector(`[name="${p}SecretVariable"]`);
+        selector.innerHTML = '<option value="">None</option>' + options(state.environments.find(e=>e.environmentId===database?.environmentId)?.variables || [],'variableName','variableName',null);
+      }
+    });
+  }
+  async function refresh() {
+    const current = buildId;
+    const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/${plane}`); const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.code || 'Could not load configuration');
+    if (current !== buildId || current !== activeBuildId) return;
+    state = data;
+    for (const p of ['databases','auth','integrations']) if (p !== plane) {
+      const r=await fetch(`/api/builds/${encodeURIComponent(buildId)}/${p}`); const v=await r.json(); supporting[p]=v.ok?v:{items:[]};
+    }
+    supporting.sourceSha=state.authoritativeSha;
+    render();
+  }
+  async function post(sub,body) {
+    if (busy || buildId !== activeBuildId) return null;
+    const requestBuildId=buildId,requestPlane=plane;
+    busy=true; status.textContent='Working…'; content.inert=true;
+    try {
+      const response=await fetch(`/api/builds/${encodeURIComponent(buildId)}/${plane}/${sub}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const result=await response.json();
+      if (requestBuildId !== activeBuildId || requestBuildId !== buildId || requestPlane !== plane) return null;
+      if (!response.ok || !result.ok) throw new Error(label(result.code || 'Operation failed'));
+      status.textContent=result.state ? label(result.state) : 'Saved'; return result;
+    } catch(e) { status.textContent=e.message; return null; }
+    finally { busy=false; content.inert=false; if (requestBuildId===activeBuildId && requestBuildId===buildId && requestPlane===plane) await refresh().catch(e=>{status.textContent=e.message;}); }
+  }
+  const data = () => Object.fromEntries(new FormData(content.querySelector('form')));
+  const mutation = (action,input) => post('mutate',{action,[{databases:'expectedDatabaseRevision',auth:'expectedAuthRevision',payments:'expectedPaymentRevision',native:'expectedNativeRevision'}[plane]]:state.revision,input});
+  async function save(e) {
+    e.preventDefault(); const d=data(); const i=state.items.find(i=>itemId(i)===selected); let input;
+    if (plane === 'databases') {
+      if (!i) return mutation('create_database',{provider:'supabase',label:d.label,environmentId:d.environmentId,source:d.source});
+      if (i.label !== d.label) {
+        const renamed=await mutation('rename_database',{databaseId:selected,label:d.label});
+        if (!renamed) return;
+      }
+      if (i.source === 'existing' && (i.providerTarget.organizationSlug !== (d.organizationSlug || null) || i.providerTarget.projectRef !== (d.projectRef || null) || i.providerTarget.region !== (d.region || null))) {
+        await mutation('set_provider_target',{databaseId:selected,organizationSlug:d.organizationSlug || null,projectRef:d.projectRef || null,region:d.region || null});
+      } else status.textContent='Saved';
+      return;
+    }
+    if (plane === 'auth') {
+      const database=supporting.databases?.items.find(x=>x.databaseId===d.databaseId);
+      const domain=state.domains?.find(x=>x.domainId===d.domainId);
+      input={label:d.label,databaseId:d.databaseId,environmentId:database?.environmentId,config:{siteUrlSource:d.urlKind,domainId:d.urlKind==='p11_domain'?d.domainId:null,siteUrl:d.urlKind==='p11_domain'?`https://${domain?.fqdn}`:d.baseUrl,redirectUrls:d.redirectUrls.split(',').map(s=>s.trim()).filter(Boolean),signupEnabled:!!d.signupEnabled,emailEnabled:!!d.emailEnabled,emailConfirmationRequired:!!d.emailConfirmationRequired,publishableKeyVariableName:d.publishableKeyVariableName,socialProviders:['google','github'].map(p=>({provider:p,enabled:!!d[p+'Enabled'],clientId:d[p+'ClientId'] || '',clientSecretVariableName:d[p+'SecretVariable'] || null}))}};
+    } else if (plane === 'payments') {
+      const [integrationId,verificationBindingId]=(d.integrationBinding || '').split('/');
+      const events={payment:['checkout.session.completed','checkout.session.async_payment_succeeded','checkout.session.async_payment_failed'],subscription:['checkout.session.completed','customer.subscription.created','customer.subscription.updated','customer.subscription.deleted','invoice.paid','invoice.payment_failed']};
+      input={label:d.label,integrationId,verificationBindingId,runtimeEnvironmentId:d.runtimeEnvironmentId,expectedMode:d.expectedMode,checkout:{mode:d.checkoutMode,priceIds:d.priceIds.split(',').map(s=>s.trim()).filter(Boolean),successPath:d.successPath,cancelPath:d.cancelPath,webhookPath:d.webhookPath,requiredWebhookEvents:events[d.checkoutMode]},urlSource:{kind:d.urlKind,domainId:d.urlKind==='p11_domain'?d.domainId:null,explicitBaseUrl:d.urlKind==='explicit'?d.baseUrl || null:null},dependencies:{authId:d.authId || null,databaseId:d.databaseId || null},webhook:{endpointId:d.endpointId || null,signingSecretVariableName:'STRIPE_WEBHOOK_SECRET'}};
+    } else input={appId:d.appId,appName:d.appName,platforms:['ios','android'].filter(p=>d[p]),buildEnvironmentId:d.buildEnvironmentId,packagePolicy:{capacitorVersion:'8.5.3',webDir:d.webDir,iosPackageManager:'SPM'},authId:d.authId || null,authCallbackScheme:d.authCallbackScheme || null};
+    if (i) input[{auth:'authId',payments:'paymentId',native:'nativeId'}[plane]]=selected;
+    const action={auth:i?'update_auth':'create_auth',payments:i?'update_payment':'create_payment',native:i?'update_profile':'create_profile'}[plane];
+    await mutation(action,input);
+  }
+  async function bind(action) {
+    const selector=content.querySelector(`[name="${action === 'bind_management_credential'?'managementVariable':'databaseUrlVariable'}"]`);
+    await mutation(action,{databaseId:selected,variableName:selector.value});
+  }
+  async function remove() {
+    const message=plane==='databases'?'Remove this PATH Builder record? The external database is retained.':'Remove this configuration?';
+    if(!confirm(message)) return;
+    const input={ [{databases:'databaseId',auth:'authId',payments:'paymentId',native:'nativeId'}[plane]]:selected };
+    if(plane==='databases') input.acknowledgeExternalResourceRetained=true;
+    await mutation({databases:'delete_database',auth:'delete_auth',payments:'delete_payment',native:'delete_profile'}[plane],input);
+    selected=null;
+  }
+  async function operate(op) {
+    const d=data(); const revision=state.revision; const envRevision=state.environmentRevision;
+    let body;
+    if(plane==='databases') {
+      body={databaseId:selected,expectedDatabaseRevision:revision,expectedEnvironmentRevision:envRevision};
+      if(op==='regions') body.organizationSlug=d.organizationSlug;
+      if(op==='provision-prepare') {
+        if(!confirm('Prepare a Supabase project creation intent? Execution can create billable provider resources.')) return;
+        Object.assign(body,{organizationSlug:d.organizationSlug,region:d.region,provisionPasswordVariableName:content.querySelector('[name="provisionVariable"]').value,acknowledgeProviderBilling:true});
+      }
+      if(op==='provision-execute'||op==='provision-observe') body={operationId:state.pendingOperation?.operationId,expectedDatabaseRevision:revision,expectedEnvironmentRevision:envRevision};
+      if(op==='migrations-observe') body.expectedAuthoritativeSha=supporting.sourceSha;
+    } else if(plane==='auth') body={authId:selected,expectedAuthRevision:revision,expectedDatabaseRevision:supporting.databases?.revision ?? 0,expectedEnvironmentRevision:envRevision};
+    else body={nativeId:selected,expectedNativeRevision:revision,expectedEnvironmentRevision:envRevision};
+    if(['apply-execute','provision-execute','execute'].includes(op) && !confirm(op==='provision-execute'?'Create this provider project now? This may incur charges.':op==='apply-execute'?'Apply the prepared authentication settings to Supabase now?':'Run dependency installation and build scripts from canonical product source, then package native projects?')) return;
+    const result=await post(op,body);
+    if(result?.regions) status.textContent='Available regions: '+result.regions.map(r=>r.code).join(', ');
+  }
+  document.querySelectorAll('[data-product-plane]').forEach(button=>button.addEventListener('click',async()=>{
+    if(!activeBuildId || busy) return;
+    plane=button.dataset.productPlane; buildId=activeBuildId; selected=null; supporting={}; title.textContent=names[plane]; status.textContent='Loading…'; content.textContent=''; dialog.showModal();
+    try { await refresh(); status.textContent=''; } catch(e) { status.textContent=e.message; }
+  }));
+  document.getElementById('closeProductOperations').onclick=()=>dialog.close();
+  document.getElementById('refreshProductOperations').onclick=()=>refresh().catch(e=>{status.textContent=e.message;});
+}
+initializeProductOperations();
+
+let operationSummaryAt = 0;
+let operationSummaryBuildId = null;
+async function refreshProductOperationSummaries(buildId) {
+  if (operationSummaryBuildId === buildId && Date.now() - operationSummaryAt < 10000) return;
+  operationSummaryAt = Date.now(); operationSummaryBuildId = buildId;
+  await Promise.all(['databases','auth','payments','native'].map(async plane => {
+    try {
+      const response = await fetch(`/api/builds/${encodeURIComponent(buildId)}/${plane}`);
+      const data = await response.json();
+      if (activeBuildId !== buildId || !response.ok || !data.ok) return;
+      const items = data.items || [];
+      let summary = 'Needs setup';
+      if (plane === 'databases' && items.length) summary = items.some(i => i.readiness?.connectionReady === true) ? 'Connected' : 'Needs verification';
+      if (plane === 'auth' && items.length) summary = items.every(i => i.readiness?.state === 'ready') ? 'Configured' : 'Needs attention';
+      if (plane === 'payments' && items.length) summary = 'Stripe · ' + (items[0].readiness?.verifiedMode === 'unknown' ? 'Not verified' : items[0].readiness.verifiedMode === 'live' ? 'Live' : 'Test');
+      if (plane === 'native' && items.length) summary = [...new Set(items.flatMap(i=>i.platforms))].map(p=>p === 'ios' ? 'iOS' : 'Android').join(' + ');
+      const element = document.getElementById('operation-summary-' + plane);
+      if (element) element.textContent = summary;
+    } catch { /* Existing summary is observational only. */ }
+  }));
+}

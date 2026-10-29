@@ -2,6 +2,23 @@ export const BUILD_COORDINATOR_PROTOCOL_VERSION = 1;
 
 export const BuildCoordinatorMethods = Object.freeze({
   HELLO: "coordinator.hello",
+  BUILD_AUTH_LIST: "build.auth.list",
+  BUILD_AUTH_READ: "build.auth.read",
+  BUILD_AUTH_MUTATE: "build.auth.mutate",
+  BUILD_AUTH_OBSERVE: "build.auth.observe",
+  BUILD_AUTH_APPLY_PREPARE: "build.auth.applyPrepare",
+  BUILD_AUTH_APPLY_EXECUTE: "build.auth.applyExecute",
+  BUILD_AUTH_APPLY_OBSERVE: "build.auth.applyObserve",
+  BUILD_PAYMENTS_LIST: "build.payments.list",
+  BUILD_PAYMENT_READ: "build.payments.read",
+  BUILD_PAYMENT_MUTATE: "build.payments.mutate",
+  BUILD_NATIVE_LIST: "build.native.list",
+  BUILD_NATIVE_READ: "build.native.read",
+  BUILD_NATIVE_MUTATE: "build.native.mutate",
+  BUILD_NATIVE_PREPARE: "build.native.prepare",
+  BUILD_NATIVE_EXECUTE: "build.native.execute",
+  BUILD_NATIVE_OBSERVE: "build.native.observe",
+
   STATUS: "coordinator.status",
   BUILD_START: "build.start",
   BUILD_GET: "build.get",

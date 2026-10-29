@@ -866,3 +866,25 @@ body {
   .rail-row-body { padding-left: 1.2rem; }
   .code-identity { font-size: 0.62rem; }
 }
+
+/* Product operation dialogs share the creator surface's spacing and colors. */
+.product-operations-dialog { width: min(980px, 94vw); max-height: 88vh; overflow: auto; border: 1px solid var(--border, #444); border-radius: 16px; padding: 24px; background: #102019; color: var(--ink); }
+.product-operations-dialog::backdrop { background: #0009; }
+.operation-heading, .operation-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.operation-heading h2 { margin-right:auto; }
+.operation-layout { display:grid; grid-template-columns: 180px minmax(0,1fr); gap:24px; }
+.operation-layout nav { display:flex; flex-direction:column; align-items:stretch; gap:8px; }
+.operation-layout nav [aria-current="true"] { outline:2px solid var(--accent, #7ca5ff); }
+.operation-form { display:grid; gap:14px; margin:18px 0; }
+.operation-form label, .product-operations-dialog details label { display:grid; gap:6px; }
+.operation-form input, .operation-form select, .product-operations-dialog details select { width:100%; min-width:0; padding:9px; border-radius:6px; border:1px solid #555; background:transparent; color:inherit; }
+.operation-form .operation-check { display:flex; align-items:center; gap:8px; }
+.operation-check input { width:auto; }
+.operation-summary dl { display:grid; grid-template-columns:minmax(100px,1fr) 2fr; gap:8px; overflow-wrap:anywhere; }
+.operation-summary dd { margin:0; }
+.product-operations-dialog details { padding:12px 0; }
+.operation-actions button { margin:4px 0; }
+@media (max-width:680px) { .operation-layout { grid-template-columns:1fr; } .operation-layout nav { flex-direction:row; flex-wrap:wrap; } .product-operations-dialog { padding:16px; } }
+
+.rail-rows { max-height: 46dvh; overflow-y: auto; }
+.product-operations-dialog .operation-heading { position: sticky; top: -24px; background: #102019; z-index: 1; padding: 8px 0; }

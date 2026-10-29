@@ -2,6 +2,7 @@ import { listBuildDatabases } from "./databases.mjs";
 import { readBuildEnvironment, readBuildSecretBinding } from "./environments.mjs";
 import { readBuildRecord } from "./record.mjs";
 import { resolveExactLocalEnvValues } from "./runtime/local-env-resolve.mjs";
+import { verifiedSafeLocalSecretNames } from "./runtime/local-env-coexistence.mjs";
 import { inventoryCommittedDatabaseMigrations, compareDatabaseMigrationVersions } from "./database-migrations.mjs";
 
 const fail = (code) => ({ ok: false, code });
@@ -47,10 +48,13 @@ export function createDatabaseProvisionSnapshot(runtimeRoot, buildId, params, ad
   const p9 = bindings(runtimeRoot, buildId, database, [database.credentials.managementSecretRef], params.expectedEnvironmentRevision);
   if (!p9.ok) return p9;
   const root = projectRoot(record); if (!root) return fail("BUILD_NOT_BOUND");
+  // exactNames below is the only material this operation may read; other
+  // verified-safe bindings of the same revision-checked environment may coexist.
+  const allowedNativeNames = verifiedSafeLocalSecretNames(p9.environment.environment.variables);
   return { ok: true, snapshot: Object.freeze({ buildId, databaseId: database.databaseId, databaseRevision: authority.revision,
     environmentId: database.environmentId, environmentRevision: p9.environment.revision, organizationSlug: params.organizationSlug,
     managementSecretRef: database.credentials.managementSecretRef, binding: Object.freeze(p9.items[0]), projectRoot: root }),
-    adapter, exactNames: Object.freeze([p9.items[0].variableName]), allowedNativeNames: Object.freeze([p9.items[0].variableName]) };
+    adapter, exactNames: Object.freeze([p9.items[0].variableName]), allowedNativeNames: Object.freeze(allowedNativeNames) };
 }
 
 export async function executeDatabaseRegionDiscovery(input) {
@@ -88,7 +92,8 @@ export function createDatabaseProvisionExecuteSnapshot(runtimeRoot, buildId, par
   const root = projectRoot(record); if (!root) return fail("BUILD_NOT_BOUND");
   return { ok: true, snapshot: Object.freeze({ buildId, operation: Object.freeze({ ...operation }), databaseRevision: authority.revision,
     environmentRevision: p9.environment.revision, bindings: Object.freeze(p9.items), projectRoot: root }), adapter,
-    exactNames: Object.freeze(p9.items.map((v) => v.variableName)), allowedNativeNames: Object.freeze(p9.items.map((v) => v.variableName)) };
+    exactNames: Object.freeze(p9.items.map((v) => v.variableName)),
+    allowedNativeNames: Object.freeze(verifiedSafeLocalSecretNames(p9.environment.environment.variables)) };
 }
 
 export function resolveDatabaseProvisionCredentials(input) {
@@ -124,17 +129,14 @@ export function createDatabaseProvisionObserveSnapshot(runtimeRoot, buildId, par
   if (!database || !database.credentials.managementSecretRef) return fail("DATABASE_AUTHORITY_STALE");
   const p9 = bindings(runtimeRoot, buildId, database, [op.managementSecretRef], params.expectedEnvironmentRevision);
   if (!p9.ok) return p9;
-  const operationCredential = readBuildSecretBinding(runtimeRoot, buildId, database.environmentId, op.provisionPasswordSecretRef);
-  const allowedNames = [p9.items[0].variableName];
-  if (operationCredential.ok && operationCredential.binding.kind === "secret" &&
-      !allowedNames.includes(operationCredential.binding.variableName)) allowedNames.push(operationCredential.binding.variableName);
   const adapter = adapterRegistry?.supabase;
   if (!adapter?.health || !adapter?.listProjects) return fail("DATABASE_PROVIDER_ADAPTER_UNAVAILABLE");
   const root = projectRoot(record); if (!root) return fail("BUILD_NOT_BOUND");
   return { ok: true, snapshot: Object.freeze({ buildId, operation: Object.freeze({ ...op }), databaseId: database.databaseId,
     databaseRevision: authority.revision, environmentId: database.environmentId, environmentRevision: p9.environment.revision,
     projectRef: database.providerTarget.projectRef, binding: Object.freeze(p9.items[0]), projectRoot: root }), adapter,
-    exactNames: Object.freeze([p9.items[0].variableName]), allowedNativeNames: Object.freeze(allowedNames) };
+    exactNames: Object.freeze([p9.items[0].variableName]),
+    allowedNativeNames: Object.freeze(verifiedSafeLocalSecretNames(p9.environment.environment.variables)) };
 }
 
 export async function executeDatabaseProvisionObservation(input) {
@@ -200,7 +202,8 @@ export function createDatabaseMigrationSnapshot(runtimeRoot, buildId, params) {
       variableName: binding.binding.variableName, backend: binding.binding.backend, bindingState: binding.binding.bindingState,
       presenceState: binding.binding.presenceState, safetyState: binding.binding.safetyState }),
     authoritativeSha: record.authoritativeSha, projectRoot: root }),
-    exactNames: Object.freeze([binding.binding.variableName]), allowedNativeNames: Object.freeze([binding.binding.variableName]) };
+    exactNames: Object.freeze([binding.binding.variableName]),
+    allowedNativeNames: Object.freeze(verifiedSafeLocalSecretNames(environment.environment.variables)) };
 }
 
 export async function executeDatabaseMigrationObservation(input) {

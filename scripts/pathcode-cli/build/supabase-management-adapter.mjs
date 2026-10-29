@@ -5,10 +5,10 @@ const MAX_BODY = 64 * 1024;
 const fail = (state, code) => ({ ok: false, state, code });
 const safeRef = (value) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(value);
 
-function executeFixedRequest(options) {
+export function executeSupabaseManagementRequest(options) {
   return new Promise((resolve, reject) => {
     const req = https.request({ protocol: "https:", hostname: "api.supabase.com", port: 443,
-      path: options.path, method: "GET", headers: options.headers, rejectUnauthorized: true }, (res) => {
+      path: options.path, method: options.method || "GET", headers: options.headers, rejectUnauthorized: true }, (res) => {
       const declared = Number(res.headers["content-length"]);
       if (Number.isFinite(declared) && declared > MAX_BODY) {
         res.destroy(); req.destroy(); reject(new Error("response unsafe")); return;
@@ -25,7 +25,7 @@ function executeFixedRequest(options) {
     const deadline = setTimeout(() => req.destroy(new Error("timeout")), 10_000);
     req.on("close", () => clearTimeout(deadline));
     req.on("error", reject);
-    req.end();
+    req.end(options.body);
   });
 }
 
@@ -38,7 +38,7 @@ function responseFailure(status) {
   return fail("unavailable", "DATABASE_PROVIDER_RESPONSE_UNSAFE");
 }
 
-export function createSupabaseManagementAdapter({ executor = executeFixedRequest } = {}) {
+export function createSupabaseManagementAdapter({ executor = executeSupabaseManagementRequest } = {}) {
   return Object.freeze({
     provider: "supabase",
     adapterVersion: SUPABASE_MANAGEMENT_ADAPTER_VERSION,

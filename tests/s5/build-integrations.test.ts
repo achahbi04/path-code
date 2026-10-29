@@ -80,9 +80,10 @@ describe("P12.1 Build integration authority", () => {
     expect(readBuildRecord(root, buildId)?.integrations).toBeUndefined();
   });
 
-  it("freezes the GitHub metadata-only catalog and rejects unsupported providers", () => {
+  it("freezes the GitHub and Stripe metadata-only catalog and rejects unsupported providers", () => {
     expect(listBuildIntegrationCatalog()).toEqual([{ providerKey: "github", displayName: "GitHub",
-      credentialRoles: [{ role: "token", required: true }] }]);
+      credentialRoles: [{ role: "token", required: true }] },
+      { providerKey: "stripe", displayName: "Stripe", credentialRoles: [{ role: "secret_key", required: true }] }]);
     const buildId = setupBuild();
     expect(mutate(buildId, "create_integration", 0, { providerKey: "gitlab", label: "GitLab" }))
       .toMatchObject({ ok: false, code: "INTEGRATION_PROVIDER_UNSUPPORTED" });
@@ -290,7 +291,7 @@ describe("P12.1 Build integration authority", () => {
     const credential = await coordinator.dispatch(COORD.mutate, { buildId,
       action: "bind_credential", expectedIntegrationRevision: 2,
       input: { integrationId: created.integrationId, bindingId: bound.bindingId, role: "token", secretRef } });
-    expect(catalog).toMatchObject({ ok: true, providers: [{ providerKey: "github" }] });
+    expect(catalog).toMatchObject({ ok: true, providers: [{ providerKey: "github" }, { providerKey: "stripe" }] });
     expect(credential).toMatchObject({ ok: true, revision: 3 });
     expect(JSON.stringify(credential)).not.toContain(secretRef);
     const beforeReads = readFileSync(resolveBuildRecordPath(root, buildId));

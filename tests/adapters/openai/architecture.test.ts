@@ -111,7 +111,7 @@ describe("openai adapter architecture", () => {
     const pkg = JSON.parse(
       readFileSync(join(repoRoot, "package.json"), "utf8"),
     ) as { dependencies?: unknown; devDependencies?: Record<string, string> };
-    expect(pkg.dependencies ?? {}).toEqual({});
+    expect(pkg.dependencies ?? {}).toEqual({ pg: "^8.23.1" });
     // Installed dependency count unchanged: only prior devDependencies.
     expect(Object.keys(pkg.devDependencies ?? {}).sort()).toEqual([
       "@types/node",

@@ -5,7 +5,7 @@ import { readBuildRecord } from "./record.mjs";
 export const ENVIRONMENTS_SCHEMA = "pathcode.p9.environments.v1";
 const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SECRET_NAME = /(?:^|_)(?:SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE_KEY|API_KEY|CREDENTIALS)(?:$|_)/i;
-const OBVIOUS_SECRET_VALUE = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\bBearer\s+\S+|\b(?:sk_live|sk_test|ghp|github_pat)_[A-Za-z0-9_]+\b|^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+:[^/@\s]+@/i;
+const OBVIOUS_SECRET_VALUE = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\bBearer\s+\S+|\b(?:sk_live|sk_test|rk_live|rk_test|whsec|sb_secret|ghp|github_pat)_[A-Za-z0-9_]+\b|^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+:[^/@\s]+@/i;
 // PATHCODE_* is PATH-owned. Git reservations below are the specific controls
 // used by PATH Git children or stripped by src/git/environment.ts.
 // This is an admission guard, not a claim that arbitrary config text is secret-free.
@@ -23,6 +23,7 @@ const RESERVED_EXACT = new Set([
   "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
 ]);
 const SECRET_KEYS = new Set(["variableName", "backend", "replace"]);
+export const APPROVED_PUBLIC_SUPABASE_KEY_NAMES = Object.freeze(new Set(["VITE_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "PUBLIC_SUPABASE_PUBLISHABLE_KEY"]));
 const CONFIG_KEYS = new Set(["variableName", "value", "replace"]);
 const ACTIONS = new Set([
   "create_environment", "rename_environment", "delete_environment",
@@ -114,7 +115,9 @@ function validVariableName(name, kind) {
   if (kind === "config" && (SECRET_NAME.test(upper) || upper === "DATABASE_URL")) {
     return "CONFIG_SECRET_NAME_REJECTED";
   }
-  if (kind === "secret" && /^(?:NEXT_PUBLIC_|VITE_|PUBLIC_)/i.test(name)) {
+  // P14 requires publishable Supabase keys to stay behind P9 references even
+  // though client bundlers intentionally expose these exact public variables.
+  if (kind === "secret" && /^(?:NEXT_PUBLIC_|VITE_|PUBLIC_)/i.test(name) && !APPROVED_PUBLIC_SUPABASE_KEY_NAMES.has(name)) {
     return "SECRET_PUBLIC_NAME_REJECTED";
   }
   return null;

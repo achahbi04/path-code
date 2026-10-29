@@ -1,0 +1,12 @@
+{
+  "counts": {
+    "passed": 2173,
+    "failed": 31,
+    "skipped": 0,
+    "total": 2204
+  },
+  "validationAuthority": false,
+  "explanation": "The initial full run overlapped a final monitor-bound adjustment. Its already-loaded native module returned the old depth-limit code to the updated test. Restarted full validation after committing the final code; final report and 103-test focused run use the fixed implementation.",
+  "temporaryAdditionalFailure": "RC-1 bounded native disk monitoring bounds traversal depth rather than accumulating an unbounded path list",
+  "finalStatus": "passed"
+}

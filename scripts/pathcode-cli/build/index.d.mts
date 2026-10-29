@@ -230,6 +230,9 @@ export interface BuildDeployments {
 }
 
 export interface BuildRecord {
+  auth?: import('./operation-types.mjs').BuildAuthAuthority;
+  payments?: import('./operation-types.mjs').BuildPaymentAuthority;
+  native?: import('./operation-types.mjs').BuildNativeAuthority;
   schema: string;
   buildId: string;
   intent: {
@@ -911,6 +914,22 @@ export function projectBuildForSurface(
 };
 
 export interface BuildCoordinatorClient {
+  listAuth(buildId: string, input?: object): Promise<any>;
+  readAuth(buildId: string, input?: object): Promise<any>;
+  mutateAuth(buildId: string, input?: object): Promise<any>;
+  observeAuth(buildId: string, input?: object): Promise<any>;
+  prepareAuthApply(buildId: string, input?: object): Promise<any>;
+  executeAuthApply(buildId: string, input?: object): Promise<any>;
+  observeAuthApply(buildId: string, input?: object): Promise<any>;
+  listPayments(buildId: string, input?: object): Promise<any>;
+  readPayment(buildId: string, input?: object): Promise<any>;
+  mutatePayment(buildId: string, input?: object): Promise<any>;
+  listNative(buildId: string, input?: object): Promise<any>;
+  readNative(buildId: string, input?: object): Promise<any>;
+  mutateNative(buildId: string, input?: object): Promise<any>;
+  prepareNative(buildId: string, input?: object): Promise<any>;
+  executeNative(buildId: string, input?: object): Promise<any>;
+  observeNative(buildId: string, input?: object): Promise<any>;
   connect(): Promise<void>;
   close(): void;
   request(method: string, params?: Record<string, unknown>): Promise<any>;
@@ -1188,6 +1207,8 @@ export function createBuildCoordinatorService(options: {
   databaseVerificationAdapters?: Readonly<Record<string, BuildDatabaseVerificationAdapterPair>> |
     ReadonlyMap<string, BuildDatabaseVerificationAdapterPair>;
   databaseOperationAdapters?: Readonly<Record<string, Record<string, any>>>;
+  authAdapter?: {adapterVersion?: string; observe(input:{credential:string;projectRef:string}):Promise<any>; patch(input:{credential:string;projectRef:string}, fields:Record<string,string|boolean>):Promise<any>};
+  nativeExecutor?: (input:{workspace:string;profile:import('./operation-types.mjs').BuildNativeProfile;env:Record<string,string>;secretValues:string[];plan:import('./operation-types.mjs').NativeOperation}) => Promise<{ok:boolean;code?:string}>;
 }): Promise<{
   dispatch(method: string, params?: Record<string, unknown>): Promise<any>;
   listDomains(buildId: string): Promise<any>;
@@ -1209,3 +1230,24 @@ export function startBuildCoordinatorServer(options: {
 }>;
 export { listProductVersions, readProductVersion, compareProductVersions } from "./versions.mjs";
 export { restoreHistoricalProductVersion, recoverPendingHistoricalRestore } from "./historical-restore.mjs";
+
+export type { AuthConfig, AuthObservation, BuildAuthItem, BuildAuthAuthority, PaymentConfig, BuildPaymentItem, BuildPaymentAuthority, NativeProfileConfig, BuildNativeProfile, NativeOperation, NativeArtifact, BuildNativeAuthority } from './operation-types.mjs';
+export function emptyBuildAuthAuthority(): import('./operation-types.mjs').BuildAuthAuthority;
+export function emptyBuildPaymentAuthority(): import('./operation-types.mjs').BuildPaymentAuthority;
+export function emptyBuildNativeAuthority(): import('./operation-types.mjs').BuildNativeAuthority;
+export function listBuildAuth(runtimeRoot:string,buildId:string): ({ok:true;buildId:string} & import('./operation-types.mjs').BuildAuthAuthority) | {ok:false;code:string};
+export function listBuildPayments(runtimeRoot:string,buildId:string): ({ok:true;buildId:string} & import('./operation-types.mjs').BuildPaymentAuthority) | {ok:false;code:string};
+export function listBuildNative(runtimeRoot:string,buildId:string): ({ok:true;buildId:string} & import('./operation-types.mjs').BuildNativeAuthority) | {ok:false;code:string};
+export const AUTH_SCHEMA: 'pathcode.p14.auth.v1';
+export const PAYMENTS_SCHEMA: 'pathcode.p15.payments.v1';
+export const NATIVE_SCHEMA: 'pathcode.p16.native.v1';
+export const CAPACITOR_VERSION: '8.5.3';
+
+export function readBuildAuth(runtimeRoot:string,buildId:string,authId:string): {ok:true;revision:number;auth:import('./operation-types.mjs').BuildAuthItem} | {ok:false;code:string};
+export function validAuthConfig(value:unknown):value is import('./operation-types.mjs').AuthConfig;
+export function validPaymentConfig(value:unknown):value is import('./operation-types.mjs').PaymentConfig;
+export function validNativeProfile(value:unknown):value is import('./operation-types.mjs').NativeProfileConfig;
+export const PAYMENT_EVENTS: Readonly<Record<'payment'|'subscription',readonly string[]>>;
+export function prepareBuildAuthMutation(runtimeRoot:string,buildId:string,request:object):{ok:boolean;code?:string;authId?:string;revision?:number;record?:BuildRecord};
+export function prepareBuildPaymentMutation(runtimeRoot:string,buildId:string,request:object):{ok:boolean;code?:string;paymentId?:string;revision?:number;record?:BuildRecord};
+export function prepareBuildNativeMutation(runtimeRoot:string,buildId:string,request:object):{ok:boolean;code?:string;nativeId?:string;revision?:number;record?:BuildRecord};

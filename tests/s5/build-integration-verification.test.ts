@@ -181,7 +181,7 @@ describe("P12.2 credential bridge and verification boundary", () => {
     expect(JSON.stringify(rejected)).not.toContain("CONFIG_ONLY_SENTINEL");
   });
 
-  it("rejects a P9 local secret outside this P12 binding while admitting the exact bound credential", async () => {
+  it("rejects an unverified P9 sibling secret, then admits the exact bound credential while a verified-safe sibling coexists", async () => {
     const valueA = "P12_BOUND_CREDENTIAL_A_SENTINEL";
     const valueB = "P12_UNBOUND_CREDENTIAL_B_VALUE_SENTINEL";
     let calls = 0;
@@ -197,12 +197,8 @@ describe("P12.2 credential bridge and verification boundary", () => {
     expect(credentialB).toMatchObject({ ok: true, revision: credentialA.environmentRevision + 1 });
     writeFileSync(join(x.projectRoot, ".env.local"),
       `INTEGRATION_TOKEN=${valueA}\nSECONDARY_LOCAL_SECRET=${valueB}\n`);
-    const p9Ready = await x.dispatch(METHODS.BUILD_ENVIRONMENT_VERIFY_LOCAL, {
-      buildId: x.buildId, environmentId: x.environmentId, variableName: "SECONDARY_LOCAL_SECRET",
-      expectedEnvironmentRevision: credentialB.revision,
-    });
-    expect(p9Ready).toMatchObject({ ok: true, revision: credentialB.revision + 1 });
-    const environmentRevision = p9Ready.revision as number;
+    // The sibling is bound but its presence/safety are not verified yet, so it may not coexist.
+    const environmentRevision = credentialB.revision as number;
     const integration = await makeIntegration(x, credentialA.secretRef as string);
 
     const rejected = await verify(x, integration, environmentRevision);
@@ -226,10 +222,17 @@ describe("P12.2 credential bridge and verification boundary", () => {
       .not.toContain("SECONDARY_LOCAL_SECRET");
     expect(rejectedRecord?.integrations?.items[0]?.bindings[0]?.verification.state).toBe("action_required");
 
-    writeFileSync(join(x.projectRoot, ".env.local"), `INTEGRATION_TOKEN=${valueA}\n`);
-    const accepted = await verify(x, { ...integration, revision: rejected.revision as number }, environmentRevision);
+    // Once the sibling is verified present and safe it may coexist; only the bound credential is ever read.
+    const p9Ready = await x.dispatch(METHODS.BUILD_ENVIRONMENT_VERIFY_LOCAL, {
+      buildId: x.buildId, environmentId: x.environmentId, variableName: "SECONDARY_LOCAL_SECRET",
+      expectedEnvironmentRevision: environmentRevision,
+    });
+    expect(p9Ready).toMatchObject({ ok: true, revision: environmentRevision + 1 });
+    const accepted = await verify(x, { ...integration, revision: rejected.revision as number }, p9Ready.revision as number);
     expect(accepted).toMatchObject({ ok: true, verification: { state: "ready",
       adapterVersion: "synthetic.github.identity.v1", providerAccountRef: "account_synthetic" } });
+    expect(JSON.stringify({ accepted, record: readBuildRecord(x.runtimeRoot, x.buildId), events: readBuildEvents(x.runtimeRoot, x.buildId) }))
+      .not.toContain(valueB);
     expect(calls).toBe(1);
   });
 
@@ -246,8 +249,8 @@ describe("P12.2 credential bridge and verification boundary", () => {
     expect(calls).toBe(0);
   });
 
-  it("exports the production GitHub default and preserves explicit empty-registry unavailability", async () => {
-    expect(Object.keys(DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS)).toEqual(["github"]);
+  it("exports production GitHub and Stripe defaults and preserves explicit empty-registry unavailability", async () => {
+    expect(Object.keys(DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS)).toEqual(["github", "stripe"]);
     expect(DEFAULT_INTEGRATION_VERIFICATION_ADAPTERS.github).toMatchObject({
       providerKey: "github", adapterVersion: "github.identity.v1",
     });

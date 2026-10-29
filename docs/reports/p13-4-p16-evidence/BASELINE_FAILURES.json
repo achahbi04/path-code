@@ -1,0 +1,216 @@
+{
+  "baselineSha": "5638ac85bf7edfbca9eb1f1df8da223ee033be03",
+  "executionHead": "d344070",
+  "branch": "work",
+  "node": "24.19.0",
+  "platform": "linux/x64",
+  "passed": 2069,
+  "failed": 34,
+  "failures": [
+    {
+      "file": "tests/ag1/ag1-proofs.test.ts",
+      "test": "AG1 F \u2014 cancellation terminates owned process cancel kills the bridge child",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected false to be true // Object.is equality\n    at /workspace/path-code/tests/ag1/ag1-proofs.test.ts:222:22\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/ag1/ag1-proofs.test.ts",
+      "test": "AG1 venv guard \u2014 no silent global fallback 3: rejects wrong/global interpreter; 4: accepts AG1 venv",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected false to be true // Object.is equality\n    at /workspace/path-code/tests/ag1/ag1-proofs.test.ts:412:21\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/ag1/ag1-proofs.test.ts",
+      "test": "AG1 bridge can start/stream/terminate with fake engine A: bridge client streams events and terminates cleanly",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected [ 'failed' ] to deeply equal ArrayContaining{\u2026}\n    at /workspace/path-code/tests/ag1/ag1-proofs.test.ts:483:39\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/ag3/ag3-proofs.test.ts",
+      "test": "AG3 runtime bootstrap lock two concurrent ensureAg1Runtime calls share one healthy runtime",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected false to be true // Object.is equality\n    at /workspace/path-code/tests/ag3/ag3-proofs.test.ts:107:20\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/ag3/ag3-proofs.test.ts",
+      "test": "AG3 package bin pathcode --version works via node entry without cwd package root",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/ag3/ag3-proofs.test.ts:227:24\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///workspace/path-code/node_modules/@vitest/ru"
+    },
+    {
+      "file": "tests/ag5/ag5-proofs.test.ts",
+      "test": "AG5 runtime self-repair rebuilds a pip-less interrupted venv",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected false to be true // Object.is equality\n    at /workspace/path-code/tests/ag5/ag5-proofs.test.ts:384:23\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/cli/package.test.ts",
+      "test": "CLI package and entry foundation registers a fixed pathcode bin path and is publishable",
+      "classification": "CONFIRMED_DEFECT",
+      "reason": "AssertionError: expected { pg: '^8.23.1' } to deeply equal {}\n    at /workspace/path-code/tests/cli/package.test.ts:22:44\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///workspace/path-code/node_modules/@vitest/ru"
+    },
+    {
+      "file": "tests/gc1/gc1c-session-integration.test.ts",
+      "test": "GC1C session integration (mock cloud, no network) runs one cloud cycle: lifecycle events in order, primary unchanged",
+      "classification": "CONFIRMED_DEFECT",
+      "reason": "AssertionError: expected -1 to be greater than 10\n    at /workspace/path-code/tests/gc1/gc1c-session-integration.test.ts:109:24\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/architecture.test.ts",
+      "test": "5G-E: the scope profile is provider-neutral 5G-E: scope stays package-internal and the package root is unchanged",
+      "classification": "CONFIRMED_DEFECT",
+      "reason": "AssertionError: expected { pg: '^8.23.1' } to deeply equal {}\n    at /workspace/path-code/tests/general-session/architecture.test.ts:87:36\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///workspace/path-code/node_m"
+    },
+    {
+      "file": "tests/general-session/cli.test.ts",
+      "test": "5G-M: a plain line at the prompt is an engineering task 5G-M: routes the operator's words to the PATH engineering session",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/general-session/cli.test.ts:109:24\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/cli.test.ts",
+      "test": "5G-M: a plain line at the prompt is an engineering task 5G-M: an unknown slash command is not treated as a task",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 'PATH Code 1.0 supports macOS Apple Si\u2026' to contain 'Unknown command: /nonsense'\n    at /workspace/path-code/tests/general-session/cli.test.ts:128:22\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/cli.test.ts",
+      "test": "5G-AF: /recover routes to the recovery command 5G-AF: passes the parsed checkpoint id and this directory",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/general-session/cli.test.ts:148:24\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/cli.test.ts",
+      "test": "5G-AF: /recover routes to the recovery command 5G-AF: a missing or path-like id is a usage message and the prompt stays open",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 'PATH Code 1.0 supports macOS Apple Si\u2026' to contain 'Usage: /recover <checkpoint-id>'\n    at /workspace/path-code/tests/general-session/cli.test.ts:169:22\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/session-loop.test.ts",
+      "test": "R2 living session loop (shell) R2-A / R2-M: two tasks one session; prompt returns; /exit leaves; counter correct",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/general-session/session-loop.test.ts:124:22\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/session-loop.test.ts",
+      "test": "R2 living session loop (shell) R2-F: declining keeps the session; next task runs",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/general-session/session-loop.test.ts:150:22\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/session-loop.test.ts",
+      "test": "R2 living session loop (shell) R2-H: escalation keeps the session",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/general-session/session-loop.test.ts:173:22\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/session-loop.test.ts",
+      "test": "R2 living session loop (shell) R2-I: /model and /autonomy still update shell settings between tasks",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected [] to deeply equal [ 'task-one', 'task-two' ]\n    at /workspace/path-code/tests/general-session/session-loop.test.ts:194:18\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/session-loop.test.ts",
+      "test": "R2 living session loop (shell) P6.7 keeps General Session model and engineering override in separate session inputs",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected [] to deeply equal [ 'gemini-2.5-flash', 'auto', \u2026(1) ]\n    at /workspace/path-code/tests/general-session/session-loop.test.ts:212:57\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/session-loop.test.ts",
+      "test": "R2 living session loop (shell) P6.7 /engineering-model does not persist a General Session or engineering default",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected [] to deeply equal [ 'auto', 'composer-2.5' ]\n    at /workspace/path-code/tests/general-session/session-loop.test.ts:236:20\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/session-loop.test.ts",
+      "test": "R2 living session loop (shell) R2-E: local AG1 path does not require OpenAI credential prompts",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/general-session/session-loop.test.ts:256:22\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/session-loop.test.ts",
+      "test": "R2 living session loop (shell) R2-L: internal error in cycle 1 does not poison cycle 2",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/general-session/session-loop.test.ts:272:22\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/general-session/session-loop.test.ts",
+      "test": "R2 living session loop (shell) R2-J: /recover between tasks returns to the prompt",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/general-session/session-loop.test.ts:295:22\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/p6/model-plane-p67.test.ts",
+      "test": "P6.7 engineering model commands refuses an engineering override in a General Session cloud run",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 'PATH Code 1.0 supports macOS Apple Si\u2026' to contain 'General Session --model'\n    at /workspace/path-code/tests/p6/model-plane-p67.test.ts:39:19\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/s5/build-b1-honest-origin-preview.test.ts",
+      "test": "B1 Part 1 \u2014 honest greenfield origin (F1\u2013F3) F1: empty PATH Builds child walks to $HOME BEFORE exactRoot; AFTER binds Build folder",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected false to be true // Object.is equality\n    at /workspace/path-code/tests/s5/build-b1-honest-origin-preview.test.ts:75:46\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///workspace/path-code"
+    },
+    {
+      "file": "tests/s5/build-b1-honest-origin-preview.test.ts",
+      "test": "B1 Part 1 \u2014 honest greenfield origin (F1\u2013F3) F2: $HOME bind is refused; corrupt guard \u2192 succeeds; restore \u2192 refused",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "Error: ENOENT: no such file or directory, mkdir '/home/agent/PATH Builds/b1-f2-corrupt-aa3727'\n    at mkdirSync (node:fs:1411:26)\n    at /workspace/path-code/tests/s5/build-b1-honest-origin-preview.test.ts:139:5\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/s5/build-b1-honest-origin-preview.test.ts",
+      "test": "B1 Part 1 \u2014 honest greenfield origin (F1\u2013F3) F3: bound projectRoot === artifact === UI field === Open-folder target",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 500 to be 200 // Object.is equality\n    at /workspace/path-code/tests/s5/build-b1-honest-origin-preview.test.ts:197:30\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/s5/build-running-identity.test.ts",
+      "test": "running Build identity reports the loaded SHA and flags stale code after a commit",
+      "classification": "CONFIRMED_DEFECT",
+      "reason": "Error: PATH Build coordinator failed to start: /tmp/identity-rt-CWpvzY/build-coordinator/coordinator.sock\nFOUND]: Cannot find package 'pg' imported from /tmp/identity-pkg-XHdvHE/scripts/pathcode-cli/build/supabase-postgres-adapter.mjs\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:301:9)\n    at packageResolve (node:internal/modules/esm/resolve:768:81)\n    at moduleResolve (node:internal/modules/esm/resolve:859:18)\n    at defaultResolve (node:internal/modules/esm/resol"
+    },
+    {
+      "file": "tests/s5/build.test.ts",
+      "test": "S5 PATH Build mechanical probe: README on task branch via git show satisfies req-readme",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected true to be false // Object.is equality\n    at /workspace/path-code/tests/s5/build.test.ts:529:49\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///workspace/path-code/node_modules/@vitest/ru",
+      "diagnosis": "Disposable origin defaults to master on this host; the pre-existing test assumes main and ignores the failed checkout."
+    },
+    {
+      "file": "tests/s5/build.test.ts",
+      "test": "S5 unbound operator entrypoint non-interactive empty dir still exits NOT_A_PROJECT",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 'PATH Code 1.0 supports macOS Apple Si\u2026' to match /existing project directory/\n    at /workspace/path-code/tests/s5/build.test.ts:694:29\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/s5/build.test.ts",
+      "test": "S5 unbound operator entrypoint interactive empty dir opens unbound; /build start git-inits; Code stays honest",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/s5/build.test.ts:722:18\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/terminal-trial/banner-entry.test.ts",
+      "test": "T01 T03 packaging and offline entry T01: new entry resolves from foreign cwd; legacy smoke entry still works",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/terminal-trial/banner-entry.test.ts:57:25\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///workspace/path-code/node_module"
+    },
+    {
+      "file": "tests/terminal-trial/banner-entry.test.ts",
+      "test": "T01 T03 packaging and offline entry T03: help/version make zero provider calls and write no trial files",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/terminal-trial/banner-entry.test.ts:92:24\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/terminal-trial/banner-entry.test.ts",
+      "test": "T01 T03 packaging and offline entry installed symlink entry reaches welcome; naive argv compare would miss",
+      "classification": "ENVIRONMENT_LIMITATION",
+      "reason": "AssertionError: expected 2 to be +0 // Object.is equality\n    at /workspace/path-code/tests/terminal-trial/banner-entry.test.ts:126:27\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    },
+    {
+      "file": "tests/adapters/openai/architecture.test.ts",
+      "test": "openai adapter architecture F30: allowlisted modules; only transport may fetch; no env; finite barrel; not on root",
+      "classification": "CONFIRMED_DEFECT",
+      "reason": "AssertionError: expected { pg: '^8.23.1' } to deeply equal {}\n    at /workspace/path-code/tests/adapters/openai/architecture.test.ts:114:36\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///workspace/path-code/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+    }
+  ]
+}
